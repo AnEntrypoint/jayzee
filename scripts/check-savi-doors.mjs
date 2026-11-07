@@ -101,7 +101,7 @@ const findingsIn = (source) => {
 
 gate('src/savi-doors is comment-free, imports nothing bare and reads no host global', () => {
   const names = readdirSync(sourceDir).filter((name) => name.endsWith('.js')).sort()
-  sameJson(names, ['catalog.js'], 'source files')
+  sameJson(names, ['catalog.js', 'router.js'], 'source files')
   for (const name of names) {
     const found = findingsIn(readFileSync(join(sourceDir, name), 'utf8'))
     assert(found.length === 0, name + ': ' + found.join(', '))
