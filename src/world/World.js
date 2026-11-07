@@ -185,6 +185,33 @@ export class World {
     }
   }
 
+  setPosition(id, position) {
+    this.#checkId(id)
+    checkVector(position, 'position')
+    this.#view(this.#position).set(position, id * 3)
+  }
+
+  exportState() {
+    return {
+      tick: this.#tick,
+      count: this.#count,
+      positions: this.#view(this.#position).slice(0, this.#count * 3),
+      velocities: this.#view(this.#velocity).slice(0, this.#count * 3),
+    }
+  }
+
+  importState(state) {
+    const words = this.#count * 3
+    if (state.count !== this.#count) throw new RangeError('state holds ' + state.count + ' bodies, world has ' + this.#count)
+    if (state.positions.length !== words || state.velocities.length !== words) {
+      throw new RangeError('state arrays do not match the body count')
+    }
+    this.#view(this.#position).set(state.positions, 0)
+    this.#view(this.#velocity).set(state.velocities, 0)
+    this.#tick = state.tick
+    this.#accumulator = 0
+  }
+
   #view(handle) {
     return this.#memory.read(handle)
   }
