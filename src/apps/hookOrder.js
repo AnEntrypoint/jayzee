@@ -2,9 +2,11 @@ export const HOOK_NAMES = Object.freeze(['onSpawn', 'onDestroy', 'update', 'late
 
 const isPositiveInteger = (value) => Number.isInteger(value) && value > 0
 
-export const createHookRunner = ({ tickDt, physics = null }) => {
+export const createHookRunner = ({ tickDt, physics = null, clock = null }) => {
   if (!(typeof tickDt === 'number' && tickDt > 0 && Number.isFinite(tickDt))) throw new RangeError('tickDt must be a positive finite number')
   if (physics !== null && typeof physics !== 'function') throw new TypeError('physics must be a function or null')
+  if (clock !== null && typeof clock !== 'function') throw new TypeError('clock must be a function or null')
+  let lastTick = -1
   const objects = new Map()
   const queued = []
 
@@ -50,6 +52,8 @@ export const createHookRunner = ({ tickDt, physics = null }) => {
 
   const tick = (tickNumber) => {
     if (!Number.isInteger(tickNumber) || tickNumber < 0) throw new RangeError('tickNumber must be a non-negative integer')
+    if (tickNumber <= lastTick) throw new RangeError('tick ' + tickNumber + ' does not advance past ' + lastTick)
+    lastTick = tickNumber
     const log = []
     const errors = []
     const ordered = [...objects.values()].sort((a, b) => a.id - b.id)
@@ -94,11 +98,19 @@ export const createHookRunner = ({ tickDt, physics = null }) => {
     return { tick: tickNumber, log, errors }
   }
 
+  const step = () => {
+    if (clock === null) throw new RangeError("step needs an injected clock")
+    const now = clock()
+    if (!Number.isInteger(now) || now < 0) throw new RangeError("clock must return a non-negative integer")
+    return tick(now)
+  }
+
   return {
     add,
     remove,
     deliverInput,
     tick,
+    step,
     has: (id) => objects.has(id),
     isSpawned: (id) => objects.has(id) && objects.get(id).spawned,
     updateImplied: (id) => objects.has(id) && objects.get(id).updateImplied,

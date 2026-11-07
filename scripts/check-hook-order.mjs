@@ -133,6 +133,50 @@ gate('the runner refuses an unknown hook, a non-function hook, a duplicate id, a
   sameJson([...HOOK_NAMES], ['onSpawn', 'onDestroy', 'update', 'lateUpdate', 'onInput'], 'supported hooks')
 })
 
+gate('the injected clock drives the ticks, and a clock that never advances is refused on its second step', () => {
+  const seen = []
+  let now = 0
+  const runner = createHookRunner({ tickDt: TICK_DT, clock: () => now })
+  runner.add(1, { update: (ctx, dt) => seen.push(dt) })
+  for (now = 0; now < 3; now++) runner.step()
+  same(seen.length, 3, 'updates driven by the clock')
+  const stuck = createHookRunner({ tickDt: TICK_DT, clock: () => 0 })
+  stuck.add(1, { update: () => {} })
+  stuck.step()
+  mustReject(() => stuck.step())
+  mustReject(() => createHookRunner({ tickDt: TICK_DT }).step())
+})
+
+gate('a tick number that does not advance is refused, so no hook runs twice on one tick', () => {
+  const events = []
+  const runner = createHookRunner({ tickDt: TICK_DT })
+  runner.add(1, { update: () => events.push('u') })
+  runner.tick(4)
+  mustReject(() => runner.tick(4))
+  mustReject(() => runner.tick(3))
+  sameJson(events, ['u'], 'updates after a repeated tick')
+})
+
+gate('a missing hook is skipped rather than invented, and an object without update or lateUpdate runs nothing', () => {
+  const events = []
+  const runner = createHookRunner({ tickDt: TICK_DT, physics: () => events.push('p') })
+  runner.add(1, {})
+  runner.add(2, { onInput: () => events.push('in') })
+  runner.deliverInput(1, { axis: 0 })
+  runner.tick(0)
+  sameJson(events, ['p'], 'events with only missing hooks')
+  mustReject(() => sameJson(events, ['u', 'p'], 'events with only missing hooks'))
+})
+
+gate('a duplicate object id is refused, so one object cannot be driven twice', () => {
+  const events = []
+  const runner = createHookRunner({ tickDt: TICK_DT })
+  runner.add(5, { update: () => events.push('a') })
+  mustReject(() => runner.add(5, { update: () => events.push('b') }))
+  runner.tick(0)
+  sameJson(events, ['a'], 'events after a refused duplicate')
+})
+
 const hostGlobals = ['process', 'performance', 'Date', 'setTimeout', 'clearTimeout', 'setImmediate', 'setInterval', 'console', 'window', 'globalThis', 'require', 'Buffer']
 
 const findingsIn = (source) => {
