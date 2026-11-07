@@ -256,7 +256,7 @@ const findingsIn = (text) => {
   return found
 }
 
-const expectedFiles = ['gc.js', 'histogram.js', 'index.js', 'registry.js', 'render.js', 'tickWindow.js']
+const expectedFiles = ['gc.js', 'gcObserver.js', 'histogram.js', 'index.js', 'metricsRoute.js', 'registry.js', 'render.js', 'tickProfile.js', 'tickWindow.js']
 
 gate('telemetry-pure has the expected files and each carries no comments and imports no host module', () => {
   sameJson(readdirSync(sourceDir).filter((name) => name.endsWith('.js')).sort(), expectedFiles, 'source files')
@@ -275,6 +275,115 @@ gate('index exports the public surface and no module-level recorder', () => {
   sameJson([telemetry.TICK_MS_BUCKETS.length, telemetry.SNAP_BYTES_BUCKETS.length], [11, 11], 'bucket counts')
   same(typeof telemetry.recordTickPhase, 'undefined', 'module-level recordTickPhase')
   mustReject(() => same(typeof telemetry.createTelemetryRegistry().recordTickPhase, 'undefined', 'registry recordTickPhase'))
+})
+
+gate('metrics route answers only loopback peers and reads the snapshot only for them', () => {
+  let reads = 0
+  const snapshot = () => {
+    reads++
+    return { tick: 1 }
+  }
+  const registry = telemetry.createTelemetryRegistry()
+  const denied = telemetry.metricsResponse({ remoteAddress: '10.0.0.5', registry, snapshot })
+  same(denied.status, 403, 'denied status')
+  same(denied.body, 'forbidden', 'denied body')
+  same(reads, 0, 'snapshot reads for a denied peer')
+  for (const remoteAddress of ['127.0.0.2', '::ffff:127.0.0.2', 'localhost', '', undefined, null]) {
+    same(telemetry.metricsResponse({ remoteAddress, registry, snapshot }).status, 403, 'denied ' + String(remoteAddress))
+  }
+  same(reads, 0, 'snapshot reads for denied peers')
+  for (const remoteAddress of ['127.0.0.1', '::1', '::ffff:127.0.0.1']) {
+    const response = telemetry.metricsResponse({ remoteAddress, registry, snapshot })
+    same(response.status, 200, 'loopback status')
+    same(response.headers['Content-Type'], telemetry.METRICS_CONTENT_TYPE, 'content type')
+    same(response.body, registry.render({ tick: 1 }), 'loopback body')
+  }
+  same(reads, 3, 'snapshot reads for loopback peers')
+  same(telemetry.METRICS_CONTENT_TYPE, 'text/plain; version=0.0.4; charset=utf-8', 'content type literal')
+  mustReject(() => same(telemetry.metricsResponse({ remoteAddress: '127.0.0.2', registry, snapshot }).status, 200, 'prefix match'))
+})
+
+gate('average text is zero with no samples and two decimals otherwise', () => {
+  same(telemetry.averageText(0, 0), '0', 'empty average')
+  same(telemetry.averageText(10, 4), '2.50', 'average')
+  mustReject(() => same(telemetry.averageText(10, 4), '2.5', 'average'))
+})
+
+gate('profile log cadence counts only enabled ticks and logs every interval-th one', () => {
+  const logGate = telemetry.createProfileLogGate(3)
+  const sequence = [false, true, true, true, false, true, true, true].map((enabled) => logGate(enabled))
+  sameJson(sequence, [false, false, false, true, false, false, false, true], 'cadence')
+  mustReject(() => sameJson(sequence, [false, false, false, true, false, false, true, false], 'cadence'))
+})
+
+const profileInput = {
+  tick: 42,
+  players: 2,
+  idle: 1,
+  physSkip: 2,
+  entities: 9,
+  dynIds: 3,
+  activeDyn: 2,
+  phases: { total: 4.5, mv: 1, col: 0.5, phys: 2, app: 1, sync: 0, respawn: 0, spatial: 0, col2: 0, int: 0, snap: 0.25 },
+  sums: { total: 10, mv: 2, phys: 4, snap: 1 },
+  count: 4,
+  memory: { heapUsed: 3 * 1048576, rss: 10.5 * 1048576, external: 0, arrayBuffers: 2 * 1048576 },
+}
+const profileLine = '[tick-profile] tick:42 players:2 idle:1 physSkip:2 entities:9 dynIds:3 activeDyn:2 total:4.50ms(avg:2.50) | mv:1.00(avg:0.50) col:0.50 phys:2.00(avg:1.00) app:1.00 sync:0.00 respawn:0.00 spatial:0.00 col2:0.00 int:0.00 snap:0.25(avg:0.25) | heap:3.0MB rss:10.5MB ext:0.0MB ab:2.0MB'
+
+gate('tick profile line keeps the spoint layout, averages and megabyte fields', () => {
+  same(telemetry.formatTickProfileLine(profileInput), profileLine, 'profile line')
+  mustReject(() => same(telemetry.formatTickProfileLine({ ...profileInput, count: 0 }), profileLine, 'profile line'))
+})
+
+class FakePerformanceObserver {
+  constructor(callback) {
+    this.callback = callback
+    this.options = null
+    this.disconnected = false
+    FakePerformanceObserver.last = this
+  }
+  observe(options) {
+    this.options = options
+  }
+  disconnect() {
+    this.disconnected = true
+  }
+}
+
+gate('the GC observer subscribes to gc entries and feeds the aggregator until it is disconnected', () => {
+  const gc = telemetry.createGcAggregator({ 4: 'major' })
+  const installed = telemetry.installGcObserver({ PerformanceObserver: FakePerformanceObserver, aggregator: gc })
+  same(installed.installed, true, 'installed')
+  sameJson(FakePerformanceObserver.last.options, { entryTypes: ['gc'], buffered: false }, 'observe options')
+  FakePerformanceObserver.last.callback({ getEntries: () => [{ duration: 2.5, kind: 4 }] })
+  assert(gc.render().includes('spoint_gc_events_total{kind="major"} 1'), 'entry not counted')
+  installed.disconnect()
+  same(FakePerformanceObserver.last.disconnected, true, 'disconnected')
+  mustReject(() => sameJson(FakePerformanceObserver.last.options, { entryTypes: ['gc'], buffered: true }, 'options'))
+})
+
+gate('the GC observer reports why it is absent and never throws', () => {
+  const gc = telemetry.createGcAggregator()
+  const absent = telemetry.installGcObserver({ PerformanceObserver: undefined, aggregator: gc })
+  same(absent.installed, false, 'absent installed')
+  same(absent.reason, 'performance-observer-unavailable', 'absent reason')
+  class Refusing {
+    observe() {
+      throw new Error('gc not supported')
+    }
+  }
+  const refused = telemetry.installGcObserver({ PerformanceObserver: Refusing, aggregator: gc })
+  same(refused.installed, false, 'refused installed')
+  same(refused.reason, 'gc not supported', 'refused reason')
+  refused.disconnect()
+})
+
+gate('the telemetry index exports the route, profile and observer helpers', () => {
+  for (const name of ['metricsResponse', 'isLoopbackAddress', 'averageText', 'createProfileLogGate', 'formatTickProfileLine', 'installGcObserver']) {
+    same(typeof telemetry[name], 'function', name)
+  }
+  same(typeof telemetry.METRICS_CONTENT_TYPE, 'string', 'content type')
 })
 
 finish()
