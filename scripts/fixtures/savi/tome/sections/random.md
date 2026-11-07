@@ -1,0 +1,5 @@
+## Random
+
+```ts
+ctx.random()
+```

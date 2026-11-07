@@ -83,7 +83,7 @@ const findingsIn = (source) => {
 
 gate('src/savi-tome is comment-free, imports nothing bare and reads no host global', () => {
   const names = readdirSync(sourceDir).filter((name) => name.endsWith('.js')).sort()
-  sameJson(names, ['tomeIndex.js'], 'source files')
+  sameJson(names, ['tomeIndex.js', 'tomeSections.js'], 'source files')
   for (const name of names) {
     const found = findingsIn(readFileSync(join(sourceDir, name), 'utf8'))
     assert(found.length === 0, name + ': ' + found.join(', '))
