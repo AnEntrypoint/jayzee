@@ -11,6 +11,13 @@ export interface WorldOptions {
 
 export type Vec3 = readonly [number, number, number]
 
+export interface State {
+  tick: number
+  count: number
+  positions: Float64Array
+  velocities: Float64Array
+}
+
 export interface Snapshot {
   tick: number
   count: number
@@ -30,6 +37,9 @@ export declare class World {
   advance(seconds: number): number
   hash(): number
   snapshot(): Snapshot
+  setPosition(id: number, position: Vec3): void
+  exportState(): State
+  importState(state: State): void
 }
 
 export interface InputRecord {
@@ -48,3 +58,66 @@ export declare function decodeInputs(buffer: ArrayBuffer): InputRecord[]
 export declare const SNAPSHOT_VERSION: number
 export declare function encodeSnapshot(snapshot: { tick: number; count: number; positions: ArrayLike<number> }): ArrayBuffer
 export declare function decodeSnapshot(buffer: ArrayBuffer): Snapshot
+
+export declare const STATE_VERSION: number
+export declare function encodeState(state: State): ArrayBuffer
+export declare function decodeState(buffer: ArrayBuffer): State
+
+export interface InputBufferOptions {
+  window?: number
+  maxHold?: number
+}
+
+export type InputSource = 'input' | 'held' | 'neutral'
+export type PushOutcome = 'accepted' | 'duplicate' | 'stale'
+
+export interface InputBufferStats {
+  accepted: number
+  duplicate: number
+  stale: number
+  skipped: number
+  input: number
+  held: number
+  neutral: number
+}
+
+export declare class InputBuffer {
+  constructor(options?: InputBufferOptions)
+  readonly next: number
+  readonly pending: number
+  readonly stats: InputBufferStats
+  push(record: InputRecord): PushOutcome
+  take(): { source: InputSource; input: InputRecord }
+}
+
+export declare function canonicalInput(record: InputRecord): InputRecord
+export declare function applyMovement(world: World, id: number, input: InputRecord, speed: number): void
+
+export interface PredictorOptions {
+  world: World
+  body: number
+  speed: number
+}
+
+export declare class Predictor {
+  constructor(options: PredictorOptions)
+  readonly pending: number
+  readonly acked: number
+  predict(intent: { moveX: number; moveZ: number; yaw: number; buttons?: number }): InputRecord
+  reconcile(state: State): boolean
+}
+
+export interface AuthorityOptions {
+  world: World
+  speed: number
+}
+
+export declare class Authority {
+  constructor(options: AuthorityOptions)
+  readonly tick: number
+  addPlayer(id: number, body: number, options?: InputBufferOptions): void
+  receive(id: number, packet: ArrayBuffer): void
+  stats(id: number): InputBufferStats
+  step(): void
+  state(): State
+}

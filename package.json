@@ -27,7 +27,8 @@
     "check:types": "tsc -p tsconfig.json",
     "bench": "node scripts/bench.mjs",
     "prepare": "npm run build:kernel",
-    "prepack": "npm run build:kernel"
+    "prepack": "npm run build:kernel",
+    "check:netcode": "node scripts/check-netcode.mjs"
   },
   "dependencies": {
     "jz": "1.0.2"
