@@ -81,4 +81,6 @@ Non-obvious facts for automated edits. Architecture and measured costs live in d
 - `TransformRingWriter` refuses a write or release while the ring generation is odd. `readCut` over a locked ring returns `consistent: false` and marks its poses stale.
 - `src/transport/wireweaveFraming.js` frames items with big-endian lengths. The gate checks a payload that starts with the batch prefix only when it is sent alone, not when it is joined with others.
 - `src/transport/webTransportPolicy.js` uses port 4433 unless a port is given. The error backoff starts at 10 ms, doubles, and stops at 1000 ms.
+- `src/animation/locomotion.js` exports `LAND_DELAY_MS` (500), but no transition reads it. A jump lands on the first grounded tick whose vertical velocity is at or below zero. `settledState` returns null for a NaN speed.
+- `src/animation/blend.js` floors the 2D sample distance at 0.01 and gives weight only to the three nearest samples. Without the floor, a query on a sample would take nearly all the weight.
 - Policy: no unit tests. Every check is a gate script under scripts/ that runs against the built kernel and the real modules, prints PASS or FAIL lines, and exits non-zero on failure. `npm test` runs the build, the kernel, world, protocol, messages, netcode, snapshot, spawn, fire, fire-modules, sandbox and savi-endpoints gates, and the type check.
