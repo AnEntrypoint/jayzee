@@ -53,7 +53,7 @@ Sources are spoint at d5e3860 (INVENTORY.md and FAMILIES.md from the spoint agen
 38. Transports: WebSocket, WebTransport, WebRTC and worker. Source: spoint src/transport (spoint) and client/BrowserServer.js (spoint). Status: decision. Adapters belong outside the core package.
 39. Client rendering, shadows, post-fx and grass. Source: spoint client/core (spoint). Status: decision. Out of scope for a physics and netcode package.
 40. Editor, hot reload and HUD panels. Source: spoint client/editor (spoint), src/debug (spoint), client/dev/HmrRuntime.js (spoint), src/apps/HotReloadQueue.js (spoint). Status: decision.
-41. Savi's 93 documented endpoints (39 published, 21 per-game, 30 manual-only, 3 disabled). Source: savi ENDPOINTS.md (savi-only; spoint path: none). Status: decision. jayzee serves no HTTP. Savi documents them. The spawn feed and resolve parts are in row 1.
+41. Savi's 93 documented endpoints (39 published, 21 per-game, 30 manual-only, 3 disabled). Source: savi ENDPOINTS.md (savi-only; spoint path: none). Jayzee paths: src/savi/endpoints.js (jayzee), scripts/fixtures/savi/ENDPOINTS.md (jayzee), scripts/check-savi-endpoints.mjs (jayzee). Status: built for the documented table only. Witness: scripts/check-savi-endpoints.mjs (jayzee), 18 PASS. Open: jayzee serves no HTTP, so endpoint behaviour is not built. The doc's header says 62 paths from an openapi.json that is not in this repo, and its published sections sum to 63. The gate checks the 93 total and the four headings, and does not reconcile the 62. The spawn feed and resolve parts are in row 1.
 
 ## Additional families from the d5e3860 inventory
 
