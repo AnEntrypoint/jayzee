@@ -72,7 +72,8 @@ Each answer comes from spoint-88's check of spoint at d5e3860. Each stays OPEN i
 - Resolve result types (row 1): found and not_found are parsed. spawn reports not_found from a live request, and the body is in resolve-not-found.json. redirect and gone are in the openapi description, but no body has been captured. OPEN. jayzee throws on those two. This comes from spawn's report, not from a probe file in this repo.
 - Manifest frames after the sheet (row 1): not documented in spawn's saved files or in spoint. OPEN. jayzee does not parse frames after the sheet.
 - Name encoder (row 1): spawn confirms no encoder is documented or implemented. OPEN. Decode only.
-- Ledger bucket (row 1): spawn tested 74 saved (bucket, sha) pairs against seven candidate rules and none matched. Treat it as undetermined. jayzee accepts any two hex characters.
+- Ledger bucket (row 1): spawn tested 74 saved (bucket, sha) pairs against seven candidate rules and none matched. Treat it as undetermined. jayzee accepts any two hex characters. The token-bucket concept is verified by spoint code: src/netcode/LagCompensator.js has capacity 10 and refill 20 per second, and src/netcode/InputGuard.js refills at 90 per second. The ledger concept itself has no spoint documentation, so the ledger reading stays UNVERIFIED.
+- spawnfile-keyed ledger family (row 1): world.assets/<xx>/https~3a~2f~2fspawnfile.io~2f... exists, per savi's FAULTS.md F3, which elides the path with "...". The full key is not in any witness. OPEN. jayzee has no fixture for it and encodes no path for it until savi sends the complete key.
 
 ## Conflicts to resolve in the sources
 
