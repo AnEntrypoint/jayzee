@@ -102,4 +102,8 @@ Non-obvious facts for automated edits. Architecture and measured costs live in d
 - `packQuat` in `src/packages/spoint-core/quaternion.js` clamps a NaN component to 0 and caps each quantum at 1022, so the top quantum 1023 is never written. spoint's `lib.rs` does the same at its line 37. Whether the 1022 cap is intended is OPEN.
 - The spoint-core port's OPEN Rust items: a lone surrogate in a string encodes as U+FFFD, where Rust has no such `&str`; a short Vec input throws RangeError, where Rust panics; and `fnv1a32` takes a Uint8Array only, where Rust takes `&[u8]`.
 - `src/packages/ecs/world.js` passes the world to a system explicitly, so a system that is destructured from its owner still runs.
+- `chooseInitialPreset(undefined)` in `src/client-pure/qualityPresets.js` returns Medium. spoint reads `navigator`, which gives High on the host where the port was checked.
+- The quality governor's default control store keeps writes. spoint's headless `RenderControls.set` drops them, so a test that expects spoint's behaviour must pass its own store.
+- `smoothstep` in `src/client-pure/cascadeShadow.js` with equal edges returns a step, where GLSL's `smoothstep` is undefined there.
+- Preset lookup in `src/client-pure/qualityPresets.js` uses `Object.hasOwn`. spoint accepts the key `constructor`, which is a prototype property there.
 - Policy: no unit tests. Every check is a gate script under scripts/ that runs against the built kernel and the real modules, prints PASS or FAIL lines, and exits non-zero on failure. `npm test` runs the build, the kernel, world, protocol, messages, netcode, snapshot, spawn, fire, fire-modules, sandbox and savi-endpoints gates, and the type check.
