@@ -54,11 +54,11 @@ gate('every served skill has its json and its md in the directory', () => {
   sameJson(summary.missingMd, [], 'missing md')
 })
 
-gate('the byte column differs from the md file size for all 23 skills, as recorded', () => {
+gate('the byte column minus the md file size is +1 for 21 skills, −12 for cameras and +27 for heightmap-terrain, savi\'s expression', () => {
   same(summary.byteColumnOffsets.length, 23, 'skills with an offset')
-  const delta = (offset) => offset.fileBytes - offset.indexBytes
-  same(summary.byteColumnOffsets.filter((offset) => delta(offset) === -1).length, 21, 'one byte lower')
-  sameJson(summary.byteColumnOffsets.filter((offset) => delta(offset) !== -1).map((offset) => [offset.id, delta(offset)]), [['cameras', 12], ['heightmap-terrain', -27]], 'other offsets')
+  const delta = (offset) => offset.indexBytes - offset.fileBytes
+  same(summary.byteColumnOffsets.filter((offset) => delta(offset) === 1).length, 21, 'one byte above the file')
+  sameJson(summary.byteColumnOffsets.filter((offset) => delta(offset) !== 1).map((offset) => [offset.id, delta(offset)]), [['cameras', -12], ['heightmap-terrain', 27]], 'other offsets')
   mustReject(() => same(summary.byteColumnOffsets.length, 0, 'skills with an offset'))
 })
 
