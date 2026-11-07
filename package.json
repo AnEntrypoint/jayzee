@@ -23,12 +23,13 @@
   },
   "scripts": {
     "build:kernel": "node scripts/build-kernel.mjs",
-    "test": "npm run build:kernel && node --test",
+    "test": "npm run build:kernel && node --test && npm run check:netcode && npm run check:snapshots",
     "check:types": "tsc -p tsconfig.json",
     "bench": "node scripts/bench.mjs",
     "prepare": "npm run build:kernel",
     "prepack": "npm run build:kernel",
-    "check:netcode": "node scripts/check-netcode.mjs"
+    "check:netcode": "node scripts/check-netcode.mjs",
+    "check:snapshots": "node scripts/check-snapshots.mjs"
   },
   "dependencies": {
     "jz": "1.0.2"

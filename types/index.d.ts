@@ -121,3 +121,33 @@ export declare class Authority {
   step(): void
   state(): State
 }
+
+export declare const DELTA_VERSION: number
+export declare function encodeDelta(state: State, base?: State | null): ArrayBuffer
+export declare function decodeDelta(buffer: ArrayBuffer, lookup?: (tick: number) => State | null): State
+
+export declare const ACK_VERSION: number
+export declare function encodeAck(tick: number): ArrayBuffer
+export declare function decodeAck(buffer: ArrayBuffer): number
+
+export interface StateSenderOptions {
+  depth?: number
+}
+
+export declare class StateSender {
+  constructor(options?: StateSenderOptions)
+  readonly acked: number | null
+  send(state: State): ArrayBuffer
+  acknowledge(tick: number): boolean
+}
+
+export interface StateReceiverOptions {
+  depth?: number
+}
+
+export declare class StateReceiver {
+  constructor(options?: StateReceiverOptions)
+  readonly latest: number | null
+  receive(buffer: ArrayBuffer): State
+  ack(): ArrayBuffer
+}

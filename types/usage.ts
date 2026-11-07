@@ -1,4 +1,4 @@
-import { World, Authority, Predictor, encodeInputs, decodeInputs, encodeSnapshot, decodeSnapshot, encodeState, decodeState } from 'jayzee'
+import { World, Authority, Predictor, encodeInputs, decodeInputs, encodeSnapshot, decodeSnapshot, encodeState, decodeState, StateSender, StateReceiver, decodeAck, State } from 'jayzee'
 
 const world = new World({ tickRate: 64, gravity: -18, radius: 0.35, boxes: [[-2, 0, -2, 2, 1, 2]] })
 const hero: number = world.spawn([0, 4, 0])
@@ -22,4 +22,11 @@ const sent: ArrayBuffer = encodeInputs([predictor.predict({ moveX: 1, moveZ: 0, 
 const reconciled: boolean = predictor.reconcile(decodeState(encodeState(authority.state())))
 const stateBytes: number = encodeState(authority.state()).byteLength
 
-export { steps, x, y, z, records, frame, digest, sent, reconciled, stateBytes }
+const sender = new StateSender({ depth: 64 })
+const receiver = new StateReceiver({ depth: 64 })
+const delta: ArrayBuffer = sender.send(authority.state())
+const received: State = receiver.receive(delta)
+const acked: boolean = sender.acknowledge(decodeAck(receiver.ack()))
+const deltaTick: number = received.tick
+
+export { steps, x, y, z, records, frame, digest, sent, reconciled, stateBytes, acked, deltaTick }
