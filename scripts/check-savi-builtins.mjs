@@ -65,7 +65,7 @@ const findingsIn = (source) => {
     const specifier = piece.slice(0, piece.indexOf("'"))
     if (!specifier.startsWith('.')) found.push('bare import ' + specifier)
   }
-  const words = new Set(source.split(/[^A-Za-z0-9_$]/))
+  const words = new Set(source.replace(/'[^'\n]*'|"[^"\n]*"/g, "''").split(/[^A-Za-z0-9_$]/))
   for (const token of hostGlobals) {
     if (words.has(token)) found.push('uses ' + token)
   }
@@ -74,12 +74,14 @@ const findingsIn = (source) => {
 
 gate('src/savi-builtins is comment-free, imports nothing bare and reads no host global', () => {
   const names = readdirSync(sourceDir).filter((name) => name.endsWith('.js')).sort()
-  sameJson(names, ['ballistics.js', 'builtinBodies.js', 'builtinModules.js', 'easing.js', 'env.js', 'math.js', 'nav.js', 'noise.js', 'path.js', 'roomRouting.js', 'spline.js', 'terrain.js', 'tween.js', 'vec3.js'], 'source files')
+  sameJson(names, ['ballistics.js', 'builtinBodies.js', 'builtinModules.js', 'easing.js', 'env.js', 'fx.js', 'math.js', 'nav.js', 'noise.js', 'path.js', 'roomRouting.js', 'spline.js', 'terrain.js', 'tween.js', 'vec3.js'], 'source files')
   for (const name of names) {
     const found = findingsIn(readFileSync(join(sourceDir, name), 'utf8'))
     assert(found.length === 0, name + ': ' + found.join(', '))
   }
   mustReject(() => assert(findingsIn("import fs from 'node:fs'\nconst t = performance.now() // x").length === 0, 'negative sample'))
+  assert(findingsIn("const key = 'window'").length === 0, 'a savi key spelled as a string is not a read')
+  assert(findingsIn('const w = window.innerWidth').join(',') === 'uses window', 'a real read of window is caught')
 })
 
 finish()
