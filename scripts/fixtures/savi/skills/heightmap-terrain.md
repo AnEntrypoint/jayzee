@@ -1,0 +1,72 @@
+# Heightmap Terrain
+
+`heightAt`/`materialAt` in your `scripts/terrain.js` are the landform (`spawn api TerrainHeightmapDef`); `terrain.marks` are everything with an edge, overriding the generator. `heightAt` runs ~17k times per 80 m chunk: a track or river is a mark, never a loop over points.
+
+```js
+// scripts/terrain.js; materialAt's ctx adds worldHeight (after marks and strokes), slope (1 − normal.y; 0.29 = 45°), height01, normal
+import { shore } from "builtin/terrain";
+const SEA = 0;
+const clamp01 = (v) => Math.min(1, Math.max(0, v));
+export function heightAt(ctx) {
+  const { x, z, noise, seedOffset } = ctx; // always set frequency (default 1 cycle/m); ridged and billowed2 are ≥ 0 and sum their octaves (1.875 at the defaults)
+  const r = Math.hypot(x, z), far = clamp01(r / 1500) ** 2;
+  const land = far * (220 + 55 * noise.fbm2({ x, z, frequency: 1 / 900, octaves: 2, seed: seedOffset(0) }));
+  const toSea = clamp01((z - 60) / 120); // −14 m seabed to the south
+  return shore((20 + land * clamp01(r / 30 - 1)) * (1 - toSea) - 14 * toSea, SEA);
+}
+export function materialAt(ctx) {
+  const { worldHeight, slope, noise, x, z, seedOffset } = ctx;
+  const n = noise.fbm2({ x, z, frequency: 1 / 30, octaves: 3, seed: seedOffset(5) });
+  if (worldHeight < 1.8 + n) return { sand: 1 };
+  const rock = clamp01((slope - 0.25 + n * 0.1) * 4);
+  return worldHeight > 200 + n * 20 ? { snow: 1 - rock / 2, rock: rock / 2 } : { rock, grass: 1 - rock };
+}
+```
+
+Sea: `t.marks.sea = { kind: "sea", level: 0, floorMaterial: "sand" }` (`t = place.terrain`): water stands where `heightAt` < 0; the seabed is yours. Every coast but a cliff passes through `shore(height, SEA)`. A lake fills your basin or digs a 2 m bowl (`depth: 0` never digs); a river runs downhill along its points to sea or lake, `depth` digging its channel. A scripted `liquid.material` on the mark replaces the whole native look; keep its foam, caustics and fresnel as nodes from `spawn api builtin/water`. A `material: { kind: "water" }` plane is a picture: nothing swims. Edits are live for everyone.
+
+`t.materials.sand = { albedo: "cdn/texture-terrain-sand-realistic-albedo.png", tint: "oklch(0.82 0.06 80)", textureScale: 2 }`: ground wears PBR by default, a CDN picture like the fresh world's grass, gravel, rock (keep them). A painted `scripts/tex-*.js` is drawn ground (relief from its brightness, no roughness map) and a tint alone is flat painted ground: each only on a creator's ask. Add any other id whole or its weight paints nothing. Cover: `t.decorations.layers.<id>` + `bindings.<materialId>: [layerId]`: a layer grows only where a binding material dominates; `t.decorations = null` removes all. Nothing grows under a thing on the ground (a floor, a deck, a trunk) or on a `path` or `road` unless a stroke paints its layer there; a `clear-scatter` mark suits open ground. `density`: items/m² of bound ground (starter meadow 50, stubble 3). Cover ends where its item draws 2 px, within its and the settings' `maxDistance`. Meadows:. A verge is a layer bound to the path's `edgeMaterial`.
+
+`t.material = { kind: "scripted", script, params }` shades all ground with `material(ctx)`.
+
+A bed on an uploaded or built mesh names it in `scatter.surface.mesh`: instanced cover; `filter.maxSlope` cuts slopes. Path posts: one scripted object (→geometry), never a bed, a `ctx.instance` per step along `points` at `ctx.groundY`.
+
+A graded path: a `path` mark with `grade: true` or a `road` with `spline` (`points` only paint), never `materialAt`; walking stops past 45°.
+
+Ground detail reach is that viewer's graphics tier: low anywhere and medium on phones and tablets stream the near bands, medium elsewhere, high and ultra append farther, coarser bands, coarse ground to `camera.clip.far`. On coarse far ground read their `graphics tier:` first (`spawn perf --frame`, player-settings skill).
+
+Sculpt, dig and material paint are field paint: `terrain.stroke(field, { center, radius, fn })`, `fn(p, inset, current)` → the written layer's cell; players see both layers summed; a hook clears it with `current - ctx.readField(field, p.x, p.z)`. A hook's dab is this room's (PLAYER layer, never your files), takes any radius (~1 ms at 11 m), others see it a few ticks later; a `run_script` that persists, a god-mode brush or `.authored` write paints the CREATOR layer publish takes. `delete ctx.place.terrain.runtimeEdits` drops the PLAYER layer, restarts included. A material's weight adds to natural ground (1 ≈ half the cell); `"terrain:natural-mask"` at 1 lays the paint alone. A rut, crown, ditch or bank: `"terrain:height"` strokes along the mark's points.
+
+`"terrain:water"` paint is metres of water over ground (0 dry): a level pond paints `level - terrain.heightAt(p.x, p.z)`, a channel its depth; it draws and bodies swim.
+
+<!-- generated-types -->
+
+### Signatures (generated: do not edit)
+
+```ts
+ctx.self.liquid.in // in terrain water or a liquid volume
+ctx.self.liquid.level // surface Y, null when dry; a character floats there: physics.density = 1000 lets velocity.y dive, delete to float up
+ctx.getWaterLevelAt(x: num, z: num, place?: str): num | null // Liquid surface Y at a world column (x, z), or null when no liquid there: terrain marks, the water a terrain:water field stands
+ctx.readField(name: str, x: num, z: num, place?: str): num // Read a scalar field at a world position: authored + runtime composed, 0 where unpainted (defaults to caller's place). name is any string
+ctx.place.fields[name].runtime[chunk] // the player-layer chunk kx,kz ({ cellSize, chunkCells, quant, cells, version } | undefined): a bulk read, not a save: dug ground keeps by default
+ctx.place.fields[name].runtime[chunk] = { ...ctx.place.fields[name].grid, cells } // writes it
+ctx.place.fields[name].runtime[chunk].cells = next // in place
+delete ctx.place.fields[name].runtime[chunk] // clears it, like = null
+ctx.place.fields[name].authored[chunk] = { ...ctx.place.fields[name].grid, cells } // writes the creator layer
+Object.keys(ctx.place.fields[name].runtime) // painted chunks: delete all to reset
+ctx.place.fields[name].changes(at): { chunks, at } // chunks moved since your last at (dig, paint, clear); pass the new at next beat
+ctx.getTerrainNormal(x: num, z: num, place?: str): Vec3 | null // Sample terrain surface normal at world position (defaults to caller's place)
+// MarkShape = { kind: "circle", radius: num } | { kind: "ellipse", radiusX: num, radiusZ: num } | { kind: "rectangle", width: num, depth: num, rotation?: deg }
+terrain.kind: "heightmap"
+terrain.seed?: num | str
+terrain.materials?: [{ id: str, albedo?: "/cdn/value.<sha>.png", pbr?: bool, tint?: Color, normal?: str, roughness?: str, textureScale?: num, metalness?: num, normalStrength?: num, roughnessIntensity?: num, antiTiling?: "none" | "stochastic", filter?: "pixel" | "linear", macro?: { scale?, hue?, value? } }, ...] // textureScale = meters per tile (default 2.5); stochastic hides repeats on far organic ground
+terrain.generator?: "scripts/file.js"
+terrain.verticalRange?: { min, max }
+terrain.marks.<key>: { kind: "sea", level: num, reach?: { shape: "rectangle", width: num, depth: num, center: { x, z } } | { shape: "halfplane", edge: "north" | "south" | "east" | "west", offset: num }, floorMaterial?: str, liquid?: LiquidSpec } | { kind: "lake", at: { x, z }, radius: num, level?: num, depth?: num, bedMaterial?: str, liquid?: LiquidSpec } | { kind: "river", points: [[x, z] | [x, z, level], ...], width: num, depth?: num, closed?: bool, bedMaterial?: str, liquid?: LiquidSpec } | { kind: "path", points: [[x, y], ...], width: num, material?: str, edgeMaterial?: str, noise?: num, falloff?: num, clearScatter?: bool, grade?: bool, maxGrade?: num } | { kind: "road", points?: [[x, y], ...], spline?: [[x, y, z], ...], closed?: bool, width: num, material?: str, edgeMaterial?: str, edgeWidth?: num, falloff?: num, clearScatter?: bool } | { kind: "flatten", center: { x, z }, height: num | { terrain: num }, shape: MarkShape | { kind: "path", points: [[x, y], ...], width: num }, falloff: num, falloffCurve?: "smooth" | "cliff" | "linear", maxGrade?: num, material?: str, edgeMaterial?: str, clearScatter?: bool } | { kind: "clear-scatter", center: { x, z }, shape: MarkShape | { kind: "path", points: [[x, y], ...], width: num } } | { kind: "hole", points: [[x, y], ...] }
+terrain.water?: LiquidSpec // the liquid every dug pond (terrain:water paint) of this place wears, the way a lake mark wears its liquid, material included; omitted: the engine's still pond
+terrain.material?: ScriptedMaterialSpec
+// DecorationItem = { kind: "sprite", weight?: num, texture: "/cdn/value.<sha>.png", uvRect?: { x, y, width, height }, anchor?: [x, y], height?: [x, y], width?: [x, y], up?: "world" | "local", wind?: { force?, scale?, speed? }, alphaTest?: num, sink?: num, randomRotation?: bool, useTerrainColor?: bool, terrainPatternStrength?: 0-1, maxDistance?: num, colorJitter?: { hue?, value? } } | { kind: "scripted", weight?: num, script: "scripts/file.js", params?: Record<str, any>, color?: str, wind?: { force?, scale?, speed? }, useTerrainColor?: bool, avoidWater?: bool, maxWaterDepth?: num, seed?: num, scale?: [x, y], up?: "world" | "local", randomRotation?: bool, sink?: num, maxDistance?: num, colorJitter?: { hue?, value? } }
+terrain.decorations?: { layers: Record<str, { items: [DecorationItem, ...], material?: ScriptedMaterialSpec, density: num, paint?: str, paintedOnly?: bool, constraints?: { slopeRange?: [x, y], heightRange?: [x, y] }, noise?: { scale?, threshold?, seed? }, cluster?: { clusters, radius, seed?, falloff? } }>, bindings: Record<str, [str, ...]>, settings?: { maxDistance?: num, fadeDistance?: num, budget?: num, enabled?: bool } }
+```
+
+<!-- /generated-types -->

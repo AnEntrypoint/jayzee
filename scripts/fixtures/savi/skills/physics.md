@@ -1,0 +1,5 @@
+# Physics
+
+<api>
+ctx.self.joints.shoulder = { to: "torso", type: "spherical", anchor, targetAnchor, axis, limits: { cone, twist: [min, max] } } // a limb built from parts (a rigged model ragdolls whole: ctx.self.ragdoll, →uploaded-models). In a chain each link joins the link above, which stands first. Build the limb MID-range, then mint with its limits: its pose at its first limits is cone 0, twist 0, kept through `.limits` retunes and re-runs; `.limits = {}` forgets it; limp is { cone: Math.PI }. axis = the limb's line in this body's frame; cone = half-angle off the middle; twist + = `to` turning right-handed about axis, seen from this body (the limb's own right-handed turn counts down); radians. A half left out is free: { cone: 0 } only spins, twist: [0, 1] turns one way. Stops are soft: hits press a twist past its edge, the harder the further, then it settles inside. `.target = { x, y, z, w }` turns it from its first-target pose, `.strength` 0..1 how firmly (a ragdolled rig's bones too)
+</api>

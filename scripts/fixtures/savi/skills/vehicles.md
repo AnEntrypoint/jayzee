@@ -1,0 +1,37 @@
+# Vehicles
+
+<api>
+physics: { body: "dynamic", collider: "box", mass, centerOfMass: [x, y, z] } // local, pivot AT THE FEET
+ctx.place.gravity // −24 in the 3D starter; every g reads it; update(ctx, dt) at 30 Hz
+input.axes.moveX (+right), .moveZ, input.held.jump, input.pressed.interact // yaw and roll +left: steer = -moveX
+export function collider() { return { kind: "box", width, height, depth }; } // hull box; geometry(ctx) on same row
+render: false // parent invisible, children drawn
+hull.controller = player.id // THE MOUNT: hull simulates on driver's machine, input → hull onInput; null dismounts
+onControlBegin(ctx, player), onControlEnd(ctx, player) // player.camera = <cameras chase rig: yaw follows hull> / null
+ctx.emit("press", { by: ctx.self.id }, { to: hullId }); ears.press = (ctx, { by }) => … // hull hands seat: wheel (= controller) if free, else first state.riders slot whose player's `ctx.getObject(id)?.parent` isn't this hull (query rows carry no parent; a silent leave frees it); two takes of a free wheel: arrival keeps one, loser hears onControlEnd, presses again
+ctx.self.parent = hullId; ctx.self.feetPosition = seatFeet; ctx.self.parent = null // parent first, then seat-local feet; the rider's controller parks
+player.controlling.state // scripts/ui.js while driving
+interpolation: { teleportThreshold } // past 2 m/tick hull warps
+audio: { kind: "program", script, params, spatial: true } // on the hull = the engine voice, fed rpm, load, cut, on, speed, character ~10 Hz; on a child = squeal
+</api>
+
+Car: ray per wheel from arch top, `physicsOnly: true`; spring + damper along `hit.normal`, memoryless; drive and side force at each wheel's OWN contact from slip `add(vel, cross(angularVelocity, sub(contact, com)))`; rear slip = hull's whole yaw damping; side force lifted 0.7 toward balance point along hull up, so the body barely leans; grip rises to peak, clamps at grip × load, side and drive/brake clamped separately (shared circle = drift dial); 4WD, drive split over driven contacts; steer smoothed from key, lock fades with speed (slip peak 1.5–3 m/s); drag on body. Bands at −24: mass 200–300, spring 4000–6000 / damper 600–900 per corner, rest 0.45–0.55 m, radius 0.33–0.35, grip 0.8–1.1, clearance 0.12–0.25; stability `sqrt(k / cornerMass) / 30 ≤ 0.3`, `damper / 30 / cornerMass ≤ 0.5`.
+Parked: engine sleeps a still body; no driver → cancel ~0.6 of each wheel's slip per tick, bounded 0.2–0.4 of grip: it rests on a grade.
+Wheels = hub children, `yaw` steers, `pitch` spins (built-in cylinder `roll: 90`). State = intent (gas, steer, driverId, HUD) written on change; spin and pose live in script memory.
+Rider script: `interact`: seated or control returned → `self.parent = null` FIRST, step out beside the seat; else near a drivable → emit `press`. A driver's E reaches hull `onInput` → `controller = null`; a passenger's, its own. `ctx.self.controlling` = hull → sit at `seats[0]`, visible (the starter's gait seats a parented body); a passenger gets the chase camera; hands on the hull's grips: `bones.LeftHand.reach = { object: <grip-l id> }`, `RightHand` on `grip-r`, `LeftFoot`/`RightFoot` on its seat's `<seat id>-foot-l`/`-foot-r`, `null` on step-out; each grip ≤ 0.45 m from and below its shoulder; a passenger sits where `ears.sit` says. Seats: `scripts/lib/data/car.yml` `seats: [{ id, x, y, z }, …]`, each the floor under the hips of the starter's seated 1.8 m body: hips 0.40 up, shoulders 0.84 (0.36 apart), head top 1.40, soles on that floor 0.4 ahead; the shell keeps that space open: walls beside it, under the shoulders; nothing across it below the roof, ≥ 1.5 m over each seat point (a closed box or loft body lids it).
+
+Tank: two belts, `vL,vR = throttle·vMax ∓ steer·vTurn`, contacts drive toward their belt; turret = pivot child aimed from `axes.aimYawSin/Cos`, seat on it; chase cam: yaw holds where the hand left it, pivot and eye above the turret, so the sight line clears it. Each tread = own child, shifted along the belt by (belt travel mod link length) so links roll; road wheels spin at belt speed ÷ radius. Voice = diesel: broad jittered knock per firing, slow, over hull rumble; tracks = broadband rattle + squeal = band-passed noise, its band rising with speed. Ship: `physics: { body: "dynamic", density }` floats the hull by weight (a hollow mesh keeps its hollow), keel and rudder = side forces.
+Two-wheelers: hull on two sprung wheels in line, moved only by held forces and torques. Handlebars child, `grip-l`, `grip-r` at its ends; seat ≈ 0.3 m under the saddle top. Each spring pushes along hull up from its wheel's centre-line point, under the car's stability bounds at cornerMass = mass/2, and at that limit it sags ≈ 0.3 m, so rest length = loaded hub height + 0.3 m; drive, brake, side grip act at com: nothing tips it. Roll torque = I·(ω²·(target lean − lean) − 2ω·roll rate), I ≈ mass·((width² + height²)/12 + d²) of the hull box, d = com drop below box centre, ω ≈ 8/s so a new lean settles in ~0.3 s; target lean from steer and speed (road bike 20–30°, scooter 12–18°), 0 parked. Yaw torque drives turn rate to |g|·tan(lean)/v, bars' own rate at walking pace; pitch free for ramps and landings; lean ~1 rad off target for ~1 s, however it lies → upright on its wheels.
+Race: each racer rides its own dynamic hull on real ground into collider barriers; the game seats each arrival and respawn (`controller = player.id` in `onArrive`); rivals = same hull and script, gas and steer from a racing-line driver, not onInput; the line = driver and progress data; laps = checkpoints in order, in hull state; one referee (`sim.js`) runs grid → countdown → race → results; gas starts countdown; a racer with no gas since the grid sits the race out, past every hazard. Arcade kart = same hull, box collider, `friction: 0` (else it pulls): held force pulls speed along nose toward throttle × top speed, held torque pulls turn rate toward steer × turn rate; drift and boosts move them.
+Airplane: held loads alone. Yoke child, `grip-l`, `grip-r`. Thrust along nose; side drag swings velocity onto heading; lift along hull up grows with airspeed, bank tilts it into a turn. Stick eases surface deflection toward the key; hull-axis torque and bone pose read it; authority grows from rolling to flying speed, damping < stick, release coasts, a bank holds. Weathervane yaw onto path; pilot beats every helper; below flying speed the nose drops. Airframe: `geometry(ctx)` + `skeleton()`, prop and surfaces = `ctx.bone()` children posed per tick. Voice: prop rpm from throttle + airspeed, wind with speed.
+Helicopter: thrust = collective × hull up × sqrt(max(0, dot(up, worldUp))); stick = torque about hull right/nose, yaw about up, release keeps tilt; leveler always on, < stick; air = row linearDamping ~0.03; spool scales loads and rotor spin. Rotor bones on the skeleton. Voice: noise chopped 3–26 Hz over turbine whine.
+
+## Gotchas
+
+- Loads move no kinematic body: a car ignoring gas has a kinematic hull; one driving itself, a stale forces entry.
+- Aircraft `update` writes loads only; a per-tick `rotation` or `velocity` write undoes them.
+- Rider writes rider, hull writes hull; a cross write lands a round trip later.
+- A mid-ride script edit re-runs `onSpawn` and `onControlBegin` on the live hull: find wheels by id.
+
+<!-- generated-types -->
+<!-- /generated-types -->
