@@ -9,7 +9,7 @@ Non-obvious facts for automated edits. Architecture and measured costs live in d
 - Edit source, never dist/. `npm test` rebuilds dist/kernel.wasm before the suites run.
 - A kernel signature change touches `src/kernel/step.js`, `src/world/World.js` and the kernel tests together. `step` passes its arguments positionally.
 - Keep `MODULES` in `src/kernel/build.js` in step with the imports. A missing file fails the build with an unresolved import.
-- `node --test` with no arguments discovers `test/oracle.js` too. It holds no tests, so it runs as an empty file.
+- scripts/lib/gate.mjs holds the shared PASS and FAIL reporter. A new gate imports it, runs each claim through gate(label, fn), and ends with finish().
 
 ## Facts that bite
 
@@ -31,4 +31,4 @@ Non-obvious facts for automated edits. Architecture and measured costs live in d
 - `World#importState` resets the accumulator, so a restore partway through a fixed step drops that remainder on purpose.
 - `decodeDelta` compares a base by tick and body count. `StateSender` and `StateReceiver` both keep 64 states by tick. The receiver keeps every state the sender can still use as a base, because the sender only uses an acknowledged tick within its own 64-tick history. Changing one depth without the other breaks that guarantee.
 - Bodies are compared with `Object.is`, so a −0 change is a real change and is sent. A body that jitters between two bit patterns is sent every tick, which costs bytes but not correctness.
-- `npm test` runs the node:test suites and then the netcode and snapshot checks. The netcode and snapshot checks are scripts that print PASS and FAIL lines and exit non-zero on failure.
+- Policy: no unit tests. Every check is a gate script under scripts/ that runs against the built kernel and the real modules, prints PASS or FAIL lines, and exits non-zero on failure. `npm test` runs the build, the kernel, world and protocol gates, the netcode and snapshot gates, and the type check.

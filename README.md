@@ -56,11 +56,16 @@ Types ship in `types/index.d.ts` and are checked by `npm run check:types`.
 ## Develop
 
 ```sh
-npm test                       # rebuilds the kernel, then runs the suites
-npm run check:types        # type-checks the declarations and a usage file
-npm run check:netcode      # prediction witness under loss and latency
-npm run check:snapshots    # delta and acknowledgement witness under loss
+npm test                     # rebuilds the kernel, then runs every gate below
+npm run check:kernel         # kernel behaviour against the real build
+npm run check:world          # world stepping, contacts and state round trips
+npm run check:protocol       # codec round trips and rejected input
+npm run check:netcode        # prediction witness under loss and latency
+npm run check:snapshots      # delta and acknowledgement witness under loss
+npm run check:types          # type-checks the declarations and a usage file
 npm run bench -- 2000 200    # bodies, measured ticks
 ```
+
+Verification is by gate scripts under `scripts/`, not unit tests. Each gate prints PASS or FAIL lines and exits non-zero on failure.
 
 See `docs/ARCHITECTURE.md` for the layering, the measured costs and what is not yet ported from spoint.

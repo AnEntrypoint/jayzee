@@ -32,7 +32,7 @@ jz compiles numeric code over typed arrays with no runtime. Its own documentatio
 - Bodies are spheres of one radius. Static geometry is the ground plane at y = 0 and axis-aligned boxes.
 - Restitution applies only to impacts faster than 1 m/s. Slower contacts remove the normal velocity, so a resting body settles instead of micro-bouncing.
 - Body pairs use a spatial hash grid. Cells are as wide as the contact diameter. Each body records its cell at the start of the pass. A candidate is accepted only when its recorded cell is the one being searched, so a bucket collision never duplicates or drops a pair. The bucket table holds two buckets per body, with a minimum of 64.
-- The solver runs `solverIterations` passes per tick (default 8). In the stack test, a chain of five overlapping bodies has a 0.19 m overlap after one pass, about 0.014 m after eight, and 0.0005 m after sixteen. Sixteen or more passes are needed when exact stacking matters.
+- The solver runs `solverIterations` passes per tick (default 8). In the stack gate, a chain of five overlapping bodies has a 0.19 m overlap after one pass, about 0.014 m after eight, and 0.0005 m after sixteen. Sixteen or more passes are needed when exact stacking matters.
 
 ## Measured cost
 
@@ -87,4 +87,4 @@ Not yet covered: more than one predicted player in the witness, jump and other b
 - Netcode: interest management, bandwidth budgets beyond deltas, jump and other buttons, client-side smoothing.
 - App lifecycle and hot reload.
 
-Each lands as a host module over the existing kernel, without changing kernel signatures unless a test shows a kernel defect.
+Each lands as a host module over the existing kernel, without changing kernel signatures unless a gate shows a kernel defect.
