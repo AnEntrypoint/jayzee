@@ -356,4 +356,17 @@ gate('removePeer marks the peer ejected so later rounds never eject it', () => {
   assertSame(control.calls.peer.length, 1, 'without removePeer the same rounds did not eject')
 })
 
+gate('consecutiveDesyncsRequired defaults to 3 and accepts a whole number of at least 1', () => {
+  assertSame(voterEnv().voter.consecutiveDesyncsRequired, DEFAULT_CONSECUTIVE_DESYNCS_REQUIRED, 'default value')
+  assertSame(DEFAULT_CONSECUTIVE_DESYNCS_REQUIRED, 3, 'default constant')
+  assertSame(voterEnv({ required: 1 }).voter.consecutiveDesyncsRequired, 1, 'one offence')
+  assertSame(voterEnv({ required: 7 }).voter.consecutiveDesyncsRequired, 7, 'seven offences')
+})
+
+gate('consecutiveDesyncsRequired refuses 0, negatives, fractions, NaN, infinities, strings and null, where it used to eject or never eject silently', () => {
+  for (const bad of [0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, '3', null]) {
+    assertThrows(() => voterEnv({ required: bad }), 'consecutiveDesyncsRequired must be a whole number of at least 1, got ' + String(bad))
+  }
+})
+
 finish()

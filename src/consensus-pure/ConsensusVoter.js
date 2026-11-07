@@ -27,6 +27,9 @@ export class ConsensusVoter {
     if (!Array.isArray(expectedPeerIds) || expectedPeerIds.length < 2) {
       throw new Error('[ConsensusVoter] expectedPeerIds must be an array of at least 2 peer pubkeys')
     }
+    if (!Number.isSafeInteger(consecutiveDesyncsRequired) || consecutiveDesyncsRequired < 1) {
+      throw new Error('[ConsensusVoter] consecutiveDesyncsRequired must be a whole number of at least 1, got ' + String(consecutiveDesyncsRequired))
+    }
 
     this.bridge = bridge
     this.checksumOf = checksumOf
