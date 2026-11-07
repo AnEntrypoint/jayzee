@@ -53,6 +53,31 @@ Sources are spoint at d5e3860 (INVENTORY.md and FAMILIES.md from the spoint agen
 40. Editor, hot reload and HUD panels. Source: spoint client/editor, src/debug, HMR runtime. Status: decision.
 41. Savi's 93 documented endpoints (39 published, 21 per-game, 30 manual-only, 3 disabled). Source: savi ENDPOINTS.md. Status: decision. jayzee serves no HTTP. Savi documents them. The spawn feed and resolve parts are in row 1.
 
+## Additional families from the d5e3860 inventory
+
+Orchestrate's read-only inventory of spoint at d5e3860: 2233 commits, 2293 tracked files, 103 PRD rows (fixed 34, refuted 28, retired 26, open 15), 142 files in work/rows, 76 tracked verdict paths, and 20 doc pages. All 57 paths I checked from that list exist in the d5e3860 tree, by a shell existence loop. A control path that does not exist was reported missing, so the loop does detect absence. I checked a subset of the inventory's paths, not all of them. Statuses below are open unless marked otherwise. Overlaps point to the earlier row.
+
+42. Binary snapshot format: 29-byte entity records, 22-byte player records, smallest-three quaternion (src/netcode/SnapshotBinFormat.js, SnapshotEncoder.js, SnapshotPacker.js, NetworkState.js). Open. Overlaps row 17.
+43. Replay file .spointreplay, magic v2 (src/netcode/ReplayFile.js). Open. Overlaps row 21.
+44. Lag compensation, hitscan and the rewind spatial index (src/netcode/LagCompensator.js, Hitscan.js, RewindSpatialIndex.js). Open. Overlaps row 11.
+45. Anticheat and lockstep helpers: CheatEjection, DesyncDetector, ConsensusVoter, EventLog, InputGuard, OutlierDetector, LockstepChecksum (src/netcode/). Open. Overlaps rows 13, 14 and 20.
+46. Protocol: InputCodec and ComponentSchema (src/protocol/). Open. Overlaps row 4 for the id table.
+47. Transports: WebTransport and QUIC datagrams, Wireweave and WebRTC, worker postMessage, NetworkSimTransport (src/transport/). Open, authorized by orchestrate after row 26.
+48. Client loops: PredictionEngine, ReconciliationEngine, SnapshotProcessor, SnapshotTimeline, PredictionChart, ClockSync, ChartEpochSync, ReconnectManager, TransportMigrationTrigger (src/client/). Open. Overlaps row 3 for the algorithm.
+49. Sharding: Cluster*, Region*, ClusterHandoff, ShardingRefusal (src/sharding/). Open. Overlaps row 30.
+50. Server SDK surfaces: ServerAPI, AgentAuthoringAPI, StaticHandler, DevHmr, RoomOrchestratorHttp, RoomDirectory, RoomPick, RoomRouting, RoomHealth, NostrAuthServer, cronSchedule, llmJobs, UploadHandler, MinimapBake, WorldPersistence (src/sdk/). Open.
+51. Physics extras: Jolt wrapper, CharacterManager, ShapeBuilder, StaticTileIndex, FlightModel, VehiclePhysics, Draco and Meshopt decoders (src/physics/). Open. Overlaps rows 8, 10 and 22.
+52. Terrain, 21 or more files, including PlanetFrame, ChartReanchor*, CaveSDF, CavePatches, CaveMeshes, GrassPlacementLod, BiomeOverride and ClimateCache (src/terrain/). Open. Overlaps rows 23 to 25 and 31. PlanetFrame.js installGroundSource (line 348) is the spoint-owned CHARTEST-est-s1-3 gap.
+53. Behaviours: buffs, fire, fluid, softbody, FSM, ragdoll activation, water level, terrain paint (src/behaviours/). Open. Fire is row 26.
+54. Shipped content: 31 built-in placed apps (src/stdlib-apps/), 15 shipped world definitions and about 40 app demos (apps/world/), and 16 GLB maps (apps/maps/). Open.
+55. Packages: mapspinner, streaming-gltf (EP_progressive_lod schemas), ecs, and spoint-core, a Rust crate. Open. The Rust crate is a different language, so it needs a decision on whether jayzee ports it.
+56. Game systems: AbilityTree, QuestSystem, ProgressionSystem, StatsSystem and EventChainManager (src/game/). Open.
+57. Animation (src/animation/). Open.
+58. Pathfinding: NavmeshQuery, ChartNavmeshQuery, RecastIntegration (src/pathfinding/). Open. Overlaps row 27.
+59. Client rendering and tools: client/editor, client/hud, client/xr and client/core, including WebGPU and WebGL postFX and the shadow and quality governors. Open, authorized by orchestrate after row 26. Rendering is at most a headless node-checkable subset.
+60. Deployment and tooling: edge/cf-do (Cloudflare Durable Object), src-tauri, bin/ (create-app, room-orchestrator-boot, room-worker-boot, and marketplace-registry, which spoint-88 found unreferenced), and about 200 scripts witnesses. Open.
+61. Open items from spoint's savi-spawn feature-gap report, which lists 47 checked and 13 unchecked. The 13 unchecked items are: terrain mark vocabulary and world-def wiring; named terrain field paint with PLAYER and CREATOR layers; decoration item layers and graphics-tier reach; rigged-model ragdoll activation; vibe pattern core and transport; PostFX look DSL and render-graph operators; private preview room and separate publish; browser readiness, fault and chat contract; declarative world tree and state scopes; shared spec parse boundary for all ctx.define* factories; surface of the tick drop counter; SES availability preflight with distinct reason codes; and a fail-loud asset loading gate for model errors. The 47 checked items are spoint's own claims, and I have not verified them.
+
 ## Split: spoint's missing witnesses versus jayzee's missing features
 
 - spoint-owned, not built in jayzee: package.json scripts check:bundle-freshness and check:bundle-freshness:require-bundle call scripts/bundle-freshness-witness.mjs, which does not exist. spoint is read-only for jayzee, so the fix belongs to the spoint owner.
