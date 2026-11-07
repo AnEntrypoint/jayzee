@@ -183,6 +183,14 @@ export declare function parseLedgerKey(key: string): { bucket: string; asset: st
 export declare function cdnValue(asset: string): { sha: string; ext: string }
 export declare function uuidToHex(uuid: string): string
 
+export declare const WIRE_PROTOCOL_VERSION: number
+export declare const MSG: Readonly<Record<string, number>>
+export declare const UNRELIABLE_MSGS: ReadonlySet<number>
+export declare const DISCONNECT_REASONS: Readonly<Record<string, number>>
+export declare function isRegisteredMessage(id: number): boolean
+export declare function msgName(id: number): string
+export declare function isUnreliable(type: number): boolean
+
 export interface SpawnManifest {
   index: { v: number; hashes: Record<string, string> }
   sheet: { v: number; [key: string]: unknown }
