@@ -4,12 +4,12 @@ import { instantiate } from 'jz/interop'
 
 const WASM = fileURLToPath(new URL('../../dist/kernel.wasm', import.meta.url))
 
-let kernel = null
+let compiled = null
 
-export const loadKernel = () => {
-  if (kernel === null) {
+export const instantiateKernel = () => {
+  if (compiled === null) {
     if (!existsSync(WASM)) throw new Error('kernel is not built: run npm run build:kernel')
-    kernel = instantiate(readFileSync(WASM)).exports
+    compiled = new WebAssembly.Module(readFileSync(WASM))
   }
-  return kernel
+  return instantiate(compiled)
 }

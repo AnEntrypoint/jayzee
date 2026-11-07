@@ -1,43 +1,42 @@
 import { bounceFor } from './respond.js'
 
-const cellCoord = (v, cellSize, dim) => {
-  const c = Math.floor(v / cellSize) + Math.floor(dim / 2)
-  return c < 0 ? 0 : c >= dim ? dim - 1 : c
+const bucketOf = (cx, cy, cz, buckets) => {
+  const h = cx * 73856093 + cy * 19349663 + cz * 83492791
+  return h - Math.floor(h / buckets) * buckets
 }
 
-export const resolvePairs = (pos, vel, count, radius, restitution, cellSize, dim) => {
-  const cells = dim * dim * dim
-  const head = new Int32Array(cells)
-  const next = new Int32Array(count)
-  for (let c = 0; c < cells; c++) head[c] = -1
-  for (let i = 0; i < count; i++) {
-    const o = i * 3
-    const cx = cellCoord(pos[o], cellSize, dim)
-    const cy = cellCoord(pos[o + 1], cellSize, dim)
-    const cz = cellCoord(pos[o + 2], cellSize, dim)
-    const c = (cx * dim + cy) * dim + cz
-    next[i] = head[c]
-    head[c] = i
-  }
+export const resolvePairs = (pos, vel, count, radius, restitution, head, next, cells) => {
   const reach = 2 * radius
   const reach2 = reach * reach
+  const buckets = head.length
+  for (let c = 0; c < buckets; c++) head[c] = -1
+  for (let i = 0; i < count; i++) {
+    const o = i * 3
+    const cx = Math.floor(pos[o] / reach)
+    const cy = Math.floor(pos[o + 1] / reach)
+    const cz = Math.floor(pos[o + 2] / reach)
+    cells[o] = cx
+    cells[o + 1] = cy
+    cells[o + 2] = cz
+    const b = bucketOf(cx, cy, cz, buckets)
+    next[i] = head[b]
+    head[b] = i
+  }
   for (let i = 0; i < count; i++) {
     const oi = i * 3
-    const cx = cellCoord(pos[oi], cellSize, dim)
-    const cy = cellCoord(pos[oi + 1], cellSize, dim)
-    const cz = cellCoord(pos[oi + 2], cellSize, dim)
+    const cx = cells[oi]
+    const cy = cells[oi + 1]
+    const cz = cells[oi + 2]
     for (let ax = -1; ax <= 1; ax++) {
-      const nx = cx + ax
-      if (nx < 0 || nx >= dim) continue
       for (let ay = -1; ay <= 1; ay++) {
-        const ny = cy + ay
-        if (ny < 0 || ny >= dim) continue
         for (let az = -1; az <= 1; az++) {
+          const nx = cx + ax
+          const ny = cy + ay
           const nz = cz + az
-          if (nz < 0 || nz >= dim) continue
-          for (let j = head[(nx * dim + ny) * dim + nz]; j !== -1; j = next[j]) {
+          for (let j = head[bucketOf(nx, ny, nz, buckets)]; j !== -1; j = next[j]) {
             if (j <= i) continue
             const oj = j * 3
+            if (cells[oj] !== nx || cells[oj + 1] !== ny || cells[oj + 2] !== nz) continue
             const dx = pos[oj] - pos[oi]
             const dy = pos[oj + 1] - pos[oi + 1]
             const dz = pos[oj + 2] - pos[oi + 2]

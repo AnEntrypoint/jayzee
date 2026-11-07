@@ -79,3 +79,48 @@ test('spawn rejects a full world and bad input', () => {
   assert.throws(() => new World({ boxes: [[1, 0, 0, -1, 1, 1]] }), RangeError)
   assert.throws(() => new World().position(0), RangeError)
 })
+
+test('hash changes for a velocity change far below the old quantum', () => {
+  const world = new World()
+  world.spawn([0, 4, 0])
+  const before = world.hash()
+  world.setVelocity(0, [0, 0, 1e-12])
+  assert.notEqual(world.hash(), before)
+})
+
+test('hash is a uint32 and matches for identical runs', () => {
+  const world = new World()
+  world.spawn([1, 2, 3], [0.1, 0.2, 0.3])
+  const digest = world.hash()
+  assert.ok(Number.isInteger(digest) && digest >= 0 && digest <= 0xffffffff)
+  assert.equal(world.hash(), digest)
+})
+
+test('worlds own separate memory, so one world does not change another', () => {
+  const a = new World()
+  const b = new World()
+  a.spawn([0, 4, 0])
+  b.spawn([0, 9, 0])
+  for (let i = 0; i < 20; i++) a.step()
+  assert.equal(b.position(0)[1], 9)
+  assert.equal(b.tick, 0)
+})
+
+test('more solver iterations separate a stack of overlapping bodies further', () => {
+  const stack = (iterations) => {
+    const world = new World({ gravity: 0, drag: 0, solverIterations: iterations, radius: 0.35 })
+    for (let i = 0; i < 4; i++) world.spawn([0, 5 + i * 0.5, 0])
+    world.step()
+    let gap = Infinity
+    for (let i = 0; i < 3; i++) gap = Math.min(gap, world.position(i + 1)[1] - world.position(i)[1])
+    return gap
+  }
+  assert.ok(stack(8) > stack(1))
+})
+
+test('solverIterations and drag and restitution are validated', () => {
+  assert.throws(() => new World({ solverIterations: 0 }), RangeError)
+  assert.throws(() => new World({ solverIterations: 33 }), RangeError)
+  assert.throws(() => new World({ solverIterations: 1.5 }), RangeError)
+  assert.throws(() => new World({ drag: -1 }), RangeError)
+})

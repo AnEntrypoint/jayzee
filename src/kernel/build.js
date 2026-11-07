@@ -5,7 +5,7 @@ import { compile } from 'jz'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const ENTRY = 'kernel.js'
-const MODULES = ['integrate.js', 'respond.js', 'collide.js', 'pairs.js', 'hash.js']
+const MODULES = ['integrate.js', 'respond.js', 'collide.js', 'pairs.js', 'step.js']
 
 const read = (name) => readFileSync(join(here, name), 'utf8')
 
