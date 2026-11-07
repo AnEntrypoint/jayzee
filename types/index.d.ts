@@ -151,3 +151,57 @@ export declare class StateReceiver {
   receive(buffer: ArrayBuffer): State
   ack(): ArrayBuffer
 }
+
+export declare function decodeName(name: string): string
+export declare function readFrames(bytes: Uint8Array): Uint8Array[]
+export declare function sha256Hex(bytes: Uint8Array): string
+export declare function verifyContent(hash: string, bytes: Uint8Array): boolean
+
+export interface SpawnHead {
+  v: number
+  worldHex: string
+  commit: string
+  tree: string
+  seq: number
+  manifest: string
+  sheet: string
+  [key: string]: unknown
+}
+
+export declare function parseHead(text: string): SpawnHead
+
+export interface SpawnManifest {
+  index: { v: number; hashes: Record<string, string> }
+  sheet: { v: number; [key: string]: unknown }
+  sheetHash: string
+  frames: Uint8Array[]
+}
+
+export declare function parseManifest(bytes: Uint8Array, head?: SpawnHead | null): SpawnManifest
+
+export interface SpawnFeedEntry {
+  world: string
+  adventure: string
+  name: string
+  creator: string
+  app: string
+  sort: string
+}
+
+export interface FeedPageRequest {
+  offset: number
+  limit: number
+}
+
+export interface FeedWalkOptions {
+  step?: number
+  limit?: number
+  emptyPagesToStop?: number
+  maxPages?: number
+}
+
+export declare function normalizeFeedEntry(entry: unknown): SpawnFeedEntry
+export declare function walkFeed(
+  fetchPage: (request: FeedPageRequest) => Promise<unknown[]>,
+  options?: FeedWalkOptions
+): Promise<{ entries: SpawnFeedEntry[]; pages: number }>
