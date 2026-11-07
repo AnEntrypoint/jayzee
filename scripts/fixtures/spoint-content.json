@@ -1,0 +1,122 @@
+{
+  "commit": "d5e3860",
+  "placedApps": {
+    "directories": [
+      "box-buoyant",
+      "box-dynamic",
+      "box-static",
+      "button",
+      "capture-zone",
+      "checkpoint-marker",
+      "destructible-box",
+      "destructible-debris",
+      "door",
+      "fluid-source",
+      "fluid3d-source",
+      "moving-platform",
+      "pickup",
+      "placed-model",
+      "playtest-bot",
+      "prop-dynamic",
+      "prop-static",
+      "respawn-zone",
+      "shrinking-zone",
+      "shrinking-zone-ring",
+      "softbody-cloth",
+      "spawn-point",
+      "tank",
+      "terrain",
+      "tower",
+      "trigger-volume",
+      "vehicle",
+      "waypoint",
+      "weapon-spawn"
+    ],
+    "nonDirectories": []
+  },
+  "worldDefs": [
+    {
+      "file": "agent-demo.js",
+      "ports": [
+        8123
+      ]
+    },
+    {
+      "file": "arena-combat.js",
+      "ports": []
+    },
+    {
+      "file": "construct.js",
+      "ports": [
+        3002
+      ]
+    },
+    {
+      "file": "deathrun.js",
+      "ports": [
+        3002
+      ]
+    },
+    {
+      "file": "empty.js",
+      "ports": []
+    },
+    {
+      "file": "fire-duel.js",
+      "ports": []
+    },
+    {
+      "file": "lockstep-rts.js",
+      "ports": []
+    },
+    {
+      "file": "rollback-duel.js",
+      "ports": []
+    },
+    {
+      "file": "sandbox.js",
+      "ports": []
+    },
+    {
+      "file": "tps-game.js",
+      "ports": [
+        3002
+      ]
+    },
+    {
+      "file": "tutorial-rpg.js",
+      "ports": [
+        3002
+      ]
+    },
+    {
+      "file": "tutorial.js",
+      "ports": [
+        3002
+      ]
+    }
+  ],
+  "maps": {
+    "glb": [
+      "aim_kosova_ak47.glb",
+      "aim_kosova_battle.glb",
+      "aim_kosova_famas.glb",
+      "aim_sillos.glb",
+      "awp_india_ks.glb",
+      "awp_kosova.glb",
+      "awp_kosova_battle.glb",
+      "awp_kosovo_trainstation.glb",
+      "de_dolc.glb",
+      "de_dust2_kosovo.glb",
+      "de_gash.glb",
+      "de_kosovo.glb",
+      "de_kps.glb",
+      "de_pub2_r3.glb",
+      "deathrun_kosova.glb",
+      "fy_osama_house.glb"
+    ],
+    "other": [
+      ".glb-cache"
+    ]
+  }
+}
