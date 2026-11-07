@@ -1,5 +1,5 @@
 import { gate, finish } from './lib/gate.mjs'
-import { dirToLocalXZ, resolveTarget, NonFiniteElevationError } from '../src/sessions-pure/relocationTarget.js'
+import { dirToLocalXZ, resolveTarget, NonFiniteElevationError, NonConvergenceError } from '../src/sessions-pure/relocationTarget.js'
 
 const assert = (condition, message) => {
   if (!condition) throw new Error(message)
@@ -69,6 +69,25 @@ gate('the refusal is a RangeError, so a generic catch on RangeError still sees i
   assert(error instanceof RangeError, 'not a RangeError')
   same(error.phase, 'bisect', 'phase carried')
   same(error.distanceM, 12, 'distance carried')
+})
+
+gate('ground that rises with the offset never brackets, so the bracket phase refuses with NonConvergenceError after its passes', () => {
+  const error = mustThrow(() => dirToLocalXZ(frame(), DIR, (x) => 10 * x), NonConvergenceError, 'did not converge in the bracket phase')
+  same(error.phase, 'bracket', 'phase')
+  assert(error.distanceM > 1000, 'the last sample is past the seed')
+  assert(!(error instanceof NonFiniteElevationError), 'refused as non-finite')
+})
+
+gate('a sign change whose midpoint is NaN refuses with NonFiniteElevationError at the bisect phase, not the bracket', () => {
+  const cliff = (x) => {
+    if (x >= 570) return -300
+    if (x > 565 && x < 570) return Number.NaN
+    return 0
+  }
+  const error = mustThrow(() => dirToLocalXZ(frame(), DIR, cliff), NonFiniteElevationError, 'non-finite bisect sample')
+  same(error.phase, 'bisect', 'phase')
+  assert(error.distanceM > 1118 && error.distanceM < 1146, 'the midpoint lies inside the bracket')
+  assert(!(error instanceof NonConvergenceError), 'refused as non-convergence')
 })
 
 finish()

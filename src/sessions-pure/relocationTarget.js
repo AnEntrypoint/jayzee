@@ -43,6 +43,15 @@ export class NonFiniteElevationError extends RangeError {
   }
 }
 
+export class NonConvergenceError extends RangeError {
+  constructor(phase, distanceM) {
+    super('elevation solve did not converge in the ' + phase + ' phase; the last sample was at ' + distanceM + ' m, and no ground hit is reported')
+    this.name = 'NonConvergenceError'
+    this.phase = phase
+    this.distanceM = distanceM
+  }
+}
+
 function rayMissM(frame, d, x, y, z) {
   const p = frame.localToDir(x, z, y)
   return frame.radius * Math.hypot(p[0] - d[0], p[1] - d[1], p[2] - d[2])
@@ -67,7 +76,7 @@ export function dirToLocalXZ(frame, dir, heightAt) {
   }
   let bestX = seed * de, bestZ = seed * dn, bestMiss = Infinity
   let s = seed, prevS = 0, prevG = 0
-  let lo = 0, hi = 0, gLo = 0
+  let lo = 0, hi = 0, gLo = 0, bracketed = false
   for (let i = 0; i < ELEVATION_BRACKET_PASSES; i++) {
     const p = probe(s)
     if (!p) throw new NonFiniteElevationError('bracket', s)
@@ -76,11 +85,13 @@ export function dirToLocalXZ(frame, dir, heightAt) {
     const g = p.s - s
     if (Math.abs(g) < ELEVATION_REFINE_TOL_M) return [p.x, p.z]
     if (i > 0 && ((prevG < 0) !== (g < 0))) {
+      bracketed = true
       if (prevS < s) { lo = prevS; gLo = prevG; hi = s } else { lo = s; gLo = g; hi = prevS }
       break
     }
     prevS = s; prevG = g; s = p.s
   }
+  if (!bracketed) throw new NonConvergenceError('bracket', prevS)
   for (let i = 0; i < ELEVATION_BISECT_PASSES && hi - lo > ELEVATION_REFINE_TOL_M; i++) {
     const mid = (lo + hi) / 2
     const p = probe(mid)
