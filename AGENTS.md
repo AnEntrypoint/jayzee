@@ -90,4 +90,6 @@ Non-obvious facts for automated edits. Architecture and measured costs live in d
 - spoint's cooldown drift is kept. Ticks of 1.9 and then 0.1 leave a cooldown of 8.3e-17, which still counts as cooling.
 - `src/physics-extras/glb.js` refuses index component type 5121, which is unsigned bytes. spoint's `GLBLoader` reads it as uint32, so a copy of spoint would misread the indices.
 - `src/physics-extras/glb.js` refuses Draco and Meshopt primitives rather than decoding them. Their decoders are WASM and no Draco fixture exists. A float vertex stride that is not a multiple of 4 is refused in `src/physics-extras/meshopt.js`, where spoint yields NaN.
+- The hooks in `src/behaviours/health.js` and `src/behaviours/destructible.js` receive event objects, not `appCtx`, so a host that expects `appCtx` must adapt them.
+- `src/behaviours/game-fsm.js` runs `after(ms)` timers from `tick` on an injected clock, not wall-clock timers. Guards and actions also receive the send payload.
 - Policy: no unit tests. Every check is a gate script under scripts/ that runs against the built kernel and the real modules, prints PASS or FAIL lines, and exits non-zero on failure. `npm test` runs the build, the kernel, world, protocol, messages, netcode, snapshot, spawn, fire, fire-modules, sandbox and savi-endpoints gates, and the type check.
