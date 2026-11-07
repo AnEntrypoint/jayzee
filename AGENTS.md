@@ -1,21 +1,25 @@
 # AGENTS.md
 
-Non-obvious facts for automated edits. Architecture lives in docs/ARCHITECTURE.md.
+Non-obvious facts for automated edits. Architecture and measured costs live in docs/ARCHITECTURE.md.
 
 ## Rules
 
-- Source files carry no comments. Put a fact that the code cannot express here, after checking it is still true.
-- Kernel files in src/kernel use only the numeric subset jz accepts: typed arrays, numbers, loops, and functions that take their state as arguments. Do not add objects, closures, classes or allocation to them.
-- Edit source, never dist/. Run npm test after any kernel change: it rebuilds dist/kernel.wasm before the suites run.
-- The kernel is compiled once by scripts/build-kernel.mjs, about 20 seconds. Do not compile at runtime.
-- Node 24 rejects a directory argument to node --test, so the test script lists its files. Keep that list in step with test/.
+- Source files carry no comments. Put a fact the code cannot express here, after checking it is still true.
+- Kernel files in src/kernel use only the numeric subset jz accepts: typed arrays, numbers, loops, and functions that take their state as arguments. No objects, closures, classes or allocation.
+- Edit source, never dist/. `npm test` rebuilds dist/kernel.wasm before the suites run.
+- A kernel signature change touches `src/kernel/step.js`, `src/world/World.js` and the kernel tests together. `step` passes its arguments positionally.
+- Keep `MODULES` in `src/kernel/build.js` in step with the imports. A missing file fails the build with an unresolved import.
+- `node --test` with no arguments discovers `test/oracle.js` too. It holds no tests, so it runs as an empty file.
 
 ## Facts that bite
 
-- hashState quantizes to 1/4096. A change smaller than that does not move the hash. Test a change of at least 0.001.
-- RESTING_SPEED in src/kernel/respond.js is 1 m/s. Impacts slower than that cancel the normal velocity instead of bouncing. Changing it changes what counts as resting.
-- resolvePairs clamps positions outside the grid to edge cells. Two bodies within the contact distance still land in neighbouring cells, so no pair is missed. Bodies beyond the grid all share edge cells, which costs time, not correctness.
-- resolvePairs builds its grid from positions at the start of the pass. Bodies moved by an earlier pair in the same pass can be missed by a later one. One tick is enough for the resting and falling cases tested.
-- World#advance caps catch-up at 8 ticks. Time past that cap is dropped on purpose.
-- A JS typed array passed to a kernel export is copied in and back out on every call. That is the cost of keeping kernels free of host state.
-- jz reads a module's imports from the modules map at compile time only. A new kernel file must be added to MODULES in src/kernel/build.js, or the build fails with an unresolved import.
+- `World#hash` is FNV-1a over the float64 bit patterns, read as uint32 words in JavaScript. It is not in the kernel. A negative zero and a positive zero hash differently.
+- `resolvePairs` records each body's cell from positions at the start of the call. A body that moves into another cell mid-pass is searched in its recorded cell until the next call. Solver iterations close the gap.
+- The cell filter in `resolvePairs` is what keeps a bucket collision from duplicating a pair. Remove it and pairs are counted twice whenever two neighbour offsets share a bucket. The bucket-collision test guards this.
+- `cells` must hold three int32 per body, and `head` must be at least one bucket. `World` sizes `head` to two buckets per body with a minimum of 64.
+- `RESTING_SPEED` in `src/kernel/respond.js` is 1 m/s. Impacts slower than that cancel the normal velocity instead of bouncing. Changing it changes what counts as resting.
+- `World#advance` caps catch-up at 8 ticks. Time past that cap is dropped on purpose.
+- Each `World` owns a wasm instance. Its memory is released only when the world is garbage collected, so a long-running process should drop worlds it no longer uses.
+- A kernel call costs roughly 15 to 25 ns per typed-array access in compiled wasm. A loop that reads a value more than once should keep it in a local.
+- The package needs Node 22 or newer. `.nvmrc` pins 24.
+- Commit as lanmower, with no trailers, under the owner rule in CLAUDE.md.

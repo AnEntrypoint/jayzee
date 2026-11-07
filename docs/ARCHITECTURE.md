@@ -4,33 +4,47 @@ jayzee keeps each layer in the language it runs well in.
 
 | Layer | Path | Language | Owns |
 |---|---|---|---|
-| Kernel | ```src/kernel``` | Numeric JavaScript, compiled by jz to wasm | Integration, contact response, pair broadphase, state hash |
-| World | ```src/world``` | Plain JavaScript | Fixed-step clock, body table, the order of kernel calls |
-| Protocol | ```src/protocol``` | Plain JavaScript | Versioned binary input and snapshot codecs |
+| Kernel | `src/kernel` | Numeric JavaScript, compiled by jz to wasm | Integration, contact response, pair search, the tick |
+| World | `src/world` | Plain JavaScript | Fixed-step clock, body table, wasm memory handles, the hash |
+| Protocol | `src/protocol` | Plain JavaScript | Versioned binary input and snapshot codecs |
 
-Dependencies point one way. The world calls the kernel. The protocol codecs depend on nothing else. The kernel imports no host code and has no objects, closures or allocation policy of its own.
+Dependencies point one way. The world calls the kernel. The codecs depend on nothing. The kernel imports no host code and allocates nothing in steady state.
 
 ## Why this split
 
-jz compiles numeric code over typed arrays with no runtime. Its own documentation lists network I/O, UI, dynamic object models and long-lived object graphs as outside its scope. spoint's physics core is numeric and hot, so it moves to wasm. Everything else stays JavaScript, where it is clear and cheap to change.
+jz compiles numeric code over typed arrays with no runtime. Its own documentation lists network I/O, UI, dynamic object models and long-lived object graphs as outside its scope. Physics is numeric and hot, so it moves to wasm. Everything else stays JavaScript, where it is clear and cheap to change.
 
 ## Build and runtime
 
-- ```scripts/build-kernel.mjs``` compiles ```src/kernel/kernel.js``` and its modules into ```dist/kernel.wasm```. The build takes about 20 seconds.
-- ```src/kernel/load.js``` instantiates those bytes through ```jz/interop```. The compiler never runs at runtime.
-- ```prepare```, ```prepack``` and ```test``` run the build, so a fresh clone is runnable after ```npm install```.
+- `scripts/build-kernel.mjs` compiles `src/kernel/kernel.js` and its modules into `dist/kernel.wasm` through `jz`. It runs on install, pack and test.
+- `src/kernel/load.js` compiles the bytes to a `WebAssembly.Module` once per process and instantiates it through `jz/interop` for each world. The compiler never runs at runtime.
+- Each `World` owns its instance and therefore its linear memory. Its arrays are created with `memory.Float64Array(n)` and `memory.Int32Array(n)`, which return pinned handles. The kernel reads and writes them in place, so a tick copies nothing across the JavaScript boundary.
+- One call to `step` runs a full tick: integrate, then `solverIterations` passes of ground, boxes and pairs.
 
 ## Determinism
 
-- The world advances in fixed ticks (default 64 Hz). ```advance``` carries the remainder and caps catch-up at 8 ticks, so a stall drops time rather than spiralling.
-- The same spawn and step schedule gives identical positions and hashes. The world suite checks this across two worlds.
-- ```hashState``` quantizes each component to 1/4096 m/s or m. It is a digest for replay checks, not a bit-exact comparison.
+- The world advances in fixed ticks (default 64 Hz). `advance` carries the remainder and caps catch-up at 8 ticks, so a stall drops time rather than spiralling.
+- The same spawn and step schedule gives identical positions, velocities and hashes. The world suite checks this across two worlds.
+- `hash()` folds the exact IEEE-754 bits of every position and velocity through FNV-1a. A change of one ulp changes it.
 
 ## Contacts
 
 - Bodies are spheres of one radius. Static geometry is the ground plane at y = 0 and axis-aligned boxes.
 - Restitution applies only to impacts faster than 1 m/s. Slower contacts remove the normal velocity, so a resting body settles instead of micro-bouncing.
-- Body pairs use a uniform grid with cell size equal to the contact diameter and 16 cells per axis. Positions outside the grid clamp to edge cells, which keeps every overlapping pair in neighbouring cells. Contacts resolve against the grid built at the start of the pass.
+- Body pairs use a spatial hash grid. Cells are as wide as the contact diameter. Each body records its cell at the start of the pass. A candidate is accepted only when its recorded cell is the one being searched, so a bucket collision never duplicates or drops a pair. The bucket table holds two buckets per body, with a minimum of 64.
+- The solver runs `solverIterations` passes per tick (default 8). In the stack test, a chain of five overlapping bodies has a 0.19 m overlap after one pass, about 0.014 m after eight, and 0.0005 m after sixteen. Sixteen or more passes are needed when exact stacking matters.
+
+## Measured cost
+
+Measured with `npm run bench` on Node 24, 8 solver iterations, 200 measured ticks after 30 warm-up ticks, bodies falling in a 60 m square above a box floor. Numbers are from one development machine; rerun them on the target before relying on them.
+
+| Bodies | Mean tick | Ticks per second |
+|---|---|---|
+| 500 | 5.8 ms | 173 |
+| 2000 | 27 ms | 37 |
+| 5000 | 71 ms | 14 |
+
+The budget at 64 Hz is 15.6 ms per tick, so this kernel fits it up to roughly 1000 bodies with eight iterations. Four iterations roughly halves the pair cost. The cost is per typed-array access in the compiled wasm, not warm-up: `--no-liftoff` changes nothing.
 
 ## Wire formats
 
@@ -41,14 +55,14 @@ jz compiles numeric code over typed arrays with no runtime. Its own documentatio
 
 | spoint | jayzee | State |
 |---|---|---|
-| ```src/physics``` (Jolt wrapper) | ```src/kernel``` | Replaced by jz kernels. Jolt is not ported. |
-| ```src/sdk/TickHandler.js``` pipeline | ```World#step``` | Ported: integrate, ground, boxes, pairs |
-| ```src/protocol``` (MessagePack, InputCodec) | ```src/protocol``` | Ported as fixed binary layouts. MessagePack is dropped. |
-| ```src/netcode``` (prediction, AOI, bandwidth budget) | none yet | Not ported. Lands as host modules over the same kernel. |
-| ```src/apps``` (AppRuntime, app lifecycle) | none yet | Not ported. Lands as a host plugin layer. |
-| ```src/terrain```, ```src/static```, ```src/fluid``` | none | Out of scope for this core. |
-| ```src/transport```, ```src/sharding```, ```src/storage``` | none | Out of scope for this core. |
-| ```client/``` (Three.js, VRM, rendering) | none | Out of scope for this core. |
+| `src/physics` (Jolt wrapper) | `src/kernel` | Replaced by jz kernels. Jolt is not ported. |
+| `src/sdk/TickHandler.js` pipeline | `World#step` | Ported: integrate, ground, boxes, pairs |
+| `src/protocol` (MessagePack, InputCodec) | `src/protocol` | Ported as fixed binary layouts. MessagePack is dropped. |
+| `src/netcode` (prediction, AOI, bandwidth budget) | none yet | Not ported. Lands as host modules over the same kernel. |
+| `src/apps` (AppRuntime, app lifecycle) | none yet | Not ported. Lands as a host plugin layer. |
+| `src/terrain`, `src/static`, `src/fluid` | none | Out of scope for this core. |
+| `src/transport`, `src/sharding`, `src/storage` | none | Out of scope for this core. |
+| `client/` (Three.js, VRM, rendering) | none | Out of scope for this core. |
 
 ## Not yet built
 
