@@ -29,3 +29,6 @@ Non-obvious facts for automated edits. Architecture and measured costs live in d
 - The netcode witness uses one seeded generator for intents, loss and delay. Changing the order of random draws changes its numbers, not its verdict. The 4-tick control is expected to show gaps and must keep doing so, or the witness no longer tests what it claims.
 - Redundancy works only up to the playout delay. Each input has `delay + 1` chances before its playout time, so raising the redundancy above that buys nothing.
 - `World#importState` resets the accumulator, so a restore partway through a fixed step drops that remainder on purpose.
+- `decodeDelta` compares a base by tick and body count. `StateSender` and `StateReceiver` both keep 64 states by tick. The receiver keeps every state the sender can still use as a base, because the sender only uses an acknowledged tick within its own 64-tick history. Changing one depth without the other breaks that guarantee.
+- Bodies are compared with `Object.is`, so a −0 change is a real change and is sent. A body that jitters between two bit patterns is sent every tick, which costs bytes but not correctness.
+- `npm test` runs the node:test suites and then the netcode and snapshot checks. The netcode and snapshot checks are scripts that print PASS and FAIL lines and exit non-zero on failure.

@@ -55,13 +55,17 @@ The budget at 64 Hz is 15.6 ms per tick, so this kernel fits it up to roughly 10
 - Prediction: the client predicts one tick per step. On each state from the server it imports the exact float64 state, drops the acknowledged inputs and replays the rest. A state from a tick it has not reached throws.
 - Authority: one tick per `Authority#step` takes one input per player, applies its movement and steps the world once.
 - The state codec carries float64 positions and velocities, because reconciliation must be exact. The float32 snapshot remains for display and broadcast.
+- Snapshot acknowledgement: the client acknowledges the newest state it received in a 5-byte `ack` message. The server keeps its last 64 states, and the next state is a delta against the newest acknowledged one that it still holds. Without an acknowledgement, or when the base has been pruned, the state is sent in full.
+- Delta codec: each changed body is sent in full as float64 values, so a delta reconstructs the state bit for bit. Bodies whose six values match the base are omitted. A settled world is about 6% of the full-state size in the witness.
 - Witness: `npm run check:netcode` runs 900 ticks with 30% input loss, input delay of 0 to 3 ticks, 10% state loss and state delay of 0 to 2 ticks. Every client tick matches an offline trajectory bit for bit, and the client converges to the server state. A control run with a 4-tick playout delay shows the gaps that the 12-tick delay removes.
 
-Not yet covered: more than one predicted player in the witness, jump and other buttons (only movement is simulated), bandwidth budgets, interest management and client-side smoothing of corrections.
+Not yet covered: more than one predicted player in the witness, jump and other buttons (only movement is simulated), bandwidth budgets beyond delta encoding, interest management and client-side smoothing of corrections.
 ## Wire formats
 
 - Input packet: version (u8), record count (u8), then 12-byte records: sequence (u32), moveX (i8, 127 = 1.0), moveZ (i8), yaw (u16, 65536 steps per turn), buttons (u32 bitmask). Out-of-range fields throw, they are not clamped.
 - Snapshot: version (u8), tick (u32), body count (u16), then float32 x, y, z per body.
+- Delta: version (u8), flags (u8, bit 0 = has base), tick (u32), base tick (u32), body count (u16), changed count (u16), then per changed body: index (u16) and six float64 values.
+- Ack: version (u8), tick (u32).
 
 ## Mapping from spoint
 
@@ -80,7 +84,7 @@ Not yet covered: more than one predicted player in the witness, jump and other b
 
 - Body-to-body and body-to-box contacts for non-sphere shapes.
 - Character controller semantics (slopes, steps, capsules).
-- Netcode: interest management, bandwidth budgets, jump and other buttons, client-side smoothing.
+- Netcode: interest management, bandwidth budgets beyond deltas, jump and other buttons, client-side smoothing.
 - App lifecycle and hot reload.
 
 Each lands as a host module over the existing kernel, without changing kernel signatures unless a test shows a kernel defect.

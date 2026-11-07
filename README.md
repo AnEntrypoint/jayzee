@@ -43,6 +43,9 @@ decodeSnapshot(frame)
 | `encodeInputs` / `decodeInputs` | Versioned binary input packets |
 | `encodeSnapshot` / `decodeSnapshot` | Versioned binary snapshots, float32 positions |
 | `encodeState` / `decodeState` | Versioned lossless state, float64 positions and velocities |
+| `encodeDelta` / `decodeDelta` | Versioned lossless state deltas against an acknowledged base |
+| `encodeAck` / `decodeAck` | Versioned acknowledgement of the newest received tick |
+| `StateSender` / `StateReceiver` | Snapshot stream: acknowledged delta bases with full-state fallback |
 | `InputBuffer` | Per-player input queue: reordering, duplicates, holds on gaps |
 | `Predictor` | Client prediction and reconciliation against authoritative states |
 | `Authority` | Server side: one input per player per tick, then a world step |
@@ -56,6 +59,7 @@ Types ship in `types/index.d.ts` and are checked by `npm run check:types`.
 npm test                       # rebuilds the kernel, then runs the suites
 npm run check:types        # type-checks the declarations and a usage file
 npm run check:netcode      # prediction witness under loss and latency
+npm run check:snapshots    # delta and acknowledgement witness under loss
 npm run bench -- 2000 200    # bodies, measured ticks
 ```
 
