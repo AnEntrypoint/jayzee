@@ -1,11 +1,5 @@
 import { decodeReplay } from '../replay/file.js'
-
-const PLAYER_DEFAULTS = Object.freeze({ capsuleRadius: 0.4, capsuleHalfHeight: 0.9, crouchHalfHeight: 0.45, mass: 120, health: 100 })
-
-const playerDefault = (playerConfig, key) => {
-  const value = playerConfig?.[key]
-  return value === undefined ? PLAYER_DEFAULTS[key] : value
-}
+import { playerDefault } from '../player-defaults-pure/playerDefaults.js'
 
 const realScheduler = {
   immediate: (callback) => setImmediate(callback),
