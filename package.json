@@ -23,7 +23,7 @@
   },
   "scripts": {
     "build:kernel": "node scripts/build-kernel.mjs",
-    "test": "npm run build:kernel && npm run check:kernel && npm run check:world && npm run check:protocol && npm run check:messages && npm run check:netcode && npm run check:snapshots && npm run check:spawn && npm run check:fire && npm run check:fire-modules && npm run check:sandbox && npm run check:savi-endpoints && npm run check:transport && npm run check:hot-reload && npm run check:anticheat && npm run check:render && npm run check:bin-snapshot && npm run check:replay-file && npm run check:lag-compensation && npm run check:protocol-codecs && npm run check:client-loops && npm run check:sharding && npm run check:sdk-surfaces && npm run check:msgpackr-compat && npm run check:content && npm run check:types",
+    "test": "npm run build:kernel && npm run check:kernel && npm run check:world && npm run check:protocol && npm run check:messages && npm run check:netcode && npm run check:snapshots && npm run check:spawn && npm run check:fire && npm run check:fire-modules && npm run check:sandbox && npm run check:savi-endpoints && npm run check:transport && npm run check:hot-reload && npm run check:anticheat && npm run check:render && npm run check:bin-snapshot && npm run check:replay-file && npm run check:lag-compensation && npm run check:protocol-codecs && npm run check:client-loops && npm run check:sharding && npm run check:sdk-surfaces && npm run check:msgpackr-compat && npm run check:content && npm run check:feature-gap && npm run check:types",
     "check:types": "tsc -p tsconfig.json",
     "bench": "node scripts/bench.mjs",
     "prepare": "npm run build:kernel",
@@ -51,7 +51,8 @@
     "check:sharding": "node scripts/check-sharding.mjs",
     "check:sdk-surfaces": "node scripts/check-sdk-surfaces.mjs",
     "check:msgpackr-compat": "node scripts/check-msgpackr-compat.mjs",
-    "check:content": "node scripts/check-content.mjs"
+    "check:content": "node scripts/check-content.mjs",
+    "check:feature-gap": "node scripts/check-feature-gap.mjs"
   },
   "dependencies": {
     "jz": "1.0.2"
