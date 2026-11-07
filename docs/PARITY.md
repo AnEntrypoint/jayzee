@@ -32,11 +32,11 @@ Sources are spoint at d5e3860 (INVENTORY.md and FAMILIES.md from the spoint agen
 19. Server authority per tick, catch-up limits and starvation holds. Source: spoint processPlayerMovement. Status: open.
 20. Anticheat: input rate limit (capacity 120, refill 90 per second), envelope clamp, shot outlier flags. Source: spoint InputGuard, OutlierDetector. Status: open.
 21. Replay record and playback. Source: spoint ReplayRecorder, ReplayPlayer. Status: open.
-22. Sessions: reconnect, migrate and session TTL of 30 s. Source: spoint src/sdk/ServerHandlers.js, src/connection/SessionStore.js. Status: open. Residual from the PRD: WADLER-relocation-probegroundy-m2-s1 in src/sdk/Relocation.js.
+22. Sessions: reconnect, migrate and session TTL of 30 s. Source: spoint src/sdk/ServerHandlers.js, src/connection/SessionStore.js. Status: open. Residual from the PRD: WADLER-relocation-probegroundy-m2-s1 in src/sdk/Relocation.js, where probeGroundY discards the reason.
 23. Heightfield terrain: baked data, fail-loud on stale code, CPU fallback. Source: spoint TerrainPhysics, data/heightfield.json and tps-game.hf (two codeVersions, one stale). Status: open.
 24. Terrain marks, paint and sculpt. Source: spoint TerrainMarks, paintStore. Status: open.
 25. Caves, erosion, structures and spline carve. Source: spoint src/terrain/CaveSDF.js, src/terrain/TerrainErosion.js, src/terrain/StructureStamp.js, src/terrain/SplineCarve.js. Status: open. No witness in spoint.
-26. Fire kernel (integer-only, hashed seeds) and fire wire. Source: spoint src/shared/fire/fireKernel.js. Status: in progress. No witness in spoint (GAP-fire-kernel-witness), so jayzee needs its own.
+26. Fire kernel (integer-only, hashed seeds) and fire wire. Source: spoint src/shared/fire/fireKernel.js. Status: in progress. No witness in spoint (GAP-fire-kernel-witness): the spoint fire kernel has no witness, so jayzee needs its own.
 27. Pathfinding with a budget of 20000 and partial results. Source: spawn learning 23, spoint pathfinding. Status: open.
 28. Spatial index with cells of 32 m. Source: spoint Octree. Status: open. No witness in spoint.
 29. Stage loading and shapes. Source: spoint Stage, StageLoader. Status: open. No witness in spoint.
