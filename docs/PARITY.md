@@ -14,7 +14,7 @@ Sources are spoint at d5e3860 (INVENTORY.md and FAMILIES.md from the spoint agen
 1. Spawn feed, resolve, head, ledger keys and CDN names. Source: spawn feed, savi spawn-engine docs. Status: partial. Witness: scripts/check-spawn.mjs. Open: resolve result types other than found, manifest frames after the sheet, the name encoder, and the ledger bucket derivation.
 2. Input, snapshot, state, delta and ack codecs. Source: spoint section 5 (wire layout differs; no compatibility claimed). Status: built. Witness: check-protocol, check-snapshots.
 3. Authority, prediction, reconciliation and input buffer. Source: spoint client prediction (no witness in spoint). Status: built. Witness: check-netcode.
-4. Message ids and reliability classes. Source: spoint MessageTypes.js, 105 ids and 12 unreliable. Status: open. The fixture is generated at scripts/fixtures/spoint-messages.json and not yet wired. Next: src/protocol/messages.js and a gate against the fixture.
+4. Message ids and reliability classes. Source: spoint MessageTypes.js, 105 ids and 12 unreliable. Status: built. Witness: scripts/check-messages.mjs against scripts/fixtures/spoint-messages.json, generated from spoint at d5e3860. Several ids are declared but unused in spoint, such as DELTA_UPDATE. They are kept so the id space matches.
 5. Physics kernel: integration, ground, boxes, pair search and contact response. Source: spoint physics (Jolt) and spawn learnings 1 to 2 and 10. Status: built. Witness: check-kernel, check-world.
 6. Physics kernel: sleeping islands, CCD, persistent contacts and warm start. Source: spawn learnings 11 to 15. Status: open.
 7. Joints, springs, axis locks and friction and restitution combine modes. Source: spawn learnings 17 to 20. Status: open.
@@ -52,6 +52,12 @@ Sources are spoint at d5e3860 (INVENTORY.md and FAMILIES.md from the spoint agen
 39. Client rendering, shadows, post-fx and grass. Source: spoint client/core. Status: decision. Out of scope for a physics and netcode package.
 40. Editor, hot reload and HUD panels. Source: spoint client/editor, src/debug, HMR runtime. Status: decision.
 41. Savi's 93 documented endpoints (39 published, 21 per-game, 30 manual-only, 3 disabled). Source: savi ENDPOINTS.md. Status: decision. jayzee serves no HTTP. Savi documents them. The spawn feed and resolve parts are in row 1.
+
+## Split: spoint's missing witnesses versus jayzee's missing features
+
+- spoint-owned, not built in jayzee: package.json scripts check:bundle-freshness and check:bundle-freshness:require-bundle call scripts/bundle-freshness-witness.mjs, which does not exist. spoint is read-only for jayzee, so the fix belongs to the spoint owner.
+- jayzee feature, not started: bundle freshness as a feature is not part of the spoint physics or netcode surface. It stays out of scope until the owner decides it belongs in this package.
+- spoint-owned, no witness: fire kernel and behaviour (src/shared/fire, src/behaviours/fire*.js). jayzee will write its own witness for the fire kernel in row 26.
 
 ## Conflicts to resolve in the sources
 
