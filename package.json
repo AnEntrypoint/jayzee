@@ -1,0 +1,28 @@
+{
+  "name": "jayzee",
+  "version": "0.1.0",
+  "description": "Deterministic physics kernels compiled through jz, with a plain JavaScript host for worlds, codecs and networking boundaries",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./kernel": "./src/kernel/load.js"
+  },
+  "files": [
+    "src/",
+    "dist/kernel.wasm",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build:kernel": "node scripts/build-kernel.mjs",
+    "prepare": "node scripts/build-kernel.mjs",
+    "prepack": "node scripts/build-kernel.mjs",
+    "test": "node scripts/build-kernel.mjs && node --test test/kernel.test.js test/world.test.js test/protocol.test.js"
+  },
+  "dependencies": {
+    "jz": "1.0.2"
+  }
+}
