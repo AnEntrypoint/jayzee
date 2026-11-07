@@ -444,7 +444,7 @@ gate('direction helpers: unit vectors and lat/lon round trip', () => {
 })
 
 gate('dirToLocalXZ: refuses a missing heightAt and returns null beyond ~87 degrees', () => {
-  const frame = { up: [0, 1, 0], east: [1, 0, 0], north: [0, 0, 1], radius: 1000, anchorHeight: 0, localToDir: () => [0, 0, 0] }
+  const frame = { up: [0, 1, 0], east: [1, 0, 0], north: [0, 0, 1], radius: 1000, anchorHeight: 0, offsetY: 0, localToDir: () => [0, 0, 0] }
   throws(() => dirToLocalXZ(frame, [1, 0, 0]), (e) => e instanceof TypeError && e.message.includes('heightAt sampler'))
   strictEqual(dirToLocalXZ(frame, [1, 0, 0], () => 0), null)
   notStrictEqual(dirToLocalXZ(frame, [0, 1, 0], () => 0), null, 'control: a direction at the anchor is not refused')

@@ -34,6 +34,15 @@ export function angleFromAnchorDeg(frame, dir) {
   return Math.acos(Math.max(-1, Math.min(1, dot(unit, frame.up)))) / DEG
 }
 
+export class NonFiniteElevationError extends RangeError {
+  constructor(phase, distanceM) {
+    super('elevation solve hit a non-finite ' + phase + ' sample at ' + distanceM + ' m; no ground hit is reported')
+    this.name = 'NonFiniteElevationError'
+    this.phase = phase
+    this.distanceM = distanceM
+  }
+}
+
 function rayMissM(frame, d, x, y, z) {
   const p = frame.localToDir(x, z, y)
   return frame.radius * Math.hypot(p[0] - d[0], p[1] - d[1], p[2] - d[2])
@@ -61,7 +70,7 @@ export function dirToLocalXZ(frame, dir, heightAt) {
   let lo = 0, hi = 0, gLo = 0
   for (let i = 0; i < ELEVATION_BRACKET_PASSES; i++) {
     const p = probe(s)
-    if (!p) break
+    if (!p) throw new NonFiniteElevationError('bracket', s)
     const miss = rayMissM(frame, d, p.x, p.y, p.z)
     if (miss < bestMiss) { bestMiss = miss; bestX = p.x; bestZ = p.z }
     const g = p.s - s
@@ -75,7 +84,7 @@ export function dirToLocalXZ(frame, dir, heightAt) {
   for (let i = 0; i < ELEVATION_BISECT_PASSES && hi - lo > ELEVATION_REFINE_TOL_M; i++) {
     const mid = (lo + hi) / 2
     const p = probe(mid)
-    if (!p) break
+    if (!p) throw new NonFiniteElevationError('bisect', mid)
     const miss = rayMissM(frame, d, p.x, p.y, p.z)
     if (miss < bestMiss) { bestMiss = miss; bestX = p.x; bestZ = p.z }
     const g = p.s - mid
