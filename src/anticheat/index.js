@@ -1,0 +1,5 @@
+export { wireCheatEjection } from './CheatEjection.js'
+export { DEFAULT_CHECKSUM_INTERVAL_TICKS, DesyncDetector } from './DesyncDetector.js'
+export { clearInputBucket, enforceMovementEnvelope, envelopeSpeedCap, isInputRateLimited, sanitizeInputPayload } from './InputGuard.js'
+export { clearOutlierWindow, recordHit } from './OutlierDetector.js'
+export { checksumBodies, createChecksumFold } from './LockstepChecksum.js'
