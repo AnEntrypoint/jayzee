@@ -60,6 +60,7 @@ Sources are spoint at d5e3860 (INVENTORY.md and FAMILIES.md from the spoint agen
 - spoint-owned, no witness: fire kernel and behaviour (src/shared/fire, src/behaviours/fire*.js). jayzee will write its own witness for the fire kernel in row 26.
 - spoint-owned, behaviour gap: src/apps/AppRuntime.js (around lines 436 to 444) logs a trimesh build failure, sets the collider to null and carries on. It does not propagate ColliderBuildError, which spoint's AGENTS.md requires. Any collider build in jayzee must propagate such failures, not drop them.
 - spoint-owned, behaviour gap: port 3002 is declared by apps/world/tps-game.js, tutorial.js and tutorial-rpg.js, so the three collide if run together.
+- spoint-owned, PRD gap, confirmed: CHARTEST-est-s1-3 in src/terrain/PlanetFrame.js, installGroundSource. A placement-only install through a prototype-linked frame (Object.create(base)) changes the shared base frame's groundSource and groundSources. There is no own-property guard. The node witness is /tmp/spoint-parity/witness-chartest-3.mjs, and it prints GAP-CONFIRMED.
 - spoint-owned, PRD residual: WADLER-relocation-probegroundy-m2-s1 in src/sdk/Relocation.js. probeGroundY discards the reason. spoint-88's classes: 1 REAL, 11 STALE, 2 DOC-ONLY, 1 UNVERIFIED, 0 HELD across the 15 open PRD rows. The matrix is at /tmp/spoint-parity/prd-matrix.json, witnessed by build-prd-matrix.mjs.
 
 ## Open source questions
