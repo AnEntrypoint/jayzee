@@ -1,0 +1,69 @@
+# Voxel Terrain
+
+Every click lands the same tick for every player. A cold young world takes the voxels starter first (one call; its dig.js: left click breaks, right places), then build moves. Buildings are blocks: a castle or bridge is a builder script stamped as a structure mark; the field stays kind: voxel.
+
+materialAt(ctx) is the source of truth ("air" is empty: never define it); ctx.x/y/z are world METERS whatever cellSize; noise.simplex3 is the volume op: caves, tunnels and ore are 3D bands. ctx.place.voxels[x][y][z] takes integer CELL coords, world = cell × cellSize (0.125 to 2, doubling; 2D: 0.5 (Terraria scale) and up); a read is the id, null for air, "unloaded" off resident cells. = "stone" places, = null breaks and fires onNeighborChanged; voxels.fill fires no per-cell hooks and lands any box whole in its call: a wall, floor or room is a few fills, never a cell loop. A live dig writes in onInput, no timer: a cell or small fill costs 3–5 ms of sim, its chunk's mesh and collider that tick. Marks are authored local edits, voxels.* live script edits, blockBehavior what a block does alone (water spreading, wheat growing, ore dropping in onBreak: block.spawn(def) at the cell, in its material, place-owned to outlive the breaker). Only a persistent place keeps edits itself. Past lodRanges far land draws to min(camera.far, linear fog far). A 2D place plays one slice (defaultSlices.sideZ (2d-side) / topY (2d-top)); every voxel call answers in slice cells (→2d-mode).
+
+```js
+// places/main/config.yaml, by run_script
+place.terrain = {
+  kind: "voxel",
+  seed: 7,
+  verticalRange: { min: -24, max: 64 },
+  generator: "scripts/terrain.js",
+  materials: {
+    grass: { color: "oklch(.64 .13 135)", tones: ["oklch(.46 .1 135)", "oklch(.58 .13 135)", "oklch(.72 .16 135)"], growth: [{ density: 0.04, height: [2, 4], head: 1, headTones: ["oklch(.88 .18 95)"] }, { density: 0.5, height: [1, 7] }], countsAsTerrainSurface: true }, // tones: a painted face, darkest first; growth: flowers and blades from it (spawn api VoxelMaterialDef)
+    dirt: { color: "oklch(.47 .07 60)", countsAsTerrainSurface: true },
+    stone: { color: "oklch(.6 .01 270)", countsAsTerrainSurface: true }, // color alone is flat or tints a texture (cdn/texture-<what>.png)
+    brick: { tones: ["oklch(.38 .15 29)", "oklch(.6 .14 25)", "oklch(.81 0 0)"], pattern: { base: [0, 1], blocks: { course: 3, run: 5, slide: 2, joint: "both" }, joint: 2 } },
+    ore: { color: "oklch(.7 .14 60)", emissive: "oklch(.75 .15 60)", emissiveIntensity: 0.8 }, // emissive is a tiny glow; a real light lights the room
+    crystal: { color: "oklch(.75 .1 222)", emissive: "oklch(.87 .09 222)", emissiveIntensity: 1.35 },
+    lava: { liquidKind: "lava", color: "oklch(.7 .19 40)", emissive: "oklch(.8 .2 45)", emissiveIntensity: 2, solid: false, collision: "none", surfaceInset: 0.125 },
+  },
+  marks: { camp: { kind: "flatten", center: { x: 0, y: 30, z: 44 }, shape: "circle", radius: 6, material: "grass", depth: 3 } },
+};
+
+// scripts/terrain.js
+export function materialAt({ x, y, z, noise, seedOffset }) {
+  const hill = 28 + noise.fbm2({ x, z, frequency: 1 / 90, octaves: 4, seed: seedOffset(0) }) * 12;
+  if (y > hill) return "air";
+  const r = Math.hypot(x, z - 10); // cavern
+  const roof = 22 - r * 0.35, floor = -2 + r * r * 0.02;
+  if (r < 26 && y < roof && y > floor) return y < 1 ? "lava" : "air";
+  const worm = noise.simplex3({ x, y, z, frequency: 1 / 14, seed: seedOffset(1) });
+  if (y < hill - 3 && Math.abs(worm) < 0.07) return "air";
+  const depth = hill - y;
+  if (depth < 1) return "grass";
+  if (depth < 4) return "dirt";
+  if (noise.simplex3({ x, y, z, frequency: 1 / 9, seed: seedOffset(2) }) > 0.78) return "ore";
+  if (y < 6 && noise.simplex3({ x, y, z, frequency: 1 / 5, seed: seedOffset(3) }) > 0.86) return "crystal";
+  return "stone";
+}
+```
+
+<api>
+materialAt(ctx): materialId | "air" // seed ids: ctx.place rolls per-instance ground, ctx.room per-room
+ctx.day, ctx.params // the place's day (sky-cycle turns) and live numbers ({} until written: ctx.place.terrain.params.snow = 1 rebuilds the chunks that read it); digs and builds stay put as the ground moves; a land.wgsl's top-level `override snow: i32 = 0;` reads one in any function (default until written)
+export function dayKey(ctx) // ctx { x, y, z, size, height?, day, params, place }, a chunk's box (height: a far column's): hash the day and params its cells read (0: none); only chunks whose key moved rebuild
+terrain.verticalRange default { min: -32, max: 256 }: bounds streaming, generating, slices. lodRanges default [96, 288]
+terrain.meshing.style "smooth" // rounded ground; digs and reads stay on cells
+terrain.materials.<id> // merges by id. solid (physics, default true) and cutout (alpha-tested art) are independent; collision: "none" only for ground cover and liquids (solid leaves hold players on canopy); liquidKind makes a liquid (onLiquidEnter/Exit; non-solid alone does not), surfaceInset sinks its top, with tones waveIntensity 0 is still, metalness 1 + roughness 0 mirrors the sky; countsAsTerrainSurface marks ground for placement and terrain.heightAt; tags are yours (a ladder is climbable, not solid)
+materials.<id>.wind: { force } // its cubes (a chunk's sway as one) and shaped cells lean with the place's wind; 0.03–0.08 is a breeze
+materials.<id>.blockBehavior: { script, randomTick, scheduledTick, neighborChanged } // only the flags it needs; fluids and propped blocks want neighborChanged + scheduledTick
+materials.<id>.pattern.flowSpeed, flowDirection: [x, z] // a painted face's pattern slides along flowDirection on up and down faces and down side faces (0.1 ≈ 1.2 m/s): falls fall, rivers run, lava creeps; cubes stay
+voxels.solid(x, y, z): true | false | null // null = unknown yet; only === false confirms empty
+voxels.fill(min, max, material | null, { state }) // any corner pair; state: decoded fields as hooks read them ({ stage: 3 }); false for an unknown material; one command per touched chunk; a made thing's fill answers { left }: unreached or unread cells (0 = done)
+voxels.stamp(source, cell, { author, id }) // cell: the source origin's { x, y, z }; source: a terrain.structures id, a script exporting build() over builtin/voxels part(), or { bounds, palette, voxels } (palette index -1 writes air; a fifth number is read's packed states[i]); author: true appends to terrain.structures (survives regen) instead
+voxels.raycast(origin, dir, { distance = 64, includeLiquids, place }): { position, normal, distance, voxel, adjacentVoxel, materialId, state } | null // break voxel, place at adjacentVoxel (the empty cell before it, null if enclosed), fx at position
+ctx.place.terrain.colorAt(x, y, z, normal) // the face's paint (raycast's normal); null off cube ground or unloaded
+voxels.query({ tag, radius, center, place }): [{ x, y, z, material, state }] // unsorted; center defaults to feet; small radii, seldom, never per frame
+voxels.interact(x, y, z) // runs onInteract
+voxels.read(min, max): { min, size, palette, cells, states } // inclusive corners; cells[i] indexes palette (palette[0] null = air; -1 not held here), states[i] its packed state; x fastest, then z, then y (min and size are [x, y, z])
+onVoxelsChanged(ctx, boxes) // sim.js: this place's held cells changed here since the last ring, by any hand (not streaming); boxes [{ min, max }], each one voxels.read
+terrain.marks.<key> // kinds flatten | clear | pond | river | path | structure, applied in that order; center.y and each point's y are hints: the mark takes the nearest solid-to-air boundary; clear { shape: "sphere" }: a 3D bubble; rivers meander with 6+ points; structure { feetPosition (bottom-center), generator | template, flattenBelow }: the script is the source of truth
+terrain.structures: [{ id, priority, placement, template }] // ordered overlays baked into chunk mesh + collider; placement at | scatter | grid | cluster; template { kind: "builder", source } | { kind: "serialized", data }; instances stamp it verbatim (a variant is its own entry)
+per cell: player edits > structures (higher priority wins) > marks > generator // structure holes fall through; delete ctx.place.terrain.runtimeEdits drops player edits for every player and after a restart (a fresh cave)
+block script exports // stateSchema; geometry / collider / raycastShape / surface, each (state): pure shape resolvers from builtin/block-shape that render, physics and support share; onRandomTick(block), onScheduledTick(block), onNeighborChanged(block, { dx, dy, dz, materialId }), onInteract(block, player), onBreak(block) (before the clear; per-cell breaks only); uvs draw as written; a shape with none takes the picture by position
+block: { x, y, z, materialId, state, get() → { materialId, state } | null, set(materialId, state), break(), isSolid(), schedule(delayTicks), random(), spawn(def) → id, … } // all but random and spawn take trailing offsets dx, dy, dz (default 0); empty cells are null, never "air"; random() is deterministic 0..1
+voxelMarkSet { markId, voxel, outline, fill, pulse, duration } / voxelMarkClear { markId } // a named overlay on one cell; { audience } on the emit scopes it to one player
+</api>

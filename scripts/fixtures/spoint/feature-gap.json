@@ -1,0 +1,889 @@
+{
+  "report": {
+    "file": "spoint-spawn-feature-gap.md",
+    "sha256": "2ff186940441a6446d8ca8876653d3a0329dcb3e97c6910a7001e5f5b1691de4",
+    "bytes": 36739
+  },
+  "summary": {
+    "total": 60,
+    "implemented": 47,
+    "remaining": 13
+  },
+  "counts": {
+    "total": 60,
+    "checked": 47,
+    "unchecked": 13
+  },
+  "items": [
+    {
+      "index": 1,
+      "section": "skills-world: world and interaction features",
+      "status": "unchecked",
+      "verification": "OPEN",
+      "name": "Terrain mark vocabulary and world-def wiring",
+      "size": "medium",
+      "files": [
+        "src/terrain/TerrainMarks.js",
+        "src/terrain/SplineCarve.js",
+        "src/terrain/TerrainPhysics.js",
+        "apps/world/index.js",
+        "scripts/terrain-marks-witness.mjs"
+      ]
+    },
+    {
+      "index": 2,
+      "section": "skills-world: world and interaction features",
+      "status": "unchecked",
+      "verification": "OPEN",
+      "name": "Named terrain field paint with PLAYER and CREATOR layers",
+      "size": "small",
+      "files": [
+        "src/terrain/FieldLayers.js",
+        "src/terrain/fieldPaint.js",
+        "scripts/terrain-field-paint-witness.mjs"
+      ]
+    },
+    {
+      "index": 3,
+      "section": "skills-world: world and interaction features",
+      "status": "checked",
+      "verification": "UNVERIFIED",
+      "name": "Composable water level, liquid state, and physics density",
+      "size": "medium",
+      "files": [
+        "src/terrain/waterLevel.js",
+        "src/apps/AppContext.js",
+        "src/behaviours/buoyancy.js",
+        "src/netcode/PhysicsIntegration.js",
+        "scripts/water-level-witness.mjs"
+      ]
+    },
+    {
+      "index": 4,
+      "section": "skills-world: world and interaction features",
+      "status": "unchecked",
+      "verification": "OPEN",
+      "name": "Decoration item layers and graphics-tier reach",
+      "size": "small",
+      "files": [
+        "src/terrain/DecorationLayers.js",
+        "src/terrain/decorationItems.js",
+        "src/terrain/groundDetailReach.js",
+        "scripts/decoration-layers-witness.mjs"
+      ]
+    },
+    {
+      "index": 5,
+      "section": "skills-world: world and interaction features",
+      "status": "checked",
+      "verification": "UNVERIFIED",
+      "name": "Scripted heightAt/materialAt and getTerrainNormal",
+      "size": "small",
+      "files": [
+        "src/terrain/scriptedTerrain.js",
+        "src/apps/AppContext.js",
+        "scripts/scripted-terrain-witness.mjs"
+      ]
+    },
+    {
+      "index": 6,
+      "section": "skills-world: world and interaction features",
+      "status": "checked",
+      "verification": "UNVERIFIED",
+      "name": "Targeted press ear and nearest-facing interact prompt",
+      "size": "small",
+      "files": [
+        "src/interaction/pressRouter.js",
+        "src/apps/AppContext.js",
+        "src/apps/EventBus.js",
+        "client/hud/interactPrompt.js",
+        "scripts/press-router-witness.mjs"
+      ]
+    },
+    {
+      "index": 7,
+      "section": "skills-world: world and interaction features",
+      "status": "checked",
+      "verification": "UNVERIFIED",
+      "name": "Trigger volume enter/exit with overlapping set",
+      "size": "small",
+      "files": [
+        "src/behaviours/triggerVolume.js",
+        "src/stdlib-apps/trigger-volume/index.js",
+        "scripts/trigger-volume-witness.mjs"
+      ]
+    },
+    {
+      "index": 8,
+      "section": "skills-world: world and interaction features",
+      "status": "checked",
+      "verification": "UNVERIFIED",
+      "name": "Static-body surface velocity belt",
+      "size": "medium",
+      "files": [
+        "src/physics/surfaceVelocity.js",
+        "src/apps/AppPhysics.js",
+        "src/physics/World.js",
+        "scripts/surface-velocity-witness.mjs"
+      ]
+    },
+    {
+      "index": 9,
+      "section": "skills-world: world and interaction features",
+      "status": "checked",
+      "verification": "UNVERIFIED",
+      "name": "Two-sided atomic trade",
+      "size": "small",
+      "files": [
+        "src/behaviours/trade.js",
+        "src/apps/AppContext.js",
+        "scripts/two-sided-trade-witness.mjs"
+      ]
+    },
+    {
+      "index": 10,
+      "section": "skills-world: world and interaction features",
+      "status": "checked",
+      "verification": "UNVERIFIED",
+      "name": "Declarative hinge pivot and rider momentum",
+      "size": "medium",
+      "files": [
+        "src/physics/pivotTransform.js",
+        "src/behaviours/platformRiders.js",
+        "src/stdlib-apps/door/index.js",
+        "src/stdlib-apps/moving-platform/index.js",
+        "scripts/pivot-riders-witness.mjs"
+      ]
+    },
+    {
+      "index": 11,
+      "section": "skills-world: world and interaction features",
+      "status": "checked",
+      "verification": "UNVERIFIED",
+      "name": "Wired provider-neutral decision runtime",
+      "size": "small",
+      "files": [
+        "src/behaviours/decisionRuntime.js",
+        "src/apps/AppContext.js",
+        "scripts/decision-runtime-witness.mjs"
+      ]
+    },
+    {
+      "index": 12,
+      "section": "skills-world: world and interaction features",
+      "status": "checked",
+      "verification": "UNVERIFIED",
+      "name": "Procedural leaf-spray texture generator",
+      "size": "small",
+      "files": [
+        "src/vegetation/leafSprayTexture.js",
+        "client/core/LeafSprayTexture.js",
+        "scripts/leaf-spray-texture-witness.mjs"
+      ]
+    },
+    {
+      "index": 13,
+      "section": "skills-world: world and interaction features",
+      "status": "checked",
+      "verification": "UNVERIFIED",
+      "name": "Crown card layout with normal and head clearance",
+      "size": "small",
+      "files": [
+        "src/vegetation/crownCards.js",
+        "client/core/VegetationBuild.js",
+        "scripts/crown-card-layout-witness.mjs"
+      ]
+    },
+    {
+      "index": 14,
+      "section": "skills-world: world and interaction features",
+      "status": "checked",
+      "verification": "UNVERIFIED",
+      "name": "Declarative touch surface resolver with diagnostics",
+      "size": "small",
+      "files": [
+        "src/client/touchSurfaces.js",
+        "src/client/InputActions.js",
+        "scripts/touch-surface-resolver-witness.mjs"
+      ]
+    },
+    {
+      "index": 15,
+      "section": "skills-world: world and interaction features",
+      "status": "checked",
+      "verification": "UNVERIFIED",
+      "name": "Per-player touch selector, labels and input channels",
+      "size": "medium",
+      "files": [
+        "src/apps/SurfaceSelector.js",
+        "src/client/touchInputChannels.js",
+        "client/core/MobileControls.js",
+        "scripts/touch-selector-channels-witness.mjs"
+      ]
+    },
+    {
+      "index": 16,
+      "section": "skills-world: world and interaction features",
+      "status": "checked",
+      "verification": "UNVERIFIED",
+      "name": "Declarative spherical joint handles",
+      "size": "medium",
+      "files": [
+        "src/physics/jointMap.js",
+        "src/apps/AppContext.js",
+        "types/math.d.ts",
+        "scripts/joint-map-witness.mjs"
+      ]
+    },
+    {
+      "index": 17,
+      "section": "skills-world: world and interaction features",
+      "status": "unchecked",
+      "verification": "OPEN",
+      "name": "Rigged-model ragdoll activation",
+      "size": "large",
+      "files": [
+        "src/apps/Ragdoll.js",
+        "src/animation/RagdollPose.js",
+        "src/physics/World.js",
+        "src/apps/AppContext.js",
+        "scripts/rigged-ragdoll-witness.mjs"
+      ]
+    },
+    {
+      "index": 18,
+      "section": "tome-builtins",
+      "status": "checked",
+      "verification": "UNVERIFIED",
+      "name": "Named easing catalogue",
+      "size": "small",
+      "files": [
+        "src/shared/easing.js",
+        "scripts/easing-witness.mjs",
+        "src/behaviours/shrinking-zone.js"
+      ]
+    },
+    {
+      "index": 19,
+      "section": "tome-builtins",
+      "status": "checked",
+      "verification": "UNVERIFIED",
+      "name": "Keyframe tween runtime (animate)",
+      "size": "medium",
+      "files": [
+        "src/behaviours/tween.js",
+        "src/apps/AppContext.js",
+        "src/behaviours/README.md",
+        "SKILL.md",
+        "types/ctx.d.ts",
+        "client/editor/sdk-typings.d.ts",
+        "client/editor/sdk-typings.generated.d.ts",
+        "scripts/tween-witness.mjs"
+      ]
+    },
+    {
+      "index": 20,
+      "section": "tome-builtins",
+      "status": "checked",
+      "verification": "UNVERIFIED",
+      "name": "Spline registry with frame sampling and projection",
+      "size": "medium",
+      "files": [
+        "src/behaviours/spline.js",
+        "src/apps/AppContext.js",
+        "SKILL.md",
+        "types/ctx.d.ts",
+        "client/editor/sdk-typings.generated.d.ts",
+        "scripts/spline-witness.mjs"
+      ]
+    },
+    {
+      "index": 21,
+      "section": "tome-builtins",
+      "status": "checked",
+      "verification": "UNVERIFIED",
+      "name": "PathHandle completion (distance, nearest, at, closed)",
+      "size": "small",
+      "files": [
+        "src/behaviours/path.js",
+        "src/apps/AppContext.js",
+        "SKILL.md",
+        "types/ctx.d.ts",
+        "client/editor/sdk-typings.d.ts",
+        "client/editor/sdk-typings.generated.d.ts",
+        "scripts/path-handle-witness.mjs"
+      ]
+    },
+    {
+      "index": 22,
+      "section": "tome-builtins",
+      "status": "checked",
+      "verification": "UNVERIFIED",
+      "name": "ctx.findPath with {points, ok, partial} status",
+      "size": "medium",
+      "files": [
+        "src/apps/AppContext.js",
+        "src/pathfinding/NavmeshQuery.js",
+        "src/pathfinding/ChartNavmeshQuery.js",
+        "apps/npc-navigator/index.js",
+        "SKILL.md",
+        "types/ctx.d.ts",
+        "client/editor/sdk-typings.generated.d.ts",
+        "scripts/find-path-status-witness.mjs"
+      ]
+    },
+    {
+      "index": 23,
+      "section": "tome-builtins",
+      "status": "checked",
+      "verification": "UNVERIFIED",
+      "name": "Nav cost-weighted corridor search",
+      "size": "small",
+      "files": [
+        "src/pathfinding/NavmeshQuery.js",
+        "src/apps/AppContext.js",
+        "scripts/nav-cost-witness.mjs"
+      ]
+    },
+    {
+      "index": 24,
+      "section": "tome-builtins",
+      "status": "checked",
+      "verification": "UNVERIFIED",
+      "name": "Ballistics lead, Vec3 arrays and ctx exposure",
+      "size": "small",
+      "files": [
+        "src/shared/ballistics.js",
+        "src/apps/AppContext.js",
+        "SKILL.md",
+        "types/ctx.d.ts",
+        "client/editor/sdk-typings.generated.d.ts",
+        "scripts/ballistics-lead-witness.mjs"
+      ]
+    },
+    {
+      "index": 25,
+      "section": "tome-builtins",
+      "status": "checked",
+      "verification": "UNVERIFIED",
+      "name": "Gravity-aware projectile integration",
+      "size": "small",
+      "files": [
+        "src/behaviours/projectile.js",
+        "src/apps/AppContext.js",
+        "SKILL.md",
+        "types/ctx.d.ts",
+        "client/editor/sdk-typings.generated.d.ts",
+        "scripts/projectile-gravity-witness.mjs"
+      ]
+    },
+    {
+      "index": 26,
+      "section": "tome-builtins",
+      "status": "unchecked",
+      "verification": "OPEN",
+      "name": "Vibe pattern core and transport",
+      "size": "large",
+      "files": [
+        "src/behaviours/vibe.js",
+        "src/apps/AppContext.js",
+        "src/client/AudioMixer.js",
+        "SKILL.md",
+        "types/ctx.d.ts",
+        "client/editor/sdk-typings.generated.d.ts",
+        "scripts/vibe-pattern-witness.mjs"
+      ]
+    },
+    {
+      "index": 27,
+      "section": "tome-builtins",
+      "status": "checked",
+      "verification": "UNVERIFIED",
+      "name": "VoxelPart builder, brushes and serialize",
+      "size": "medium",
+      "files": [
+        "src/behaviours/voxels.js",
+        "src/apps/AppContext.js",
+        "SKILL.md",
+        "types/ctx.d.ts",
+        "client/editor/sdk-typings.generated.d.ts",
+        "scripts/voxels-witness.mjs"
+      ]
+    },
+    {
+      "index": 28,
+      "section": "tome-builtins",
+      "status": "checked",
+      "verification": "UNVERIFIED",
+      "name": "Reusable water shading helpers (CPU + TSL parity)",
+      "size": "medium",
+      "files": [
+        "src/shared/water.js",
+        "packages/mapspinner/src/tsl/water-tsl.js",
+        "src/behaviours/buoyancy.js",
+        "scripts/water-helpers-witness.mjs"
+      ]
+    },
+    {
+      "index": 29,
+      "section": "tome-builtins",
+      "status": "unchecked",
+      "verification": "OPEN",
+      "name": "PostFX look DSL and render-graph operators",
+      "size": "large",
+      "files": [
+        "client/core/PostFxLook.js",
+        "client/core/RenderGraph.nodes.js",
+        "client/core/RenderControls.js",
+        "client/core/QualityGovernor.js",
+        "packages/mapspinner/src/tsl/terrain-ambient-shared.js",
+        "scripts/postfx-look-witness.mjs"
+      ]
+    },
+    {
+      "index": 30,
+      "section": "tome-builtins",
+      "status": "checked",
+      "verification": "UNVERIFIED",
+      "name": "Room-routing helper set and async pickRoom contract",
+      "size": "small",
+      "files": [
+        "src/sdk/RoomRouting.js",
+        "src/sdk/RoomPick.js",
+        "src/sdk/RoomOrchestratorHttp.js",
+        "src/sdk/RoomOrchestrator.js",
+        "scripts/room-routing-witness.mjs"
+      ]
+    },
+    {
+      "index": 31,
+      "section": "spawn-tooling (agentic tooling and workflow ideas)",
+      "status": "checked",
+      "verification": "UNVERIFIED",
+      "name": "Per-verb CLI help contract",
+      "size": "small",
+      "files": [
+        "scripts/lib/cli-help.mjs",
+        "scripts/spoint-cli.mjs",
+        "scripts/cli-help-witness.mjs"
+      ]
+    },
+    {
+      "index": 32,
+      "section": "spawn-tooling (agentic tooling and workflow ideas)",
+      "status": "checked",
+      "verification": "UNVERIFIED",
+      "name": "Coverage and gap report generator",
+      "size": "small",
+      "files": [
+        "scripts/lib/coverage-report.mjs",
+        "scripts/docs-coverage-witness.mjs",
+        "docs/COVERAGE.md"
+      ]
+    },
+    {
+      "index": 33,
+      "section": "spawn-tooling (agentic tooling and workflow ideas)",
+      "status": "checked",
+      "verification": "UNVERIFIED",
+      "name": "Engine pin hash verifier",
+      "size": "small",
+      "files": [
+        "scripts/lib/pin-manifest.mjs",
+        "scripts/engine-pin-witness.mjs",
+        "engine-pin.json"
+      ]
+    },
+    {
+      "index": 34,
+      "section": "spawn-tooling (agentic tooling and workflow ideas)",
+      "status": "checked",
+      "verification": "UNVERIFIED",
+      "name": "Run manifest factory",
+      "size": "small",
+      "files": [
+        "scripts/lib/run-manifest.mjs",
+        "scripts/run-manifest-witness.mjs",
+        "runs/task.schema.json"
+      ]
+    },
+    {
+      "index": 35,
+      "section": "spawn-tooling (agentic tooling and workflow ideas)",
+      "status": "checked",
+      "verification": "UNVERIFIED",
+      "name": "JSONL source ledger",
+      "size": "small",
+      "files": [
+        "scripts/lib/source-ledger.mjs",
+        "scripts/source-ledger-witness.mjs",
+        "sources/index.jsonl"
+      ]
+    },
+    {
+      "index": 36,
+      "section": "spawn-tooling (agentic tooling and workflow ideas)",
+      "status": "checked",
+      "verification": "UNVERIFIED",
+      "name": "Reference bundle generator",
+      "size": "small",
+      "files": [
+        "scripts/lib/reference-bundle.mjs",
+        "scripts/reference-bundle-witness.mjs",
+        "docs/reference/INDEX.md",
+        "docs/skills/INDEX.md"
+      ]
+    },
+    {
+      "index": 37,
+      "section": "spawn-tooling (agentic tooling and workflow ideas)",
+      "status": "checked",
+      "verification": "UNVERIFIED",
+      "name": "HTTP door catalog with no-write policy",
+      "size": "small",
+      "files": [
+        "scripts/lib/http-door-catalog.mjs",
+        "scripts/http-door-catalog-witness.mjs",
+        "docs/http-doors.md"
+      ]
+    },
+    {
+      "index": 38,
+      "section": "spawn-tooling (agentic tooling and workflow ideas)",
+      "status": "checked",
+      "verification": "UNVERIFIED",
+      "name": "Agent command registry: numbers, logs, events, prefetch",
+      "size": "medium",
+      "files": [
+        "bin/spoint-agent.js",
+        "scripts/lib/agent-commands.mjs",
+        "scripts/agent-commands-witness.mjs"
+      ]
+    },
+    {
+      "index": 39,
+      "section": "spawn-tooling (agentic tooling and workflow ideas)",
+      "status": "checked",
+      "verification": "UNVERIFIED",
+      "name": "World identity resolver",
+      "size": "small",
+      "files": [
+        "scripts/lib/world-identity.mjs",
+        "scripts/world-identity-witness.mjs",
+        "docs/world-identity.md"
+      ]
+    },
+    {
+      "index": 40,
+      "section": "spawn-tooling (agentic tooling and workflow ideas)",
+      "status": "checked",
+      "verification": "UNVERIFIED",
+      "name": "Post-write verification and retry",
+      "size": "small",
+      "files": [
+        "scripts/lib/write-verified.mjs",
+        "scripts/write-verified-witness.mjs"
+      ]
+    },
+    {
+      "index": 41,
+      "section": "spawn-tooling (agentic tooling and workflow ideas)",
+      "status": "checked",
+      "verification": "UNVERIFIED",
+      "name": "Independent count verification",
+      "size": "small",
+      "files": [
+        "scripts/lib/count-verifier.mjs",
+        "scripts/count-verifier-witness.mjs"
+      ]
+    },
+    {
+      "index": 42,
+      "section": "spawn-tooling (agentic tooling and workflow ideas)",
+      "status": "checked",
+      "verification": "UNVERIFIED",
+      "name": "Generated-script preflight with line and column",
+      "size": "small",
+      "files": [
+        "scripts/lib/script-preflight.mjs",
+        "scripts/script-preflight-witness.mjs"
+      ]
+    },
+    {
+      "index": 43,
+      "section": "spawn-tooling (agentic tooling and workflow ideas)",
+      "status": "checked",
+      "verification": "UNVERIFIED",
+      "name": "Private-body redaction",
+      "size": "small",
+      "files": [
+        "scripts/lib/private-body.mjs",
+        "scripts/private-body-witness.mjs"
+      ]
+    },
+    {
+      "index": 44,
+      "section": "spawn-tooling (agentic tooling and workflow ideas)",
+      "status": "checked",
+      "verification": "UNVERIFIED",
+      "name": "Content-addressed asset registry",
+      "size": "small",
+      "files": [
+        "scripts/lib/asset-registry.mjs",
+        "scripts/asset-registry-witness.mjs",
+        "docs/asset-upload.md"
+      ]
+    },
+    {
+      "index": 45,
+      "section": "spawn-tooling (agentic tooling and workflow ideas)",
+      "status": "checked",
+      "verification": "UNVERIFIED",
+      "name": "Read-only live exec",
+      "size": "medium",
+      "files": [
+        "bin/spoint-exec.js",
+        "scripts/lib/live-exec.mjs",
+        "scripts/live-exec-witness.mjs"
+      ]
+    },
+    {
+      "index": 46,
+      "section": "spawn-tooling (agentic tooling and workflow ideas)",
+      "status": "checked",
+      "verification": "UNVERIFIED",
+      "name": "Simulated tester bodies",
+      "size": "medium",
+      "files": [
+        "bin/spoint-body.js",
+        "scripts/lib/tester-body.mjs",
+        "scripts/tester-body-witness.mjs"
+      ]
+    },
+    {
+      "index": 47,
+      "section": "spawn-tooling (agentic tooling and workflow ideas)",
+      "status": "unchecked",
+      "verification": "OPEN",
+      "name": "Private preview room and separate publish",
+      "size": "large",
+      "files": [
+        "bin/spoint-preview.js",
+        "scripts/lib/preview-room.mjs",
+        "scripts/preview-room-witness.mjs",
+        "docs/preview-publish.md"
+      ]
+    },
+    {
+      "index": 48,
+      "section": "spawn-tooling (agentic tooling and workflow ideas)",
+      "status": "unchecked",
+      "verification": "OPEN",
+      "name": "Browser readiness, fault and chat contract",
+      "size": "medium",
+      "files": [
+        "scripts/lib/page-readiness.mjs",
+        "scripts/lib/chat-events.mjs",
+        "scripts/browser-chat-contract-witness.mjs"
+      ]
+    },
+    {
+      "index": 49,
+      "section": "spawn-tooling (agentic tooling and workflow ideas)",
+      "status": "unchecked",
+      "verification": "OPEN",
+      "name": "Declarative world tree and state scopes",
+      "size": "large",
+      "files": [
+        "apps/world.config.yaml",
+        "apps/places/README.md",
+        "scripts/lib/world-tree.mjs",
+        "scripts/world-tree-witness.mjs",
+        "design.md"
+      ]
+    },
+    {
+      "index": 50,
+      "section": "spoint-inventory",
+      "status": "checked",
+      "verification": "UNVERIFIED",
+      "name": "Reinstate the documented AGENTS.md/SKILL.md fact witness",
+      "size": "small",
+      "files": [
+        "scripts/agents-md-facts-witness.mjs",
+        "scripts/skill-md-facts-witness.mjs",
+        "scripts/check.mjs",
+        "SKILL.md",
+        "AGENTS.md",
+        "package.json"
+      ]
+    },
+    {
+      "index": 51,
+      "section": "spoint-inventory",
+      "status": "checked",
+      "verification": "UNVERIFIED",
+      "name": "Machine-checked SKILL.md ctx API coverage",
+      "size": "small",
+      "files": [
+        "scripts/skill-md-ctx-coverage.mjs",
+        "SKILL.md",
+        "scripts/check.mjs",
+        "package.json"
+      ]
+    },
+    {
+      "index": 52,
+      "section": "spoint-inventory",
+      "status": "checked",
+      "verification": "UNVERIFIED",
+      "name": "AppLoader structured refusals with reason codes",
+      "size": "small",
+      "files": [
+        "src/apps/AppLoader.js",
+        "scripts/verify-app.mjs",
+        "scripts/app-loader-refusal-witness.mjs"
+      ]
+    },
+    {
+      "index": 53,
+      "section": "spoint-inventory",
+      "status": "checked",
+      "verification": "UNVERIFIED",
+      "name": "One-boundary world movement validation",
+      "size": "small",
+      "files": [
+        "src/shared/worldResolve.js",
+        "src/shared/movement.js",
+        "scripts/world-movement-parse-witness.mjs",
+        "SKILL.md",
+        "AGENTS.md"
+      ]
+    },
+    {
+      "index": 54,
+      "section": "spoint-inventory",
+      "status": "unchecked",
+      "verification": "OPEN",
+      "name": "Shared spec parse boundary for all ctx.define* factories",
+      "size": "medium",
+      "files": [
+        "src/behaviours/specBoundary.js",
+        "src/behaviours/weapon.js",
+        "src/behaviours/teams.js",
+        "src/behaviours/pickup.js",
+        "src/behaviours/health.js",
+        "src/behaviours/README.md",
+        "src/apps/AppContext.js",
+        "scripts/define-spec-boundary-witness.mjs"
+      ]
+    },
+    {
+      "index": 55,
+      "section": "spoint-inventory",
+      "status": "checked",
+      "verification": "UNVERIFIED",
+      "name": "Offline remote-model URL manifest check",
+      "size": "small",
+      "files": [
+        "scripts/check-remote-model-manifest.mjs",
+        "scripts/check.mjs",
+        "SKILL.md",
+        "package.json"
+      ]
+    },
+    {
+      "index": 56,
+      "section": "spoint-inventory",
+      "status": "checked",
+      "verification": "UNVERIFIED",
+      "name": "Rocks and vegetation respect placed-model footprints",
+      "size": "medium",
+      "files": [
+        "client/core/Rocks.js",
+        "client/core/Vegetation.js",
+        "client/app.js",
+        "scripts/rock-model-exclusion-witness.mjs"
+      ]
+    },
+    {
+      "index": 57,
+      "section": "spoint-inventory",
+      "status": "unchecked",
+      "verification": "OPEN",
+      "name": "Surface the tick drop counter",
+      "size": "small",
+      "files": [
+        "src/netcode/TickSystemBase.js",
+        "src/sdk/ServerAPI.js",
+        "src/sdk/server.js",
+        "scripts/tick-drop-counter-witness.mjs",
+        "SKILL.md"
+      ]
+    },
+    {
+      "index": 58,
+      "section": "spoint-inventory",
+      "status": "unchecked",
+      "verification": "OPEN",
+      "name": "SES availability preflight with distinct reason codes",
+      "size": "small",
+      "files": [
+        "src/sdk/SESCompartmentEvaluator.js",
+        "scripts/check-ses-preflight.mjs",
+        "scripts/check.mjs",
+        "package.json",
+        "AGENTS.md"
+      ]
+    },
+    {
+      "index": 59,
+      "section": "spoint-inventory",
+      "status": "checked",
+      "verification": "UNVERIFIED",
+      "name": "Node-witnessable app authoring contract linter",
+      "size": "medium",
+      "files": [
+        "scripts/check-app-contract.mjs",
+        "scripts/lib/app-contract-fixtures/",
+        "scripts/check.mjs",
+        "SKILL.md",
+        "package.json"
+      ]
+    },
+    {
+      "index": 60,
+      "section": "spoint-inventory",
+      "status": "unchecked",
+      "verification": "OPEN",
+      "name": "Fail-loud asset loading gate for model errors",
+      "size": "large",
+      "files": [
+        "client/EntityLoader.js",
+        "client/app.js",
+        "client/LoadingManager.js",
+        "scripts/model-load-gate-witness.mjs",
+        "SKILL.md"
+      ]
+    }
+  ],
+  "parityRow61": {
+    "checked": 47,
+    "unchecked": 13,
+    "uncheckedNames": [
+      "terrain mark vocabulary and world-def wiring",
+      "named terrain field paint with PLAYER and CREATOR layers",
+      "decoration item layers and graphics-tier reach",
+      "rigged-model ragdoll activation",
+      "vibe pattern core and transport",
+      "PostFX look DSL and render-graph operators",
+      "private preview room and separate publish",
+      "browser readiness, fault and chat contract",
+      "declarative world tree and state scopes",
+      "shared spec parse boundary for all ctx.define* factories",
+      "surface of the tick drop counter",
+      "SES availability preflight with distinct reason codes",
+      "a fail-loud asset loading gate for model errors"
+    ]
+  }
+}

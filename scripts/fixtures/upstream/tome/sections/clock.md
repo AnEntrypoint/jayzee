@@ -1,0 +1,5 @@
+## Clock
+
+```ts
+ctx.now()
+```

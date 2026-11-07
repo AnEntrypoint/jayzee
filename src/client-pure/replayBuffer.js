@@ -1,0 +1,81 @@
+export function createReplayBuffer({ maxFrames = 600, captureFn, idleCaptureEveryNFrames = 60 } = {}) {
+  if (typeof captureFn !== 'function') throw new Error('createReplayBuffer requires a captureFn() function')
+  if (!Number.isFinite(maxFrames) || maxFrames < 1) throw new Error('createReplayBuffer requires maxFrames >= 1')
+
+  const ring = new Array(maxFrames)
+  let idx = 0
+  let filled = 0
+  let totalRecorded = 0
+  const liveSubscriptions = new Set()
+  let framesSinceCapture = 0
+
+  function subscribe() {
+    const token = {}
+    liveSubscriptions.add(token)
+    return () => { liveSubscriptions.delete(token) }
+  }
+
+  function unsubscribe() {
+    const oldest = liveSubscriptions.values().next()
+    if (!oldest.done) liveSubscriptions.delete(oldest.value)
+  }
+
+  function getConsumerCount() { return liveSubscriptions.size }
+
+  function record(nowMs) {
+    if (liveSubscriptions.size === 0) {
+      framesSinceCapture++
+      if (framesSinceCapture < idleCaptureEveryNFrames) return undefined
+      framesSinceCapture = 0
+    } else {
+      framesSinceCapture = 0
+    }
+    const frame = captureFn(nowMs)
+    ring[idx] = frame
+    idx = (idx + 1) % maxFrames
+    if (filled < maxFrames) filled++
+    totalRecorded++
+    return frame
+  }
+
+  function scrub(frameIndex) {
+    if (filled === 0) throw new Error('ReplayBuffer.scrub: no frames recorded yet')
+    if (!Number.isInteger(frameIndex) || frameIndex < 0 || frameIndex >= filled) {
+      throw new Error(`ReplayBuffer.scrub: frameIndex ${frameIndex} out of range [0, ${filled - 1}]`)
+    }
+    const oldestSlot = filled < maxFrames ? 0 : idx
+    return ring[(oldestSlot + frameIndex) % maxFrames]
+  }
+
+  function clear() {
+    ring.fill(undefined)
+    idx = 0
+    filled = 0
+    totalRecorded = 0
+  }
+
+  return {
+    record,
+    scrub,
+    getFrameCount: () => filled,
+    getMaxFrames: () => maxFrames,
+    getTotalRecorded: () => totalRecorded,
+    clear,
+    subscribe,
+    unsubscribe,
+    getConsumerCount,
+  }
+}
+
+export function createSceneGraphCaptureFn(sceneGraph, now = () => performance.now()) {
+  return function captureSceneGraphFrame(nowMs) {
+    const transforms = {}
+    for (const [id, node] of sceneGraph.nodes()) {
+      const g = node.group
+      if (!g) continue
+      const p = g.position, q = g.quaternion
+      transforms[id] = { x: p.x, y: p.y, z: p.z, qx: q.x, qy: q.y, qz: q.z, qw: q.w }
+    }
+    return { t: nowMs != null ? nowMs : now(), transforms }
+  }
+}

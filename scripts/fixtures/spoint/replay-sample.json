@@ -1,0 +1,28 @@
+{
+  "generatedFrom": "spoint src/netcode/ReplayFile.js encodeReplay",
+  "sha256": "9bf401beccdd091741dde0b9ec3cca996996d3e410e123db16259dc20f952ca3",
+  "byteLength": 186,
+  "sample": {
+    "header": {
+      "world": "replay-sample",
+      "tickRate": 64,
+      "seed": 7
+    },
+    "inputs": [
+      {
+        "tick": 1,
+        "player": "p1",
+        "buttons": 3,
+        "pitch": 0.5
+      },
+      {
+        "tick": 2,
+        "player": "p1",
+        "buttons": 0,
+        "pitch": -0.25
+      }
+    ],
+    "ticks": [],
+    "events": []
+  }
+}

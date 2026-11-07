@@ -1,0 +1,237 @@
+import { parsePlayerId, tryParsePlayerId } from './playerId.js'
+
+export const CURVE_LINEAR = 'linear'
+export const CURVE_EXPONENTIAL = 'exponential'
+export const CURVE_QUADRATIC = 'quadratic'
+
+export const DEFAULT_CONFIG = {
+  curve: CURVE_QUADRATIC,
+  baseXpPerLevel: 100,
+  curveScalar: 1.5,
+  maxLevel: 100,
+  xpPerKill: 10
+}
+
+function isLegalCurve(v) {
+  return v === CURVE_LINEAR || v === CURVE_EXPONENTIAL || v === CURVE_QUADRATIC
+}
+
+const CONFIG_VALIDATORS = {
+  curve: isLegalCurve,
+  baseXpPerLevel: (v) => Number.isFinite(v) && v >= 0,
+  curveScalar: (v) => Number.isFinite(v),
+  maxLevel: (v) => Number.isInteger(v) && v >= 1,
+  xpPerKill: (v) => Number.isFinite(v) && v >= 0
+}
+
+function resolveConfig(config) {
+  const cfg = { ...DEFAULT_CONFIG, ...config }
+  for (const [key, valid] of Object.entries(CONFIG_VALIDATORS)) {
+    if (config[key] === undefined) {
+      cfg[key] = DEFAULT_CONFIG[key]
+      continue
+    }
+    if (!valid(config[key])) {
+      throw new TypeError(`[progression] config.${key} = ${String(config[key])} is not a legal value`)
+    }
+  }
+  return cfg
+}
+
+export function createProgressionSystem(config = {}) {
+  const cfg = resolveConfig(config)
+
+  const playerProgression = new Map()
+  let ticksElapsed = 0
+
+  function calculateXpThreshold(level, curve = cfg.curve) {
+    if (!isLegalCurve(curve)) throw new TypeError(`[progression] curve = ${String(curve)} is not a legal value`)
+    if (level <= 1) return 0
+    const base = cfg.baseXpPerLevel
+
+    switch (curve) {
+      case CURVE_LINEAR:
+        return base * (level - 1)
+      case CURVE_EXPONENTIAL:
+        return Math.floor(base * Math.pow(cfg.curveScalar, level - 2))
+      case CURVE_QUADRATIC:
+        return Math.floor(base * (level - 1) * (level - 1))
+      default:
+        return base * (level - 1)
+    }
+  }
+
+  function getPlayerState(playerId) {
+    const key = parsePlayerId(playerId)
+    if (!playerProgression.has(key)) {
+      playerProgression.set(key, {
+        id: key,
+        xp: 0,
+        level: 1,
+        totalXp: 0,
+        lastLevelUpTick: 0,
+        levelUpEvents: []
+      })
+    }
+    return playerProgression.get(key)
+  }
+
+  function addXpResult(playerId, amount) {
+    if (!Number.isFinite(amount) || amount < 0) return { ok: false, reason: 'invalid-amount', leveledUp: false }
+
+    const state = getPlayerState(playerId)
+    const newTotalXp = state.totalXp + amount
+
+    if (newTotalXp > 0xFFFFFFFF) {
+      state.totalXp = 0xFFFFFFFF
+      state.level = levelForTotalXp(state.totalXp)
+      state.xp = state.totalXp - calculateXpThreshold(state.level)
+      return { ok: false, reason: 'xp-saturated', leveledUp: false }
+    }
+
+    state.totalXp = newTotalXp
+
+    let leveledUp = false
+    while (state.level < cfg.maxLevel) {
+      const nextLevelThreshold = calculateXpThreshold(state.level + 1)
+      if (state.totalXp >= nextLevelThreshold) {
+        state.level++
+        state.lastLevelUpTick = ticksElapsed
+        state.levelUpEvents.push({
+          level: state.level,
+          xp: state.totalXp - calculateXpThreshold(state.level),
+          totalXp: state.totalXp,
+          tick: ticksElapsed
+        })
+        leveledUp = true
+      } else {
+        break
+      }
+    }
+
+    const currentLevelThreshold = calculateXpThreshold(state.level)
+    state.xp = state.totalXp - currentLevelThreshold
+
+    return { ok: true, reason: null, leveledUp }
+  }
+
+  function addXp(playerId, amount) {
+    return addXpResult(playerId, amount).leveledUp
+  }
+
+  function getProgress(playerId) {
+    const state = getPlayerState(playerId)
+    const currentThreshold = calculateXpThreshold(state.level)
+    const nextThreshold = calculateXpThreshold(state.level + 1)
+    const xpForLevel = nextThreshold - currentThreshold
+    const xpInLevel = state.xp
+    const progressRatio = xpForLevel > 0 ? xpInLevel / xpForLevel : 0
+
+    return {
+      level: state.level,
+      xp: state.xp,
+      totalXp: state.totalXp,
+      xpForLevel,
+      xpInLevel,
+      progressRatio: Math.min(1, Math.max(0, progressRatio))
+    }
+  }
+
+  function getState(playerId) {
+    return playerProgression.get(parsePlayerId(playerId)) || null
+  }
+
+  function getAllStates() {
+    return Array.from(playerProgression.values())
+  }
+
+  function levelForTotalXp(totalXp) {
+    let level = 1
+    while (level < cfg.maxLevel && totalXp >= calculateXpThreshold(level + 1)) level++
+    return level
+  }
+
+  function applySnapshot(snapshotData) {
+    if (!snapshotData || !Array.isArray(snapshotData.progressions)) return
+
+    for (const snap of snapshotData.progressions) {
+      const snapKey = snap ? tryParsePlayerId(snap.id) : null
+      if (snapKey === null) continue
+      const declaredTotalXp = Number.isFinite(snap.totalXp) ? snap.totalXp : 0
+      const totalXp = Math.min(0xFFFFFFFF, Math.max(0, declaredTotalXp))
+      const level = levelForTotalXp(totalXp)
+      const declaredTick = Number.isFinite(snap.lastLevelUpTick) ? Math.floor(snap.lastLevelUpTick) : 0
+      playerProgression.set(snapKey, {
+        id: snapKey,
+        xp: totalXp - calculateXpThreshold(level),
+        level,
+        totalXp,
+        lastLevelUpTick: Math.max(0, declaredTick),
+        levelUpEvents: Array.isArray(snap.levelUpEvents)
+          ? snap.levelUpEvents
+            .filter(event => event && Number.isFinite(event.level) && Number.isFinite(event.totalXp))
+            .map(event => ({ ...event }))
+          : []
+      })
+    }
+  }
+
+  function buildSnapshot() {
+    return {
+      progressions: Array.from(playerProgression.values()).map(s => ({
+        id: s.id,
+        xp: s.xp,
+        level: s.level,
+        totalXp: s.totalXp,
+        lastLevelUpTick: s.lastLevelUpTick,
+        levelUpEvents: s.levelUpEvents.map(event => ({ ...event }))
+      }))
+    }
+  }
+
+  function drainLevelUpEvents(playerId) {
+    const state = getPlayerState(playerId)
+    const events = state.levelUpEvents
+    state.levelUpEvents = []
+    return events
+  }
+
+  function tick(dt) {
+    ticksElapsed++
+  }
+
+  function removePlayer(playerId) {
+    playerProgression.delete(parsePlayerId(playerId))
+  }
+
+  function getConfig() {
+    return { ...cfg }
+  }
+
+  return {
+    calculateXpThreshold,
+    getPlayerState,
+    addXp,
+    addXpResult,
+    getProgress,
+    getState,
+    getAllStates,
+    applySnapshot,
+    buildSnapshot,
+    drainLevelUpEvents,
+    tick,
+    removePlayer,
+    getConfig
+  }
+}
+
+export function getStatScaling(level, baseValue, curve = CURVE_LINEAR) {
+  if (curve === CURVE_LINEAR) {
+    return baseValue + (level - 1) * 5
+  } else if (curve === CURVE_EXPONENTIAL) {
+    return Math.floor(baseValue * Math.pow(1.05, level - 1))
+  } else if (curve === CURVE_QUADRATIC) {
+    return Math.floor(baseValue * (1 + (level - 1) * 0.1))
+  }
+  return baseValue
+}

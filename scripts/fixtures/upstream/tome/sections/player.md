@@ -1,0 +1,5 @@
+## Player
+
+```ts
+<player>.displayName
+```

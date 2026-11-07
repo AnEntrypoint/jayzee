@@ -1,0 +1,802 @@
+[
+ {
+  "world": "7451705a-1142-4451-a8e4-d0ac42730131",
+  "adventure": "escape-from-stranglethorn",
+  "name": "Escape from Stranglethorn",
+  "creator": "izkimar",
+  "app": "c52c8aab-4429-4dc4-83df-951cf88227f1",
+  "sort": "hot"
+ },
+ {
+  "world": "b132844d-c800-4116-b49c-0f93637543c2",
+  "adventure": "shogun-s-fate",
+  "name": "Shogun’s Fate",
+  "creator": "poisoncode",
+  "app": "342ed7a8-491d-41de-8ae1-6c1a62275640",
+  "sort": "hot"
+ },
+ {
+  "world": "aebe2245-eec7-4fbe-97e8-fd57e0495d4d",
+  "adventure": "shoguns-return",
+  "name": "Shoguns Return",
+  "creator": "gaba",
+  "app": "93f963b1-db50-4c18-8fe4-635f8ae51349",
+  "sort": "hot"
+ },
+ {
+  "world": "60c01514-b06d-4f8a-9af4-17b3798de457",
+  "adventure": "astroimpero-blitz",
+  "name": "AstroImpero Blitz",
+  "creator": "maguer",
+  "app": "54cee91d-d6f9-40c8-a18e-16a70585c571",
+  "sort": "hot"
+ },
+ {
+  "world": "71a9b6bd-91d1-4e7a-910a-aa8b40e3a74f",
+  "adventure": "fabling-park",
+  "name": "Fabling Park",
+  "creator": "smallzero",
+  "app": "6459d8a3-55e9-4173-839f-015c2f3c7004",
+  "sort": "hot"
+ },
+ {
+  "world": "56c81c80-49d6-4e51-b76a-2172e0e2f78b",
+  "adventure": "diablo-survivors",
+  "name": "Diablo Survivors",
+  "creator": "izkimar",
+  "app": "601198d1-ec6f-40e8-ac30-890a76fd6c40",
+  "sort": "hot"
+ },
+ {
+  "world": "d8fe9e9c-c555-4811-ba5b-e92b848f4705",
+  "adventure": "watercraft",
+  "name": "Watercraft",
+  "creator": "mrmclean",
+  "app": "2011941b-51d7-4178-9e5e-44cbb43e28cb",
+  "sort": "hot"
+ },
+ {
+  "world": "27f44471-e1a6-45b9-afd1-7bbfe2aeff1c",
+  "adventure": "win7-simulator",
+  "name": "Win7 Simulator",
+  "creator": "bigyahu",
+  "app": "5ada71bd-bfa2-4a5f-ac86-0f84fe38ba9f",
+  "sort": "hot"
+ },
+ {
+  "world": "ccacf25b-e024-40c7-88ef-32bc567f9da4",
+  "adventure": "flickshot",
+  "name": "Flickshot",
+  "creator": "yuidev",
+  "app": "35edbbb3-0ca7-4cc6-989b-a0fa821585c9",
+  "sort": "hot"
+ },
+ {
+  "world": "02eeb05c-ad06-4e3a-964f-167954b4e4bf",
+  "adventure": "aether-legends",
+  "name": "Aether Legends",
+  "creator": "yisus",
+  "app": "bbebc885-7e1a-4fb3-9cfe-abd030e89eb3",
+  "sort": "hot"
+ },
+ {
+  "world": "4948ad76-94f2-4d43-8a8f-149d16acfb37",
+  "adventure": "counter-spawn-global-offensive",
+  "name": "Counter-Spawn: Global Offensive",
+  "creator": "xenos",
+  "app": "fb1ba745-b530-4143-987c-18263b34e37c",
+  "sort": "hot"
+ },
+ {
+  "world": "fc6167dd-e4df-419a-9f84-eef05df7e893",
+  "adventure": "mog",
+  "name": "MOG",
+  "creator": "robot",
+  "app": "0a2f384b-76ef-46bb-8340-5cd15e80a41c",
+  "sort": "hot"
+ },
+ {
+  "world": "1f70eb16-3f04-4d84-a26a-f58b100ba1a5",
+  "adventure": "sniper-arcade",
+  "name": "Sniper Arcade",
+  "creator": "fracture",
+  "app": "8394c207-78f8-49ff-ae37-c42ef8fe2797",
+  "sort": "hot"
+ },
+ {
+  "world": "0925a45c-523d-4983-8a77-0418d6b00d1b",
+  "adventure": "call-of-paint",
+  "name": "Call of Paint",
+  "creator": "maine",
+  "app": "b1debd07-a9f2-4a9b-aa25-658b7c8dcb4b",
+  "sort": "hot"
+ },
+ {
+  "world": "37daaf65-a1ec-4c1c-aa90-c16925e57217",
+  "adventure": "spawnjam-25-pinball",
+  "name": "SpawnJam 25 Pinball",
+  "creator": "djdef1le",
+  "app": "480bf28d-f7b6-4b47-b7a4-ef74bdb15f5f",
+  "sort": "hot"
+ },
+ {
+  "world": "85fd21fd-9664-4e20-ab5c-d981b1606ce3",
+  "adventure": "spawn-turismo",
+  "name": "Spawn Turismo",
+  "creator": "kevin",
+  "app": "85b6c83e-cd62-47d5-a8ef-fa5bbe53baba",
+  "sort": "hot"
+ },
+ {
+  "world": "4a90acdd-79a0-45b8-bbc0-3f36b4fd6d44",
+  "adventure": "blood-s-gambit",
+  "name": "Blood's Gambit",
+  "creator": "chubozuma",
+  "app": "6bc8a50e-97fa-46de-919c-5897ff2a7e55",
+  "sort": "hot"
+ },
+ {
+  "world": "06ea853f-7986-47d9-8882-8b2f910c1669",
+  "adventure": "spawn-heights",
+  "name": "Spawn Heights",
+  "creator": "smallzero",
+  "app": "91e798c4-a74f-4791-b136-960362b0d47a",
+  "sort": "hot"
+ },
+ {
+  "world": "a0da9af3-f280-411a-af75-4ebceae3b790",
+  "adventure": "astroimpero",
+  "name": "AstroImpero",
+  "creator": "maguer",
+  "app": "bbbdf02d-6623-49b1-97ca-20e532397bd5",
+  "sort": "hot"
+ },
+ {
+  "world": "b23e42e7-60aa-4ecd-813b-d8b9a40f0039",
+  "adventure": "glint",
+  "name": "GLINT",
+  "creator": "fracture",
+  "app": "5c9d2f55-db35-4523-b55e-6fd08fc3de1e",
+  "sort": "hot"
+ },
+ {
+  "world": "d94e8566-dfdb-4c00-b3ea-711384c17688",
+  "adventure": "dojo-city",
+  "name": "DOJO CITY",
+  "creator": "ninjacatlive",
+  "app": "2f3ead7a-e15c-49dc-9636-1d57c63d4ce6",
+  "sort": "hot"
+ },
+ {
+  "world": "2f2f6fd8-774a-4f28-8fff-9fc5c1abfaa0",
+  "adventure": "steal-an-egg",
+  "name": "Steal an Egg",
+  "creator": "stranger4ever95",
+  "app": "3e34bf70-fa33-4a68-97a2-02342db7d59d",
+  "sort": "hot"
+ },
+ {
+  "world": "4b310ab8-bca5-462c-a955-7d98c2bf3736",
+  "adventure": "rot",
+  "name": "ROT",
+  "creator": "sath",
+  "app": "f9cf42b1-ec63-4ae7-bfa8-d30d0f2adcc3",
+  "sort": "hot"
+ },
+ {
+  "world": "7ca6cb00-6305-44c4-8f6a-8bcd81532994",
+  "adventure": "the-sauce",
+  "name": "The Sauce",
+  "creator": "mattshumer",
+  "app": "4cc7f106-9f2c-4e58-8f5a-ac52b609bc1f",
+  "sort": "hot"
+ },
+ {
+  "world": "4c7356d1-f1ff-4ea9-a743-5e9bd9c4f7c9",
+  "adventure": "rollbound",
+  "name": "Rollbound",
+  "creator": "alice",
+  "app": "9e00c648-0153-4d53-b051-edfb60d1a35c",
+  "sort": "hot"
+ },
+ {
+  "world": "66e86719-0d15-46f0-a453-f868950bc976",
+  "adventure": "the-outer",
+  "name": "The Outer",
+  "creator": "vasa",
+  "app": "f57e7413-5097-4265-b208-7b00fa8ff25b",
+  "sort": "hot"
+ },
+ {
+  "world": "8c7bc81a-890a-4726-8af3-b4e1cd13269f",
+  "adventure": "league-of-spawn",
+  "name": "League of Spawn",
+  "creator": "izkimar",
+  "app": "e41b5b94-c869-4726-98c9-bbb0d83901c7",
+  "sort": "hot"
+ },
+ {
+  "world": "7cc24382-cc79-4125-93d1-b8a8c4e011fa",
+  "adventure": "spawn-strike",
+  "name": "Spawn Strike",
+  "creator": "csplay",
+  "app": "3a6aa856-a8e1-4583-80c8-ed6abebac633",
+  "sort": "hot"
+ },
+ {
+  "world": "61e9443e-5832-45eb-b0cf-f556998fe08d",
+  "adventure": "shellrunner",
+  "name": "SHELLRUNNER",
+  "creator": "monoglyph",
+  "app": "8fc44ac8-8a61-4c49-95f3-a9d0c30df90f",
+  "sort": "hot"
+ },
+ {
+  "world": "676022c6-f224-447b-8ac4-7c49780baa2d",
+  "adventure": "project-reborn-1-6",
+  "name": "Project Reborn 1.6",
+  "creator": "zag",
+  "app": "9ec36f8d-e78b-446d-8278-aaf0adec15a8",
+  "sort": "hot"
+ },
+ {
+  "world": "f2e27048-1fd4-41c5-b9ff-e41bc9f7a1c4",
+  "adventure": "paintball-park-of-memphis-game-on",
+  "name": "Paintball Park of Memphis - GAME ON",
+  "creator": "vandevious",
+  "app": "c346c556-2122-4d88-acc6-0bf14bc8690b",
+  "sort": "hot"
+ },
+ {
+  "world": "4f50fd44-9e9a-4ca5-a5e5-f7d3905322af",
+  "adventure": "corrode-beta",
+  "name": "Corrode [Beta]",
+  "creator": "yuidev",
+  "app": "baec389c-ca44-485c-bf71-62948e94cb56",
+  "sort": "hot"
+ },
+ {
+  "world": "e292bf6b-023c-4571-b7f6-0fa8d587d3e0",
+  "adventure": "fnx",
+  "name": "FNX",
+  "creator": "robot",
+  "app": "56e7dfa5-b4f3-487d-9e7d-46c83a0e5b7c",
+  "sort": "hot"
+ },
+ {
+  "world": "cb3e572d-8c79-422b-bed4-66974a037632",
+  "adventure": "hypergamy-simulator",
+  "name": "Hypergamy Simulator",
+  "creator": "222",
+  "app": "7de62370-5c55-425f-bf49-08cd4d2e5d54",
+  "sort": "hot"
+ },
+ {
+  "world": "10df6f9e-b037-4d3c-a41f-5eb3dedcbc91",
+  "adventure": "warlings",
+  "name": "Warlings",
+  "creator": "toofz",
+  "app": "cab1a10a-0ead-4cbc-996d-3f24eef2a21a",
+  "sort": "hot"
+ },
+ {
+  "world": "8ac2551f-e5ca-4cb3-ad59-a91129c0e1a4",
+  "adventure": "bearsky",
+  "name": "Bearsky",
+  "creator": "fookamon",
+  "app": "2b6ae81a-055e-4aa9-8913-b3bbbe16ed58",
+  "sort": "hot"
+ },
+ {
+  "world": "d3756513-f5e1-47ce-b715-25e65ab68af7",
+  "adventure": "close-quarters",
+  "name": "Close Quarters",
+  "creator": "uncommonephemera",
+  "app": "e1e1334f-6a88-470b-af5c-754223648941",
+  "sort": "hot"
+ },
+ {
+  "world": "db27b155-ed0a-4503-b775-1fb33bf50b4c",
+  "adventure": "cat-haven",
+  "name": "Cat Haven",
+  "creator": "chizkeykkk",
+  "app": "d9e413d2-02cc-43ac-945e-137fe5400832",
+  "sort": "hot"
+ },
+ {
+  "world": "df0c76ff-905d-4ab3-9a6c-5328c4d947e0",
+  "adventure": "valenfeld",
+  "name": "Valenfeld",
+  "creator": "chubigans",
+  "app": "90199716-6484-4bf2-b0dc-38eb525d26e2",
+  "sort": "hot"
+ },
+ {
+  "world": "bdabcf5a-511c-417e-9609-f526f6dab1f4",
+  "adventure": "need-for-spawn",
+  "name": "Need for Spawn",
+  "creator": "chucky",
+  "app": "2af23258-1dfa-41ac-bcf7-2210071d6a92",
+  "sort": "hot"
+ },
+ {
+  "world": "d9c6c3c6-d3b8-4bb5-80ae-d3ebda587d73",
+  "adventure": "sakura-drift-tuning",
+  "name": "Sakura Drift Tuning",
+  "creator": "matt1x",
+  "app": "55afdc85-8c12-4b47-aa9b-5a838cdab83e",
+  "sort": "hot"
+ },
+ {
+  "world": "7d0f59d3-0310-47a8-a857-473cb59df403",
+  "adventure": "dust-2-dm",
+  "name": "Dust 2 DM",
+  "creator": "tiger",
+  "app": "10997fa1-3d68-4252-826f-7d35f5ba3394",
+  "sort": "hot"
+ },
+ {
+  "world": "94a98732-3adb-4392-bc22-a43ad31f4569",
+  "adventure": "underground-warfare",
+  "name": "UNDERGROUND WARFARE",
+  "creator": "retro",
+  "app": "a2364b34-da96-4e7b-986f-60359f4be25d",
+  "sort": "hot"
+ },
+ {
+  "world": "a06859af-1b8f-4890-9144-a0b4c71cfb37",
+  "adventure": "world-of-spawncraft-2",
+  "name": "World of Spawncraft",
+  "creator": "devcat",
+  "app": "81e520d9-6e29-45d3-a907-43961bf40843",
+  "sort": "hot"
+ },
+ {
+  "world": "7ef0eb38-1259-4710-ae1c-baf18b050064",
+  "adventure": "triarch",
+  "name": "Triarch",
+  "creator": "zatonic",
+  "app": "288b9120-847b-4a2a-b540-2a9dfb130914",
+  "sort": "hot"
+ },
+ {
+  "world": "d289e75d-2074-458a-87cb-e18e2c9c752a",
+  "adventure": "huss-valley",
+  "name": "Huss Valley",
+  "creator": "smallzero",
+  "app": "fcdfaffd-330a-4e60-b0ae-5f22a89348a8",
+  "sort": "hot"
+ },
+ {
+  "world": "fd9c1833-684e-4aea-ac29-b7b21e4d63c8",
+  "adventure": "the-tower",
+  "name": "The Tower",
+  "creator": "skyx",
+  "app": "7e60541e-92b2-4cde-9120-79454546e6d5",
+  "sort": "hot"
+ },
+ {
+  "world": "3f3d62a6-fdb8-4c7d-937a-e106c865a937",
+  "adventure": "wurst-wars",
+  "name": "Wurst Wars",
+  "creator": "papaur",
+  "app": "109d91af-a6a2-4e2f-9527-7d006777d2cc",
+  "sort": "hot"
+ },
+ {
+  "world": "d3f96b0a-ccf0-4692-a416-6d1572e2b235",
+  "adventure": "passive",
+  "name": "PASSIVE",
+  "creator": "longthunder",
+  "app": "d9f95785-ef54-4443-a609-3c8dd3ce6901",
+  "sort": "hot"
+ },
+ {
+  "world": "ecb629e1-721f-43a9-9def-f3eb7fab91bd",
+  "adventure": "munchie-match",
+  "name": "Munchie Match",
+  "creator": "psybergamesstudio",
+  "app": "961ffe67-5975-41fd-aceb-62bcb14e07a2",
+  "sort": "hot"
+ },
+ {
+  "world": "4e709464-ecfc-408f-980a-c3b5b46b0ee3",
+  "adventure": "gta-earth",
+  "name": "GTA Earth",
+  "creator": "borickk",
+  "app": "1a167899-8f22-4b48-9004-ef5c4bf1fd20",
+  "sort": "hot"
+ },
+ {
+  "world": "6b8d7640-a331-4c22-9cc7-c1551d1432df",
+  "adventure": "lifting-simulator",
+  "name": "Lifting Simulator",
+  "creator": "sh1soid",
+  "app": "ca069442-8459-41c7-81a4-5c730bd924d6",
+  "sort": "hot"
+ },
+ {
+  "world": "09f24769-50a8-4966-8300-f16a6062648e",
+  "adventure": "fruit-jar",
+  "name": "Fruit Jar",
+  "creator": "borickk",
+  "app": "aa9d873b-3c4a-46e8-8593-c49481155582",
+  "sort": "hot"
+ },
+ {
+  "world": "d7428b91-92d3-4470-a865-71d256bea5a7",
+  "adventure": "crown-split",
+  "name": "Crown Split",
+  "creator": "lrgkhaos",
+  "app": "14696ff2-1081-4fb5-a3f8-16bd264d34b6",
+  "sort": "hot"
+ },
+ {
+  "world": "ed1e28b0-810b-46a2-8fa4-6a9bc9420070",
+  "adventure": "matchinroage",
+  "name": "Matchinroage",
+  "creator": "match3lover",
+  "app": "af162cac-7ade-4c25-9238-e66f5d1a9b46",
+  "sort": "hot"
+ },
+ {
+  "world": "555347ab-d90b-4a7b-9edb-f1cc06e2df55",
+  "adventure": "lingo-lagoon",
+  "name": "Lingo Lagoon",
+  "creator": "cupcakellama",
+  "app": "f1bce2f7-b668-4cf6-b330-5a3276cfe566",
+  "sort": "hot"
+ },
+ {
+  "world": "b60a7d54-53e7-4518-bece-b818c813470e",
+  "adventure": "plinko-monsters",
+  "name": "Plinko & Monsters",
+  "creator": "cardshark",
+  "app": "5636baa9-c44f-4b8d-a4d8-fdbc6b86efe9",
+  "sort": "hot"
+ },
+ {
+  "world": "7dbc559e-cc32-4605-bc9d-cb6c0a56e41d",
+  "adventure": "gpu-peasant",
+  "name": "GPU Peasant",
+  "creator": "shadow_knight_71",
+  "app": "ba6b6c29-95e3-40da-88ed-d32e1578634b",
+  "sort": "hot"
+ },
+ {
+  "world": "b144513e-29fe-4603-88ae-b40f6694ba26",
+  "adventure": "aelorien-elf-village",
+  "name": "Aelorien Elf Village",
+  "creator": "borickk",
+  "app": "b7043913-9afb-4272-b16e-a953ba9f62e9",
+  "sort": "hot"
+ },
+ {
+  "world": "e3329b91-9f3e-4252-ad05-b92a9e0866cd",
+  "adventure": "first-date",
+  "name": "First Date",
+  "creator": "borickk",
+  "app": "7752acc3-c191-450f-a796-cdfc989df8fe",
+  "sort": "hot"
+ },
+ {
+  "world": "12a0110a-71db-4356-94d2-ba09b044d641",
+  "adventure": "fallen-nephilim",
+  "name": "Fallen Nephilim",
+  "creator": "obeylegend",
+  "app": "596ae7cc-ee04-4243-8fda-30e4a94ccc20",
+  "sort": "hot"
+ },
+ {
+  "world": "ab91c85e-293a-4fa3-a8e7-5eba1a4927db",
+  "adventure": "wisp-village",
+  "name": "Wisp Village",
+  "creator": "borickk",
+  "app": "53f1f8cd-888c-4c0e-b756-d43bead8deab",
+  "sort": "hot"
+ },
+ {
+  "world": "6db288dc-2ee0-44b5-a272-dcd38349fd18",
+  "adventure": "neon-surf",
+  "name": "Neon Surf",
+  "creator": "tiger",
+  "app": "6b0b8f54-51d1-48b4-b1c4-d34c5b598324",
+  "sort": "hot"
+ },
+ {
+  "world": "2a07c35b-5445-45f6-b022-9385b1c4cb80",
+  "adventure": "my-best-friend",
+  "name": "My Best Friend",
+  "creator": "dreamdoktor",
+  "app": "3dc0be9d-3bbc-474f-9da7-7fc5fd5a7ae7",
+  "sort": "hot"
+ },
+ {
+  "world": "245daa9b-c057-42bf-8f7f-1456fbd5ec68",
+  "adventure": "bossa-nova-broskis-prototype-wip",
+  "name": "Bossa Nova Broskis - Prototype/WIP",
+  "creator": "someguywefoundgames",
+  "app": "a6079ced-a3d5-47e5-af4c-2dbdc7715d92",
+  "sort": "hot"
+ },
+ {
+  "world": "13bf2fb3-765a-42a2-a3a0-1a614fb8942e",
+  "adventure": "glyphwood",
+  "name": "GLYPHWOOD",
+  "creator": "smallzero",
+  "app": "016f627b-b43e-40b4-b6bc-583cd16e5d33",
+  "sort": "hot"
+ },
+ {
+  "world": "d7e8b00c-2c5e-41e0-9e30-9b6f9c268808",
+  "adventure": "grinder-blood-money",
+  "name": "Grinder: Blood Money",
+  "creator": "beastslayer202",
+  "app": "2b4b7fdc-17bb-45fd-84ed-6d9d509662d2",
+  "sort": "hot"
+ },
+ {
+  "world": "19ec912b-c954-456c-b5bc-53142bf79452",
+  "adventure": "counter-flame",
+  "name": "Counter Flame",
+  "creator": "enixs228567",
+  "app": "d56a9551-2116-458d-b231-035efb441e2a",
+  "sort": "hot"
+ },
+ {
+  "world": "d84ac307-abd1-442c-b55b-53c31d39da14",
+  "adventure": "s-t-a-l-k-e-r-alternative",
+  "name": "S.T.A.L.K.E.R. Alternative",
+  "creator": "marlen",
+  "app": "e8472205-6e02-43f9-b18d-30dc9dee1691",
+  "sort": "hot"
+ },
+ {
+  "world": "fee339ff-f97a-4076-b944-8bef7c416e22",
+  "adventure": "holy-circuit-a-templeos-game",
+  "name": "Holy Circuit: A TempleOS Game",
+  "creator": "arc_keeper_77",
+  "app": "399dab7f-e094-4954-bbe1-b216f6ad2ed2",
+  "sort": "hot"
+ },
+ {
+  "world": "1d60c1c8-7b96-4126-bea8-538a17bd42b1",
+  "adventure": "call-of-dih",
+  "name": "CALL OF DIH",
+  "creator": "landonion",
+  "app": "1c5061f6-800d-474f-a09b-8e8570be288b",
+  "sort": "hot"
+ },
+ {
+  "world": "b9b68a5e-67da-425c-a1bf-fdf84e51cb8f",
+  "adventure": "mg-south-park",
+  "name": "MG South Park",
+  "creator": "andreamgdev",
+  "app": "17d29076-e08c-4eee-a40f-b4ce53447e8d",
+  "sort": "hot"
+ },
+ {
+  "world": "93509f48-6b17-4cfb-8905-42c6203c81ac",
+  "adventure": "inazuma-eleven-2d",
+  "name": "Inazuma Eleven 2D",
+  "creator": "andreamgdev",
+  "app": "469cd1bc-f88d-4b3c-88ca-224c04b0ae0f",
+  "sort": "hot"
+ },
+ {
+  "world": "dc9c07fa-c12a-4ec7-a4bd-c96aefa822c8",
+  "adventure": "skin-club-spawn",
+  "name": "Skin.Club Spawn",
+  "creator": "relic",
+  "app": "b2e95b7d-0f1d-469c-be93-556467abbbcd",
+  "sort": "hot"
+ },
+ {
+  "world": "a99cb035-b1c6-4f70-94b0-5bf3e28bdf11",
+  "adventure": "mote",
+  "name": "Mote",
+  "creator": "dogg",
+  "app": "83010951-1ecb-4033-a78d-992bb8ddcc8f",
+  "sort": "hot"
+ },
+ {
+  "world": "94be2b7e-6626-454f-835c-19fe638dd35c",
+  "adventure": "spawndle",
+  "name": "Spawndle",
+  "creator": "dreamcatcher",
+  "app": "b9d12d64-bf92-4ebd-baa8-a7aaac4e1e7a",
+  "sort": "hot"
+ },
+ {
+  "world": "33940c45-cff2-4403-8895-067846373253",
+  "adventure": "mg-switch-2-simulator",
+  "name": "MG Switch 2 Simulator",
+  "creator": "andreamgdev",
+  "app": "04dad635-f30b-40ac-b841-d06cd277de53",
+  "sort": "hot"
+ },
+ {
+  "world": "77ce5e32-8f07-4ed3-90c5-775c7ff77a6c",
+  "adventure": "event-horizon",
+  "name": "Event Horizon",
+  "creator": "coffeewithcross",
+  "app": "33f42aca-d347-4d85-b4ff-5c73ec856351",
+  "sort": "hot"
+ },
+ {
+  "world": "f385b82b-2218-45a4-97b7-b214429cae55",
+  "adventure": "silent-moon",
+  "name": "Silent Moon",
+  "creator": "betteroffgaming",
+  "app": "10174073-40d6-40cf-bfd3-50097f3baae3",
+  "sort": "hot"
+ },
+ {
+  "world": "f2ae8bcb-3000-4d21-92f3-1be05c078e8e",
+  "adventure": "neon-pulse",
+  "name": "Neon Pulse",
+  "creator": "tuna",
+  "app": "9412432a-d96e-4c05-b79b-8161da57dba3",
+  "sort": "hot"
+ },
+ {
+  "world": "fe805e85-e4a9-4c55-9207-981548db49cd",
+  "adventure": "canyon-overdrive-reloaded",
+  "name": "Canyon Overdrive Reloaded",
+  "creator": "aianddesign",
+  "app": "420e0582-1597-4929-a749-725170eddf8b",
+  "sort": "hot"
+ },
+ {
+  "world": "0fc0e87f-89e0-468e-9af4-258feaf63bde",
+  "adventure": "hedgecraft",
+  "name": "Hedgecraft",
+  "creator": "fofofolife",
+  "app": "21d6eff9-eaed-4932-885f-91ee47ca89de",
+  "sort": "hot"
+ },
+ {
+  "world": "54bda0f1-b08c-4467-a2d6-fc1fb7fcdb5a",
+  "adventure": "soul-keeper-the-last-candle",
+  "name": "Soul Keeper: The Last Candle",
+  "creator": "bomb_bo",
+  "app": "ea608e6c-6b13-48b8-9b90-053c2f2de37c",
+  "sort": "hot"
+ },
+ {
+  "world": "b00a61d1-449b-4dc9-8b01-2051bee23284",
+  "adventure": "bario-kart",
+  "name": "Bario Kart",
+  "creator": "hotdog",
+  "app": "d311b52b-d2f9-40ee-bf67-a96bcd88cdeb",
+  "sort": "hot"
+ },
+ {
+  "world": "fb6f2e4f-2181-4c9d-899d-8753ad9bdb5d",
+  "adventure": "second-nature",
+  "name": "Second Nature",
+  "creator": "unkoolj",
+  "app": "3e10fb1e-35a0-4815-9ebf-da30cfe60421",
+  "sort": "hot"
+ },
+ {
+  "world": "180245b7-7ced-45dc-814f-c478bf126a4b",
+  "adventure": "street-chaves-ii",
+  "name": "Street Chaves II",
+  "creator": "blastore",
+  "app": "43eb30e5-4c57-4233-a293-d5fa9ddd0de2",
+  "sort": "hot"
+ },
+ {
+  "world": "84aa3907-117b-435b-bd3e-ecad0bb96497",
+  "adventure": "still-water",
+  "name": "Still Water",
+  "creator": "ttkcrusader",
+  "app": "28ed7b31-61b3-489b-82e4-e9425e8038cd",
+  "sort": "hot"
+ },
+ {
+  "world": "0e8e98ae-f22d-4fd2-9ae7-10c8c08652ac",
+  "adventure": "aegis-link-2",
+  "name": "Aegis-Link",
+  "creator": "giraffe",
+  "app": "bddb2cd4-52f0-43e7-9699-ea0e2a07c4fd",
+  "sort": "hot"
+ },
+ {
+  "world": "359eed0f-2be2-4c22-8353-f8ea4f12c07f",
+  "adventure": "pegi",
+  "name": "pegi",
+  "creator": "wavebinder",
+  "app": "39027c87-d5b4-4569-921b-a4671f8a9cd0",
+  "sort": "hot"
+ },
+ {
+  "world": "a422353c-7bed-4f01-aa02-8869fdc699bb",
+  "adventure": "realm-of-crafts",
+  "name": "Realm of Crafts",
+  "creator": "ebd",
+  "app": "025107fc-5a36-46ed-9c89-f07494d2bbe2",
+  "sort": "hot"
+ },
+ {
+  "world": "51bce911-ec8b-4744-a9e8-55ec25b8a43b",
+  "adventure": "ten-days-babysitting-horror",
+  "name": "Ten Days Babysitting (horror)",
+  "creator": "ghost_dragon",
+  "app": "92ce5e30-0abd-4a6d-ab15-6287bb7516be",
+  "sort": "hot"
+ },
+ {
+  "world": "38fef523-1b9e-4683-9491-6337b107b106",
+  "adventure": "lord-of-the-rings-honor-of-the-king",
+  "name": "Lord of the Rings: Honor of the King",
+  "creator": "masternathan",
+  "app": "069d5e71-ac10-420c-8603-3355886ae582",
+  "sort": "hot"
+ },
+ {
+  "world": "ebbb60af-3040-41e4-b00d-9f2465982359",
+  "adventure": "sunset-city-rp",
+  "name": "Sunset City RP",
+  "creator": "hussain",
+  "app": "9279f540-f0b7-47b5-a524-5867f63ea348",
+  "sort": "hot"
+ },
+ {
+  "world": "e34a9f4d-b884-47a2-bdfd-5f848bbec455",
+  "adventure": "drawn",
+  "name": "drawn",
+  "creator": "atfundum",
+  "app": "db488126-1dda-4779-99e0-f5cb53f85e58",
+  "sort": "hot"
+ },
+ {
+  "world": "fedce11c-2ee7-435f-86f9-153e3576de34",
+  "adventure": "golden-hour-sortie",
+  "name": "Golden Hour Sortie",
+  "creator": "enfeul",
+  "app": "075181c5-2944-470b-8ffb-842ad0544023",
+  "sort": "hot"
+ },
+ {
+  "world": "b62d2032-360e-4910-950f-1bed25cb4a73",
+  "adventure": "game-portal",
+  "name": "GAME PORTAL",
+  "creator": "fitty",
+  "app": "ac340860-4011-4c4b-8cab-48a8ba71e1ab",
+  "sort": "hot"
+ },
+ {
+  "world": "8e1ecbcc-1c62-46d5-983c-690cebd50406",
+  "adventure": "crunch-em-up-derby",
+  "name": "Crunch-em-up Derby",
+  "creator": "nickyp",
+  "app": "71fca885-df66-4894-b607-58b8262ecaf9",
+  "sort": "hot"
+ },
+ {
+  "world": "43b1bf2c-6242-48a5-a5fb-c778afbc69c6",
+  "adventure": "clumsy-hammer",
+  "name": "Clumsy Hammer",
+  "creator": "prompt_knight",
+  "app": "790311b4-9147-4afe-84ba-ed300160d6d6",
+  "sort": "hot"
+ },
+ {
+  "world": "88c8bc7c-d684-4401-ba62-81df5a744657",
+  "adventure": "red-lies-of-space",
+  "name": "Red Lies of Space",
+  "creator": "suplexnexgen",
+  "app": "31bcb235-61c0-4f16-9acc-1c7cb1df046a",
+  "sort": "hot"
+ },
+ {
+  "world": "ad879ce9-f82c-462e-8d8d-e0655ac68a5f",
+  "adventure": "dead-floor",
+  "name": "DEAD FLOOR",
+  "creator": "fbp",
+  "app": "d28f199d-c551-4429-a1fc-78ccdb16c028",
+  "sort": "hot"
+ }
+]

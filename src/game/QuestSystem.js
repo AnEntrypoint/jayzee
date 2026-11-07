@@ -1,0 +1,260 @@
+import { parsePlayerId } from './playerId.js'
+
+export function defineQuestSystem(spec = {}, appCtx = null) {
+  const quests = (spec.quests && typeof spec.quests === 'object') ? spec.quests : {}
+  const channel = spec.channel || 'quests'
+  const now = spec.now || Date.now
+  const statsSystem = () => spec.stats || appCtx?.progression || null
+  const inventorySystem = () => spec.inventory || appCtx?.inventory || null
+
+  for (const [id, def] of Object.entries(quests)) {
+    if (!def || typeof def !== 'object') throw new Error(`[quest] quest "${id}" must be an object`)
+    if (!def.title || typeof def.title !== 'string') throw new Error(`[quest] quest "${id}" missing or invalid title`)
+    if (!Array.isArray(def.objectives)) throw new Error(`[quest] quest "${id}" missing objectives array`)
+    if (!def.rewards || typeof def.rewards !== 'object') throw new Error(`[quest] quest "${id}" missing rewards`)
+  }
+
+  const _playerQuests = new Map()
+
+  const _getPlayerData = (pid) => {
+    const key = parsePlayerId(pid)
+    let data = _playerQuests.get(key)
+    if (!data) {
+      data = new Map()
+      _playerQuests.set(key, data)
+    }
+    return data
+  }
+
+  const _fire = (name, arg) => {
+    const fn = spec[name]
+    if (typeof fn === 'function') {
+      try { fn(appCtx, arg) } catch (e) {
+        appCtx?.debug?.warn?.('[quest] ' + name + ' threw: ' + e.message)
+      }
+    }
+  }
+
+  const _pushToClient = (pid, questId) => {
+    const data = _getPlayerData(pid)
+    const quest = data.get(questId)
+    if (quest) {
+      appCtx?.players?.send?.(pid, {
+        type: channel,
+        questId,
+        state: quest.state,
+        progress: quest.progress,
+        completedAt: quest.completedAt || null,
+      })
+    }
+  }
+
+  const questSystem = {
+    startQuest(pid, questId) {
+      const data = _getPlayerData(pid)
+      if (!quests[questId]) return { ok: false, reason: 'unknown-quest' }
+
+      const existing = data.get(questId)
+      const replayable = existing?.state === 'claimed' && quests[questId].repeatable === true
+      if (existing && !replayable) return { ok: false, reason: 'already-started' }
+
+      const questDef = quests[questId]
+      const progress = questDef.objectives.map(() => 0)
+
+      data.set(questId, {
+        state: 'active',
+        progress,
+        startedAt: now(),
+      })
+
+      _fire('onQuestStart', { playerId: parsePlayerId(pid), questId })
+      _pushToClient(pid, questId)
+      return { ok: true }
+    },
+
+    completeObjective(pid, questId, objectiveIndex, amount = 1) {
+      const data = _getPlayerData(pid)
+      const quest = data.get(questId)
+
+      if (!quest) return { ok: false, reason: 'unknown-quest' }
+      if (quest.state !== 'active') return { ok: false, reason: 'not-active' }
+
+      const questDef = quests[questId]
+      if (!questDef) return { ok: false, reason: 'unknown-quest' }
+      if (!questDef.objectives[objectiveIndex]) return { ok: false, reason: 'bad-objective' }
+
+      if (!(typeof amount === 'number' && Number.isFinite(amount)) || amount <= 0) {
+        return { ok: false, reason: 'bad-amount' }
+      }
+
+      const objective = questDef.objectives[objectiveIndex]
+      const target = objective.count || 1
+      if (quest.progress[objectiveIndex] >= target) return { ok: false, reason: 'already-at-target' }
+
+      quest.progress[objectiveIndex] = Math.min(target, quest.progress[objectiveIndex] + amount)
+
+      _fire('onObjectiveProgress', {
+        playerId: parsePlayerId(pid),
+        questId,
+        objectiveIndex,
+        progress: quest.progress[objectiveIndex],
+        target,
+      })
+
+      _pushToClient(pid, questId)
+
+      const allComplete = questDef.objectives.every((obj, i) => quest.progress[i] >= (obj.count || 1))
+
+      if (allComplete) {
+        quest.state = 'complete'
+        quest.completedAt = now()
+        _fire('onQuestComplete', {
+          playerId: parsePlayerId(pid),
+          questId,
+          rewards: questDef.rewards,
+        })
+        _pushToClient(pid, questId)
+      }
+
+      return { ok: true }
+    },
+
+    claimReward(pid, questId) {
+      const data = _getPlayerData(pid)
+      const quest = data.get(questId)
+
+      if (!quest) return { ok: false, reason: 'unknown-quest' }
+      if (quest.state !== 'complete') return { ok: false, reason: 'not-complete' }
+
+      const questDef = quests[questId]
+      if (!questDef) return { ok: false, reason: 'unknown-quest' }
+
+      const rewards = questDef.rewards
+      quest.state = 'claimed'
+      quest.claimedAt = now()
+
+      const stats = statsSystem()
+      const inventory = inventorySystem()
+
+      if (rewards.xp && stats?.addXP) {
+        stats.addXP(pid, rewards.xp)
+      }
+
+      if (rewards.items && inventory?.add) {
+        for (const [itemId, count] of Object.entries(rewards.items)) {
+          inventory.add(pid, itemId, count)
+        }
+      }
+
+      if (rewards.statBonuses && stats?.applyBonus) {
+        for (const [stat, bonus] of Object.entries(rewards.statBonuses)) {
+          stats.applyBonus(pid, stat, bonus)
+        }
+      }
+
+      _pushToClient(pid, questId)
+      return { ok: true, xp: rewards.xp || 0, items: rewards.items || {}, statBonuses: rewards.statBonuses || {} }
+    },
+
+    push(pid) {
+      for (const questId of _getPlayerData(pid).keys()) _pushToClient(pid, questId)
+    },
+
+    getQuestState(pid, questId) {
+      const data = _getPlayerData(pid)
+      const quest = data.get(questId)
+      if (!quest) return null
+
+      return {
+        questId,
+        state: quest.state,
+        progress: [...quest.progress],
+        startedAt: quest.startedAt || null,
+        completedAt: quest.completedAt || null,
+        claimedAt: quest.claimedAt || null,
+      }
+    },
+
+    getPlayerQuests(pid) {
+      const data = _getPlayerData(pid)
+      const result = {}
+
+      for (const [questId, state] of data) {
+        result[questId] = {
+          state: state.state,
+          progress: [...state.progress],
+          startedAt: state.startedAt || null,
+          completedAt: state.completedAt || null,
+          claimedAt: state.claimedAt || null,
+        }
+      }
+
+      return result
+    },
+
+    getAllQuestProgress(pid) {
+      const data = _getPlayerData(pid)
+      const result = {}
+
+      for (const [questId, questDef] of Object.entries(quests)) {
+        const playerQuest = data.get(questId)
+        result[questId] = {
+          title: questDef.title,
+          description: questDef.description,
+          objectives: questDef.objectives.map((obj, i) => ({
+            type: obj.type,
+            description: obj.description || `${obj.type} objective`,
+            progress: playerQuest ? playerQuest.progress[i] || 0 : 0,
+            target: obj.count || 1,
+          })),
+          state: playerQuest?.state || 'available',
+          rewards: questDef.rewards,
+        }
+      }
+
+      return result
+    },
+
+    snapshot() {
+      const data = {}
+      for (const [pid, quests] of _playerQuests) {
+        data[pid] = {}
+        for (const [questId, quest] of quests) {
+          data[pid][questId] = {
+            state: quest.state,
+            progress: [...quest.progress],
+            startedAt: quest.startedAt,
+            completedAt: quest.completedAt,
+            claimedAt: quest.claimedAt,
+          }
+        }
+      }
+      return data
+    },
+
+    restore(data) {
+      if (!data || typeof data !== 'object') return
+      _playerQuests.clear()
+
+      for (const [pid, playerQuests] of Object.entries(data)) {
+        const questMap = new Map()
+        for (const [questId, quest] of Object.entries(playerQuests)) {
+          questMap.set(questId, {
+            state: quest.state,
+            progress: Array.isArray(quest.progress) ? [...quest.progress] : [],
+            startedAt: quest.startedAt,
+            completedAt: quest.completedAt,
+            claimedAt: quest.claimedAt,
+          })
+        }
+        if (questMap.size > 0) {
+          _playerQuests.set(pid, questMap)
+        }
+      }
+    },
+  }
+
+  return questSystem
+}
+
+export default defineQuestSystem

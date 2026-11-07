@@ -1,0 +1,5 @@
+export { HotReloadQueue } from './hotReloadQueue.js'
+export { updateKey } from './updateKey.js'
+export { createCoalescer } from './coalescer.js'
+export { decideUpdate } from './decideUpdate.js'
+export { ancestorsOf, findBoundaries, isClass, loadedByPath, createLoadedPaths, sameValue, nothingLive } from './hmrDecide.js'
