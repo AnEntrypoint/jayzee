@@ -58,6 +58,18 @@ Sources are spoint at d5e3860 (INVENTORY.md and FAMILIES.md from the spoint agen
 - spoint-owned, not built in jayzee: package.json scripts check:bundle-freshness and check:bundle-freshness:require-bundle call scripts/bundle-freshness-witness.mjs, which does not exist. spoint is read-only for jayzee, so the fix belongs to the spoint owner.
 - jayzee feature, not started: bundle freshness as a feature is not part of the spoint physics or netcode surface. It stays out of scope until the owner decides it belongs in this package.
 - spoint-owned, no witness: fire kernel and behaviour (src/shared/fire, src/behaviours/fire*.js). jayzee will write its own witness for the fire kernel in row 26.
+- spoint-owned, behaviour gap: src/apps/AppRuntime.js (around lines 436 to 444) logs a trimesh build failure, sets the collider to null and carries on. It does not propagate ColliderBuildError, which spoint's AGENTS.md requires. Any collider build in jayzee must propagate such failures, not drop them.
+- spoint-owned, behaviour gap: port 3002 is declared by apps/world/tps-game.js, tutorial.js and tutorial-rpg.js, so the three collide if run together.
+- spoint-owned, PRD residual: WADLER-relocation-probegroundy-m2-s1 in src/sdk/Relocation.js. probeGroundY discards the reason. spoint-88's classes: 1 REAL, 11 STALE, 2 DOC-ONLY, 1 UNVERIFIED, 0 HELD across the 15 open PRD rows. The matrix is at /tmp/spoint-parity/prd-matrix.json, witnessed by build-prd-matrix.mjs.
+
+## Open source questions
+
+Each answer comes from spoint-88's check of spoint at d5e3860. Each stays OPEN in jayzee until a source documents the rule.
+
+- Name encoder for ledger names (row 1): spoint has no encodeName or nameEncoder in src, scripts or client. OPEN. jayzee implements decoding only.
+- Ledger bucket rule for world.assets/<xx>/ (row 1): spoint has no ledger-bucket concept. The nearest code is token buckets (src/netcode/InputGuard.js, isInputRateLimited and clearInputBucket). The rewind bucket in spoint's DESIGN.md (capacity 10, refill 20 per second) has no located code. UNVERIFIED. jayzee checks the shape only.
+- Resolve result types besides found (row 1): spoint's only resolve is occlusion queries (docs/engine-graph.md, docs/rendering.md). OPEN. jayzee throws on any other type.
+- Manifest frames after the sheet (row 1): not documented. The nearest spoint code is src/apps/appsManifest.js and scripts/bundle-apps-manifest.mjs, which are not the same format. OPEN. jayzee does not parse frames after the sheet.
 
 ## Conflicts to resolve in the sources
 
