@@ -46,6 +46,18 @@ Measured with `npm run bench` on Node 24, 8 solver iterations, 200 measured tick
 
 The budget at 64 Hz is 15.6 ms per tick, so this kernel fits it up to roughly 1000 bodies with eight iterations. Four iterations roughly halves the pair cost. The cost is per typed-array access in the compiled wasm, not warm-up: `--no-liftoff` changes nothing.
 
+## Netcode
+
+- The client sends each tick's input in a packet that also carries the previous 15 inputs. Any single packet can be lost without a gap.
+- The server keeps an `InputBuffer` per player. It accepts out-of-order packets, ignores duplicates and stale inputs, and takes exactly one input per tick. A missing input holds the last movement for up to four ticks, then goes neutral.
+- Playout delay: the server processes tick t at its step t + 12. Input t can arrive in any packet sent between steps t and t + 12, so the 16-input redundancy survives long loss bursts. With a delay of 4 the same redundancy leaves gaps under 30% loss (22 of 900 inputs in the witness).
+- Canonical inputs: both sides apply the decoded wire value, not the raw intent, so both run identical numbers. `canonicalInput` is the single place that quantizes.
+- Prediction: the client predicts one tick per step. On each state from the server it imports the exact float64 state, drops the acknowledged inputs and replays the rest. A state from a tick it has not reached throws.
+- Authority: one tick per `Authority#step` takes one input per player, applies its movement and steps the world once.
+- The state codec carries float64 positions and velocities, because reconciliation must be exact. The float32 snapshot remains for display and broadcast.
+- Witness: `npm run check:netcode` runs 900 ticks with 30% input loss, input delay of 0 to 3 ticks, 10% state loss and state delay of 0 to 2 ticks. Every client tick matches an offline trajectory bit for bit, and the client converges to the server state. A control run with a 4-tick playout delay shows the gaps that the 12-tick delay removes.
+
+Not yet covered: more than one predicted player in the witness, jump and other buttons (only movement is simulated), bandwidth budgets, interest management and client-side smoothing of corrections.
 ## Wire formats
 
 - Input packet: version (u8), record count (u8), then 12-byte records: sequence (u32), moveX (i8, 127 = 1.0), moveZ (i8), yaw (u16, 65536 steps per turn), buttons (u32 bitmask). Out-of-range fields throw, they are not clamped.
@@ -58,7 +70,7 @@ The budget at 64 Hz is 15.6 ms per tick, so this kernel fits it up to roughly 10
 | `src/physics` (Jolt wrapper) | `src/kernel` | Replaced by jz kernels. Jolt is not ported. |
 | `src/sdk/TickHandler.js` pipeline | `World#step` | Ported: integrate, ground, boxes, pairs |
 | `src/protocol` (MessagePack, InputCodec) | `src/protocol` | Ported as fixed binary layouts. MessagePack is dropped. |
-| `src/netcode` (prediction, AOI, bandwidth budget) | none yet | Not ported. Lands as host modules over the same kernel. |
+| `src/netcode` (prediction, AOI, bandwidth budget) | `src/netcode` | Input buffer, prediction, reconciliation and authority are ported. AOI and bandwidth budgets are not. |
 | `src/apps` (AppRuntime, app lifecycle) | none yet | Not ported. Lands as a host plugin layer. |
 | `src/terrain`, `src/static`, `src/fluid` | none | Out of scope for this core. |
 | `src/transport`, `src/sharding`, `src/storage` | none | Out of scope for this core. |
@@ -68,7 +80,7 @@ The budget at 64 Hz is 15.6 ms per tick, so this kernel fits it up to roughly 10
 
 - Body-to-body and body-to-box contacts for non-sphere shapes.
 - Character controller semantics (slopes, steps, capsules).
-- Netcode: input buffering, prediction and reconciliation, interest management, bandwidth budgets.
+- Netcode: interest management, bandwidth budgets, jump and other buttons, client-side smoothing.
 - App lifecycle and hot reload.
 
 Each lands as a host module over the existing kernel, without changing kernel signatures unless a test shows a kernel defect.

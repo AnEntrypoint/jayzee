@@ -23,3 +23,9 @@ Non-obvious facts for automated edits. Architecture and measured costs live in d
 - A kernel call costs roughly 15 to 25 ns per typed-array access in compiled wasm. A loop that reads a value more than once should keep it in a local.
 - The package needs Node 22 or newer. `.nvmrc` pins 24.
 - Commit as lanmower, with no trailers, under the owner rule in CLAUDE.md.
+- `Authority` takes one input per player per tick, so `InputBuffer.next` must equal the world tick plus one. Add every player before the first `step`; a player added later starts at sequence 1 and falls out of step.
+- `Predictor#predict` defaults `buttons` to 0. The sequence it assigns is the world tick plus one, so predict only once per tick.
+- `Predictor#reconcile` keeps unacknowledged inputs until a state covers them. Under sustained loss the pending list grows with the gap between acknowledgements.
+- The netcode witness uses one seeded generator for intents, loss and delay. Changing the order of random draws changes its numbers, not its verdict. The 4-tick control is expected to show gaps and must keep doing so, or the witness no longer tests what it claims.
+- Redundancy works only up to the playout delay. Each input has `delay + 1` chances before its playout time, so raising the redundancy above that buys nothing.
+- `World#importState` resets the accumulator, so a restore partway through a fixed step drops that remainder on purpose.

@@ -42,6 +42,11 @@ decodeSnapshot(frame)
 | `World#snapshot()` | Tick, count and a copy of the positions |
 | `encodeInputs` / `decodeInputs` | Versioned binary input packets |
 | `encodeSnapshot` / `decodeSnapshot` | Versioned binary snapshots, float32 positions |
+| `encodeState` / `decodeState` | Versioned lossless state, float64 positions and velocities |
+| `InputBuffer` | Per-player input queue: reordering, duplicates, holds on gaps |
+| `Predictor` | Client prediction and reconciliation against authoritative states |
+| `Authority` | Server side: one input per player per tick, then a world step |
+| `World#exportState` / `importState` | Lossless state round trip for a world |
 
 Types ship in `types/index.d.ts` and are checked by `npm run check:types`.
 
@@ -50,6 +55,7 @@ Types ship in `types/index.d.ts` and are checked by `npm run check:types`.
 ```sh
 npm test                       # rebuilds the kernel, then runs the suites
 npm run check:types        # type-checks the declarations and a usage file
+npm run check:netcode      # prediction witness under loss and latency
 npm run bench -- 2000 200    # bodies, measured ticks
 ```
 
