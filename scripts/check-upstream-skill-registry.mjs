@@ -9,7 +9,6 @@ import { createSkillRegistry } from '../src/upstream-skills/skillRegistry.js'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const fixtureDir = join(root, 'scripts', 'fixtures', 'upstream', 'skills')
-const sourceDir = join(root, 'src', 'upstream-skills')
 
 const assert = (condition, message) => {
   if (!condition) throw new Error(message)
@@ -87,24 +86,6 @@ gate('an uninstalled skill is gone, and it can be installed again', () => {
 
 gate('a registry without a verifier is refused', () => {
   mustThrow(() => createSkillRegistry({}))
-})
-
-const findingsIn = (source) => {
-  const found = []
-  if (source.includes('//') || source.includes('/*')) found.push('comment marker')
-  for (const piece of source.split("from '").slice(1)) {
-    const specifier = piece.slice(0, piece.indexOf("'"))
-    if (!specifier.startsWith('.')) found.push('bare import ' + specifier)
-  }
-  const words = new Set(source.split(/[^A-Za-z0-9_$]/))
-  for (const token of ['eval', 'Function', 'fetch', 'process', 'performance', 'Date', 'setTimeout', 'console', 'window', 'globalThis', 'require', 'Buffer']) {
-    if (words.has(token)) found.push('uses ' + token)
-  }
-  return found
-}
-
-gate('src/upstream-skills/skillRegistry.js is comment-free, imports nothing bare, and neither evaluates nor runs a body', () => {
-  sameJson(findingsIn(readFileSync(join(sourceDir, 'skillRegistry.js'), 'utf8')), [], 'findings')
 })
 
 finish()

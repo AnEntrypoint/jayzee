@@ -8,7 +8,6 @@ import { headingsOf, lookupByFile, lookupByHeading, lookupText } from '../src/up
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const tomeDir = join(root, 'scripts', 'fixtures', 'upstream', 'tome')
-const sourceDir = join(root, 'src', 'upstream-tome')
 
 const assert = (condition, message) => {
   if (!condition) throw new Error(message)
@@ -75,24 +74,6 @@ gate('a section whose body is not strict UTF-8 is refused by the text lookup', (
 gate('heading matching is exact: a different case or a trailing space finds nothing', () => {
   sameJson(lookupByHeading(sections, 'identity'), [], 'lower case')
   sameJson(lookupByHeading(sections, 'Identity '), [], 'trailing space')
-})
-
-const findingsIn = (source) => {
-  const found = []
-  if (source.includes('//') || source.includes('/*')) found.push('comment marker')
-  for (const piece of source.split("from '").slice(1)) {
-    const specifier = piece.slice(0, piece.indexOf("'"))
-    if (!specifier.startsWith('.')) found.push('bare import ' + specifier)
-  }
-  const words = new Set(source.split(/[^A-Za-z0-9_$]/))
-  for (const token of ['process', 'performance', 'Date', 'setTimeout', 'clearTimeout', 'setImmediate', 'setInterval', 'console', 'window', 'globalThis', 'require', 'Buffer', 'URL']) {
-    if (words.has(token)) found.push('uses ' + token)
-  }
-  return found
-}
-
-gate('src/upstream-tome/tomeLookup.js is comment-free, imports nothing bare and reads no host global', () => {
-  sameJson(findingsIn(readFileSync(join(sourceDir, 'tomeLookup.js'), 'utf8')), [], 'findings')
 })
 
 finish()

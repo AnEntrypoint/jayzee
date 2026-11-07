@@ -9,6 +9,7 @@ Non-obvious facts for automated edits. Architecture and measured costs live in d
 - Edit source, never dist/. `npm test` rebuilds dist/kernel.wasm before the suites run.
 - A kernel signature change touches `src/kernel/step.js`, `src/world/World.js` and the kernel tests together. `step` passes its arguments positionally.
 - Keep `MODULES` in `src/kernel/build.js` in step with the imports. A missing file fails the build with an unresolved import.
+- Hygiene scans (comment markers, bare imports, host globals) live only in `scripts/check-hygiene.mjs`. A source directory that needs them joins its `SCOPES` table, not a per-file gate.
 - scripts/lib/gate.mjs holds the shared PASS and FAIL reporter. A new gate imports it, runs each claim through gate(label, fn), and ends with finish().
 
 ## Facts that bite

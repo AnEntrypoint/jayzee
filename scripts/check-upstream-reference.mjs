@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { gate, finish } from './lib/gate.mjs'
@@ -7,7 +7,6 @@ import { bucketOf, countBuckets, parseReadmeTotals, sumOf } from '../src/upstrea
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const readmePath = join(root, 'scripts', 'fixtures', 'upstream', 'reference', 'README.md')
 const pathsPath = join(root, 'scripts', 'fixtures', 'upstream', 'reference', 'PATHS.txt')
-const sourceDir = join(root, 'src', 'upstream-reference')
 const INDEXED = ['tome', 'skills', 'engine', 'cli', 'http', 'guide']
 
 const assert = (condition, message) => {
@@ -58,32 +57,6 @@ gate('bucket rules place top-level files, the cli types directory and paths of e
   same(bucketOf('.spawn/reference/cli/types/Foo.txt'), 'cli-types', 'cli types')
   same(bucketOf('.spawn/reference/cli/INDEX.md'), 'cli', 'cli index')
   same(bucketOf('.spawn/reference/engine-deep/api-b.md'), 'engine-deep', 'engine-deep')
-})
-
-const hostGlobals = ['process', 'performance', 'Date', 'setTimeout', 'clearTimeout', 'setImmediate', 'setInterval', 'console', 'window', 'globalThis', 'require']
-
-const findingsIn = (source) => {
-  const found = []
-  if (source.includes('//') || source.includes('/*')) found.push('comment marker')
-  for (const piece of source.split("from '").slice(1)) {
-    const specifier = piece.slice(0, piece.indexOf("'"))
-    if (!specifier.startsWith('.')) found.push('bare import ' + specifier)
-  }
-  const words = new Set(source.split(/[^A-Za-z0-9_$]/))
-  for (const token of hostGlobals) {
-    if (words.has(token)) found.push('uses ' + token)
-  }
-  return found
-}
-
-gate('src/upstream-reference is comment-free, imports nothing bare and reads no host global', () => {
-  const names = readdirSync(sourceDir).filter((name) => name.endsWith('.js')).sort()
-  sameJson(names, ['referenceIndex.js'], 'source files')
-  for (const name of names) {
-    const found = findingsIn(readFileSync(join(sourceDir, name), 'utf8'))
-    assert(found.length === 0, name + ': ' + found.join(', '))
-  }
-  mustReject(() => assert(findingsIn("import fs from 'node:fs'\nconst t = performance.now() // x").length === 0, 'negative sample'))
 })
 
 finish()

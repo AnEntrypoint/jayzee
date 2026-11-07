@@ -1,4 +1,3 @@
-import { readFileSync, readdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { gate, finish } from './lib/gate.mjs'
@@ -14,7 +13,6 @@ import {
   createTickScheduler,
 } from '../src/tick-pure/tickScheduler.js'
 
-const sourceDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'src', 'tick-pure')
 const TICK_60 = 1000 / 60
 
 const assert = (condition, message) => {
@@ -252,32 +250,6 @@ gate('the scheduler refuses a missing clock, timer or logger instead of reading 
   mustReject(() => createTickScheduler({ clock: h.clock, setTimer: null, clearTimer: h.clearTimer, logger: recorder() }))
   mustReject(() => createTickScheduler({ clock: h.clock, setTimer: h.setTimer, clearTimer: h.clearTimer, logger: {} }))
   mustReject(() => createTickScheduler({ clock: h.clock, setTimer: h.setTimer, clearTimer: h.clearTimer, logger: recorder(), tickRate: 0 }))
-})
-
-const hostGlobals = ['process', 'performance', 'Date', 'setTimeout', 'clearTimeout', 'setImmediate', 'setInterval', 'console', 'window', 'globalThis', 'require']
-
-const findingsIn = (text) => {
-  const found = []
-  if (text.includes('//') || text.includes('/*')) found.push('comment marker')
-  for (const piece of text.split("from '").slice(1)) {
-    const source = piece.slice(0, piece.indexOf("'"))
-    if (!source.startsWith('.')) found.push('bare import ' + source)
-  }
-  const words = new Set(text.split(/[^A-Za-z0-9_$]/))
-  for (const token of hostGlobals) {
-    if (words.has(token)) found.push('uses ' + token)
-  }
-  return found
-}
-
-gate('tick-pure is comment-free, imports nothing bare and reads no host global', () => {
-  const names = readdirSync(sourceDir).filter((name) => name.endsWith('.js')).sort()
-  same(JSON.stringify(names), JSON.stringify(['tickScheduler.js', 'tickSystem.js']), 'source files')
-  for (const name of names) {
-    const found = findingsIn(readFileSync(join(sourceDir, name), 'utf8'))
-    assert(found.length === 0, name + ': ' + found.join(', '))
-  }
-  mustReject(() => assert(findingsIn("import fs from 'node:fs'\nconst t = performance.now() // x").length === 0, 'negative sample'))
 })
 
 finish()

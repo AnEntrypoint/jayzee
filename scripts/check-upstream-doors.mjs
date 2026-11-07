@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { gate, finish } from './lib/gate.mjs'
@@ -6,7 +6,6 @@ import { parseDoorCatalog, statusOf, summarizeDoors } from '../src/upstream-door
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const fixturePath = join(root, 'scripts', 'fixtures', 'upstream', 'CATALOG.md')
-const sourceDir = join(root, 'src', 'upstream-doors')
 const NO_VERB_DOORS = ['delete', 'play.attach', 'git', 'openapi']
 
 const assert = (condition, message) => {
@@ -75,32 +74,6 @@ gate('status classes are exercised, documented and other only', () => {
   same(statusOf('exercised with ?unread=1: 200'), 'exercised', 'exercised with query')
   same(statusOf('documented, not exercised. Source'), 'documented', 'documented')
   same(statusOf('unknown text'), 'other', 'other')
-})
-
-const hostGlobals = ['process', 'performance', 'Date', 'setTimeout', 'clearTimeout', 'setImmediate', 'setInterval', 'console', 'window', 'globalThis', 'require']
-
-const findingsIn = (source) => {
-  const found = []
-  if (source.includes('//') || source.includes('/*')) found.push('comment marker')
-  for (const piece of source.split("from '").slice(1)) {
-    const specifier = piece.slice(0, piece.indexOf("'"))
-    if (!specifier.startsWith('.')) found.push('bare import ' + specifier)
-  }
-  const words = new Set(source.split(/[^A-Za-z0-9_$]/))
-  for (const token of hostGlobals) {
-    if (words.has(token)) found.push('uses ' + token)
-  }
-  return found
-}
-
-gate('src/upstream-doors is comment-free, imports nothing bare and reads no host global', () => {
-  const names = readdirSync(sourceDir).filter((name) => name.endsWith('.js')).sort()
-  sameJson(names, ['catalog.js', 'dispatch.js', 'router.js'], 'source files')
-  for (const name of names) {
-    const found = findingsIn(readFileSync(join(sourceDir, name), 'utf8'))
-    assert(found.length === 0, name + ': ' + found.join(', '))
-  }
-  mustReject(() => assert(findingsIn("import fs from 'node:fs'\nconst t = performance.now() // x").length === 0, 'negative sample'))
 })
 
 finish()

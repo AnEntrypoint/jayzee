@@ -88,23 +88,4 @@ gate('a door whose method is not stated is refused rather than guessed', () => {
   same(stated.method, 'method not stated in source', 'delete method cell')
 })
 
-const findingsIn = (source) => {
-  const found = []
-  if (source.includes("//") || source.includes("/*")) found.push("comment marker")
-  for (const piece of source.split("from '").slice(1)) {
-    const specifier = piece.slice(0, piece.indexOf("'"))
-    if (!specifier.startsWith(".")) found.push("bare import " + specifier)
-  }
-  const words = new Set(source.split(/[^A-Za-z0-9_$]/))
-  for (const token of ["process", "performance", "Date", "setTimeout", "clearTimeout", "setImmediate", "setInterval", "console", "window", "globalThis", "require", "Buffer", "URL"]) {
-    if (words.has(token)) found.push("uses " + token)
-  }
-  return found
-}
-
-gate("src/upstream-doors/router.js is comment-free, imports nothing bare and reads no host global", () => {
-  const source = readFileSync(join(root, "src", "upstream-doors", "router.js"), "utf8")
-  sameJson(findingsIn(source), [], "findings")
-})
-
 finish()

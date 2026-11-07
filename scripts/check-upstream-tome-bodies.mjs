@@ -8,7 +8,6 @@ import { bindSections, sectionByFile, sectionsByHeading, sectionText, totalSecti
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const tomeDir = join(root, 'scripts', 'fixtures', 'upstream', 'tome')
 const indexPath = join(tomeDir, 'INDEX.md')
-const sourceDir = join(root, 'src', 'upstream-tome')
 const TOTAL_BYTES = 119521
 
 const assert = (condition, message) => {
@@ -71,26 +70,6 @@ gate('a missing body, a body of the wrong length and a duplicate file are refuse
   mustReject(() => bindSections(one, () => null))
   mustReject(() => bindSections(one, () => new Uint8Array(3)))
   mustReject(() => bindSections([...one, ...one], () => new Uint8Array(2)))
-})
-
-const findingsIn = (source) => {
-  const found = []
-  if (source.includes('//') || source.includes('/*')) found.push('comment marker')
-  for (const piece of source.split("from '").slice(1)) {
-    const specifier = piece.slice(0, piece.indexOf("'"))
-    if (!specifier.startsWith('.')) found.push('bare import ' + specifier)
-  }
-  const words = new Set(source.split(/[^A-Za-z0-9_$]/))
-  for (const token of ['process', 'performance', 'Date', 'setTimeout', 'clearTimeout', 'setImmediate', 'setInterval', 'console', 'window', 'globalThis', 'require', 'Buffer']) {
-    if (words.has(token)) found.push('uses ' + token)
-  }
-  return found
-}
-
-gate('src/upstream-tome/tomeSections.js is comment-free, imports nothing bare and reads no host global', () => {
-  const source = readFileSync(join(sourceDir, 'tomeSections.js'), 'utf8')
-  sameJson(findingsIn(source), [], 'findings')
-  mustReject(() => assert(findingsIn("import fs from 'node:fs'\nconst t = Buffer.alloc(1) // x").length === 0, 'negative sample'))
 })
 
 finish()

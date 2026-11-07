@@ -8,7 +8,6 @@ import { dispatch } from '../src/upstream-doors/dispatch.js'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const catalogPath = join(root, 'scripts', 'fixtures', 'upstream', 'CATALOG.md')
-const sourceDir = join(root, 'src', 'upstream-doors')
 
 const assert = (condition, message) => {
   if (!condition) throw new Error(message)
@@ -106,24 +105,6 @@ gate('a handler that throws is not retried, and the error reaches the caller', (
 gate('a registered entry that is not a function is refused, and nothing else runs', () => {
   const broken = new Map([['me', 'not a function']])
   mustThrow(() => dispatch(routes, broken, 'GET', '/api/agent/v1/me'))
-})
-
-const findingsIn = (source) => {
-  const found = []
-  if (source.includes('//') || source.includes('/*')) found.push('comment marker')
-  for (const piece of source.split("from '").slice(1)) {
-    const specifier = piece.slice(0, piece.indexOf("'"))
-    if (!specifier.startsWith('.')) found.push('bare import ' + specifier)
-  }
-  const words = new Set(source.split(/[^A-Za-z0-9_$]/))
-  for (const token of ['fetch', 'XMLHttpRequest', 'WebSocket', 'process', 'performance', 'Date', 'setTimeout', 'console', 'window', 'globalThis', 'require', 'Buffer', 'URL']) {
-    if (words.has(token)) found.push('uses ' + token)
-  }
-  return found
-}
-
-gate('src/upstream-doors/dispatch.js is comment-free, imports only the router, and makes no network call or host call', () => {
-  sameJson(findingsIn(readFileSync(join(sourceDir, 'dispatch.js'), 'utf8')), [], 'findings')
 })
 
 finish()

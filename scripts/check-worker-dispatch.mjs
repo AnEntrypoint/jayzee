@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { gate, finish } from './lib/gate.mjs'
@@ -12,7 +11,6 @@ import {
 } from '../src/worker-dispatch-pure/workerDispatch.js'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
-const sourceDir = join(root, 'src', 'worker-dispatch-pure')
 
 const assert = (condition, message) => {
   if (!condition) throw new Error(message)
@@ -113,24 +111,6 @@ gate('a handler that throws is not retried, and the error reaches the caller', (
   } })
   mustThrow(() => failing({ type: 'SAVE_NOW' }))
   same(count, 1, 'SAVE_NOW invocations')
-})
-
-const findingsIn = (source) => {
-  const found = []
-  if (source.includes('//') || source.includes('/*')) found.push('comment marker')
-  for (const piece of source.split("from '").slice(1)) {
-    const specifier = piece.slice(0, piece.indexOf("'"))
-    if (!specifier.startsWith('.')) found.push('bare import ' + specifier)
-  }
-  const words = new Set(source.split(/[^A-Za-z0-9_$]/))
-  for (const token of ['postMessage', 'self', 'window', 'document', 'Worker', 'fetch', 'process', 'performance', 'Date', 'setTimeout', 'console', 'globalThis', 'require', 'Buffer']) {
-    if (words.has(token)) found.push('uses ' + token)
-  }
-  return found
-}
-
-gate('src/worker-dispatch-pure/workerDispatch.js is comment-free, imports nothing, and touches no worker or host global', () => {
-  sameJson(findingsIn(readFileSync(join(sourceDir, 'workerDispatch.js'), 'utf8')), [], 'findings')
 })
 
 finish()

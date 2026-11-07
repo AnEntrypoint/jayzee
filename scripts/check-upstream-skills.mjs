@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { gate, finish } from './lib/gate.mjs'
@@ -6,7 +6,6 @@ import { parseManifest, parseSkillIndex, summarizeSkills } from '../src/upstream
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const fixtureDir = join(root, 'scripts', 'fixtures', 'upstream', 'skills')
-const sourceDir = join(root, 'src', 'upstream-skills')
 
 const assert = (condition, message) => {
   if (!condition) throw new Error(message)
@@ -57,32 +56,6 @@ gate('a malformed index row or manifest line is refused rather than dropped', ()
   mustReject(() => parseSkillIndex('| id | name | description | bytes |\n|---|---|---|---|\n| a | A | d |\n'))
   mustReject(() => parseSkillIndex('| id | name | description | bytes |\n|---|---|---|---|\n| a | A | d | big |\n'))
   mustReject(() => parseManifest('abc 12 physics.md\n'))
-})
-
-const hostGlobals = ['process', 'performance', 'Date', 'setTimeout', 'clearTimeout', 'setImmediate', 'setInterval', 'console', 'window', 'globalThis', 'require']
-
-const findingsIn = (source) => {
-  const found = []
-  if (source.includes('//') || source.includes('/*')) found.push('comment marker')
-  for (const piece of source.split("from '").slice(1)) {
-    const specifier = piece.slice(0, piece.indexOf("'"))
-    if (!specifier.startsWith('.')) found.push('bare import ' + specifier)
-  }
-  const words = new Set(source.split(/[^A-Za-z0-9_$]/))
-  for (const token of hostGlobals) {
-    if (words.has(token)) found.push('uses ' + token)
-  }
-  return found
-}
-
-gate('src/upstream-skills is comment-free, imports nothing bare and reads no host global', () => {
-  const names = readdirSync(sourceDir).filter((name) => name.endsWith('.js')).sort()
-  sameJson(names, ['skillBodies.js', 'skillIndex.js', 'skillRegistry.js'], 'source files')
-  for (const name of names) {
-    const found = findingsIn(readFileSync(join(sourceDir, name), 'utf8'))
-    assert(found.length === 0, name + ': ' + found.join(', '))
-  }
-  mustReject(() => assert(findingsIn("import fs from 'node:fs'\nconst t = performance.now() // x").length === 0, 'negative sample'))
 })
 
 finish()

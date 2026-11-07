@@ -1,11 +1,9 @@
-import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { gate, finish } from './lib/gate.mjs'
 import { resolveServedAsset, servedCandidates, GLTF_CONTENT_TYPE } from '../src/spawn/namedAssetRedirect.js'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
-const sourcePath = join(root, 'src', 'spawn', 'namedAssetRedirect.js')
 
 const ORIGIN = 'https://play.spawn.co'
 const SHA = 'a'.repeat(64)
@@ -166,27 +164,5 @@ check('a 200 that is not model/gltf-binary is refused')
 check('a body whose first bytes are not glTF is refused')
 check('a value-sha 200 resolves without a redirect')
 check('a 404 is refused by status, and a non-timeout network error is refused without retry')
-
-const hostGlobals = ['process', 'performance', 'Date', 'setTimeout', 'clearTimeout', 'setImmediate', 'setInterval', 'console', 'window', 'globalThis', 'require', 'Buffer', 'fetch', 'URL']
-
-const findingsIn = (source) => {
-  const found = []
-  if (source.includes('//') || source.includes('/*')) found.push('comment marker')
-  if (source.includes('Math.random')) found.push('uses Math.random')
-  for (const piece of source.split("from '").slice(1)) {
-    const specifier = piece.slice(0, piece.indexOf("'"))
-    if (!specifier.startsWith('.')) found.push('bare import ' + specifier)
-  }
-  const words = new Set(source.split(/[^A-Za-z0-9_$]/))
-  for (const token of hostGlobals) {
-    if (words.has(token)) found.push('uses ' + token)
-  }
-  return found
-}
-
-gate('src/spawn/namedAssetRedirect.js is comment-free, imports nothing bare, reads no host clock, network or random source', () => {
-  sameJson(findingsIn(readFileSync(sourcePath, 'utf8')), [], 'findings')
-  mustReject(() => assert(findingsIn("import fs from 'node:fs'\nconst t = performance.now() // x").length === 0, 'negative sample'))
-})
 
 finish()

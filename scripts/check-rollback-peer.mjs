@@ -1,12 +1,9 @@
-import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { gate, finish } from './lib/gate.mjs'
 import { createCorrectionObserver } from '../src/rollback-pure/correctionObserver.js'
 import { STATE_RING_TICKS, STATS_POST_INTERVAL_MS, buildRollbackPeerLoop, startStatsPost } from '../src/rollback-pure/peerSimRuntime.js'
 
-const root = join(dirname(fileURLToPath(import.meta.url)), '..')
-const sourceFiles = ['correctionObserver.js', 'peerSimRuntime.js']
 
 const assert = (condition, message) => {
   if (!condition) throw new Error(message)
@@ -118,26 +115,6 @@ gate('the rollback peer loop refuses a link without broadcast, so no transport i
     capture: () => ({}),
     apply: () => {},
   }))
-})
-
-const findingsIn = (source) => {
-  const found = []
-  if (source.includes('//') || source.includes('/*')) found.push('comment marker')
-  for (const piece of source.split("from '").slice(1)) {
-    const specifier = piece.slice(0, piece.indexOf("'"))
-    if (!specifier.startsWith('.')) found.push('bare import ' + specifier)
-  }
-  const words = new Set(source.split(/[^A-Za-z0-9_$]/))
-  for (const token of ['process', 'performance', 'Date', 'setTimeout', 'setInterval', 'clearInterval', 'console', 'window', 'globalThis', 'require', 'Buffer']) {
-    if (words.has(token)) found.push('uses ' + token)
-  }
-  return found
-}
-
-gate('the new rollback-pure modules are comment-free, import only relative modules and read no host clock or timer', () => {
-  for (const name of sourceFiles) {
-    sameJson(findingsIn(readFileSync(join(root, 'src', 'rollback-pure', name), 'utf8')), [], name)
-  }
 })
 
 finish()

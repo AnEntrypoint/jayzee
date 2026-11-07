@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { gate, finish } from './lib/gate.mjs'
@@ -6,7 +5,6 @@ import { World } from '../src/world/World.js'
 import { createQueries } from '../src/world/query.js'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
-const sourcePath = join(root, 'src', 'world', 'query.js')
 
 const assert = (condition, message) => {
   if (!condition) throw new Error(message)
@@ -130,28 +128,6 @@ gate('a query refuses malformed input: a zero radius, an inverted box, a bad ori
   mustThrow(() => queries.raycast([0, 0], [1, 0, 0]))
   mustThrow(() => queries.overlapSphere([0, 0, 0], -1))
   mustThrow(() => queries.overlapBox([1, 0, 0], [0, 1, 1]))
-})
-
-const hostGlobals = ['process', 'performance', 'Date', 'setTimeout', 'clearTimeout', 'setImmediate', 'setInterval', 'console', 'window', 'globalThis', 'require', 'Buffer']
-
-const findingsIn = (source) => {
-  const found = []
-  if (source.includes('//') || source.includes('/*')) found.push('comment marker')
-  if (source.includes('Math.random')) found.push('uses Math.random')
-  for (const piece of source.split("from '").slice(1)) {
-    const specifier = piece.slice(0, piece.indexOf("'"))
-    if (!specifier.startsWith('.')) found.push('bare import ' + specifier)
-  }
-  const words = new Set(source.split(/[^A-Za-z0-9_$]/))
-  for (const token of hostGlobals) {
-    if (words.has(token)) found.push('uses ' + token)
-  }
-  return found
-}
-
-gate('src/world/query.js is comment-free, imports nothing bare, reads no host clock or random source', () => {
-  sameJson(findingsIn(readFileSync(sourcePath, 'utf8')), [], 'findings')
-  mustReject(() => assert(findingsIn("import fs from 'node:fs'\nconst t = performance.now() // x").length === 0, 'negative sample'))
 })
 
 finish()

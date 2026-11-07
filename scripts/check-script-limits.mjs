@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { gate, finish } from './lib/gate.mjs'
@@ -6,7 +5,6 @@ import { World } from '../src/world/World.js'
 import { LimitError, SPAWN_KILL_AFTER_MS, SPAWN_MEMORY_CAP_BYTES, createScriptLimits } from '../src/sandbox/limits.js'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
-const sourcePath = join(root, 'src', 'sandbox', 'limits.js')
 
 const assert = (condition, message) => {
   if (!condition) throw new Error(message)
@@ -106,28 +104,6 @@ gate('World.advance takes at most 8 ticks per call and drops the rest, so an ove
   same(world.tick, 16, 'tick after the half-second advance')
   mustReject(() => same(world.advance(1000), 9, 'steps'))
   mustReject(() => world.advance(-1))
-})
-
-const hostGlobals = ['process', 'performance', 'Date', 'setTimeout', 'clearTimeout', 'setImmediate', 'setInterval', 'console', 'window', 'globalThis', 'require', 'Buffer']
-
-const findingsIn = (source) => {
-  const found = []
-  if (source.includes('//') || source.includes('/*')) found.push('comment marker')
-  if (source.includes('Math.random')) found.push('uses Math.random')
-  for (const piece of source.split("from '").slice(1)) {
-    const specifier = piece.slice(0, piece.indexOf("'"))
-    if (!specifier.startsWith('.')) found.push('bare import ' + specifier)
-  }
-  const words = new Set(source.split(/[^A-Za-z0-9_$]/))
-  for (const token of hostGlobals) {
-    if (words.has(token)) found.push('uses ' + token)
-  }
-  return found
-}
-
-gate('src/sandbox/limits.js is comment-free, imports nothing bare, reads no host clock or random source', () => {
-  same(findingsIn(readFileSync(sourcePath, 'utf8')).join(','), '', 'findings')
-  mustReject(() => assert(findingsIn("import fs from 'node:fs'\nconst t = performance.now() // x").length === 0, 'negative sample'))
 })
 
 finish()

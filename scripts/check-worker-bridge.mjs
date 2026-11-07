@@ -1,10 +1,8 @@
-import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { gate, finish } from './lib/gate.mjs'
 import { createWorkerTransport } from '../src/transport/workerTransport.js'
 
-const sourcePath = join(dirname(fileURLToPath(import.meta.url)), '..', 'src', 'transport', 'workerTransport.js')
 
 const assert = (condition, message) => {
   if (!condition) throw new Error(message)
@@ -81,15 +79,6 @@ gate('a closed worker transport refuses sends and tells its close listeners once
   same(transport.send(new Uint8Array(1), 0), false, 'send after close')
   same(calls.length, 0, 'posts after close')
   same(closes, 1, 'close listeners')
-})
-
-gate('the worker transport module is comment-free and reads no worker or window global', () => {
-  const text = readFileSync(sourcePath, 'utf8')
-  assert(!text.includes('//') && !text.includes('/*'), 'comment marker')
-  const words = new Set(text.split(/[^A-Za-z0-9_$]/))
-  for (const token of ['self', 'postMessage', 'Worker', 'window', 'globalThis', 'process', 'require']) {
-    assert(!words.has(token), 'uses ' + token)
-  }
 })
 
 finish()

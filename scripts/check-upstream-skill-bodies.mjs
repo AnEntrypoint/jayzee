@@ -8,7 +8,6 @@ import { bindSkills, parseSkillJson, skillById, totalBodyBytes } from '../src/up
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const fixtureDir = join(root, 'scripts', 'fixtures', 'upstream', 'skills')
-const sourceDir = join(root, 'src', 'upstream-skills')
 
 const assert = (condition, message) => {
   if (!condition) throw new Error(message)
@@ -88,26 +87,6 @@ gate('a tampered body, a tampered manifest sha, a missing body and a renamed jso
   const renamed = new TextEncoder().encode(JSON.stringify({ ...JSON.parse(decode(fileBytes(jsonName))), name: 'Renamed' }))
   mustReject(() => bindSkills(indexRows, rebuiltManifest(jsonName, renamed), (name) => (name === jsonName ? renamed : fileBytes(name)), digestOf))
   mustReject(() => parseSkillJson('{"id":"a","name":"A","description":"d"}'))
-})
-
-const findingsIn = (source) => {
-  const found = []
-  if (source.includes('//') || source.includes('/*')) found.push('comment marker')
-  for (const piece of source.split("from '").slice(1)) {
-    const specifier = piece.slice(0, piece.indexOf("'"))
-    if (!specifier.startsWith('.')) found.push('bare import ' + specifier)
-  }
-  const words = new Set(source.split(/[^A-Za-z0-9_$]/))
-  for (const token of ['process', 'performance', 'Date', 'setTimeout', 'clearTimeout', 'setImmediate', 'setInterval', 'console', 'window', 'globalThis', 'require', 'Buffer']) {
-    if (words.has(token)) found.push('uses ' + token)
-  }
-  return found
-}
-
-gate('src/upstream-skills/skillBodies.js is comment-free, imports nothing bare and reads no host global', () => {
-  const source = readFileSync(join(sourceDir, 'skillBodies.js'), 'utf8')
-  sameJson(findingsIn(source), [], 'findings')
-  mustReject(() => assert(findingsIn("import fs from 'node:fs'\nconst t = Buffer.alloc(1) // x").length === 0, 'negative sample'))
 })
 
 finish()
