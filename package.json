@@ -78,7 +78,8 @@
     "check:tick-authority": "node scripts/check-tick-authority.mjs",
     "check:chart-anchor": "node scripts/check-chart-anchor.mjs",
     "check:sessions": "node scripts/check-sessions.mjs",
-    "check:snapshot-lod": "node scripts/check-snapshot-lod.mjs"
+    "check:snapshot-lod": "node scripts/check-snapshot-lod.mjs",
+    "check:terrain-witness": "node scripts/check-terrain-witness.mjs"
   },
   "dependencies": {
     "jz": "1.0.2"
