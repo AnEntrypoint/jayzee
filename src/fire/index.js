@@ -1,0 +1,1 @@
+export { createFireKernel, FIRE_STATE, FIRE_EVENT, FIRE_MAX_WIND_COMPONENT, TILE_AXIS_CELLS, FACE_FREE, FACE_COUNT } from './fireKernel.js'
