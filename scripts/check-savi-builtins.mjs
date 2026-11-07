@@ -74,7 +74,7 @@ const findingsIn = (source) => {
 
 gate('src/savi-builtins is comment-free, imports nothing bare and reads no host global', () => {
   const names = readdirSync(sourceDir).filter((name) => name.endsWith('.js')).sort()
-  sameJson(names, ['ballistics.js', 'builtinBodies.js', 'builtinModules.js', 'easing.js', 'env.js', 'fx.js', 'lighting.js', 'math.js', 'nav.js', 'noise.js', 'path.js', 'physics.js', 'postfx.js', 'roomRouting.js', 'spline.js', 'terrain.js', 'three.js', 'tsl.js', 'tween.js', 'vec3.js', 'vibe.js', 'voxels.js'], 'source files')
+  sameJson(names, ['ballistics.js', 'builtinBodies.js', 'builtinModules.js', 'easing.js', 'env.js', 'fx.js', 'lighting.js', 'math.js', 'nav.js', 'noise.js', 'path.js', 'physics.js', 'postfx.js', 'roomRouting.js', 'spline.js', 'terrain.js', 'three.js', 'tsl.js', 'tween.js', 'vec3.js', 'vibe.js', 'voxels.js', 'water.js'], 'source files')
   for (const name of names) {
     const found = findingsIn(readFileSync(join(sourceDir, name), 'utf8'))
     assert(found.length === 0, name + ': ' + found.join(', '))
