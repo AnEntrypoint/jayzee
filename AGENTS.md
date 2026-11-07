@@ -48,4 +48,18 @@ Non-obvious facts for automated edits. Architecture and measured costs live in d
 - `wind` keeps the raw value and the effective wind is clamped to plus or minus 16 (`FIRE_MAX_WIND_COMPONENT`). The snapshot keeps the raw value, so a restore clamps it again.
 - `Math.floor(fuelInit * regrowFuelFraction)` is the only non-integer operation. With a fraction below 1, regrown fuel never equals the class fuel, so a regrown tile is never quiet and is never reclaimed.
 - The undo log grows until `takeDelta()`. A caller that wants one delta per step must call `takeDelta()` and `releaseDelta()` at each step boundary, or the next `undoDelta` reverts several steps.
-- Policy: no unit tests. Every check is a gate script under scripts/ that runs against the built kernel and the real modules, prints PASS or FAIL lines, and exits non-zero on failure. `npm test` runs the build, the kernel, world, protocol, messages, netcode, snapshot, spawn and fire gates, and the type check.
+- `src/fire/behaviour` takes samplers, the frame and io sinks as arguments and never reads an app context. Callers bind appCtx at the edge.
+- The fire lattice walk is symmetric only in the sense that some step from a neighbour returns to the origin. Across a cube edge the step changes axis, so the opposite direction in the new face's coordinates is not the way back.
+- The keyframe encoder's `advance(budgetMs)` makes no progress with a budget of 0, because its deadline is reached on entry. Use a positive budget.
+- `createFireTimeline#startAt` throws once the timeline has advanced at all, so it must be the first call.
+- `createChecksumLedger` applies one `limit` (default 64) to both local history and received remote checksums.
+- `IGNITE_AREA` wire rows carry the radius but no source byte, because the kernel does not read one for area ignition.
+- `fireQueries.js` uses float arithmetic on purpose. The integer-only rule covers the kernel and the wire, not these queries.
+- `src/sandbox/ses.js` does not import SES. `preflightSes` takes an `importSes` function, and when it resolves, locks down with `errorTaming: 'unsafe'`, `stackFiltering: 'verbose'` and `overrideTaming: 'severe'`. A `SES_ALREADY_LOCKED_DOWN` error from lockdown counts as success.
+- `preflightSes` returns `ok` or one refusal code: `ses-not-installed`, `lockdown-missing`, `lockdown-failed`, `compartment-missing` or `intrinsics-not-hardened`. A preflight that throws becomes `preflight-threw`. Every refusal fails closed with no Compartment.
+- `createSesEvaluator` memoises one preflight. On a refused preflight, `evaluate` throws `SandboxUnavailableError` (code `SANDBOX_UNAVAILABLE`) before the blocklist is read, so a blocked source gets the throw, not null, while SES is unavailable.
+- The blocklist is a substring match, so it also rejects the same text inside strings and comments. A blocked or empty source returns null and logs one line, and it does not throw.
+- `timingSafeTokenEqual` returns false for non-string input and for tokens with different UTF-8 byte lengths. It uses `node:crypto` `timingSafeEqual` when Node is present.
+- `resolveWithinRoot(root, candidate)` returns the resolved path, or null when it lands outside the root. The root itself is accepted, and a sibling that shares the root's prefix is rejected. An absolute candidate is taken as a filesystem path, so a URL path must drop its leading slash first.
+- `COEP_VALUE` is `require-corp`.
+- Policy: no unit tests. Every check is a gate script under scripts/ that runs against the built kernel and the real modules, prints PASS or FAIL lines, and exits non-zero on failure. `npm test` runs the build, the kernel, world, protocol, messages, netcode, snapshot, spawn, fire, fire-modules and sandbox gates, and the type check.
