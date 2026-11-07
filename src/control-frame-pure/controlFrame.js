@@ -1,9 +1,13 @@
 export const CONSENSUS_CTRL_PREFIX = 'wwconsensus:'
 export const ROLLBACK_CTRL_PREFIX = 'wwrollback:'
+export const LOCKSTEP_CTRL_PREFIX = 'wwlockstep:'
 
 const isFiniteNumber = (value) => typeof value === 'number' && Number.isFinite(value)
 const isTruthy = (value) => !!value
 const isInteger = (value) => Number.isInteger(value)
+const isPositiveInteger = (value) => Number.isInteger(value) && value >= 1
+const isText = (value) => typeof value === 'string'
+const isList = (value) => Array.isArray(value)
 
 const FRAME_CONTRACTS = new Map([
   [CONSENSUS_CTRL_PREFIX, new Map([
@@ -12,6 +16,10 @@ const FRAME_CONTRACTS = new Map([
   [ROLLBACK_CTRL_PREFIX, new Map([
     ['input', new Map([['tick', isInteger]])],
     ['checksum', new Map([['tick', isInteger]])],
+  ])],
+  [LOCKSTEP_CTRL_PREFIX, new Map([
+    ['input', new Map([['tick', isPositiveInteger]])],
+    ['drop', new Map([['peer', isText], ['have', isInteger], ['tail', isList]])],
   ])],
 ])
 
