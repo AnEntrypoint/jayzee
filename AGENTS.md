@@ -93,4 +93,6 @@ Non-obvious facts for automated edits. Architecture and measured costs live in d
 - The hooks in `src/behaviours/health.js` and `src/behaviours/destructible.js` receive event objects, not `appCtx`, so a host that expects `appCtx` must adapt them.
 - `src/behaviours/game-fsm.js` runs `after(ms)` timers from `tick` on an injected clock, not wall-clock timers. Guards and actions also receive the send payload.
 - spoint's `findCostCorridor` defaults its budget to `Infinity`, and no 20000 constant exists in spoint's pathfinding sources. The 20000 figure in PARITY row 27 stays unverified until a source documents it.
+- `src/terrain-pure/grassDecal.js` reads `Date.now` unless `opts.now` is given. `src/terrain-pure/planetFrame.js` logs through `console.error`, so a host that needs silent terrain has to filter it.
+- The marching tables in `src/terrain-pure/marchingCubes.js` and `src/terrain-pure/marchingEdges.js` are copies of spoint's tables. The hot-module-replacement tail of spoint's terrain modules is not ported.
 - Policy: no unit tests. Every check is a gate script under scripts/ that runs against the built kernel and the real modules, prints PASS or FAIL lines, and exits non-zero on failure. `npm test` runs the build, the kernel, world, protocol, messages, netcode, snapshot, spawn, fire, fire-modules, sandbox and savi-endpoints gates, and the type check.

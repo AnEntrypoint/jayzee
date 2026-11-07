@@ -1,0 +1,404 @@
+export const DEFAULT_PATCH_MAX_LEVEL = 11
+
+export const SURFACE_SOLVE_TOLERANCE_M = 1e-4
+const _reportedSolveFailures = new Set()
+const _stepDiscontinuities = { count: 0, maxJumpM: 0 }
+const _solveStats = { solves: 0, evaluations: 0 }
+const _memoStats = { hits: 0, misses: 0, evictions: 0, epochStale: 0, cellCollisions: 0 }
+const BRACKET_HALVING_WINDOW = 6
+const GROUND_MEMO_SLOTS = 4096
+const GROUND_MEMO_CELLS_PER_M = 4
+const GROUND_MEMO_HASH_X = 73856093
+const GROUND_MEMO_HASH_Z = 19349663
+
+export function surfaceSolveStepDiscontinuities() { return { ..._stepDiscontinuities } }
+
+export function surfaceSolveStats() { return { ..._solveStats } }
+
+export function resetSurfaceSolveStats() { _solveStats.solves = 0; _solveStats.evaluations = 0 }
+
+export function groundMemoStats() { return { ..._memoStats } }
+
+export function resetGroundMemoStats() {
+  _memoStats.hits = 0; _memoStats.misses = 0; _memoStats.evictions = 0
+  _memoStats.epochStale = 0; _memoStats.cellCollisions = 0
+}
+
+export class SurfaceSolveError extends RangeError {
+  constructor(x, z, toleranceM, evaluations, residualM) {
+    super(`solveSurfaceY did not reach ${toleranceM} m in ${evaluations} evaluations at local (${x}, ${z}): residual ${residualM} m`)
+    this.name = 'SurfaceSolveError'
+    this.x = x; this.z = z; this.residualM = residualM
+  }
+}
+
+export class ChartRangeError extends SurfaceSolveError {
+  constructor(x, z, radius) {
+    super(x, z, 0, 0, NaN)
+    this.name = 'ChartRangeError'
+    this.message = `chart-local (${x}, ${z}) is ${Math.hypot(x, z)} m from the chart anchor, at or beyond the planet radius ${radius} m: a flat tangent chart has no ground there`
+    this.radius = radius
+  }
+}
+
+export class NoGroundHeightError extends SurfaceSolveError {
+  constructor(x, z) {
+    super(x, z, 0, 0, NaN)
+    this.name = 'NoGroundHeightError'
+    this.message = `the height sampler returned no finite height at chart-local (${x}, ${z}), so the surface solve has no ground to converge on`
+  }
+}
+
+export class SolveToleranceError extends RangeError {
+  constructor(toleranceM) {
+    super(`solveSurfaceY toleranceM is the convergence target in metres and must be a finite number greater than 0; got ${String(toleranceM)}`)
+    this.name = 'SolveToleranceError'
+    this.toleranceM = toleranceM
+  }
+}
+
+export class SurfaceSolveArgumentError extends RangeError {
+  constructor(fnName, arg, value, predicate) {
+    super(`${fnName} requires ${arg} to ${predicate}; the call is refused before any height is sampled, got ${describeArgumentValue(value)}`)
+    this.name = 'SurfaceSolveArgumentError'
+    this.fnName = fnName
+    this.arg = arg
+    this.value = value
+    this.predicate = predicate
+  }
+}
+
+function describeArgumentValue(v) {
+  return typeof v === 'number' ? String(v) : `${typeof v} ${String(v)}`
+}
+
+function argumentIsFiniteNumber(v) {
+  return typeof v === 'number' && Number.isFinite(v)
+}
+
+function requireArgument(fnName, arg, value, predicate, holds) {
+  if (!holds) throw new SurfaceSolveArgumentError(fnName, arg, value, predicate)
+}
+
+function groundFailureCause(e) {
+  if (e instanceof ChartRangeError) return 'beyond the chart radius'
+  if (e instanceof NoGroundHeightError) return 'the height sampler returned no finite height'
+  return `solver residual ${e.residualM} m`
+}
+
+export const NO_GROUND_HEIGHT = null
+
+export function isNoGroundHeight(v) { return v === NO_GROUND_HEIGHT }
+
+export function isSurfaceRootWithin(residualM, toleranceM) {
+  return Number.isFinite(residualM) && Number.isFinite(toleranceM) && toleranceM > 0 && Math.abs(residualM) <= toleranceM
+}
+
+export function guardedGroundHeight(where, heightFn) {
+  return (x, z, ...rest) => {
+    try { return heightFn(x, z, ...rest) } catch (e) {
+      if (!(e instanceof SurfaceSolveError)) throw e
+      if (!_reportedSolveFailures.has(where)) {
+        _reportedSolveFailures.add(where)
+        console.warn(`[terrain] ${where}: no ground height at chart-local (${e.x.toFixed(0)}, ${e.z.toFixed(0)}), ${Math.hypot(e.x, e.z).toFixed(0)} m from the chart anchor, ${groundFailureCause(e)}; the result is NO_GROUND_HEIGHT`)
+      }
+      return NO_GROUND_HEIGHT
+    }
+  }
+}
+const SURFACE_SOLVE_MAX_EVALS = 64
+
+const _norm = (v) => { const l = Math.hypot(v[0], v[1], v[2]) || 1; return [v[0] / l, v[1] / l, v[2] / l] }
+const _add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]]
+const _scale = (a, s) => [a[0] * s, a[1] * s, a[2] * s]
+const _cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
+
+export function sphereDropBelowTangent(r2, sphereRadius) {
+  const q = sphereRadius * sphereRadius - r2
+  return q > 0 ? r2 / (sphereRadius + Math.sqrt(q)) : sphereRadius
+}
+
+function _frameRadius(frame) {
+  return Number.isFinite(frame.radius) && frame.radius > 0 ? frame.radius : Infinity
+}
+
+export function sphereSurfaceLocalY(frame, x, z, elevation) {
+  if (!frame || !Number.isFinite(frame.offsetY) || !Number.isFinite(frame.anchorHeight) || !Number.isFinite(elevation)) return null
+  const radius = _frameRadius(frame)
+  const drop = radius === Infinity ? 0 : sphereDropBelowTangent(x * x + z * z, radius + elevation)
+  return frame.offsetY + (elevation - frame.anchorHeight) - drop
+}
+
+export function waterlineLocalY(frame, x, z) {
+  return sphereSurfaceLocalY(frame, x, z, 0)
+}
+
+export function elevationAtLocal(frame, x, y, z) {
+  if (!frame || !Number.isFinite(frame.offsetY) || !Number.isFinite(frame.anchorHeight)) return null
+  const radius = _frameRadius(frame)
+  if (radius === Infinity) return y - frame.offsetY + frame.anchorHeight
+  const t = radius + frame.anchorHeight + (y - frame.offsetY)
+  const r2 = x * x + z * z
+  const l = Math.sqrt(t * t + r2)
+  return (t - radius) + r2 / (l + t)
+}
+
+const RAYCAST_BISECT_STEPS = 16
+
+export function raycastGroundLocal(frame, origin, direction, maxDistance, { stepM = 0.5, cellM = 1 } = {}) {
+  if (!frame || typeof frame.groundHeightLocal !== 'function') return null
+  const len = Math.hypot(direction[0], direction[1], direction[2])
+  if (!(len > 0) || !Number.isFinite(maxDistance) || maxDistance <= 0) return null
+  const dx = direction[0] / len, dy = direction[1] / len, dz = direction[2] / len
+  const groundAt = (x, z) => {
+    try { return frame.groundHeightLocal(x, z) } catch (e) {
+      if (e instanceof SurfaceSolveError) return null
+      throw e
+    }
+  }
+  const sampleAt = (t) => {
+    const x = origin[0] + dx * t, y = origin[1] + dy * t, z = origin[2] + dz * t
+    const g = groundAt(x, z)
+    return { x, y, z, above: g === null ? true : y > g }
+  }
+  let prevT = 0
+  let prev = sampleAt(0)
+  if (!prev.above) return hitAt(0, prev)
+  for (let t = stepM; t <= maxDistance + stepM * 0.5; t += stepM) {
+    const tc = Math.min(t, maxDistance)
+    const cur = sampleAt(tc)
+    if (!cur.above) {
+      let lo = prevT, hi = tc
+      for (let i = 0; i < RAYCAST_BISECT_STEPS; i++) {
+        const mid = 0.5 * (lo + hi)
+        if (sampleAt(mid).above) lo = mid; else hi = mid
+      }
+      return hitAt(hi, sampleAt(hi))
+    }
+    if (tc >= maxDistance) break
+    prevT = tc
+    prev = cur
+  }
+  return null
+
+  function hitAt(distance, p) {
+    const e = cellM * 0.5
+    const gxp = groundAt(p.x + e, p.z), gxm = groundAt(p.x - e, p.z)
+    const gzp = groundAt(p.x, p.z + e), gzm = groundAt(p.x, p.z - e)
+    const gx = (gxp !== null && gxm !== null) ? (gxp - gxm) / (2 * e) : 0
+    const gz = (gzp !== null && gzm !== null) ? (gzp - gzm) / (2 * e) : 0
+    const nl = Math.hypot(gx, 1, gz)
+    const normal = [-gx / nl, 1 / nl, -gz / nl]
+    const point = [p.x, p.y, p.z]
+    const cell = point.map((c) => Math.floor(c / cellM))
+    const adjacent = point.map((c, i) => Math.floor((c + normal[i] * cellM) / cellM))
+    return { distance, point, normal, cell, adjacent }
+  }
+}
+
+export function anchorBasis(anchorDir) {
+  const up = _norm(anchorDir)
+  const ref = Math.abs(up[1]) < 0.99 ? [0, 1, 0] : [1, 0, 0]
+  const east = _norm(_cross(ref, up))
+  const north = _cross(east, up)
+  return { up, east, north }
+}
+
+export function tangentLocalToDir(basis, radius, x, z) {
+  const { up, east, north } = basis
+  return _norm([up[0] * radius + east[0] * x + north[0] * z, up[1] * radius + east[1] * x + north[1] * z, up[2] * radius + east[2] * x + north[2] * z])
+}
+
+export function createPlanetFrame({ sampler, anchorDir = [0, 1, 0], offsetY = 0, reliefScale }) {
+  const radius = sampler.radius
+  const _reliefScale = (reliefScale != null) ? reliefScale : 0.01
+  const { up: _u, east: _e, north: _n } = anchorBasis(anchorDir)
+  const up = [..._u]
+  const east = [..._e]
+  const north = [..._n]
+  let anchorHeight = sampler.heightAt(up)
+  let _e0 = east[0], _e1 = east[1], _e2 = east[2]
+  let _n0 = north[0], _n1 = north[1], _n2 = north[2]
+  let _u0 = up[0], _u1 = up[1], _u2 = up[2]
+  function renderDirAt(x, renderY, z) {
+    const t = radius + anchorHeight + renderY
+    const ax = _u0 * t + _e0 * x + _n0 * z
+    const ay = _u1 * t + _e1 * x + _n1 * z
+    const az = _u2 * t + _e2 * x + _n2 * z
+    const l = Math.hypot(ax, ay, az) || 1
+    return [ax / l, ay / l, az / l]
+  }
+  function renderYOnSphere(r2, elevation) {
+    return (elevation - anchorHeight) - sphereDropBelowTangent(r2, radius + elevation)
+  }
+  function localToDir(x, z, y) {
+    const renderY = (y === undefined) ? renderYOnSphere(x * x + z * z, 0) : y - offsetY
+    return renderDirAt(x, renderY, z)
+  }
+  function solveSurfaceY(x, z, heightAtDir, toleranceM = SURFACE_SOLVE_TOLERANCE_M, yGuess) {
+    requireArgument('solveSurfaceY', 'x', x, 'be a finite number', argumentIsFiniteNumber(x))
+    requireArgument('solveSurfaceY', 'z', z, 'be a finite number', argumentIsFiniteNumber(z))
+    if (!Number.isFinite(toleranceM) || toleranceM <= 0) throw new SolveToleranceError(toleranceM)
+    const r2 = x * x + z * z
+    if (Number.isFinite(radius) && r2 >= radius * radius) throw new ChartRangeError(x, z, radius)
+    let y = Number.isFinite(yGuess) ? yGuess : renderYOnSphere(r2, 0), yPrev = 0, gPrev = 0
+    let belowSurface = -Infinity, aboveSurface = Infinity
+    let lastG = Infinity, gBelow = 0, gAbove = 0
+    let checkpointK = -1, checkpointWidth = Infinity
+    _solveStats.solves++
+    for (let k = 0; k < SURFACE_SOLVE_MAX_EVALS; k++) {
+      _solveStats.evaluations++
+      const h = heightAtDir(renderDirAt(x, y, z))
+      if (h == null || !Number.isFinite(h)) throw new NoGroundHeightError(x, z)
+      const yF = renderYOnSphere(r2, h)
+      const g = yF - y
+      lastG = g
+      if (isSurfaceRootWithin(g, toleranceM)) return y
+      if (g > 0) { if (y > belowSurface) { belowSurface = y; gBelow = g } }
+      else if (y < aboveSurface) { aboveSurface = y; gAbove = g }
+      if (belowSurface > -Infinity && aboveSurface < Infinity && aboveSurface - belowSurface <= toleranceM) {
+        const jump = (belowSurface + gBelow) - (aboveSurface + gAbove)
+        _stepDiscontinuities.count++
+        if (jump > _stepDiscontinuities.maxJumpM) _stepDiscontinuities.maxJumpM = jump
+        return 0.5 * ((belowSurface + gBelow) + (aboveSurface + gAbove))
+      }
+      const bracketed = belowSurface > -Infinity && aboveSurface < Infinity
+      let mustBisect = false
+      if (bracketed) {
+        const width = aboveSurface - belowSurface
+        if (checkpointK < 0) { checkpointK = k; checkpointWidth = width }
+        else if (k - checkpointK >= BRACKET_HALVING_WINDOW) { mustBisect = width > 0.5 * checkpointWidth; checkpointK = k; checkpointWidth = width }
+      }
+      let yNext = (k > 0 && g !== gPrev) ? y - g * (y - yPrev) / (g - gPrev) : yF
+      if (mustBisect || !(yNext > belowSurface && yNext < aboveSurface)) {
+        yNext = bracketed ? 0.5 * (belowSurface + aboveSurface) : yF
+      }
+      yPrev = y; gPrev = g; y = yNext
+    }
+    throw new SurfaceSolveError(x, z, toleranceM, SURFACE_SOLVE_MAX_EVALS, lastG)
+  }
+  const memoX = new Float64Array(GROUND_MEMO_SLOTS).fill(NaN)
+  const memoZ = new Float64Array(GROUND_MEMO_SLOTS)
+  const memoHeight = new Float64Array(GROUND_MEMO_SLOTS)
+  const memoEpoch = new Int32Array(GROUND_MEMO_SLOTS).fill(-1)
+  const memoFailure = new Array(GROUND_MEMO_SLOTS).fill(null)
+  const sampleHeightAtDir = (d) => sampler.heightAt(d)
+  function groundHeightLocal(x, z, yGuess) {
+    requireArgument('groundHeightLocal', 'x', x, 'be a finite number', argumentIsFiniteNumber(x))
+    requireArgument('groundHeightLocal', 'z', z, 'be a finite number', argumentIsFiniteNumber(z))
+    const cellX = Math.floor(x * GROUND_MEMO_CELLS_PER_M)
+    const cellZ = Math.floor(z * GROUND_MEMO_CELLS_PER_M)
+    const slot = (Math.imul(cellX, GROUND_MEMO_HASH_X) ^ Math.imul(cellZ, GROUND_MEMO_HASH_Z)) & (GROUND_MEMO_SLOTS - 1)
+    if (memoX[slot] === x && memoZ[slot] === z && memoEpoch[slot] === frame.chartEpoch) {
+      _memoStats.hits++
+      if (memoFailure[slot] !== null) throw memoFailure[slot]
+      return memoHeight[slot]
+    }
+    _memoStats.misses++
+    if (memoEpoch[slot] !== -1) {
+      _memoStats.evictions++
+      if (memoX[slot] === x && memoZ[slot] === z) _memoStats.epochStale++
+      else if (Math.floor(memoX[slot] * GROUND_MEMO_CELLS_PER_M) === cellX && Math.floor(memoZ[slot] * GROUND_MEMO_CELLS_PER_M) === cellZ) _memoStats.cellCollisions++
+    }
+    let guess = Number.isFinite(yGuess) && Number.isFinite(offsetY) ? yGuess - offsetY : NaN
+    memoX[slot] = x; memoZ[slot] = z; memoEpoch[slot] = frame.chartEpoch; memoFailure[slot] = null
+    try {
+      const y = solveSurfaceY(x, z, sampleHeightAtDir, SURFACE_SOLVE_TOLERANCE_M, guess)
+      memoHeight[slot] = y + offsetY
+      return memoHeight[slot]
+    } catch (e) {
+      if (!(e instanceof SurfaceSolveError)) { memoEpoch[slot] = -1; throw e }
+      memoFailure[slot] = e
+      throw e
+    }
+  }
+  const anchorSurfaceWorld = _scale(up, radius + anchorHeight)
+  function localToWorld(x, y, z) {
+    const surf = _add(_scale(up, radius + anchorHeight + y), _add(_scale(east, x), _scale(north, z)))
+    return surf
+  }
+  let cpuDivergenceReported = false
+  const cpuElevationAtDir = (d) => sampler.heightAt(_norm(d))
+  const elevationAtDir = (d) => {
+    if (frame.cpuHeightDivergentFromGround === true && frame.groundSource !== 'cpu-solve' && cpuDivergenceReported === false) {
+      cpuDivergenceReported = true
+      console.error(`[terrain] elevationAtDir is reading the CPU height sampler while this frame takes its ground from another source: at terrain hashVersion ${frame.hashVersion} the CPU sampler and any GPU terrain disagree by a measured 1.4 m mean / 4.1 m max over 256 m, so this elevation describes ground nobody walks on -- read the frame ground height and convert it with elevationAtLocal, or seed a solve with cpuElevationAtDir`)
+    }
+    return cpuElevationAtDir(d)
+  }
+  const frame = { radius, hashVersion: sampler.hashVersion, up, east, north, anchorHeight, anchorSurfaceWorld, offsetY, reliefScale: _reliefScale, localToDir, solveSurfaceY, groundHeightLocal, cpuGroundHeightLocal: groundHeightLocal, localToWorld, elevationAtDir, cpuElevationAtDir, cpuHeightDivergentFromGround: false, chartEpoch: 0 }
+  Object.defineProperty(frame, 'anchorDir', { enumerable: true, configurable: true, get: () => [up[0], up[1], up[2]] })
+  const groundSources = new Map([['cpu-solve', groundHeightLocal]])
+  let _groundHeightLocal = groundHeightLocal
+  let _groundSourceName = 'cpu-solve'
+  let _anonymousInstalls = 0
+  function anonymousSourceName(fn) {
+    for (const [name, served] of groundSources) if (served === fn) return name
+    _anonymousInstalls++
+    return _anonymousInstalls === 1 ? 'substituted' : `substituted#${_anonymousInstalls}`
+  }
+  function probeGroundSource(name, fn) {
+    let y
+    try { y = fn(0, 0, 0) } catch (e) {
+      if (e instanceof SurfaceSolveError) return
+      throw e
+    }
+    if (typeof y !== 'number' || !Number.isFinite(y)) throw new TypeError(`the ground source port returns a finite number where there is ground, or throws SurfaceSolveError where there is none; source "${name}" returned ${typeof y} ${String(y)} at the anchor (0, 0), so it is refused`)
+  }
+  function installGroundSource(name, fn) {
+    if (typeof name !== 'string' || name === '') throw new TypeError(`this frame names every ground source it serves, so installing one takes a non-empty name; got ${JSON.stringify(name)}`)
+    if (typeof fn !== 'function') throw new TypeError(`the ground source port is (x, z, yGuess) => number that throws SurfaceSolveError where there is no ground, so source "${name}" installs a function; got ${fn === null ? 'null' : typeof fn}`)
+    if (typeof fn === 'function' && fn.length < 3) throw new TypeError(`the ground source port is (x, z, yGuess) => number; source '${name}' declares ${fn.length} parameter(s), so it drops yGuess and is refused`)
+    probeGroundSource(name, fn)
+    groundSources.set(name, fn)
+    _groundSourceName = name
+    _groundHeightLocal = fn
+    return name
+  }
+  Object.defineProperty(frame, 'groundSource', {
+    enumerable: true,
+    configurable: true,
+    get: () => _groundSourceName,
+  })
+  Object.defineProperty(frame, 'groundSources', {
+    enumerable: true,
+    configurable: true,
+    get: () => [...groundSources.keys()],
+  })
+  Object.defineProperty(frame, 'groundSourceOf', {
+    enumerable: true,
+    configurable: true,
+    value: (name) => {
+      const fn = groundSources.get(name)
+      if (!fn) throw new Error(`this frame serves no ground source named "${name}"; it names ${[...groundSources.keys()].join(', ')}`)
+      return fn
+    },
+  })
+  Object.defineProperty(frame, 'registerGroundSource', {
+    enumerable: true,
+    configurable: true,
+    value: installGroundSource,
+  })
+  Object.defineProperty(frame, 'groundHeightLocal', {
+    enumerable: true,
+    configurable: true,
+    get: () => _groundHeightLocal,
+    set: (fn) => { installGroundSource(fn === groundHeightLocal ? 'cpu-solve' : anonymousSourceName(fn), fn) },
+  })
+  function reanchor(newDir) {
+    const b = anchorBasis(newDir)
+    for (let i = 0; i < 3; i++) { up[i] = b.up[i]; east[i] = b.east[i]; north[i] = b.north[i] }
+    _e0 = east[0]; _e1 = east[1]; _e2 = east[2]
+    _n0 = north[0]; _n1 = north[1]; _n2 = north[2]
+    _u0 = up[0]; _u1 = up[1]; _u2 = up[2]
+    anchorHeight = sampler.heightAt(up)
+    frame.anchorHeight = anchorHeight
+    const lift = radius + anchorHeight
+    for (let i = 0; i < 3; i++) anchorSurfaceWorld[i] = up[i] * lift
+    frame.chartEpoch++
+    return [...up]
+  }
+  frame.reanchor = reanchor
+  return frame
+}
+

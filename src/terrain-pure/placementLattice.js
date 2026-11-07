@@ -1,0 +1,195 @@
+const QUARTER_TURN = Math.PI / 2
+const FACE_EDGE_ANGLE = Math.PI / 4
+const FACE_COUNT = 6
+const MIN_AXIS_STRETCH = 0.66
+const DIR_CACHE_SLOTS = 16384
+const DIR_CACHE_MASK = DIR_CACHE_SLOTS - 1
+
+const FACE_BASIS = new Float64Array([
+  1, 0, 0, 0, 0, -1, 0, 1, 0,
+  -1, 0, 0, 0, 0, 1, 0, 1, 0,
+  0, 1, 0, 1, 0, 0, 0, 0, -1,
+  0, -1, 0, 1, 0, 0, 0, 0, 1,
+  0, 0, 1, 1, 0, 0, 0, 1, 0,
+  0, 0, -1, -1, 0, 0, 0, 1, 0,
+])
+
+export function cubeFaceOf(dx, dy, dz) {
+  const ax = Math.abs(dx)
+  const ay = Math.abs(dy)
+  const az = Math.abs(dz)
+  if (ax >= ay && ax >= az) return dx >= 0 ? 0 : 1
+  if (ay >= az) return dy >= 0 ? 2 : 3
+  return dz >= 0 ? 4 : 5
+}
+
+function faceAngles(face, dx, dy, dz, out) {
+  const b = face * 9
+  const dn = dx * FACE_BASIS[b] + dy * FACE_BASIS[b + 1] + dz * FACE_BASIS[b + 2]
+  const du = dx * FACE_BASIS[b + 3] + dy * FACE_BASIS[b + 4] + dz * FACE_BASIS[b + 5]
+  const dv = dx * FACE_BASIS[b + 6] + dy * FACE_BASIS[b + 7] + dz * FACE_BASIS[b + 8]
+  out[0] = Math.atan2(du, dn)
+  out[1] = Math.atan2(dv, dn)
+  return out
+}
+
+function dirOfFaceAngles(face, au, av, out) {
+  const b = face * 9
+  const tu = Math.tan(au)
+  const tv = Math.tan(av)
+  const x = FACE_BASIS[b] + tu * FACE_BASIS[b + 3] + tv * FACE_BASIS[b + 6]
+  const y = FACE_BASIS[b + 1] + tu * FACE_BASIS[b + 4] + tv * FACE_BASIS[b + 7]
+  const z = FACE_BASIS[b + 2] + tu * FACE_BASIS[b + 5] + tv * FACE_BASIS[b + 8]
+  const l = Math.hypot(x, y, z)
+  out[0] = x / l
+  out[1] = y / l
+  out[2] = z / l
+  return out
+}
+
+export function createPlacementLattice(radius, chunkM, cellsPerChunk) {
+  if (!(Number.isFinite(radius) && radius > 0)) throw new Error(`placement lattice needs a finite planet radius, got ${radius}`)
+  if (!(chunkM > 0) || !(cellsPerChunk >= 1)) throw new Error(`placement lattice needs chunkM > 0 and cellsPerChunk >= 1, got ${chunkM}, ${cellsPerChunk}`)
+  const chunksPerFace = Math.ceil(QUARTER_TURN * radius / chunkM)
+  const cellsPerFace = chunksPerFace * cellsPerChunk
+  const cellAngle = QUARTER_TURN / cellsPerFace
+  const chunkAngle = cellAngle * cellsPerChunk
+  const cellM = chunkM / cellsPerChunk
+  const centreCellAreaOverTarget = (radius * cellAngle / cellM) ** 2
+  const scratchAngles = [0, 0]
+
+  function cellDir(face, fu, fv, out) {
+    return dirOfFaceAngles(face, fu * cellAngle - FACE_EDGE_ANGLE, fv * cellAngle - FACE_EDGE_ANGLE, out)
+  }
+
+  function cellAreaOverTarget(fu, fv) {
+    const tu = Math.tan(fu * cellAngle - FACE_EDGE_ANGLE)
+    const tv = Math.tan(fv * cellAngle - FACE_EDGE_ANGLE)
+    const su = 1 + tu * tu
+    const sv = 1 + tv * tv
+    const l2 = su + tv * tv
+    return centreCellAreaOverTarget * su * sv / (l2 * Math.sqrt(l2))
+  }
+
+  function clampIndex(i, n) {
+    return i < 0 ? 0 : (i >= n ? n - 1 : i)
+  }
+
+  function chunkKey(face, ci, cj) {
+    return (face * chunksPerFace + ci) * chunksPerFace + cj
+  }
+
+  function decodeChunk(key, out) {
+    const cj = key % chunksPerFace
+    const rest = (key - cj) / chunksPerFace
+    const ci = rest % chunksPerFace
+    out[0] = (rest - ci) / chunksPerFace
+    out[1] = ci
+    out[2] = cj
+    return out
+  }
+
+  function chunkKeyOfDir(dx, dy, dz) {
+    const face = cubeFaceOf(dx, dy, dz)
+    faceAngles(face, dx, dy, dz, scratchAngles)
+    const ci = clampIndex(Math.floor((scratchAngles[0] + FACE_EDGE_ANGLE) / chunkAngle), chunksPerFace)
+    const cj = clampIndex(Math.floor((scratchAngles[1] + FACE_EDGE_ANGLE) / chunkAngle), chunksPerFace)
+    return chunkKey(face, ci, cj)
+  }
+
+  const scratchDecoded = [0, 0, 0]
+  const scratchDir = new Float64Array(3)
+  const dirCacheKey = new Float64Array(DIR_CACHE_SLOTS).fill(-1)
+  const dirCacheValue = new Float64Array(DIR_CACHE_SLOTS * 3)
+
+  function chunkCentreDir(key, out) {
+    const h = Math.imul(key, 0x9e3779b1)
+    const slot = (h ^ (h >>> 15)) & DIR_CACHE_MASK
+    const at = slot * 3
+    if (dirCacheKey[slot] !== key) {
+      dirCacheKey[slot] = key
+      decodeChunk(key, scratchDecoded)
+      cellDir(scratchDecoded[0], (scratchDecoded[1] + 0.5) * cellsPerChunk, (scratchDecoded[2] + 0.5) * cellsPerChunk, scratchDir)
+      dirCacheValue[at] = scratchDir[0]
+      dirCacheValue[at + 1] = scratchDir[1]
+      dirCacheValue[at + 2] = scratchDir[2]
+    }
+    out[0] = dirCacheValue[at]
+    out[1] = dirCacheValue[at + 1]
+    out[2] = dirCacheValue[at + 2]
+    return out
+  }
+
+  function chunkCornerDir(key, cornerU, cornerV, out) {
+    decodeChunk(key, scratchDecoded)
+    return cellDir(scratchDecoded[0], (scratchDecoded[1] + cornerU) * cellsPerChunk, (scratchDecoded[2] + cornerV) * cellsPerChunk, out)
+  }
+
+  function cellId(face, i, j) {
+    return (face * cellsPerFace + i) * cellsPerFace + j
+  }
+
+  function hashRow(face, i) {
+    return face * cellsPerFace + i
+  }
+
+  const scratchCentre = [0, 0, 0]
+  const ringKeys = []
+  const ringChord = []
+  function ringAroundDir(dx, dy, dz, radiusM) {
+    const maxAngle = radiusM / radius
+    const maxChordSq = 4 * Math.sin(maxAngle / 2) ** 2
+    const reach = maxAngle / (chunkAngle * MIN_AXIS_STRETCH)
+    const reachTan = Math.tan(FACE_EDGE_ANGLE + reach * chunkAngle)
+    ringKeys.length = 0
+    ringChord.length = 0
+    const consider = (key) => {
+      chunkCentreDir(key, scratchCentre)
+      const ex = scratchCentre[0] - dx
+      const ey = scratchCentre[1] - dy
+      const ez = scratchCentre[2] - dz
+      const chordSq = ex * ex + ey * ey + ez * ez
+      if (chordSq > maxChordSq) return
+      ringKeys.push(key)
+      ringChord.push(chordSq)
+    }
+    for (let face = 0; face < FACE_COUNT; face++) {
+      const b = face * 9
+      const dn = dx * FACE_BASIS[b] + dy * FACE_BASIS[b + 1] + dz * FACE_BASIS[b + 2]
+      if (dn <= 0) continue
+      const du = dx * FACE_BASIS[b + 3] + dy * FACE_BASIS[b + 4] + dz * FACE_BASIS[b + 5]
+      const duLimit = dn * reachTan
+      if (du > duLimit || du < -duLimit) continue
+      const dv = dx * FACE_BASIS[b + 6] + dy * FACE_BASIS[b + 7] + dz * FACE_BASIS[b + 8]
+      if (dv > duLimit || dv < -duLimit) continue
+      faceAngles(face, dx, dy, dz, scratchAngles)
+      const fci = (scratchAngles[0] + FACE_EDGE_ANGLE) / chunkAngle - 0.5
+      const fcj = (scratchAngles[1] + FACE_EDGE_ANGLE) / chunkAngle - 0.5
+      const i0 = Math.max(0, Math.ceil(fci - reach))
+      const i1 = Math.min(chunksPerFace - 1, Math.floor(fci + reach))
+      if (i0 > i1) continue
+      for (let ci = i0; ci <= i1; ci++) {
+        const off = ci - fci
+        const rest = reach * reach - off * off
+        if (rest <= 0) continue
+        const half = Math.sqrt(rest)
+        const j0 = Math.max(0, Math.ceil(fcj - half))
+        const j1 = Math.min(chunksPerFace - 1, Math.floor(fcj + half))
+        for (let cj = j0; cj <= j1; cj++) consider(chunkKey(face, ci, cj))
+      }
+    }
+    const n = ringKeys.length
+    const order = new Array(n)
+    for (let i = 0; i < n; i++) order[i] = i
+    order.sort((a, b) => ringChord[a] - ringChord[b] || ringKeys[a] - ringKeys[b])
+    const out = new Array(n)
+    for (let i = 0; i < n; i++) out[i] = ringKeys[order[i]]
+    return out
+  }
+
+  return {
+    radius, chunkM, cellM, cellsPerChunk, chunksPerFace, cellsPerFace, cellAngle, chunkAngle, faceCount: FACE_COUNT,
+    cellDir, cellAreaOverTarget, chunkKey, decodeChunk, chunkKeyOfDir, chunkCentreDir, chunkCornerDir,
+    cellId, hashRow, ringAroundDir,
+  }
+}
