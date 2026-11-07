@@ -33,6 +33,9 @@ Non-obvious facts for automated edits. Architecture and measured costs live in d
 - Bodies are compared with `Object.is`, so a −0 change is a real change and is sent. A body that jitters between two bit patterns is sent every tick, which costs bytes but not correctness.
 - `manifest.bin` in a spawn world is a run of frames, each a big-endian uint32 length followed by its payload, and the frames end exactly at the file's end. Frame 0 is the index `{v, hashes}` and `hashes` is an object whose values are the 80 value hashes. Frame 1 is the sheet, and its sha256 equals `head.sheet`. Later frames are not parsed yet.
 - Spawn ledger names use `~XX` hex escapes (`~2f` is `/`, `~3a` is `:`). `decodeName` throws on a bare tilde or a non-ASCII escape. The encoder is not documented, so there is no `encodeName`.
+- `resolve-found.json` is spawn's resolve response, reported by the spawn agent and not captured from the probe. Only the `found` result type is parsed; other types throw until they are read from a fixture.
+- A missing head is a 404 with `{"error":"head_not_found"}`. Any other non-200 status is an error.
+- A ledger key is `world.assets/<2 hex>/<encoded>.yaml`. The two-hex bucket is not derived from anything here, so it is only checked for shape.
 - The feed walk is offset-based: 22-entry steps, a 44-entry page cap, and it stops after two empty pages. Repeated worlds are dropped.
 - `scripts/fixtures/spawn` is trimmed from the spawn probe scan `4e709464ecfc408f980ac3b5b46b0ee3` and its feed listing of 2848 entries, which were not recorded in this repo. The gate reads only the fixtures.
 - Policy: no unit tests. Every check is a gate script under scripts/ that runs against the built kernel and the real modules, prints PASS or FAIL lines, and exits non-zero on failure. `npm test` runs the build, the kernel, world, protocol, netcode, snapshot and spawn gates, and the type check.

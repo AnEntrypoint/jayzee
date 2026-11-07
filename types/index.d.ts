@@ -169,6 +169,19 @@ export interface SpawnHead {
 }
 
 export declare function parseHead(text: string): SpawnHead
+export declare function parseHeadResponse(status: number, text: string): { present: false } | { present: true; head: SpawnHead }
+
+export interface SpawnResolved {
+  type: 'found'
+  appId: string
+  worldId: string
+  worldHex: string
+}
+
+export declare function parseResolve(text: string): SpawnResolved
+export declare function parseLedgerKey(key: string): { bucket: string; asset: string }
+export declare function cdnValue(asset: string): { sha: string; ext: string }
+export declare function uuidToHex(uuid: string): string
 
 export interface SpawnManifest {
   index: { v: number; hashes: Record<string, string> }

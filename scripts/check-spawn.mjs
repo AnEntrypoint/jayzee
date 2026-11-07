@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { gate, finish } from './lib/gate.mjs'
-import { decodeName, readFrames, sha256Hex, verifyContent, parseHead, parseManifest, normalizeFeedEntry, walkFeed } from '../src/spawn/index.js'
+import { decodeName, readFrames, sha256Hex, verifyContent, parseHead, parseHeadResponse, parseManifest, normalizeFeedEntry, walkFeed, parseResolve, parseLedgerKey, cdnValue } from '../src/spawn/index.js'
 
 const fixtures = join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'spawn')
 const bytesOf = (path) => readFileSync(join(fixtures, path))
@@ -171,6 +171,64 @@ gate('walkFeed drops repeated worlds', () => {
   if (walkTwiceError) throw walkTwiceError
   const distinct = new Set(feedFixture.map((entry) => entry.world)).size
   assert(walkedTwice.entries.length === distinct, 'duplicated feed walked to ' + walkedTwice.entries.length + ' entries')
+})
+
+gate('parseResolve maps a found result to the head world', () => {
+  const resolved = parseResolve(textOf('resolve-found.json'))
+  assert(resolved.type === 'found', 'result type ' + resolved.type)
+  assert(resolved.worldHex === head.worldHex, 'resolved world ' + resolved.worldHex + ' differs from head ' + head.worldHex)
+})
+
+gate('parseResolve refuses a result type it does not know', () => {
+  let rejected = false
+  try {
+    parseResolve('{"ok":true,"result":{"type":"gone"}}')
+  } catch {
+    rejected = true
+  }
+  assert(rejected, 'unknown result type was accepted')
+})
+
+gate('a 404 head_not_found response reads as an absent head', () => {
+  const response = parseHeadResponse(404, textOf('head-404.json'))
+  assert(response.present === false, 'absent head read as present')
+})
+
+gate('a 200 head response parses the head, and other statuses are refused', () => {
+  const response = parseHeadResponse(200, textOf('head.json'))
+  assert(response.present === true && response.head.sheet === head.sheet, 'present head did not parse')
+  let rejected = false
+  try {
+    parseHeadResponse(500, '')
+  } catch {
+    rejected = true
+  }
+  assert(rejected, 'status 500 was read as a head response')
+})
+
+const glbRows = textOf('glb-rows.tsv').trim().split('\n').slice(1).map((line) => line.split('\t'))
+
+gate('a ledger key names the same cdn value as the GLB row url', () => {
+  for (const row of glbRows) {
+    const sha = row[1]
+    const url = row[2]
+    const key = 'world.assets/3d/~2fcdn~2fvalue.' + sha + '.glb.yaml'
+    const { bucket, asset } = parseLedgerKey(key)
+    assert(bucket === '3d', 'bucket ' + bucket)
+    assert(asset === '/cdn/value.' + sha + '.glb', 'asset ' + asset)
+    assert(cdnValue(asset).sha === sha, 'sha from asset does not match the row')
+    assert(url.endsWith('/cdn/value.' + sha + '.glb'), 'row url does not name the same value')
+  }
+})
+
+gate('a ledger key without a two-hex bucket is refused', () => {
+  let rejected = false
+  try {
+    parseLedgerKey('world.assets/~2fcdn~2fvalue.yaml')
+  } catch {
+    rejected = true
+  }
+  assert(rejected, 'key without a bucket was accepted')
 })
 
 finish()

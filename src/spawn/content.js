@@ -11,6 +11,16 @@ export const verifyContent = (hash, bytes) => {
   return sha256Hex(bytes) === hash
 }
 
+export const parseHeadResponse = (status, text) => {
+  if (status === 404) {
+    const body = JSON.parse(text)
+    if (body.error !== 'head_not_found') throw new RangeError('unexpected 404 body: ' + text)
+    return { present: false }
+  }
+  if (status !== 200) throw new RangeError('head request returned status ' + status)
+  return { present: true, head: parseHead(text) }
+}
+
 export const parseHead = (text) => {
   const head = JSON.parse(text)
   if (head.v !== 1) throw new RangeError('unsupported head version ' + head.v)
