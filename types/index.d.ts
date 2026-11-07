@@ -178,7 +178,7 @@ export interface SpawnResolved {
   worldHex: string
 }
 
-export declare function parseResolve(text: string): SpawnResolved
+export declare function parseResolve(text: string): SpawnResolved | { type: 'not_found' }
 export declare function parseLedgerKey(key: string): { bucket: string; asset: string }
 export declare function cdnValue(asset: string): { sha: string; ext: string }
 export declare function uuidToHex(uuid: string): string

@@ -179,6 +179,11 @@ gate('parseResolve maps a found result to the head world', () => {
   assert(resolved.worldHex === head.worldHex, 'resolved world ' + resolved.worldHex + ' differs from head ' + head.worldHex)
 })
 
+gate('parseResolve maps a not_found result without a world', () => {
+  const resolved = parseResolve(textOf('resolve-not-found.json'))
+  assert(resolved.type === 'not_found' && resolved.worldHex === undefined, 'not_found result ' + JSON.stringify(resolved))
+})
+
 gate('parseResolve refuses a result type it does not know', () => {
   let rejected = false
   try {
