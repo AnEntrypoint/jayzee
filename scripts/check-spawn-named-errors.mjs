@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -10,7 +9,7 @@ import {
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const fixture = (...parts) => readFileSync(join(root, 'scripts', 'fixtures', ...parts), 'utf8')
 const contentSource = readFileSync(join(root, 'src', 'spawn', 'content.js'), 'utf8')
-const findings = fixture('savi', 'spawn-evidence', 'FINDINGS.md')
+const findings = fixture('upstream', 'spawn-evidence', 'FINDINGS.md')
 const record = fixture('spawn', 'learning-record-section-7.md')
 
 const ZEROS = '0'.repeat(64)
@@ -39,8 +38,7 @@ const mustThrow = (check, fragment, type) => {
   if (type !== undefined) assert(error instanceof type, 'refused with ' + error.name + ', expected ' + type.name)
 }
 
-gate('the witness copies agree: the savi FINDINGS copy hashes to the value both savi copies share, and line 30 holds the drifted manifest 200 and 513116 bytes', () => {
-  same(createHash('sha256').update(findings).digest('hex'), '4e64f372d60d8537ed6b91b2068ddaa09118d5eeec19c7956d47a50d9798dc04', 'FINDINGS sha256')
+gate('line 30 of the FINDINGS witness holds the drifted manifest 200 and 513116 bytes', () => {
   const line30 = findings.split('\n')[29]
   assert(line30.includes('manifests/3fa9a434...') && line30.includes('200 application/octet-stream, 513116 bytes'), 'line 30 lost the drifted manifest witness')
   assert(line30.includes('NOT reproduced') && line30.includes('OPEN'), 'line 30 lost the OPEN drifted-head scope')

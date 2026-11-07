@@ -45,7 +45,7 @@ try {
 
 gate('decodes the documented ~XX name escapes', () => {
   assert(decodeName('~2fcdn~2fneutral-default-avatar.glb.yaml') === '/cdn/neutral-default-avatar.glb.yaml', 'slash escape')
-  assert(decodeName('https~3a~2f~2fspawnfile.io~2fprod~2fcharacter-assets~2f1794000000000-savi-reduced-fitted.glb.yaml') === 'https://spawnfile.io/prod/character-assets/1794000000000-savi-reduced-fitted.glb.yaml', 'url escape')
+  assert(decodeName('https~3a~2f~2fspawnfile.io~2fprod~2fcharacter-assets~2f1794000000000-reduced-fitted.glb.yaml') === 'https://spawnfile.io/prod/character-assets/1794000000000-reduced-fitted.glb.yaml', 'url escape')
   assert(decodeName('plain-name.glb') === 'plain-name.glb', 'unescaped name')
   assert(decodeName('a~7eb') === 'a~b', 'tilde escape')
 })

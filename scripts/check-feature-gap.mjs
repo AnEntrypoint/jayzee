@@ -5,7 +5,7 @@ import { gate, finish } from './lib/gate.mjs'
 import { buildReport, countItems, normalizeName, parseFeatureGap, parseSummary, sha256Hex } from './gen-feature-gap.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
-const copyPath = join(here, 'fixtures', 'spoint', 'savi-spawn-feature-gap.md')
+const copyPath = join(here, 'fixtures', 'spoint', 'spoint-spawn-feature-gap.md')
 const recordPath = join(here, 'fixtures', 'spoint', 'feature-gap.json')
 const EXPECTED = { total: 60, checked: 47, unchecked: 13 }
 
@@ -61,7 +61,7 @@ const freshProblems = (recorded, fresh) => ['report', 'summary', 'counts', 'item
 
 const rowProblems = (row) => countProblems({ checked: EXPECTED.checked, unchecked: EXPECTED.unchecked }, row)
 
-const fresh = buildReport(copyBytes, 'savi-spawn-feature-gap.md')
+const fresh = buildReport(copyBytes, 'spoint-spawn-feature-gap.md')
 
 gate('the fixture records the sha256 and byte length of the copy', () => {
   assertNoProblems(hashProblems(record.report, copyBytes))

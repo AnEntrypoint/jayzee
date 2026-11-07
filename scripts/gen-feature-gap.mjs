@@ -91,7 +91,7 @@ const invokedDirectly = process.argv[1] !== undefined && resolve(process.argv[1]
 if (invokedDirectly) {
   const reportPath = process.argv[2]
   if (!reportPath) {
-    console.error('usage: node scripts/gen-feature-gap.mjs <savi-spawn-feature-gap.md>')
+    console.error('usage: node scripts/gen-feature-gap.mjs <spoint-spawn-feature-gap.md>')
     process.exitCode = 2
   } else {
     const report = buildReport(readFileSync(reportPath), basename(reportPath))
