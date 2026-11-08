@@ -1101,6 +1101,7 @@ gate('every module in src/client-pure is covered by this gate or by the gate nam
     frameCapture: 'check-client-pure-spoint.mjs',
     macrotaskYield: 'check-client-pure-spoint.mjs',
     playerTierSplit: 'check-client-tier-split.mjs',
+    playerLodPlanner: 'check-player-lod-plan.mjs',
     minimapGlyphs: 'check-client-pure-spoint.mjs',
     clientMachine: 'check-client-machines.mjs',
     exactPatchFrame: 'check-client-pure-rows.mjs',
@@ -1119,7 +1120,7 @@ gate('every module in src/client-pure is covered by this gate or by the gate nam
   const unlinked = Object.entries(coveredElsewhere).filter(([name, gateFile]) => !readFileSync(join(here, gateFile), 'utf8').includes(name)).map(([name]) => name)
   assert(missing.length === 0 && absent.length === 0 && unlinked.length === 0, `uncovered ${missing.join(',')} absent ${absent.join(',')} unlinked ${unlinked.join(',')}`)
   const total = covered.size + Object.keys(coveredElsewhere).length
-  assert(total === present.length && present.length === 37, 'negative control: the module count must be exactly the 37 ported files')
+  assert(total === present.length && present.length === 38, 'negative control: the module count must be exactly the 38 ported files')
 })
 
 finish()
