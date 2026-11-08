@@ -1,0 +1,157 @@
+import { resolveNetcodeProfile } from '../lockstep-pure/netcodeProfile.js'
+import { DEFAULT_MOVEMENT } from '../motion-pure/movement.js'
+
+const isObj = v => v !== null && typeof v === 'object' && !Array.isArray(v)
+const isNum = v => typeof v === 'number' && Number.isFinite(v)
+const isVec = (v, n) => Array.isArray(v) && v.length === n && v.every(isNum)
+const PLAYER_POSITIVE_KEYS = ['capsuleRadius', 'capsuleHalfHeight', 'crouchHalfHeight', 'mass', 'health']
+const MOVEMENT_EXTENSION_FIELDS = Object.freeze([
+  'sprintSpeed', 'crouchSpeedMul', 'coyoteTime', 'jumpBuffer', 'slideMinSpeed',
+  'airMaxSpeed', 'airSpeedCap', 'collisionRestitution', 'collisionDamping',
+])
+
+export const WORLD_NOT_A_PLAIN_OBJECT = 'world-not-a-plain-object'
+export const WORLD_FIELD_INVALID = 'world-field-invalid'
+
+export class WorldResolveError extends TypeError {
+  constructor({ path, reason, code, reasonCode = null, field = null, worldName = null }) {
+    super(`[world] invalid world ${JSON.stringify(worldName ?? '(unnamed)')}: ${path || '(root)'} ${reason}`)
+    this.name = 'WorldResolveError'
+    this.code = code
+    this.reasonCode = reasonCode ?? code
+    this.field = field
+    this.path = path || ''
+    this.reason = reason
+    this.worldName = worldName ?? null
+  }
+}
+
+const reject = (path, reason) => ({ ok: false, path, reason, code: path ? WORLD_FIELD_INVALID : WORLD_NOT_A_PLAIN_OBJECT })
+
+const isMovementField = field => Object.hasOwn(DEFAULT_MOVEMENT, field) || MOVEMENT_EXTENSION_FIELDS.includes(field)
+const movementFieldNames = () => [...Object.keys(DEFAULT_MOVEMENT), ...MOVEMENT_EXTENSION_FIELDS].join(', ')
+const describeMovementValue = (v) => {
+  if (v === undefined || v === null) return String(v)
+  if (typeof v === 'string') return JSON.stringify(v)
+  if (typeof v === 'number' || typeof v === 'symbol' || typeof v === 'bigint') return String(v)
+  return Array.isArray(v) ? 'array' : typeof v
+}
+const movementRefusal = (field, path, reason) => ({
+  ok: false,
+  path,
+  field,
+  reason,
+  code: WORLD_FIELD_INVALID,
+  reasonCode: WORLD_FIELD_INVALID,
+})
+
+export function validateMovement(movement) {
+  if (!isObj(movement)) return movementRefusal('movement', 'movement', 'movement must be an object of finite positive numbers')
+  const parsed = {}
+  for (const field of Object.keys(movement)) {
+    const path = `movement.${field}`
+    if (!isMovementField(field)) return movementRefusal(field, path, `${path} is not a movement field (known: ${movementFieldNames()})`)
+    const value = movement[field]
+    if (value === null && !Object.hasOwn(DEFAULT_MOVEMENT, field)) continue
+    if (!isNum(value) || value <= 0) return movementRefusal(field, path, `${path} must be a finite number > 0, got ${describeMovementValue(value)} (typeof ${typeof value})`)
+    parsed[field] = value
+  }
+  return { ok: true, movement: parsed }
+}
+
+function checkSlices(w, parseTerrain) {
+  if (!isObj(w)) return reject('', 'world definition must be a plain object (the default export of the world module)')
+  if (w.name !== undefined && typeof w.name !== 'string') return reject('name', 'must be a string')
+  for (const k of ['tickRate', 'entityTickRate']) if (w[k] !== undefined && !(isNum(w[k]) && w[k] > 0 && w[k] <= 1000)) return reject(k, 'must be a finite number in (0, 1000]')
+  for (const k of ['physicsRadius', 'physicsBodyBudget', 'relevanceRadius']) if (w[k] !== undefined && !(isNum(w[k]) && w[k] >= 0)) return reject(k, 'must be a non-negative finite number')
+  if (w.gravity !== undefined && !isVec(w.gravity, 3)) return reject('gravity', 'must be [x, y, z] finite numbers')
+  if (w.spawnPoint !== undefined && !isVec(w.spawnPoint, 3)) return reject('spawnPoint', 'must be [x, y, z] finite numbers')
+  if (w.spawnPoints !== undefined) {
+    if (!Array.isArray(w.spawnPoints)) return reject('spawnPoints', 'must be an array of [x, y, z]')
+    const bad = w.spawnPoints.findIndex(p => !isVec(p, 3))
+    if (bad >= 0) return reject(`spawnPoints[${bad}]`, 'must be [x, y, z] finite numbers')
+  }
+  if (w.player !== undefined) {
+    if (!isObj(w.player)) return reject('player', 'must be an object')
+    for (const k of PLAYER_POSITIVE_KEYS) if (w.player[k] !== undefined && !(isNum(w.player[k]) && w.player[k] > 0)) return reject(`player.${k}`, 'must be a positive finite number')
+  }
+  for (const k of ['camera', 'animation', 'scene', 'input']) if (w[k] !== undefined && !isObj(w[k])) return reject(k, 'must be an object')
+  let movement = null
+  if (w.movement !== undefined) {
+    const m = validateMovement(w.movement)
+    if (!m.ok) return m
+    movement = m.movement
+  }
+  let terrain = null
+  if (w.terrain === true) return reject('terrain', 'must be a terrain config object, false or null: true declares no terrain config and no terrain consumer parses it')
+  if (w.terrain !== undefined && w.terrain !== null && typeof w.terrain !== 'boolean') {
+    if (!isObj(w.terrain)) return reject('terrain', 'must be a terrain config object, false or null')
+    const t = parseTerrain(w.terrain)
+    if (!t.ok) return reject(t.path ? `terrain.${t.path}` : 'terrain', t.reason)
+    terrain = t.config
+  }
+  if (w.planetRadius !== undefined && !(isNum(w.planetRadius) && w.planetRadius >= 0)) return reject('planetRadius', 'must be a finite number >= 0 (0 declares a flat world)')
+  if (w.iceServers !== undefined) {
+    if (!Array.isArray(w.iceServers)) return reject('iceServers', 'must be an array of RTCIceServer objects')
+    const bad = w.iceServers.findIndex(s => !isObj(s) || !(typeof s.urls === 'string' || (Array.isArray(s.urls) && s.urls.every(u => typeof u === 'string'))))
+    if (bad >= 0) return reject(`iceServers[${bad}].urls`, 'must be a string or an array of strings')
+  }
+  for (const k of ['placeableApps', 'trustedApps']) if (w[k] !== undefined && !(Array.isArray(w[k]) && w[k].every(a => typeof a === 'string'))) return reject(k, 'must be an array of app names')
+  if (w.equipment !== undefined) {
+    if (!Array.isArray(w.equipment) || !w.equipment.every(a => typeof a === 'string' && a !== '')) return reject('equipment', 'must be an array of non-empty equipment names (index 0 is equipment code 1)')
+    if (new Set(w.equipment).size !== w.equipment.length) return reject('equipment', 'must not repeat an equipment name: the code is its index, so a duplicate is ambiguous')
+  }
+  if (w.players !== undefined) {
+    if (!isObj(w.players)) return reject('players', 'must be an object')
+    if (w.players.behaviours !== undefined && !isObj(w.players.behaviours)) return reject('players.behaviours', 'must be an object mapping behaviour names to their spec')
+  }
+  if (w.input?.mobileButtons !== undefined) {
+    const buttons = w.input.mobileButtons
+    if (!Array.isArray(buttons) || !buttons.every(b => b && typeof b === 'object' && typeof b.action === 'string' && b.action !== '')) {
+      return reject('input.mobileButtons', 'must be an array of objects with a non-empty action string')
+    }
+    if (new Set(buttons.map(b => b.action)).size !== buttons.length) return reject('input.mobileButtons', 'must not repeat an action: only the first button for an action is kept')
+  }
+  if (w.entities !== undefined) {
+    if (!Array.isArray(w.entities)) return reject('entities', 'must be an array')
+    const ids = new Set()
+    for (let i = 0; i < w.entities.length; i++) {
+      const e = w.entities[i]
+      if (!isObj(e)) return reject(`entities[${i}]`, 'must be an object')
+      if (e.id !== undefined) {
+        if (typeof e.id !== 'string' || !e.id) return reject(`entities[${i}].id`, 'must be a non-empty string')
+        if (ids.has(e.id)) return reject(`entities[${i}].id`, `duplicate entity id "${e.id}"`)
+        ids.add(e.id)
+      }
+      if (e.app !== undefined && typeof e.app !== 'string') return reject(`entities[${i}].app`, 'must be an app name string')
+      if (e.behaviours !== undefined && !isObj(e.behaviours)) return reject(`entities[${i}].behaviours`, 'must be an object mapping behaviour names to their spec')
+      if (e.position !== undefined && !isVec(e.position, 3)) return reject(`entities[${i}].position`, 'must be [x, y, z] finite numbers')
+      if (e.rotation !== undefined && !isVec(e.rotation, 4)) return reject(`entities[${i}].rotation`, 'must be a [x, y, z, w] quaternion of finite numbers')
+      if (e.scale !== undefined && !isVec(e.scale, 3)) return reject(`entities[${i}].scale`, 'must be [x, y, z] finite numbers')
+    }
+  }
+  let profile
+  try { profile = resolveNetcodeProfile(w) } catch (e) { return reject('netcode', e.message) }
+  const world = { ...w, netcode: { ...(w.netcode ?? {}), ...profile } }
+  if (terrain !== null) world.terrain = terrain
+  if (movement !== null) world.movement = movement
+  return { ok: true, world }
+}
+
+function terrainParserOf(parseTerrain) {
+  if (parseTerrain === undefined) {
+    return () => ({ ok: false, path: '', reason: 'no terrain parser was supplied, so a terrain config object cannot be validated' })
+  }
+  if (typeof parseTerrain !== 'function') throw new TypeError('parseTerrain must be a function returning { ok, config } or { ok: false, path, reason }')
+  return parseTerrain
+}
+
+export function parseWorld(worldDef, { parseTerrain } = {}) {
+  return checkSlices(worldDef, terrainParserOf(parseTerrain))
+}
+
+export function assertWorld(worldDef, worldName = null, { parseTerrain } = {}) {
+  const r = parseWorld(worldDef, { parseTerrain })
+  if (!r.ok) throw new WorldResolveError({ path: r.path, reason: r.reason, code: r.code, reasonCode: r.reasonCode, field: r.field, worldName: worldName ?? worldDef?.name ?? null })
+  return r.world
+}
