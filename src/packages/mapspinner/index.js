@@ -7,3 +7,4 @@ export { buildGridGeometry, perspectiveZeroToOne } from './patch-grid-geometry.j
 export { seaHeightMean } from './sea-waves.js'
 export { Mat4, TEXTURE_UNITS } from './mat4.js'
 export { HPF_CHANNELS, HPF_FACES, hpfLatticeDenom, hpfQuintic, hpfPoolFloats, assertHpfRes, assertHpfPool, assertHpfTap, hpfLattice, hpfFaceSampler, hpfPoolSampler } from './hpf-lattice.js'
+export { resolvePoolParams, resolveWetness } from './pool-params.js'
