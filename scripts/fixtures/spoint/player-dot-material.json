@@ -1,0 +1,33 @@
+{
+  "source": {
+    "commit": "4df338a",
+    "files": [
+      "client/core/PlayerLOD.js",
+      "client/core/PlayerLODTSL.js"
+    ],
+    "sha256": {
+      "client/core/PlayerLOD.js": "b2f54a6ed95a09e74ff8b1c9ca059632cb0887ba68587e5e272626c430f55c48",
+      "client/core/PlayerLODTSL.js": "22e9616c77b70def1158adbd6c00180bf28cae5c7e5941d3fa9493a5231f970f"
+    }
+  },
+  "webgl": {
+    "material": {
+      "side": 0,
+      "transparent": true,
+      "opacity": 0.85,
+      "depthWrite": false
+    },
+    "mesh": {
+      "frustumCulled": false,
+      "renderOrder": 3
+    }
+  },
+  "tsl": {
+    "material": {
+      "side": 0,
+      "transparent": true,
+      "opacity": 0.85,
+      "depthWrite": false
+    }
+  }
+}
