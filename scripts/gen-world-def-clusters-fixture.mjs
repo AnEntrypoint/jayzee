@@ -1,6 +1,7 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { isDeepStrictEqual } from 'node:util'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const spointRoot = process.argv[2] || '/workspace/spoint'
@@ -13,30 +14,6 @@ const verdictOf = (fn) => {
   } catch (error) {
     return { code: error.code, message: error.message }
   }
-}
-
-const isPlainObject = (value) => typeof value === 'object' && value !== null && !Array.isArray(value)
-
-const terrainConfigOf = (def) => {
-  if (Array.isArray(def.entities)) {
-    for (const entity of def.entities) {
-      if (entity && entity.app === 'terrain' && isPlainObject(entity.config)) return entity.config
-    }
-  }
-  return isPlainObject(def.terrain) ? def.terrain : null
-}
-
-const projectionOf = (def) => {
-  const out = {}
-  if ('planetRadius' in def) out.planetRadius = def.planetRadius
-  const terrain = terrainConfigOf(def)
-  if (terrain) {
-    const picked = {}
-    if ('clusters' in terrain) picked.clusters = terrain.clusters
-    if ('radius' in terrain) picked.radius = terrain.radius
-    out.terrain = picked
-  }
-  return out
 }
 
 const SYNTHETIC = [
@@ -75,10 +52,11 @@ for (const world of SHIPPED) {
   const routed = readFileSync(path, 'utf8').includes('parseWorldDef(')
   const mod = await import(pathToFileURL(path).href)
   const def = mod.default
+  if (!isDeepStrictEqual(JSON.parse(JSON.stringify(def)), def)) throw new Error(world + ': the def does not survive a JSON round trip')
   shipped.push({
     world,
     routed,
-    projection: projectionOf(def),
+    def,
     expect: verdictOf(() => spoint.parseWorldDef(world, def)),
   })
 }

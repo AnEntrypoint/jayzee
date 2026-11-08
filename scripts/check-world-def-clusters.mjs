@@ -32,7 +32,7 @@ for (const item of fixture.synthetic) {
 for (const item of fixture.shipped) {
   const route = item.routed ? 'routed through parseWorldDef' : 'not routed through parseWorldDef'
   gate('shipped world ' + item.world + ' (' + route + '): the cluster verdict matches spoint', () => {
-    assert.deepEqual(verdictOf(() => parseClusterFlag(item.world, item.projection)), item.expect, 'verdict differs from spoint parseWorldDef')
+    assert.deepEqual(verdictOf(() => parseClusterFlag(item.world, item.def)), item.expect, 'verdict differs from spoint parseWorldDef')
   })
 }
 
