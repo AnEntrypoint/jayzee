@@ -1,0 +1,29 @@
+{
+  "source": {
+    "files": [
+      "src/physics/World.js",
+      "src/physics/DormantStatics.js"
+    ],
+    "sha256": {
+      "src/physics/World.js": "2c978302c0fa894b8168e0e1ad8242a5bd5e70c0ee571274b22e4815197e1d3e",
+      "src/physics/DormantStatics.js": "933bb30f065e13cc6e3375fa64bae1cccafe937ac5033059f345ab222ffa957b"
+    },
+    "joltPhysics": "1.1.0"
+  },
+  "labels": [
+    "park 120 statics farthest first",
+    "zero budget and no movers reinserts one batch of 32 in park order",
+    "zero budget with the origin as mover reinserts the 32 nearest first",
+    "a mover 476 m along x reorders the pending set and reinserts its 32 nearest",
+    "unlimited budget drains the remaining statics",
+    "drain on an empty set returns 0"
+  ],
+  "rows": [
+    "{\"label\":s:\"park 120 statics farthest first\",\"value\":{\"pending\":n:120,\"returned\":n:120}}",
+    "{\"label\":s:\"zero budget and no movers reinserts one batch of 32 in park order\",\"value\":{\"drained\":n:32,\"stillParked\":[n:0,n:1,n:2,n:3,n:4,n:5,n:6,n:7,n:8,n:9,n:10,n:11,n:12,n:13,n:14,n:15,n:16,n:17,n:18,n:19,n:20,n:21,n:22,n:23,n:24,n:25,n:26,n:27,n:28,n:29,n:30,n:31,n:32,n:33,n:34,n:35,n:36,n:37,n:38,n:39,n:40,n:41,n:42,n:43,n:44,n:45,n:46,n:47,n:48,n:49,n:50,n:51,n:52,n:53,n:54,n:55,n:56,n:57,n:58,n:59,n:60,n:61,n:62,n:63,n:64,n:65,n:66,n:67,n:68,n:69,n:70,n:71,n:72,n:73,n:74,n:75,n:76,n:77,n:78,n:79,n:80,n:81,n:82,n:83,n:84,n:85,n:86,n:87]}}",
+    "{\"label\":s:\"zero budget with the origin as mover reinserts the 32 nearest first\",\"value\":{\"drained\":n:32,\"stillParked\":[n:32,n:33,n:34,n:35,n:36,n:37,n:38,n:39,n:40,n:41,n:42,n:43,n:44,n:45,n:46,n:47,n:48,n:49,n:50,n:51,n:52,n:53,n:54,n:55,n:56,n:57,n:58,n:59,n:60,n:61,n:62,n:63,n:64,n:65,n:66,n:67,n:68,n:69,n:70,n:71,n:72,n:73,n:74,n:75,n:76,n:77,n:78,n:79,n:80,n:81,n:82,n:83,n:84,n:85,n:86,n:87]}}",
+    "{\"label\":s:\"a mover 476 m along x reorders the pending set and reinserts its 32 nearest\",\"value\":{\"drained\":n:32,\"stillParked\":[n:32,n:33,n:34,n:35,n:36,n:37,n:38,n:39,n:40,n:41,n:42,n:43,n:44,n:45,n:46,n:47,n:48,n:49,n:50,n:51,n:52,n:53,n:54,n:55]}}",
+    "{\"label\":s:\"unlimited budget drains the remaining statics\",\"value\":{\"drained\":n:24,\"pending\":n:0}}",
+    "{\"label\":s:\"drain on an empty set returns 0\",\"value\":{\"drained\":n:0}}"
+  ]
+}
