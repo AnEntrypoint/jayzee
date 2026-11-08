@@ -255,7 +255,7 @@ const sameText = (actual, expected, label) => {
   assert(actual === expected, label + ' is ' + JSON.stringify(actual) + ', expected ' + JSON.stringify(expected))
 }
 
-gate('encodeName escapes ":", "~", capitals and "/" as upstream does, and leaves the literal set alone', () => {
+gate('encodeName escapes ":", "~", capitals and "/" as the upstream probe test does, and leaves the literal set alone', () => {
   sameText(encodeName('https://spawnfile.io'), 'https~3a~2f~2fspawnfile.io', 'colon and slash')
   sameText(encodeName('a~b'), 'a~7eb', 'tilde')
   sameText(encodeName('Upper'), '~55pper', 'capital')
