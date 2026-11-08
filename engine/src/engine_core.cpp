@@ -26,6 +26,8 @@ std::uint32_t stageHandles[engine::kMaxBodies];
 std::int32_t planetScratch[4];
 alignas(8) std::uint8_t codecBytes[engine::codec::kScratchBytes];
 alignas(8) double codecValues[engine::codec::kScratchValues];
+std::int32_t codecCounts[4];
+std::uint32_t packetEpoch = 0;
 
 }
 
@@ -293,6 +295,25 @@ EMSCRIPTEN_KEEPALIVE int engine_codec_decode_quat() {
 EMSCRIPTEN_KEEPALIVE int engine_codec_encode_inputs(int count) {
   const int length = engine::codec::encodeInputs(codecValues, count, codecBytes);
   return length < 0 ? engine::kRange : length;
+}
+
+EMSCRIPTEN_KEEPALIVE int engine_codec_encode_packet(int buttons, int axes, double chartEpoch, int count) {
+  const engine::codec::PacketSchema schema{buttons, axes};
+  return engine::codec::encodePacket(schema, codecValues, count, chartEpoch, codecBytes, codecCounts);
+}
+
+EMSCRIPTEN_KEEPALIVE int engine_codec_decode_packet(int buttons, int axes, int length, int dropping, std::uint32_t dropAtOrBelow) {
+  const engine::codec::PacketSchema schema{buttons, axes};
+  const std::size_t size = length < 0 ? 0 : static_cast<std::size_t>(length);
+  return engine::codec::decodePacket(schema, codecBytes, size, dropping != 0, dropAtOrBelow, codecValues, packetEpoch);
+}
+
+EMSCRIPTEN_KEEPALIVE std::uint32_t engine_codec_packet_epoch() {
+  return packetEpoch;
+}
+
+EMSCRIPTEN_KEEPALIVE std::int32_t* engine_codec_counts() {
+  return codecCounts;
 }
 
 EMSCRIPTEN_KEEPALIVE int engine_codec_decode_inputs(int length) {

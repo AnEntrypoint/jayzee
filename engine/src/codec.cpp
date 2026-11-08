@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 
 namespace engine::codec {
 
@@ -219,6 +220,206 @@ int decodeInputs(const std::uint8_t* in, std::size_t length, double* records) {
     record[4] = static_cast<double>(readU32(in, at + 8));
   }
   return count;
+}
+
+namespace {
+
+constexpr double kHalfPi = 3.14159265358979323846 / 2.0;
+constexpr double kPitchScale = 32767.0 / kHalfPi;
+constexpr double kUint32Span = 4294967296.0;
+constexpr std::uint8_t kPacketEpochFlag = 0x80;
+constexpr std::uint8_t kPacketAnalogFlag = 0x01;
+constexpr std::size_t kPacketHeaderBytes = 1;
+constexpr std::size_t kPacketEpochBytes = 4;
+constexpr std::size_t kPacketFixedBytes = 14;
+constexpr std::size_t kPacketAnalogBytes = 2;
+constexpr std::size_t kPacketAxisBytes = 4;
+
+int reject(InputCase code) {
+  return -1 - static_cast<int>(code);
+}
+
+bool isUint32Value(double value) {
+  return value >= 0.0 && value < kUint32Span && std::floor(value) == value;
+}
+
+bool schemaValid(const PacketSchema& schema) {
+  return schema.buttons >= 0 && schema.buttons <= kPacketMaxButtons && schema.axes >= 0 && schema.axes <= kPacketMaxAxes;
+}
+
+std::uint32_t buttonMask(int buttons) {
+  return buttons >= 32 ? 0xffffffffu : ((1u << buttons) - 1u);
+}
+
+std::uint32_t floatBits(float value) {
+  std::uint32_t bits = 0;
+  std::memcpy(&bits, &value, sizeof bits);
+  return bits;
+}
+
+float floatFromBits(std::uint32_t bits) {
+  float value = 0.0f;
+  std::memcpy(&value, &bits, sizeof value);
+  return value;
+}
+
+void clampTo(double& value, double lo, double hi, std::int32_t& clamped) {
+  if (value < lo) {
+    value = lo;
+    clamped += 1;
+  } else if (value > hi) {
+    value = hi;
+    clamped += 1;
+  }
+}
+
+int writeRecord(const PacketSchema& schema, const double* record, std::uint8_t* out, std::size_t off, std::int32_t& clamped,
+                std::int32_t& wrapped) {
+  if (!isUint32Value(record[1])) return reject(InputCase::Field);
+  writeU32(out, off, static_cast<std::uint32_t>(record[0]));
+  writeU32(out, off + 4, static_cast<std::uint32_t>(record[1]) & buttonMask(schema.buttons));
+
+  const double yaw = record[2];
+  if (!std::isfinite(yaw)) return reject(InputCase::Field);
+  if (yaw < 0.0 || yaw >= kTwoPi) wrapped += 1;
+  const double wrappedYaw = std::fmod(std::fmod(yaw, kTwoPi) + kTwoPi, kTwoPi);
+  const std::int64_t steps = static_cast<std::int64_t>(jsRound((wrappedYaw / kTwoPi) * kYawSteps)) % 65536;
+  writeU16(out, off + 8, static_cast<std::uint32_t>(steps));
+
+  double pitch = record[3];
+  if (!std::isfinite(pitch)) return reject(InputCase::Field);
+  clampTo(pitch, -kHalfPi, kHalfPi, clamped);
+  writeU16(out, off + 10, static_cast<std::uint32_t>(static_cast<std::int64_t>(jsRound(pitch * kPitchScale))));
+
+  double expr = record[4];
+  if (!std::isfinite(expr)) return reject(InputCase::Field);
+  clampTo(expr, 0.0, 255.0, clamped);
+  out[off + 12] = static_cast<std::uint8_t>(expr);
+
+  if (!(record[5] == 0.0 || record[5] == 1.0)) return reject(InputCase::Field);
+  const bool analog = record[5] == 1.0;
+  out[off + 13] = analog ? kPacketAnalogFlag : 0;
+  off += kPacketFixedBytes;
+  if (analog) {
+    for (std::size_t k = 0; k < kPacketAnalogBytes; ++k) {
+      double value = record[6 + k];
+      if (!std::isfinite(value)) return reject(InputCase::Field);
+      clampTo(value, -1.0, 1.0, clamped);
+      out[off + k] = static_cast<std::uint8_t>(static_cast<std::int8_t>(static_cast<std::int64_t>(jsRound(value * kAxisScale))));
+    }
+    off += kPacketAnalogBytes;
+  }
+  for (int a = 0; a < schema.axes; ++a) {
+    const double value = record[8 + a];
+    if (!std::isfinite(value)) return reject(InputCase::Field);
+    writeU32(out, off, floatBits(static_cast<float>(value)));
+    off += kPacketAxisBytes;
+  }
+  return static_cast<int>(off);
+}
+
+int recordSpan(const PacketSchema& schema, const std::uint8_t* in, std::size_t off, std::size_t end) {
+  if (off + kPacketFixedBytes > end) return reject(InputCase::TruncatedRecord);
+  const std::uint8_t flags = in[off + 13];
+  if ((flags & static_cast<std::uint8_t>(~kPacketAnalogFlag)) != 0) return reject(InputCase::Flags);
+  std::size_t span = kPacketFixedBytes;
+  if ((flags & kPacketAnalogFlag) != 0) {
+    span += kPacketAnalogBytes;
+    if (off + span > end) return reject(InputCase::TruncatedAnalog);
+  }
+  const std::size_t axesBytes = static_cast<std::size_t>(schema.axes) * kPacketAxisBytes;
+  if (off + span + axesBytes > end) return reject(InputCase::TruncatedAxes);
+  return static_cast<int>(span + axesBytes);
+}
+
+int readRecord(const PacketSchema& schema, const std::uint8_t* in, std::size_t off, std::size_t end, double* entry) {
+  const int span = recordSpan(schema, in, off, end);
+  if (span < 0) return span;
+  const bool analog = (in[off + 13] & kPacketAnalogFlag) != 0;
+  entry[0] = static_cast<double>(readU32(in, off));
+  entry[1] = static_cast<double>(readU32(in, off + 4) & buttonMask(schema.buttons));
+  entry[2] = (static_cast<double>(readU16(in, off + 8)) / kYawSteps) * kTwoPi;
+  entry[3] = static_cast<double>(static_cast<std::int16_t>(readU16(in, off + 10))) / kPitchScale;
+  entry[4] = static_cast<double>(in[off + 12]);
+  entry[5] = analog ? 1.0 : 0.0;
+  entry[6] = 0.0;
+  entry[7] = 0.0;
+  std::size_t at = off + kPacketFixedBytes;
+  if (analog) {
+    entry[6] = static_cast<double>(static_cast<std::int8_t>(in[at])) / kAxisScale;
+    entry[7] = static_cast<double>(static_cast<std::int8_t>(in[at + 1])) / kAxisScale;
+    at += kPacketAnalogBytes;
+  }
+  for (int a = 0; a < kPacketMaxAxes; ++a) entry[8 + a] = 0.0;
+  for (int a = 0; a < schema.axes; ++a) {
+    const double value = static_cast<double>(floatFromBits(readU32(in, at)));
+    at += kPacketAxisBytes;
+    if (!std::isfinite(value)) return reject(InputCase::Axis);
+    entry[8 + a] = value;
+  }
+  return static_cast<int>(off) + span;
+}
+
+}
+
+int encodePacket(const PacketSchema& schema, const double* entries, int count, double chartEpoch, std::uint8_t* out, std::int32_t* counts) {
+  if (!schemaValid(schema)) return reject(InputCase::Schema);
+  if (count == 0) return reject(InputCase::EntriesEmpty);
+  if (count < 0 || count > kPacketMaxEntries) return reject(InputCase::Count);
+  for (int i = 0; i < count; ++i) {
+    if (!isUint32Value(entries[i * kPacketStride])) return reject(InputCase::Sequence);
+  }
+  if (!isUint32Value(chartEpoch)) return reject(InputCase::Epoch);
+  const int kept = std::min(count, kPacketMaxRecords);
+  const int first = count - kept;
+  const bool tagged = chartEpoch > 0.0;
+  std::int32_t clamped = 0;
+  std::int32_t wrapped = 0;
+  out[0] = static_cast<std::uint8_t>(kept | (tagged ? kPacketEpochFlag : 0));
+  std::size_t off = kPacketHeaderBytes;
+  if (tagged) {
+    writeU32(out, off, static_cast<std::uint32_t>(chartEpoch));
+    off += kPacketEpochBytes;
+  }
+  for (int i = first; i < count; ++i) {
+    const int next = writeRecord(schema, entries + i * kPacketStride, out, off, clamped, wrapped);
+    if (next < 0) return next;
+    off = static_cast<std::size_t>(next);
+  }
+  counts[0] = clamped;
+  counts[1] = wrapped;
+  counts[2] = first;
+  return static_cast<int>(off);
+}
+
+int decodePacket(const PacketSchema& schema, const std::uint8_t* in, std::size_t length, bool dropping, std::uint32_t dropAtOrBelow,
+                 double* entries, std::uint32_t& chartEpoch) {
+  chartEpoch = 0;
+  if (!schemaValid(schema)) return reject(InputCase::Schema);
+  if (length == 0) return reject(InputCase::PayloadEmpty);
+  const int n = in[0] & 0x7f;
+  if (n == 0 || n > kPacketMaxRecords) return reject(InputCase::Count);
+  std::size_t off = kPacketHeaderBytes;
+  if ((in[0] & kPacketEpochFlag) != 0) {
+    if (length < kPacketHeaderBytes + kPacketEpochBytes) return reject(InputCase::TruncatedEpoch);
+    chartEpoch = readU32(in, off);
+    off += kPacketEpochBytes;
+  }
+  int kept = 0;
+  for (int i = 0; i < n; ++i) {
+    const int span = recordSpan(schema, in, off, length);
+    if (span < 0) return span;
+    if (dropping && readU32(in, off) <= dropAtOrBelow) {
+      off += static_cast<std::size_t>(span);
+      continue;
+    }
+    const int next = readRecord(schema, in, off, length, entries + kept * kPacketStride);
+    if (next < 0) return next;
+    off = static_cast<std::size_t>(next);
+    kept += 1;
+  }
+  if (off != length) return reject(InputCase::Trailing);
+  return kept;
 }
 
 }

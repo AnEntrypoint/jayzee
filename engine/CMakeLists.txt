@@ -110,7 +110,11 @@ set(ENGINE_EXPORTS
   _engine_codec_encode_quat
   _engine_codec_decode_quat
   _engine_codec_encode_inputs
-  _engine_codec_decode_inputs)
+  _engine_codec_decode_inputs
+  _engine_codec_encode_packet
+  _engine_codec_decode_packet
+  _engine_codec_packet_epoch
+  _engine_codec_counts)
 string(JOIN "," ENGINE_EXPORT_LIST ${ENGINE_EXPORTS})
 
 target_link_options(engine_core PRIVATE

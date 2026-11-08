@@ -101,6 +101,38 @@ gate('refusals: every case the spoint codecs refuse, the C++ codecs refuse too',
   }
 })
 
+gate('schema input packets: C++ encode bytes and clamp, wrap and drop counts equal encodeInputPacket', () => {
+  for (const c of cases.packet.encode) {
+    const schema = cases.packet.schemas[c.schema]
+    writeValues(c.entries.flat())
+    const length = module._engine_codec_encode_packet(schema.buttons, schema.axes, num(c.epoch), c.entries.length)
+    if (!c.accepted) {
+      assert.equal(-1 - length, c.code, c.label)
+      continue
+    }
+    assert.equal(length, c.bytes.length / 2, c.label)
+    assert.equal(toHex(readBytes(length)), c.bytes, c.label)
+    const counts = module._engine_codec_counts() / 4
+    assert.deepEqual(Array.from(module.HEAP32.subarray(counts, counts + 3)), c.counts, c.label)
+  }
+})
+
+gate('schema input packets: C++ decode equals decodeInputPacket value for value, bit for bit, and refuses what it refuses', () => {
+  for (const c of cases.packet.decode) {
+    const schema = cases.packet.schemas[c.schema]
+    const bytes = fromHex(c.bytes)
+    writeBytes(bytes)
+    const kept = module._engine_codec_decode_packet(schema.buttons, schema.axes, bytes.length, c.drop === null ? 0 : 1, c.drop ?? 0)
+    if (!c.accepted) {
+      assert.equal(-1 - kept, c.code, c.label)
+      continue
+    }
+    assert.equal(kept, c.entries.length, c.label)
+    assert.ok(same(readValues(kept * 24), c.entries.flat()), c.label)
+    assert.equal(module._engine_codec_packet_epoch() >>> 0, c.epoch, c.label)
+  }
+})
+
 gate('a truncated record is refused: 28 entity bytes and 21 player bytes', () => {
   writeBytes(new Uint8Array(28))
   assert.ok(module._engine_codec_decode_entity(28) < 0)
