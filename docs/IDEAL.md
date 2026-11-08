@@ -1,0 +1,756 @@
+# IDEAL: one feature ledger for spoint, upstream and jayzee
+
+This file lists every documented feature of the three projects with a status and a proof path. It is the reconciliation ledger for the merge. Status words:
+
+- built: a jayzee module implements the feature and a gate in package.json witnesses it.
+- partial: part of the feature is ported and witnessed; the rest is named in the row.
+- missing: no jayzee module and no recorded decision. These are open work.
+- owner-decision: the feature needs a host, a licence, a Jolt, DOM, WebGPU, socket or worker dependency, or evidence only the owner can supply.
+
+Proof paths are repo-relative. Each is verified to exist, except where a row says it is a glob.
+
+## 1. Upstream gap register (JAYZEE-GAPS rows 1 to 67)
+
+Every row id from the upstream register appears below as row N. Titles and gate names come from docs/PARITY.md at this commit.
+
+| Gap row | Feature (jayzee PARITY title) | jayzee PARITY row | Status | Proof |
+|---|---|---|---|---|
+| row 1 | Spawn feed, resolve, head, ledger keys and CDN names | 60 | built | scripts/check-spawn.mjs |
+| row 2 | Input, snapshot, state, delta and ack codecs | 1 | built | scripts/check-protocol.mjs, scripts/check-snapshots.mjs |
+| row 3 | Authority, prediction, reconciliation and input buffer | 2 | built | scripts/check-netcode.mjs |
+| row 4 | Message ids and reliability classes | 3 | built | scripts/check-messages.mjs |
+| row 5 | Physics kernel: integration, ground, boxes, pair search and contact response | 4 | built | scripts/check-kernel.mjs, scripts/check-world.mjs |
+| row 6 | Physics kernel: sleeping islands, CCD, persistent contacts and warm start | 5 | built | scripts/check-physics-pure.mjs, scripts/check-ccd.mjs |
+| row 7 | Joints, springs, axis locks and friction and restitution combine modes | 6 | built | scripts/check-constraint-limits.mjs, scripts/check-jolt-limits.mjs |
+| row 8 | Character controller: wall planes and steps, with the walkable slope set by a normal-Y flo | 7 | owner-decision (Jolt CharacterManager) | scripts/check-character-step.mjs, scripts/check-movement.mjs |
+| row 9 | Queries: raycast, overlap, filters and pending geometry | 8 | partial | scripts/check-world-query.mjs |
+| row 10 | Vehicles | 9 | owner-decision (Jolt VehiclePhysics) | scripts/check-flight-model.mjs, scripts/check-vehicle-tuning.mjs |
+| row 11 | Lag compensation with a rewind ring, a 1000 ms window and a rate limit | 10 | built | scripts/check-lag-compensation.mjs |
+| row 12 | Rollback loop with maxRollbackTicks 12 and window 32 | 11 | owner-decision (WebRTC bridge host) | scripts/check-rollback.mjs, scripts/check-rollback-bridge.mjs |
+| row 13 | Lockstep loop with input delay 3, checksum every 30 ticks and stall 600 | 12 | owner-decision (capture and apply need a host) | scripts/check-lockstep.mjs, scripts/check-tick-scheduler.mjs, scripts/check-worker-bridge.mjs |
+| row 14 | Desync detection, consensus voting and peer ejection | 13 | built | scripts/check-consensus.mjs, scripts/check-anticheat.mjs, scripts/check-event-log.mjs |
+| row 15 | Interest management: relevance radius 200 m and cell lookup | 14 | owner-decision (spawn learnings 57 to 58 not in either repo) | scripts/check-aoi.mjs |
+| row 16 | Bandwidth budget and priority: 900 bytes per tick, decay 0.02, 64 entities | 15 | built | scripts/check-aoi.mjs |
+| row 17 | Snapshot LOD: full detail for 30 players, 5 Hz beyond 120 m | 16 | partial | scripts/check-snapshot-lod.mjs, scripts/check-row16-client-decoder.mjs |
+| row 18 | Replication scope and audience | 17 | owner-decision (spawn learnings 30 to 37 not in either repo) | scripts/check-aoi.mjs |
+| row 19 | Server authority per tick, catch-up limits and starvation holds | 18 | partial | scripts/check-tick-authority.mjs, scripts/check-tick-order.mjs |
+| row 20 | Anticheat: input rate limit (capacity 120, refill 90 per second), envelope clamp, shot out | 19 | partial | scripts/check-anticheat.mjs |
+| row 21 | Replay record and playback | 20 | built | scripts/check-replay-player.mjs |
+| row 22 | Sessions: reconnect, migrate and session TTL of 30 s | 21 | partial | scripts/check-sessions.mjs |
+| row 23 | Heightfield terrain: baked data, fail-loud on stale code, CPU fallback | 22 | built | scripts/check-heightfield-physics.mjs |
+| row 24 | Terrain marks, paint and sculpt | 23 | built | scripts/check-terrain-pure.mjs, scripts/check-paint-store.mjs |
+| row 25 | Caves, erosion, structures and spline carve | 24 | partial | scripts/check-terrain-witness.mjs, scripts/check-marching-drift.mjs |
+| row 26 | Fire kernel (integer-only, hashed seeds), fire wire and fire modules | 25 | partial | scripts/check-fire.mjs, scripts/check-fire-modules.mjs |
+| row 27 | Pathfinding with a budget of 20000 and partial results | 26 | owner-decision (recast WASM bake, licence) | scripts/check-pathfinding.mjs |
+| row 28 | Spatial index with cells of 32 m | 27 | partial | scripts/check-octree.mjs |
+| row 29 | Stage loading and shapes | 28 | partial | scripts/check-stage.mjs |
+| row 30 | Clusters and sharding | 29 | owner-decision (RegionRouter host, IPC, HTTP) | scripts/check-clusters.mjs |
+| row 31 | Chart re-anchor and cube-sphere | 30 | partial | scripts/check-chart-anchor.mjs, scripts/check-chart-reanchor.mjs |
+| row 32 | Apps runtime and hook order: onSpawn, onInput, update, lateUpdate | 31 | built | scripts/check-hook-order.mjs |
+| row 33 | Scripting limits: op caps, a 32 MiB memory cap and a 5 s kill | 32 | built | scripts/check-sandbox.mjs, scripts/check-script-limits.mjs |
+| row 34 | World persistence and state restore | 33 | owner-decision (snapshot format change to add a fingerprint) | scripts/check-world-persistence.mjs |
+| row 35 | Tick governor and shed fraction | 34 | owner-decision (spawn learnings 2 to 3 not in either repo) | scripts/check-tick-governor.mjs, scripts/check-tick-scheduler.mjs |
+| row 36 | Telemetry: tick budget windows and bandwidth horizons | 35 | owner-decision (spawn learnings 46 and 65 to 66) | scripts/check-telemetry.mjs |
+| row 37 | Sandbox: fail-closed evaluator | 36 | built | scripts/check-sandbox.mjs |
+| row 38 | Transports: WebSocket, WebTransport, WebRTC and worker | 37 | owner-decision (sockets and browser) | scripts/check-transport.mjs |
+| row 39 | Client rendering, shadows, post-fx and grass | 38 | owner-decision (WebGPU and WebGL) | scripts/check-render.mjs |
+| row 40 | Editor, hot reload and HUD panels | 39 | owner-decision (DOM editor and HUD) | scripts/check-hot-reload.mjs |
+| row 41 | Upstream's 93 documented endpoints (39 published, 21 per-game, 30 manual-only, 3 disabled) | U41 | built | scripts/check-upstream-endpoints.mjs |
+| row 42 | Binary snapshot format: 29-byte entity records, 22-byte player records, smallest-three qua | 40 | owner-decision (msgpackr licence) | scripts/check-bin-snapshot.mjs |
+| row 43 | Replay file .spointreplay, magic v2 | 41 | owner-decision (msgpackr licence) | scripts/check-replay-file.mjs, scripts/check-msgpackr-compat.mjs |
+| row 44 | Lag compensation, hitscan and the rewind spatial index | 42 | partial | scripts/check-lag-compensation.mjs, scripts/check-chart-transfer.mjs |
+| row 45 | Anticheat and lockstep helpers: CheatEjection, DesyncDetector, ConsensusVoter, EventLog, I | 43 | built | scripts/check-anticheat.mjs, scripts/check-event-log.mjs, scripts/check-consensus.mjs |
+| row 46 | Protocol: InputCodec and ComponentSchema | 44 | owner-decision (msgpackr licence) | scripts/check-protocol-codecs.mjs |
+| row 47 | Transports: WebTransport and QUIC datagrams, Wireweave and WebRTC, worker postMessage, Net | 45 | owner-decision (sockets, WebRTC, Wireweave) | scripts/check-transport-framing.mjs |
+| row 48 | Client loops: PredictionEngine, ReconciliationEngine, SnapshotProcessor, SnapshotTimeline, | 46 | partial | scripts/check-client-loops.mjs, scripts/check-prediction-engine.mjs, scripts/check-snapshot-processor.mjs |
+| row 49 | Sharding: Cluster*, Region*, ClusterHandoff, ShardingRefusal | 47 | owner-decision (RegionRouter HTTP, WebSocket, IPC) | scripts/check-sharding.mjs, scripts/check-cluster-handoff.mjs |
+| row 50 | Server SDK surfaces: ServerAPI, AgentAuthoringAPI, StaticHandler, DevHmr, RoomOrchestrator | 48 | owner-decision (HTTP and WebSocket surfaces) | scripts/check-sdk-surfaces.mjs |
+| row 51 | Physics extras: Jolt wrapper, CharacterManager, ShapeBuilder, StaticTileIndex, FlightModel | 49 | owner-decision (Jolt wrapper, Draco and Meshopt WASM) | scripts/check-physics-extras.mjs |
+| row 52 | Terrain, 21 or more files, including PlanetFrame, ChartReanchor*, CaveSDF, CavePatches, Ca | 50 | owner-decision (physics, DOM and fetch modules) | scripts/check-terrain-pure.mjs, scripts/check-spline-erosion-witness.mjs |
+| row 53 | Behaviours: buffs, fire, fluid, softbody, FSM, ragdoll activation, water level, terrain pa | 51 | partial | scripts/check-behaviours.mjs, scripts/check-behaviour-health-destructible.mjs |
+| row 54 | Shipped content: 29 built-in placed-app directories (src/stdlib-apps (spoint)), 12 world d | 52 | built | scripts/check-content.mjs |
+| row 55 | Packages: mapspinner, streaming-gltf (EP_progressive_lod schemas), ecs, and spoint-core, a | 53 | partial | scripts/check-packages.mjs, scripts/check-mapspinner-atmosphere.mjs, scripts/check-mapspinner-fields.mjs |
+| row 56 | Game systems: AbilityTree, QuestSystem, ProgressionSystem, StatsSystem and EventChainManag | 54 | partial | scripts/check-game-systems.mjs |
+| row 57 | Animation | 55 | partial | scripts/check-animation.mjs, scripts/check-animation-rig.mjs, scripts/check-animation-control.mjs |
+| row 58 | Pathfinding: NavmeshQuery, ChartNavmeshQuery, RecastIntegration | 56 | owner-decision (recast WASM bake) | scripts/check-pathfinding.mjs |
+| row 59 | Client rendering and tools: client/editor, client/hud, client/xr and client/core, includin | 57 | owner-decision (WebGPU, XR, editor DOM) | scripts/check-client-pure.mjs |
+| row 60 | Deployment and tooling: edge/cf-do (Cloudflare Durable Object), src-tauri/tauri.conf.json  | 58 | owner-decision (edge and Tauri, not in jayzee) | scripts/check-bundle-freshness.mjs |
+| row 61 | Spawn feature-gap report: 47 checked and 13 unchecked items, with the counts and names pin | 59 | built | scripts/check-feature-gap.mjs |
+| row 62 | HTTP door catalog: 70 doors, 17 exercised and 53 documented | 61 | built | scripts/check-upstream-doors.mjs, scripts/check-upstream-door-dispatch.mjs |
+| row 63 | Tome API reference index: 68 distinct headings over 69 index rows, 69 section files, and 2 | 62 | built | scripts/check-upstream-tome.mjs, scripts/check-upstream-tome-lookup.mjs |
+| row 64 | Served skills: 23 served, and 47 directory entries | 63 | owner-decision (upstream count and run semantics) | scripts/check-upstream-skills.mjs, scripts/check-upstream-skill-bodies.mjs, scripts/check-upstream-skill-registry.mjs |
+| row 65 | Builtin modules: 21 served by name, against the owner count of 23 (UNVERIFIED, OPEN-028) | 64 | owner-decision (owner count 23) | scripts/check-upstream-builtin-bodies.mjs, scripts/check-upstream-builtin-easing.mjs, scripts/check-upstream-builtins.mjs |
+| row 66 | Reference total: 563 tracked files under .spawn/reference, against the README's 208 indexe | 65 | owner-decision (owner count 208) | scripts/check-upstream-reference.mjs |
+| row 67 | Named /cdn/ asset resolution: strip .yaml, follow one 302 to the value-origin host, retry  | U67 | built | scripts/check-named-asset-redirect.mjs |
+
+## 2. spoint FEATURES.md rows 1 to 60
+
+| Ref | Feature | Status | Jayzee proof | Note |
+|---|---|---|---|---|
+| spoint FEATURES row 1 | Lockstep loop refuses input delay above the retain window | built | src/lockstep-pure/lockstepGameLoop.js; scripts/check-lockstep.mjs | Refusal and 240-tick bound pinned in the gate |
+| spoint FEATURES row 2 | Lockstep game loop factory | built | src/lockstep-pure/lockstepGameLoop.js; scripts/check-lockstep.mjs | createLockstepGameLoop and defaults (delay 3, checksum 30, stall 600) |
+| spoint FEATURES row 3 | Lockstep tick system | built | src/lockstep-pure/lockstepTickSystem.js; scripts/check-lockstep.mjs | |
+| spoint FEATURES row 4 | Lockstep input transport | built | src/lockstep-pure/lockstepInputTransport.js; scripts/check-lockstep.mjs | |
+| spoint FEATURES row 5 | Rollback loop stalls past max rollback ticks | built | src/rollback-pure/rollbackGameLoop.js; scripts/check-rollback.mjs | Stall pinned by a gate; rollback factory is not registered in PEER_LOOP_FACTORIES (PARITY row 12) |
+| spoint FEATURES row 6 | Rollback loop | built | src/rollback-pure/rollbackLoop.js; scripts/check-rollback.mjs | |
+| spoint FEATURES row 7 | Rollback input transport | built | src/rollback-pure/rollbackInputTransport.js; scripts/check-rollback-bridge.mjs, scripts/check-rollback.mjs | |
+| spoint FEATURES row 8 | Tick system and tick-drop counter | built | src/tick-pure/tickScheduler.js, src/tick-pure/tickSystem.js; scripts/check-tick-scheduler.mjs, scripts/check-tick-governor.mjs | Drop accounting is in tickScheduler stats; shed fraction stays open (PARITY row 34) |
+| spoint FEATURES row 9 | Tick system base | built | src/tick-pure/tickScheduler.js; scripts/check-tick-scheduler.mjs | Paused scheduler arms no wake, a recorded deviation from spoint |
+| spoint FEATURES row 10 | Lockstep checksum fold and body checksum | built | src/anticheat/LockstepChecksum.js; scripts/check-anticheat.mjs, scripts/check-world-persistence.mjs | |
+| spoint FEATURES row 11 | Desync detection | built | src/anticheat/DesyncDetector.js; scripts/check-anticheat.mjs | |
+| spoint FEATURES row 12 | Consensus voter for desync | built | src/consensus-pure/ConsensusVoter.js; scripts/check-consensus.mjs | Refuses a non-integer or below-1 threshold, where spoint is silent |
+| spoint FEATURES row 13 | Cheat ejection | built | src/anticheat/CheatEjection.js; scripts/check-anticheat.mjs | |
+| spoint FEATURES row 14 | Input guard: rate limit, sanitise, movement envelope | built | src/anticheat/InputGuard.js; scripts/check-anticheat.mjs, scripts/check-tick-authority.mjs | |
+| spoint FEATURES row 15 | Lag compensation with clamped rewind | built | src/netcode/lagCompensation.js; scripts/check-lag-compensation.mjs | Rewind older than window clamps to oldest tick, as spoint does; window retains 255 ticks |
+| spoint FEATURES row 16 | Rewind spatial index with duplicate id refusal | built | src/netcode/rewindIndex.js; scripts/check-lag-compensation.mjs | RewindDuplicatePlayerIdError |
+| spoint FEATURES row 17 | Hitscan fire request resolution | built | src/netcode/hitscan.js; scripts/check-lag-compensation.mjs | |
+| spoint FEATURES row 18 | Hitscan ray versus capsule | built | src/netcode/hitscan.js; scripts/check-lag-compensation.mjs | rayVsCapsule |
+| spoint FEATURES row 19 | Outlier detector | built | src/anticheat/OutlierDetector.js; scripts/check-anticheat.mjs | Headshot ratio gate |
+| spoint FEATURES row 20 | Replay recorder | built | src/replay-pure/recorder.js; scripts/check-replay-player.mjs | |
+| spoint FEATURES row 21 | Replay player | built | src/replay-pure/player.js; scripts/check-replay-player.mjs | |
+| spoint FEATURES row 22 | Replay file encode and decode (SPOINTREPLAY) | partial | src/replay/file.js; scripts/check-replay-file.mjs | Standard msgpack, not spoint's msgpackr record dialect; spoint files are refused; no checksum |
+| spoint FEATURES row 23 | Event log | built | src/anticheat/EventLog.js; scripts/check-event-log.mjs | |
+| spoint FEATURES row 24 | Snapshot encoder with self block and tombstones | built | src/snapshot-lod-pure/snapshotEncoder.js, src/snapshot-lod-pure/selfBlock.js; scripts/check-snapshot-lod.mjs | |
+| spoint FEATURES row 25 | Player LOD tiers (full and reduced) | built | src/snapshot-lod-pure/playerLod.js, src/snapshot-lod-pure/snapshotEncoder.js; scripts/check-snapshot-lod.mjs | classifyPlayerTiers |
+| spoint FEATURES row 26 | Binary snapshot records (full and reduced pose) | partial | src/wire/binSnapshot.js; scripts/check-bin-snapshot.mjs | Full 29 and 22 byte records built; reduced pose is a msgpack tuple and stays open (PARITY row 40) |
+| spoint FEATURES row 27 | Snapshot packer | owner-decision | - | Spoint packs with msgpackr-backed pack; msgpackr is a devDependency held pending the owner's licence decision |
+| spoint FEATURES row 28 | Teleport hold | built | src/sessions-pure/teleportHold.js; scripts/check-sessions.mjs, scripts/check-tick-authority.mjs | |
+| spoint FEATURES row 29 | Peer simulation session | partial | src/lockstep-pure/peerSimSession.js, src/rollback-pure/peerSimRuntime.js; scripts/check-lockstep.mjs, scripts/check-rollback-peer.mjs | Lockstep path built; rollback capture and apply need a host and are not wired (PARITY row 12) |
+| spoint FEATURES row 30 | Peer loop factories and simulated profiles | partial | src/lockstep-pure/peerLoops.js, src/rollback-pure/peerSimRuntime.js; scripts/check-lockstep.mjs, scripts/check-rollback-peer.mjs | Only the lockstep factory is registered; rollback factory is unregistered on purpose |
+| spoint FEATURES row 31 | Netcode profiles (resolveNetcodeProfile) | built | src/lockstep-pure/netcodeProfile.js; scripts/check-lockstep.mjs | |
+| spoint FEATURES row 32 | Control frame codec (lockstep, rollback, consensus prefixes) | built | src/control-frame-pure/controlFrame.js; scripts/check-lockstep.mjs, scripts/check-rollback-bridge.mjs, scripts/check-consensus.mjs | |
+| spoint FEATURES row 33 | Worker bridge proxy | partial | src/transport/workerTransport.js, src/transport/workerMessages.js; scripts/check-worker-bridge.mjs | Send contract ported; the WorkerBridgeProxy class itself is not |
+| spoint FEATURES row 34 | Player-to-player collision push | partial | src/netcode/separationPush.js; scripts/check-prediction-engine.mjs | Push helper ported; spoint's CollisionSystem class is not |
+| spoint FEATURES row 35 | Collision tile streamer | missing | - | No jayzee module and no recorded decision |
+| spoint FEATURES row 36 | Player manager | missing | - | No module; spoint's version packs and mints owners, and only src/sessions-pure/playerOwner.js exists here |
+| spoint FEATURES row 37 | Physics integration | missing | - | Spoint version imports terrain PlanetFrame, which is not ported; no decision recorded |
+| spoint FEATURES row 38 | Network state | missing | - | No module; PARITY row 40 lists it as open and it depends on vecGuard |
+| spoint FEATURES row 39 | Message type table and name lookup | built | src/protocol/messages.js; scripts/check-messages.mjs | msgName, isRegisteredMessage |
+| spoint FEATURES row 40 | Unreliable message classification | built | src/protocol/messages.js; scripts/check-messages.mjs | UNRELIABLE_MSGS, isUnreliable |
+| spoint FEATURES row 41 | Wire protocol version and disconnect reasons | built | src/protocol/messages.js; scripts/check-messages.mjs | WIRE_PROTOCOL_VERSION 5 and DISCONNECT_REASONS |
+| spoint FEATURES row 42 | Input packet encode keeps newest records and reports drops | built | src/protocol/inputCodec.js; scripts/check-protocol-codecs.mjs | encodeInputPacket and tryEncodeInputPacket; the keep-newest rule was not re-read for this row |
+| spoint FEATURES row 43 | Input quantization clamps pitch and wraps yaw | built | src/protocol/inputCodec.js; scripts/check-protocol-codecs.mjs | Clamp and wrap cases are emitted in quantizeInput |
+| spoint FEATURES row 44 | Input packet decode | built | src/protocol/inputCodec.js; scripts/check-protocol-codecs.mjs | decodeInputPacket with dropAtOrBelow |
+| spoint FEATURES row 45 | Msgpack pack, unpack and lazy packer | partial | src/protocol/msgpack.js; scripts/check-protocol-codecs.mjs, scripts/check-msgpackr-compat.mjs | pack and unpack built; the lazy msgpackr-backed packer (ensurePacked) is not, and bytes differ from spoint for 2^32 and plain objects |
+| spoint FEATURES row 46 | Wire structure hash and WIRE_STRUCTURES order | built | src/protocol/msgpack.js; scripts/check-msgpackr-compat.mjs, scripts/check-protocol-codecs.mjs | WIRE_STRUCT_HASH matches spoint's value at d5e3860 |
+| spoint FEATURES row 47 | Component schema validation and custom field codec | built | src/protocol/componentSchema.js; scripts/check-protocol-codecs.mjs | |
+| spoint FEATURES row 48 | Cursor event stream with reconnect backoff | built | src/protocol/cursorEventStream.js; scripts/check-protocol-codecs.mjs | backoffDelay in the same module |
+| spoint FEATURES row 49 | Event emitter with unsubscribe | built | src/protocol/eventEmitter.js; scripts/check-protocol-codecs.mjs | |
+| spoint FEATURES row 50 | Base client prediction lead bound (MAX_PREDICTION_LEAD_STEPS) | missing | - | No BaseClient module and no such bound; PredictionEngine.predictionLeadSteps reports lead but does not bound it |
+| spoint FEATURES row 51 | Coalesced frame split | partial | src/transport/wireweaveFraming.js; scripts/check-transport-framing.mjs | decodeBatch and decodeWireFrame cover the split; the splitCoalesced name is not ported |
+| spoint FEATURES row 52 | Transport connect rejects with TransportConnectError | owner-decision | - | Needs a socket transport; PARITY rows 37 and 45 keep sockets in host adapters |
+| spoint FEATURES row 53 | Physics network client connection | owner-decision | - | Needs a socket host; PARITY rows 37 and 45 keep sockets outside the core package |
+| spoint FEATURES row 54 | Reconnect manager | built | src/client/ReconnectManager.js; scripts/check-client-loops.mjs | Transition table with injected timers and transport |
+| spoint FEATURES row 55 | Transport migration trigger | built | src/client/TransportMigrationTrigger.js; scripts/check-client-loops.mjs | |
+| spoint FEATURES row 56 | Clock sync | built | src/client/ClockSync.js; scripts/check-client-loops.mjs | Refuses NaN round trip or receive time, where spoint accepted them |
+| spoint FEATURES row 57 | Chart epoch sync with held-snapshot resync request | built | src/client/ChartEpochSync.js; scripts/check-client-loops.mjs, scripts/check-chart-anchor.mjs, scripts/check-chart-reanchor.mjs | |
+| spoint FEATURES row 58 | Client prediction engine | built | src/client/PredictionEngine.js; scripts/check-prediction-engine.mjs, scripts/check-client-loops.mjs | |
+| spoint FEATURES row 59 | Prediction blocked-direction suppression (wedgeNormal) | built | src/client/PredictionEngine.js; scripts/check-prediction-engine.mjs | |
+| spoint FEATURES row 60 | Reconciliation engine | built | src/client/ReconciliationEngine.js; scripts/check-client-loops.mjs | |
+## 2. spoint FEATURES.md rows 61 to 120
+
+| Ref | Feature | Status | Jayzee proof | Note |
+|---|---|---|---|---|
+| spoint FEATURES row 61 | Snapshot timeline interpolation | built | src/client/SnapshotTimeline.js; scripts/check-client-loops.mjs | check:client-loops, 32 PASS per PARITY row 46 |
+| spoint FEATURES row 62 | Snapshot processor | built | src/client/SnapshotProcessor.js, src/wire/binSnapshot.js; scripts/check-snapshot-processor.mjs | 22 PASS; a truncated record is refused where spoint reads it silently |
+| spoint FEATURES row 63 | Quaternion slerp | built | src/client/interpolation.js; scripts/check-client-loops.mjs | slerpQuat, named by the gate |
+| spoint FEATURES row 64 | Player and entity record reexpression | partial | src/client/reexpressRecords.js; scripts/check-client-loops.mjs | used by SnapshotTimeline and SnapshotProcessor, but no gate names reexpressPlayerRecord or reexpressEntityRecord |
+| spoint FEATURES row 65 | Prediction chart step normal and motion reexpression | built | src/client/PredictionChart.js; scripts/check-client-loops.mjs | reexpressMotionState and saveStepNormal, both named by the gate |
+| spoint FEATURES row 66 | Step trail | built | src/client/StepTrail.js; scripts/check-prediction-engine.mjs | createStepTrail, named by the gate |
+| spoint FEATURES row 67 | Collision mirror | owner-decision | - | spoint's mirror binds Jolt world bodies; jayzee's PredictionEngine only takes a mirror by injection (setCollisionMirror) |
+| spoint FEATURES row 68 | Input handler and keybind conflict detection | owner-decision | - | spoint binds window, document and navigator gamepad APIs; jayzee has no keybind-conflict code |
+| spoint FEATURES row 69 | Input action compile (keyboard, mouse, gamepad, touch) | missing | - | spoint's module is pure with no DOM globals; jayzee has no port and no decision is recorded |
+| spoint FEATURES row 70 | Input stepper with catch-up cap | missing | - | pure timing over performance.now and setTimeout; no port and no decision recorded (a port would inject clock and timers, as tickScheduler does) |
+| spoint FEATURES row 71 | Touch surface resolver | partial | src/client-pure/touchSurfaceSpec.js, src/client-pure/touchDraft.js; scripts/check-client-pure.mjs | surface parsing and draft ported; resolveControls (four-chip cap, fallback to the draft when a surface is unusable) is not |
+| spoint FEATURES row 72 | Audio mixer and defineAudio | owner-decision | - | spoint reads window globals and AudioContext |
+| spoint FEATURES row 73 | Client message handler | missing | - | dispatch is mostly pure over ported client loops, but it depends on the Jolt-bound collision mirror (row 67); no port and no decision recorded |
+| spoint FEATURES row 74 | Cluster manager | partial | src/clusters-pure/clusterAssignment.js; scripts/check-cluster-handoff.mjs | createClusterAssigner ported; the manager wrapper (direction bookkeeping, tallies, rejection reporting, step cadence) is not |
+| spoint FEATURES row 75 | Cluster runtime | owner-decision | - | wires a Jolt-bound world host, the cluster manager and node:net server worlds |
+| spoint FEATURES row 76 | Cluster world host capacity refusal | owner-decision | - | hosts Jolt worlds in a fixed wasm heap; ClusterWorldCapacityError has no jayzee counterpart |
+| spoint FEATURES row 77 | Cluster coordinator | owner-decision | - | drives host.ensure on the Jolt-bound world host |
+| spoint FEATURES row 78 | Player handoff export | built | src/sharding/clusterHandoffFlow.js, src/sharding/ClusterHandoff.js; scripts/check-cluster-handoff.mjs | export, admit and release flow; 31 PASS against the spoint fixture. PARITY row 29 still says export and admit are not ported, which row 47 supersedes |
+| spoint FEATURES row 79 | Cluster chart-local spawn | owner-decision | - | spoint's ClusterServerWorld starts a node:net server and the sdk server |
+| spoint FEATURES row 80 | Region grid ids and ghost-margin bounds | built | src/sharding/RegionGrid.js; scripts/check-sharding.mjs | regionIdFor and regionBoundsWithGhost, named by the gate |
+| spoint FEATURES row 81 | Region IPC transport | owner-decision | - | spoint wraps a transport for region IPC between processes |
+| spoint FEATURES row 82 | Region router and handoff | partial | src/sharding/RegionRouter.js; scripts/check-sharding.mjs | containment and handoff helpers ported; the RegionRouter class (fork, IPC, HTTP, WebSocket) is not |
+| spoint FEATURES row 83 | Sharding refusal table | built | src/sharding/ShardingRefusal.js; scripts/check-sharding.mjs | check:sharding, 15 PASS per PARITY row 47 |
+| spoint FEATURES row 84 | Region worker entry | owner-decision | - | worker entry that uses node:fs and worker message dispatch |
+| spoint FEATURES row 85 | GLB transform cache | owner-decision | - | node:fs file cache over a glTF transform host; jayzee's GLB parsers (src/physics-extras/glb.js) are not a cache |
+| spoint FEATURES row 86 | Draco strip and Meshopt compression | owner-decision | src/physics-extras/meshopt.js; scripts/check-physics-extras.mjs | jayzee has Meshopt dequantize and index views only; Draco and Meshopt compression need WASM codecs and a Draco fixture |
+| spoint FEATURES row 87 | KTX2 conversion and apply | owner-decision | src/packages/streaming-gltf/ktx2-mip-cap.js; scripts/check-streaming-gltf-queues.mjs | conversion runs an external encoder through spawnSync; ktx2-mip-cap is a mip-cap helper, not the conversion |
+| spoint FEATURES row 88 | VRM0 and VRMC passthrough | owner-decision | - | needs @gltf-transform/core, a third-party dependency jayzee does not carry |
+| spoint FEATURES row 89 | KTX2 image extraction and cache | owner-decision | - | node:fs on-disk cache over the GLB transform |
+| spoint FEATURES row 90 | Progressive bake and contained-path check | partial | src/sandbox/paths.js, src/packages/streaming-gltf/progressive-lod-schema.js; scripts/check-sandbox.mjs, scripts/check-packages.mjs | contained-path check ported as resolveWithinRoot; the progressive bake is file IO and is not ported |
+| spoint FEATURES row 91 | Fetch manifest | owner-decision | - | node:fs reads and a manifest over static outputs; jayzee's src/spawn/manifest.js is the spawn manifest, not this |
+| spoint FEATURES row 92 | Bake code version pins | partial | src/terrain-pure/heightfieldPhysics.js, src/bundle/freshness.js; scripts/check-heightfield-physics.mjs, scripts/check-bundle-freshness.mjs | stale-bake refusal by codeVersion and a named-source sha256 stamp are ported; spoint's file-reading pin table is not, and freshness.js is an analogue, not a port |
+| spoint FEATURES row 93 | Animation system | partial | src/animation/animationSystem.js; scripts/check-animation-control.mjs | state logic and foot grounding ported over injected io; spoint's three.js-bound parts (11 THREE references) are not |
+| spoint FEATURES row 94 | Animation controller | built | src/animation/animationController.js; scripts/check-animation-control.mjs | createAnimationController, 56 PASS in the control gate |
+| spoint FEATURES row 95 | Blend trees and animation blender | built | src/animation/blend.js; scripts/check-animation.mjs | 1D and 2D weights; spoint's BlendTree has one three.js reference, an import |
+| spoint FEATURES row 96 | Two-bone IK, foot IK and IK rig | built | src/animation/ikSolver.js; scripts/check-animation-rig.mjs | TwoBoneIKSolver, FootIKSolver and IKChain; the gate is in package.json but not in npm test and imports the spoint checkout |
+| spoint FEATURES row 97 | Procedural skeleton and skinned body | partial | src/animation/proceduralSkeleton.js; scripts/check-animation-rig.mjs | skeleton build and skin binding over injected geometry; spoint imports three from node_modules and the three.js body is not ported |
+| spoint FEATURES row 98 | Ragdoll pose | built | src/animation/ragdollPose.js; scripts/check-animation-control.mjs | RagdollPose |
+| spoint FEATURES row 99 | Ragdoll activation parse and plan check | built | src/animation/ragdollActivation.js; scripts/check-animation-control.mjs | parseRagdollActivation and checkRagdollPlan |
+| spoint FEATURES row 100 | Ragdoll activation apply | built | src/animation/ragdollActivation.js; scripts/check-animation-control.mjs | applyRagdollActivation; grounding refuses a hip delta with no io hook |
+| spoint FEATURES row 101 | Shape key driver | built | src/animation/shapeKeys.js; scripts/check-animation-rig.mjs | createShapeKeyDriver; gate is not in npm test |
+| spoint FEATURES row 102 | Spring bones | built | src/animation/springBones.js; scripts/check-animation-rig.mjs | gate is not in npm test |
+| spoint FEATURES row 103 | Skeleton utilities | built | src/animation/skeletonUtils.js; scripts/check-animation-rig.mjs | gate is not in npm test |
+| spoint FEATURES row 104 | Heightfield codec decode (bad magic and truncation refused) | built | src/packages/mapspinner/heightfield-codec.js; scripts/check-packages.mjs | decodeHeightfield; the gate names magic and truncation |
+| spoint FEATURES row 105 | Heightfield codec encode for baked artifacts | built | src/packages/mapspinner/heightfield-codec.js; scripts/check-packages.mjs | encodeHeightfield; the bake pipeline that writes artifacts is not ported |
+| spoint FEATURES row 106 | CPU height sampler createHeightSampler | partial | src/packages/mapspinner/height-gen.js, src/packages/mapspinner/anchor-field.js, src/packages/mapspinner/glsl-rt.js, src/packages/mapspinner/hpf-lattice.js; scripts/check-mapspinner-fields.mjs, scripts/check-packages.mjs | core height and its inputs ported; the createHeightSampler wrapper (uniform defaults, carve and hash-version gating) is not; check-mapspinner-fields is not in npm test |
+| spoint FEATURES row 107 | GLSL-to-JS height transpile producing height-gen.js | partial | src/packages/mapspinner/height-gen.js; scripts/check-mapspinner-fields.mjs | generated output copied; jayzee has no transpiler; gate is not in npm test |
+| spoint FEATURES row 108 | Single-source terrain defaults (TERRAIN_DEFAULTS) | missing | - | no TERRAIN_DEFAULTS in jayzee; src/packages/mapspinner/lod-defaults.js holds LOD_DEFAULTS, a different set; no decision recorded |
+| spoint FEATURES row 109 | Terrain carves applied to the CPU height sampler | missing | - | carve geometry is ported (src/terrain-pure/splineCarve.js, PARITY row 24), but applying carves to a sampler is not; no decision recorded |
+| spoint FEATURES row 110 | Height hash-version backends (float v1, integer v2) | missing | - | heightfield-codec carries hashVersion as metadata only; neither backend is ported; no decision recorded |
+| spoint FEATURES row 111 | Continental bias term (CONTINENTAL_BIAS_AMP = 50) | built | src/packages/mapspinner/height-gen.js; scripts/check-mapspinner-fields.mjs | constant used in makeHeight; gate is not in npm test |
+| spoint FEATURES row 112 | Anchor field climate and elevation modulation | built | src/packages/mapspinner/anchor-field.js; scripts/check-mapspinner-fields.mjs | createAnchorField, named by the gate; gate is not in npm test |
+| spoint FEATURES row 113 | Anchor field band detail overlay | built | src/packages/mapspinner/anchor-field-bands.js; scripts/check-mapspinner-fields.mjs | gate is not in npm test |
+| spoint FEATURES row 114 | HPF lattice build and face or pool samplers | built | src/packages/mapspinner/hpf-lattice.js; scripts/check-packages.mjs | hpfLattice, hpfFaceSampler and hpfPoolSampler, all named by the gate |
+| spoint FEATURES row 115 | CPU vs GPU ground-height parity gate | owner-decision | - | spoint's parity path is the WebGL readback in gl-render.js, which needs a GPU host |
+| spoint FEATURES row 116 | Cube-sphere quadtree LOD selection | built | src/packages/mapspinner/quadtree.js; scripts/check-packages.mjs | Quadtree and updateQuadtree, named by the gate |
+| spoint FEATURES row 117 | Ground-per-face-metre LOD metric | built | src/packages/mapspinner/quadtree.js; scripts/check-packages.mjs | groundPerFaceMetre, named by the gate |
+| spoint FEATURES row 118 | Local-to-deformed sphere mapping | built | src/packages/mapspinner/quadtree.js; scripts/check-packages.mjs | localToDeformed, named by the gate |
+| spoint FEATURES row 119 | LOD config resolution and application | built | src/packages/mapspinner/lod-config.js; scripts/check-packages.mjs | resolveLodConfig and applyLodConfig, named by the gate |
+| spoint FEATURES row 120 | Cube-face selection and face-local projection | built | src/packages/mapspinner/planet-orchestrator-cull.js; scripts/check-mapspinner-fields.mjs | pickFace and worldToFaceLocal; gate is not in npm test |
+
+Counts: 60 rows. built 28, partial 10, missing 6, owner-decision 16.
+## 2. spoint FEATURES.md rows 121 to 176 (mapspinner)
+
+| Ref | Feature | Status | Jayzee proof | Note |
+|---|---|---|---|---|
+| spoint FEATURES row 121 | Frustum quad culling and frustum plane extraction | built | src/packages/mapspinner/planet-orchestrator-cull.js; scripts/check-mapspinner-fields.mjs | Gates at lines 293, 321 and 354 match spoint on seeded cameras. The gate is in package.json but not in the npm test chain. |
+| spoint FEATURES row 122 | Per-frame planet orchestrator and renderer entry | partial | src/packages/mapspinner/lod-config.js; src/packages/mapspinner/quadtree.js; scripts/check-packages.mjs | Split factor and LOD config are ported and gated. The orchestrator entry needs WebGL, so it is not ported. |
+| spoint FEATURES row 123 | Patch grid with outer skirt ring | built | src/packages/mapspinner/patch-grid-geometry.js; scripts/check-packages.mjs | Vertex and triangle counts, ring marking, winding and determinism are gated under npm test (check:packages). |
+| spoint FEATURES row 124 | Zero-to-one depth perspective matrix | built | src/packages/mapspinner/patch-grid-geometry.js; scripts/check-packages.mjs | Near plane maps to 0 and far plane to 1, gated under check:packages. |
+| spoint FEATURES row 125 | Patch baker with height patches and thermal erosion | owner-decision | - | The baker needs OffscreenCanvas and the WebGL orchestrator. Its thermal erosion is a different algorithm from jayzee's thermalErode in src/terrain-pure/terrainErosion.js, so it is not ported. |
+| spoint FEATURES row 126 | Remote patch baker over a worker | owner-decision | - | Needs a Worker host. |
+| spoint FEATURES row 127 | Module worker job runner with timeout | owner-decision | - | Needs a Worker host. |
+| spoint FEATURES row 128 | Planet radius default and resolver | built | src/packages/mapspinner/planet-radius.js; scripts/check-packages.mjs | Default 6360000 m, radiusM over radius, and refusal of bad radii are gated under check:packages. |
+| spoint FEATURES row 129 | GPU pool and wetness parameters from window knobs | owner-decision | - | Reads window globals, so a host must supply them. The pure part could take an injected knob map. |
+| spoint FEATURES row 130 | Geomorph parent-grid snap across LOD levels | owner-decision | - | Spoint's version is a TSL node built on three/tsl. three.js is out of scope. |
+| spoint FEATURES row 131 | Transmittance LUT bake and verify | built | src/packages/mapspinner/atmosphere-transmittance-lut.js; scripts/check-mapspinner-atmosphere.mjs | Small and default bakes hash to spoint's reference fixture, and verifyLUT is gated. Under check:mapspinner-atmosphere, which is in npm test. |
+| spoint FEATURES row 132 | Scattering LUT bake and verify | built | src/packages/mapspinner/atmosphere-scattering-lut.js; scripts/check-mapspinner-atmosphere.mjs | Bakes hash to spoint's fixture and verifyScatteringLUT flags are gated. In npm test. |
+| spoint FEATURES row 133 | Off-thread atmosphere LUT bake job | owner-decision | - | The job wrapper needs a Worker. The bakes it calls are built in rows 131 and 132. |
+| spoint FEATURES row 134 | WebGPU atmosphere LUT texture upload and readback | owner-decision | - | Needs a WebGPU host. |
+| spoint FEATURES row 135 | TSL sky radiance march | owner-decision | - | TSL on three/webgpu. The LUT inputs are built in rows 131 and 132, but the march is not ported. |
+| spoint FEATURES row 136 | WebGPU sky renderer | owner-decision | - | Needs a WebGPU host. |
+| spoint FEATURES row 137 | Aerial-perspective gating in terrain lighting | owner-decision | - | TSL node on three/webgpu. The gate distances in the pure ambient module are not ported. |
+| spoint FEATURES row 138 | Legacy terrain lighting path | owner-decision | - | TSL on three/webgpu. |
+| spoint FEATURES row 139 | Day/night ambient and terrain grade scalars | missing | - | Spoint's terrain-ambient-shared.js is pure and imports no three module, but nothing is ported and no decision is recorded. |
+| spoint FEATURES row 140 | WebGL2 terrain renderer entry | owner-decision | - | Needs a WebGL host. |
+| spoint FEATURES row 141 | Live GPU ground-height readback | owner-decision | - | Needs a GL or WebGPU host. |
+| spoint FEATURES row 142 | Terrain shader discards confined to the water pass | owner-decision | - | GLSL terrain shader that runs only on WebGL. |
+| spoint FEATURES row 143 | Fast-path render flags for cheap vertex and fragment shading and half-res water | owner-decision | - | Set on the WebGL render path. |
+| spoint FEATURES row 144 | TSL planet material and mesh entry | owner-decision | - | TSL on three/webgpu. |
+| spoint FEATURES row 145 | Render order: terrain after opaque occluders, water before transparents | owner-decision | - | Three.js render-order concern. |
+| spoint FEATURES row 146 | Water TSL with sea-level fragment discard | owner-decision | - | TSL on three/webgpu. |
+| spoint FEATURES row 147 | Sea wave height field | partial | src/packages/mapspinner/sea-waves.js; scripts/check-packages.mjs | seaHeightMean is ported and gated (check-packages line 563). seaHeight and seaHeightLF are TSL nodes and are not ported. |
+| spoint FEATURES row 148 | Far-distance splat fade | owner-decision | - | TSL on three/tsl. |
+| spoint FEATURES row 149 | Terrain albedo and climate splat blend | owner-decision | - | TSL on three/tsl. |
+| spoint FEATURES row 150 | Splat weights per hash version | missing | - | No jayzee module. Spoint builds its noise by runtime codegen (new Function in tsl/ops-jsgen.js), which jayzee does not use. No decision recorded. |
+| spoint FEATURES row 151 | Surface texture set decode and sRGB linearisation | owner-decision | - | Decode uses fetch and DOM image decoding. The delin8 table is pure and not ported. |
+| spoint FEATURES row 152 | Contact occlusion field factor and sync | owner-decision | - | TSL on three/webgpu. Jayzee's pure contact field in src/terrain-pure/contactOcclusionField.js is a different spoint module. |
+| spoint FEATURES row 153 | Display-referred transfer | owner-decision | - | TSL on three/tsl. |
+| spoint FEATURES row 154 | Sculpt override TSL | owner-decision | - | Uses three/webgpu DataTexture and TSL. |
+| spoint FEATURES row 155 | Height probe TSL and probe directions | owner-decision | - | TSL on three/tsl. The direction table (heightProbeDirs) is pure and not ported. |
+| spoint FEATURES row 156 | Demo tuning-panel registry for elevEdgeInset | owner-decision | - | Reads window globals and feeds the DOM tweak panel. |
+| spoint FEATURES row 157 | VDRS render-scale gate read from window.__vdrsScale | owner-decision | - | Window flag read on the WebGL path. |
+| spoint FEATURES row 158 | VDRS upscale and composite passes | owner-decision | - | Needs a WebGPU host. |
+| spoint FEATURES row 159 | WebGPU terrain height compute | owner-decision | - | Needs a WebGPU host. |
+| spoint FEATURES row 160 | WebGPU composeHeight compute | owner-decision | - | Needs a WebGPU host. |
+| spoint FEATURES row 161 | WebGPU height-tile bake to texture | owner-decision | - | Needs a WebGPU host. |
+| spoint FEATURES row 162 | WebGPU ground probe compute | owner-decision | - | Needs a WebGPU host. |
+| spoint FEATURES row 163 | WebGPU patch grid renderer | owner-decision | - | Needs a WebGPU host. |
+| spoint FEATURES row 164 | WebGPU water renderer and occlusion probe | owner-decision | - | Needs a WebGPU host. |
+| spoint FEATURES row 165 | WebGPU planet entry and capability detection | owner-decision | - | Needs a WebGPU host. |
+| spoint FEATURES row 166 | WebGPU pipeline cache | owner-decision | - | Needs a WebGPU host. |
+| spoint FEATURES row 167 | SDK entry point exports (createRenderer, createPlanet, VERSION) | partial | src/packages/mapspinner/index.js; scripts/check-packages.mjs | The barrel exports the pure pieces. createRenderer, createPlanet and VERSION are missing because they need WebGL. createAnchorField is not in the jayzee barrel. |
+| spoint FEATURES row 168 | Relative-import resolution across mapspinner src | partial | src/packages/mapspinner/index.js; scripts/check-packages.mjs; scripts/check-mapspinner-fields.mjs | Every ported module is loaded by at least one gate, so the imports resolve. No gate names this claim. |
+| spoint FEATURES row 169 | Three.js export-name resolution for TSL modules | owner-decision | - | Needs three.js. |
+| spoint FEATURES row 170 | Bake code-version closure for the heightfield codec and .hf artifacts | partial | src/packages/mapspinner/heightfield-codec.js; src/terrain-pure/heightfieldPhysics.js; scripts/check-heightfield-physics.mjs | The codeVersion stamp and stale-bake refusal are ported and gated. The closure of sources that defines the version has no jayzee bake script. |
+| spoint FEATURES row 171 | Headless heightmap CLI (heightmap verb, PNG and stats) | missing | - | The verb needs the CPU height sampler (height-cpu), which jayzee lacks, and a PNG writer. No decision recorded. |
+| spoint FEATURES row 172 | GPU backend selection guard and backend divergence verdict | owner-decision | - | Needs a GPU probe and a live browser backend. |
+| spoint FEATURES row 173 | Terrain renderer performance gate | owner-decision | - | Needs a browser and GPU run. |
+| spoint FEATURES row 174 | Elevation A/B comparison script | missing | - | Imports the CPU height sampler (height-cpu), which jayzee lacks. No decision recorded. |
+| spoint FEATURES row 175 | Dev server with COOP/COEP headers and /diag and /cmd channel | partial | src/sandbox/paths.js; site/coi-sw.js; scripts/check-sandbox.mjs; scripts/check-site.mjs | The COEP value (require-corp) and the COOP/COEP service worker are ported and gated. The /diag and /cmd channel is not ported. |
+| spoint FEATURES row 176 | In-page diagnostics on window.__diag | owner-decision | - | Writes page globals from the DOM. |
+
+Counts: 56 rows. built 6 (rows 121, 123, 124, 128, 131, 132). partial 6 (rows 122, 147, 167, 168, 170, 175). missing 4 (rows 139, 150, 171, 174). owner-decision 40.
+
+Read-only slice. No file was edited or committed, and docs/IDEAL.md was not written by this subagent. Stale line: docs/PARITY.md row 53 still lists seven mapspinner modules as open, although they are present in src/packages/mapspinner and pinned by check-packages and check-mapspinner-fields.
+## 3. upstream FEATURESET streams 11 to 27 (plus stream 17 subsections, spawn learning and migrators)
+
+| Ref | Feature | Status | Jayzee proof | Note |
+|---|---|---|---|---|
+| upstream FEATURESET Stream 11 (jayzee PARITY rows 6-10, 32, 33) — src/physics/World.js | Sleep thresholds, CCD sweep, persistent contacts, warm start | partial | src/physics-pure/ccd.js, src/physics-pure/contacts.js; scripts/check-ccd.mjs, scripts/check-physics-pure.mjs | Static-box sweep and contact finding are built. Body-against-moving-body sweep, sleep islands and warm start are listed as not built in PARITY row 5. |
+| Stream 11 — src/physics/constraintLimits.js, joltLimits.js | Joint limits and Jolt reservation sizing | built | src/motion-pure/constraintLimits.js, src/motion-pure/joltLimits.js; scripts/check-constraint-limits.mjs, scripts/check-jolt-limits.mjs | PARITY row 6. Sizing and limit checks only, no Jolt body. |
+| Stream 11 — src/physics/jointMap.js | Joint map and pivot, surface and transform helpers | built | src/physics-extras/jointMap.js, src/physics-extras/pivotTransform.js; scripts/check-physics-extras.mjs | Pure parts per PARITY row 49. |
+| Stream 11 — src/shared/characterStep.js | Walkable normal floor and step handling | built | src/motion-pure/characterStep.js; scripts/check-character-step.mjs | PARITY row 7. Spoint's CharacterManager default slope (45 degrees) is a separate Jolt-bound value. |
+| Stream 11 — shared/movement.js | applyMovement and DEFAULT_MOVEMENT | built | src/motion-pure/movement.js; scripts/check-movement.mjs | PARITY row 7. Jump stays buffered on a null input, as spoint does. |
+| Stream 11 — src/physics/CharacterManager.js | Character controller on a Jolt character | owner-decision | - | Jolt ExtendedUpdate with no Jolt backend in jayzee. PARITY row 7 marks it an owner decision. |
+| Stream 11 — src/physics/World.js | Queries: raycast, overlap, filters, pending geometry | partial | src/world/query.js; scripts/check-world-query.mjs | Pure index over world positions. Spoint's Jolt CastRay is not ported (PARITY row 8). |
+| Stream 11 — src/physics/World.js CastRay, DormantStatics | Jolt narrow-phase cast and Jolt-bound dormant bodies | owner-decision | src/physics-extras/dormantStatics.js (arithmetic only) | Narrow phase needs Jolt. The dormant statics arithmetic is built. |
+| Stream 11 — src/physics/FlightModel.js | Flight forces and quaternion rotation | built | src/motion-pure/flightModel.js; scripts/check-flight-model.mjs | PARITY row 9. |
+| Stream 11 — src/physics/VehiclePhysics.js (validators) | Slip curve and suspension spring validators | built | src/motion-pure/vehicleTuning.js; scripts/check-vehicle-tuning.mjs | PARITY row 9. |
+| Stream 11 — src/physics/VehiclePhysics.js installVehiclePhysics | Writing curves and springs into Jolt wheels | owner-decision | - | Same Jolt owner decision as the character controller (PARITY row 9). |
+| Stream 11 — src/apps/AppRuntime.js (hook order) | onSpawn, onInput, update and tick hook order | built | src/apps/hookOrder.js; scripts/check-hook-order.mjs | PARITY row 31. Pure runner with the caller supplying the tick number. |
+| Stream 11 — src/apps/AppRuntime.js lines 430-440 | Trimesh collider failure propagation | owner-decision | - | Spoint-owned gap that logs and nulls the collider. Collider builds run on Jolt, so the decision sits with the owner (PARITY row 31). |
+| Stream 11 — src/sdk/SESCompartmentEvaluator.js | Scripting limits: step budget, memory cap, time kill | built | src/sandbox/limits.js; scripts/check-script-limits.mjs | PARITY row 32. Spoint never increments its step counter and has no memory or kill cap, so these limits are jayzee's own design. |
+| Stream 12 (spoint counterparts for rows 13, 19, 36, 47) — src/transport/WorkerTransport.js, src/sdk/WorkerEntry.js | Worker bridge dispatch and WorkerTransport send | partial | src/transport/workerTransport.js, src/transport/workerMessages.js; scripts/check-worker-bridge.mjs, scripts/check-worker-dispatch.mjs | Message table and send contract built. A real Worker needs a runtime (PARITY rows 12 and 47). |
+| Stream 12 — src/netcode/TickSystemBase.js | Tick wake planning, timer granularity, paused state | partial | src/tick-pure/tickScheduler.js; scripts/check-tick-scheduler.mjs | Paused state arms no wake, a deliberate difference from spoint. PARITY row 34 keeps the base-class scheduler and catch-up accounting open. |
+| Stream 12 — src/netcode/PeerSimSession.js (stats interval) | PEER_STATS interval | partial | src/lockstep-pure/peerSimSession.js; scripts/check-lockstep.mjs | No setInterval exists in jayzee src. The timer is host-side. |
+| Stream 12 — src/netcode/PeerSimSession.js, peerLoops.js | Rollback-only peer session and peer loop factory registry | partial | src/rollback-pure/peerSimRuntime.js, src/rollback-pure/correctionObserver.js, src/lockstep-pure/peerLoops.js; scripts/check-rollback-peer.mjs | buildRollbackPeerLoop is not registered in the factory map. Capture and apply need a host (PARITY row 12). |
+| Stream 12 — src/sdk/Metrics.js, TickHandlerAOI.js (bandwidth horizons) | Bandwidth horizons in Metrics | owner-decision | - | Horizon figures come from spawn learnings 46 and 65-66, which are in neither repo. Only the owner can supply them (PARITY row 35). |
+| Stream 12 — src/sdk/Metrics.js createGcTracker | Host GC pause observer | built | src/telemetry-pure/gcObserver.js, src/telemetry-pure/gc.js; scripts/check-telemetry.mjs | The PerformanceObserver is injected. |
+| Stream 12 — src/sdk/ServerAPIRoutes.js handleMetrics | /metrics route and Prometheus text | partial | src/telemetry-pure/metricsRoute.js, src/telemetry-pure/render.js; scripts/check-telemetry.mjs | Route response and text render are built. No live HTTP server (PARITY row 48). |
+| Stream 12 — src/sdk/TickHandler.js | Tick ordering and four phase timers | partial | src/tick-authority-pure (directory); scripts/check-tick-authority.mjs, scripts/check-tick-order.mjs | Ordering is witnessed with injected steps. Real movement, collision, physics and snapshot steps are not wired (no tick-loop host, PARITY row 18). |
+| Stream 13 (worker and transport-migration surface) — client/core/WorkerRenderer.js | Render worker protocol with lowercase message types | owner-decision | - | Needs OffscreenCanvas and a DOM host (PARITY rows 39 and 57). |
+| Stream 13 — src/sdk/WorkerEntry.js | Netcode worker entry runtime (INIT, PEER_CONNECT, WORKER_READY) | owner-decision | - | Message dispatch is partly ported, but the worker runtime needs a host (PARITY row 47). |
+| Stream 13 — src/protocol/MessageTypes.js lines 34-37, 97, 114-115 | Control frames 0x60-0x63, HOST_MIGRATE 0xad, MIGRATE 0xb7 and MIGRATE_ACK 0xb8 | built | src/protocol/messages.js; scripts/check-messages.mjs | PARITY row 3, id space matches spoint at d5e3860. |
+| Stream 13 — src/sdk/ServerHandlers.js _handleMigrate | Server-side socket migrate handoff | owner-decision | - | Socket-side reconnect and migrate are not witnessed and need a socket host (PARITY row 21). |
+| Stream 13 — src/client/TransportMigrationTrigger.js | Client trigger: network change and RTT spike streak | built | src/client/TransportMigrationTrigger.js; scripts/check-client-loops.mjs | PARITY row 46. The thresholds are spoint's values and are not re-measured here. |
+| Stream 13 — src/client/PhysicsNetworkClient.js migrateTransport | Client swap to WebTransport or WebSocket | owner-decision | - | Needs real sockets (PARITY rows 37 and 45). |
+| Stream 13 — src/transport/TransformRing (TRANSFORM_RING_CAPACITY 64) | Transform ring layout, writer and consistent cut | built | src/transport/transformRing.js; scripts/check-transport.mjs | PARITY row 47. |
+| Stream 14 (sharding and cluster surface) — src/protocol/MessageTypes.js lines 130-137 | Control opcodes TELEPORT_ACK 0xc3 to CLUSTER_HANDOFF 0xc7 | built | src/protocol/messages.js; scripts/check-messages.mjs | Ids match spoint. Spoint has no CLUSTER_HANDOFF refusal or ack opcode. |
+| Stream 14 — src/sharding/ClusterHandoff.js | Handoff codes and ClusterHandoffError | built | src/sharding/ClusterHandoff.js; scripts/check-cluster-handoff.mjs | Parser and error class ported. |
+| Stream 14 — src/sharding/ClusterHandoff.js lines 29-90 | Handoff export, admit, apply and release | partial | src/sharding/clusterHandoffFlow.js; scripts/check-cluster-handoff.mjs | The functions exist, although PARITY row 47 still lists them as open. The ledger is behind the code. |
+| Stream 14 — src/sharding/ClusterCoordinator.js, ClusterManager.js, ClusterServerWorld.js, ClusterWorldHost.js | Cluster coordinator and world host classes | owner-decision | - | Jolt heap and worker host, not ported (PARITY rows 29 and 47). |
+| Stream 14 — src/sharding/RegionRouter.js | Region router handoff state and identity | partial | src/sharding/RegionRouter.js, src/sharding/HandoffState.js; scripts/check-sharding.mjs | Pure identity and handoff state built. The router class with fork, IPC, HTTP and WebSocket is not ported. |
+| Stream 14 — src/sharding/RegionWorkerEntry.js, RegionIPCTransport | Region worker entry and IPC transport | owner-decision | - | Needs a process fork host (PARITY row 47). |
+| Stream 14 — src/sharding/ShardingRefusal.js | Refusal codes and refusal error classes | built | src/sharding/ShardingRefusal.js; scripts/check-sharding.mjs | PARITY row 47. |
+| Stream 14 — apps/world (clusters flag) | Shipped worlds cluster flag and port pins | partial | scripts/check-content.mjs | Five port declarations are pinned. The cluster flags and the parser refusal have no jayzee module. |
+| Stream 15 (game systems, animation, pathfinding) — src/game/AbilityTree.js | AbilityTree and hotkey map | built | src/game/AbilityTree.js; scripts/check-game-systems.mjs | PARITY row 54. |
+| Stream 15 — src/game/ProgressionSystem.js | Progression curve legality and XP thresholds | built | src/game/ProgressionSystem.js; scripts/check-game-systems.mjs | PARITY row 54. |
+| Stream 15 — src/game/StatsSystem.js | StatsSystem XP curve and level clamp | built | src/game/StatsSystem.js; scripts/check-game-systems.mjs | App context is optional and the XP curve is injected. Spoint's silent xpPerLevel default is not carried over. |
+| Stream 15 — src/game/QuestSystem.js | QuestSystem with injected clock | built | src/game/QuestSystem.js; scripts/check-game-systems.mjs | Clock is spec.now. |
+| Stream 15 — src/game/EventChainManager.js | Event chain registry | built | src/game/EventChainManager.js; scripts/check-game-systems.mjs | Spoint's only consumer is the editor. Sends stay host-side. |
+| Stream 15 — src/pathfinding/costCorridor.js | findCostCorridor with budget | built | src/pathfinding/costCorridor.js; scripts/check-pathfinding.mjs | Spoint's budget defaults to Infinity. The 20000 figure is unverified. |
+| Stream 15 — src/pathfinding/findPathStatus.js | findPathStatus with partial results | built | src/pathfinding/index.js; scripts/check-pathfinding.mjs | Exported through the barrel. |
+| Stream 15 — src/pathfinding/NavmeshQuery.js, ChartNavmeshQuery.js | Navmesh query classes | built | src/pathfinding/NavmeshQuery.js, src/pathfinding/ChartNavmeshQuery.js; scripts/check-pathfinding.mjs | PARITY row 56. |
+| Stream 15 — src/pathfinding/RecastIntegration.js | Recast bake and ring turning | partial | src/pathfinding/recastPolyMesh.js (pure parts); scripts/check-pathfinding.mjs | Config derivation and polyMesh conversion are built. bakeNavmesh needs the recast WASM package (owner decision). |
+| Stream 15 — src/animation/AnimationSystem.js | AnimationSystem and setRagdollPlan | built | src/animation/animationSystem.js; scripts/check-animation-control.mjs | PARITY row 55. |
+| Stream 15 — src/animation/BlendTree.js | 1D and 2D blend weights | built | src/animation/blend.js; scripts/check-animation.mjs | Distance is floored at 0.01 and only the three nearest samples get weight. |
+| Stream 15 — src/animation/AnimationController.js, ProceduralSkeleton.js, RagdollPose.js, ragdollActivation.js | Animation controller, procedural skeleton, ragdoll pose and activation | built | src/animation/animationController.js, src/animation/proceduralSkeleton.js, src/animation/ragdollPose.js, src/animation/ragdollActivation.js; scripts/check-animation-control.mjs | Witnessed inside npm test. |
+| Stream 15 — src/animation/IKSolver.js | IK solver (two-bone, foot, rig) | partial | src/animation/ikSolver.js; scripts/check-animation-rig.mjs | The rig gate is not in npm test and imports spoint and three from /workspace/spoint. |
+| Stream 15 — src/animation/ShapeKeys.js, SkeletonUtils.js, SpringBones.js | Shape-key driver, skeleton utils and spring bones | partial | src/animation/shapeKeys.js, src/animation/skeletonUtils.js, src/animation/springBones.js; scripts/check-animation-rig.mjs | Same rig gate caveat as the IK solver. |
+| Stream 15 — three.js-bound parts of animation controllers | Three.js-bound controller parts | owner-decision | - | Not ported (PARITY row 55). |
+| Stream 16 (client prediction and sync) — src/client/BaseClient.js | Prediction lead cap of 16 steps | missing | - | No such constant in jayzee and no decision recorded. |
+| Stream 16 — src/client/interpolation.js | slerpQuat | built | src/client/interpolation.js; scripts/check-client-loops.mjs | PARITY row 46. |
+| Stream 16 — src/client/PredictionChart.js | PredictionChart and re-express helpers | built | src/client/PredictionChart.js, src/client/chartReexpress.js; scripts/check-client-loops.mjs | PARITY row 46. |
+| Stream 16 — src/client/PredictionEngine.js | PredictionEngine | partial | src/client/PredictionEngine.js; scripts/check-prediction-engine.mjs, scripts/check-client-loops.mjs | PARITY row 46 keeps the collision and world-defaults wiring open. |
+| Stream 16 — src/client/ReconciliationEngine.js | ReconciliationEngine | built | src/client/ReconciliationEngine.js; scripts/check-client-loops.mjs | PARITY row 46. |
+| Stream 16 — src/client/SnapshotTimeline.js | SnapshotTimeline | built | src/client/SnapshotTimeline.js; scripts/check-client-loops.mjs | PARITY row 46. |
+| Stream 16 — src/client/SnapshotProcessor.js | SnapshotProcessor and reduced pose reader | partial | src/client/SnapshotProcessor.js; scripts/check-snapshot-processor.mjs | Wire helpers exist. Player collision pass and HMR tails stay open (PARITY row 46). |
+| Stream 16 — src/client/ClockSync.js | ClockSync | built | src/client/ClockSync.js; scripts/check-client-loops.mjs | PARITY row 46. |
+| Stream 16 — src/client/ChartEpochSync.js | Chart epoch sync | built | src/client/ChartEpochSync.js; scripts/check-client-loops.mjs | PARITY row 46. |
+| Stream 16 — src/client/ReconnectManager.js | ReconnectManager transition table | built | src/client/ReconnectManager.js; scripts/check-client-loops.mjs | Socket side of reconnect is owner-decision (row 21). |
+| Stream 17 (Replay) — src/netcode/ReplayFile.js | Replay file magic spointreplay, version 2, envelope | partial | src/replay/file.js; scripts/check-replay-file.mjs | Envelope and refusals built. Bytes are standard msgpack, so spoint's files are refused (PARITY row 41). |
+| Stream 17 (Replay) — src/netcode/ReplayFile.js with msgpackr | Byte compatibility with spoint's msgpackr dialect | owner-decision | src/replay/msgpack.js; scripts/check-msgpackr-compat.mjs | msgpackr stays a devDependency until the owner decides its licence. |
+| Stream 17 (Replay) — src/netcode/ReplayRecorder.js, ReplayPlayer.js | Replay recorder and player | built | src/replay-pure/recorder.js, src/replay-pure/player.js; scripts/check-replay-player.mjs | PARITY row 20. Second start registers the tick callback again, as spoint does. |
+| Stream 17 (Lag compensation) — src/netcode/LagCompensator.js | Rewind ring, token bucket, origin check and teleport detection | built | src/netcode/lagCompensation.js; scripts/check-lag-compensation.mjs | PARITY row 10. A window over 255 ticks is clamped to the ring. |
+| Stream 17 (Lag compensation) — src/netcode/Hitscan.js | Ray and capsule hit, linear and spatial finders | built | src/netcode/hitscan.js; scripts/check-lag-compensation.mjs | PARITY row 42. Differential run had 0 mismatches at port time. |
+| Stream 17 (Lag compensation) — src/netcode/RewindSpatialIndex.js | Rewind spatial index and duplicate-id refusal | built | src/netcode/rewindIndex.js; scripts/check-lag-compensation.mjs | PARITY row 42. |
+| Stream 17 (Anti-cheat) — src/netcode/CheatEjection.js | Peer ejection wiring | built | src/anticheat/CheatEjection.js; scripts/check-anticheat.mjs | PARITY row 43. |
+| Stream 17 (Anti-cheat) — src/netcode/DesyncDetector.js | Desync detector with checksum interval 30 | built | src/anticheat/DesyncDetector.js; scripts/check-anticheat.mjs | PARITY row 43. |
+| Stream 17 (Anti-cheat) — src/netcode/ConsensusVoter.js | Voter with default 3 desyncs | built | src/consensus-pure/ConsensusVoter.js; scripts/check-consensus.mjs | Jayzee refuses a non-whole or zero threshold, which spoint accepts silently. |
+| Stream 17 (Anti-cheat) — src/netcode/EventLog.js | Event log kinds and deserialize | built | src/anticheat/EventLog.js; scripts/check-event-log.mjs | PARITY row 43. |
+| Stream 17 (Anti-cheat) — src/netcode/InputGuard.js | Input rate limit and movement envelope | built | src/anticheat/InputGuard.js; scripts/check-anticheat.mjs | PARITY rows 19 and 43. |
+| Stream 17 (Anti-cheat) — src/netcode/OutlierDetector.js | Headshot outlier detector with cooldown | built | src/anticheat/OutlierDetector.js; scripts/check-anticheat.mjs | PARITY row 43. |
+| Stream 17 (Anti-cheat) — src/netcode/LockstepChecksum.js | Second-lane checksum | built | src/anticheat/LockstepChecksum.js; scripts/check-anticheat.mjs | PARITY row 43. |
+| Stream 17 (Snapshot binary) — src/netcode/SnapshotBinFormat.js | 29-byte entity and 22-byte player records, reduced pose | built | src/wire/binSnapshot.js; scripts/check-bin-snapshot.mjs | PARITY row 40. Truncated records and flags above 255 are refused. |
+| Stream 17 (Snapshot binary) — src/netcode/SnapshotEncoder.js | LOD tiers: 30 full, 120 m, 5 Hz | partial | src/snapshot-lod-pure/playerLod.js, src/snapshot-lod-pure/snapshotEncoder.js; scripts/check-snapshot-lod.mjs | PARITY row 16. The crowd-dot decode quirk is kept on purpose. |
+| Stream 17 (Snapshot binary) — src/netcode/SnapshotPacker.js | packSnapshotBytes msgpack splice | owner-decision | - | Needs msgpackr's packer, which the owner has not licensed (PARITY row 40). |
+| Stream 17 (Wire) — src/protocol/MessageTypes.js line 1 | WIRE_PROTOCOL_VERSION 5 | built | src/protocol/messages.js; scripts/check-messages.mjs | Client version check is in the message handler. |
+| Stream 17 (Wire) — src/protocol/MessageTypes.js lines 146-154 | Message registry and unreliable set | built | src/protocol/messages.js; scripts/check-messages.mjs | PARITY row 3. |
+| Stream 17 (Wire) — src/protocol/InputCodec.js | Input packet encoder with epoch flag and limits | partial | src/protocol/inputCodec.js; scripts/check-protocol-codecs.mjs | Limits 32 and 8 and flag 0x80 are present. The msgpackr-backed wire is open (PARITY row 44). |
+| Stream 21 — src/connection/SessionStore.js | Session store TTL and pinned sessions | built | src/sessions-pure/sessionStore.js; scripts/check-sessions.mjs | Zero TTL becomes the default, the same silent fallback as spoint. |
+| Stream 21 — src/stage/StageLoader.js | Stage loader and config refusals | partial | src/stage-pure/stageLoader.js; scripts/check-stage.mjs | Resolvers are injected and the real terrain and cluster resolvers are absent (PARITY row 28). |
+| Stream 21 — src/stage/Stage.js, stageShapes.js | Stage class and flat ring height | built | src/stage-pure/stage.js, src/stage-pure/stageShapes.js; scripts/check-stage.mjs | PARITY row 28. |
+| Stream 22 (static asset pipeline) — src/static/BakeCodeVersion.js | Bake code-version pin over CRLF-normalised text | missing | - | No jayzee module and no decision recorded. |
+| Stream 22 — src/static/GLBTransformer.js | GLB transformer cache and transform | owner-decision | src/physics-extras/glb.js (container reader only) | Needs file IO and transform tooling (PARITY row 49). |
+| Stream 22 — src/static/GLBDraco.js | Draco and Meshopt helpers | owner-decision | src/physics-extras/meshopt.js (refuses unsupported primitives) | Decoders are WASM and no Draco fixture exists (PARITY row 49). |
+| Stream 22 — src/static/GLBKtx2.js, KTX2Extract.js | KTX2 binary availability and extraction | owner-decision | src/packages/streaming-gltf/ktx2-mip-cap.js (pure mip cap only) | Needs the KTX tool binary and file IO. |
+| Stream 22 — src/static/ProgressiveBake.js | Progressive bake containment | partial | src/sandbox/paths.js (resolveWithinRoot); scripts/check-sandbox.mjs | The containment rule is ported. The bake itself is absent. |
+| Stream 22 — src/static/FetchManifest.js | Fetch manifest build | owner-decision | - | Reads world definitions from disk (host file IO). |
+| Stream 22 — src/static/GLBVrmPassthrough.js | VRM0 and VRMC_vrm passthrough extensions | missing | - | No jayzee module and no decision recorded. |
+| chartState per-file migrators — src/sdk/chartState/migratePlayers.js | Player migrator factory | missing | - | Not ported. Pure chart transfer lives in src/netcode/lagChartTransfer.js (PARITY row 42 notes the callers are not wired). |
+| chartState per-file migrators — src/sdk/chartState/migrateWorldAnchors.js | World-anchor migrator factory | missing | - | Not ported. Re-anchor policy lives in src/chart-pure/chartReanchorService.js (PARITY row 30 partial). |
+| Spawn consolidated learning record — manifests and frames (2580 rows, 229921 frames) | Corpus-wide manifest frame census | owner-decision | src/spawn/manifest.js; scripts/check-spawn.mjs | The corpus is spawn-local. Only the owner can supply it. |
+| Spawn consolidated learning record — 399 worlds, 2416 /cdn/ refs | /cdn/ GLB census | partial | src/spawn/namedAssetRedirect.js; scripts/check-named-asset-redirect.mjs | The name resolver is built. The census is a lower bound from a spawn-local TSV. |
+| Spawn consolidated learning record — 11987 decoded-frame keys | Unique decoded-frame key count | owner-decision | - | Taken from an ephemeral probe. No durable copy exists. |
+| Spawn consolidated learning record — 307 text-visible keys | Key escape witness | partial | src/spawn/cdnName.js; scripts/check-spawn.mjs | Slash escape is witnessed on the 307 captured keys. The tilde escape ~7e has no captured key. |
+| Spawn consolidated learning record — 83 non-CDN data rows | Non-CDN reference census | owner-decision | - | Spawn-local TSV and network probes only. |
+| Spawn consolidated learning record — /cdn/-only probe results | Probe status counts (302, 401) | owner-decision | src/spawn/namedAssetRedirect.js | Results are from an ephemeral probe. The redirect rule itself is built. |
+| Spawn consolidated learning record — gone 410 (39 probes) | Gone response body | owner-decision | src/spawn/resolve.js | No captured body. The gone shape comes from the OpenAPI spec only. |
+| Spawn consolidated learning record — ledger bucket rule | Bucket rule for world.assets prefixes | partial | src/spawn/ledger.js; scripts/check-spawn.mjs | Built as upstream derives it. upstream lists the rule as undetermined, so it stays partial. |
+| Spawn consolidated learning record — error keys | Named world-store 404 errors | built | src/spawn/content.js; scripts/check-spawn-named-errors.mjs | Drifted-head case is still open. |
+| Spawn consolidated learning record — mp4 retry (200 on bounded read) | mp4 retry observation | owner-decision | - | Spawn-reported only. |
+| Spawn consolidated learning record — spawnfile.io bytes and key | spawnfile-keyed ledger family | owner-decision | src/spawn/ledger.js (parseLedgerKey) | Full key is elided in upstream's FAULTS.md, and no fixture exists. |
+| Stream 23 (fire behaviour modules) — src/behaviours/fireWeather.js | Weather reader and createFireWeather | built | src/fire/behaviour/weather.js; scripts/check-fire-modules.mjs | Snow yields less rain. |
+| Stream 23 — src/behaviours/fireSpec.js | Fire spec defaults and resolveFireSpec | built | src/fire/behaviour/spec.js; scripts/check-fire-modules.mjs | Rain per intensity is an integer from 0 to 255. |
+| Stream 23 — src/behaviours/fireTerrain.js | Firebreak fuel construction and refusals | built | src/fire/behaviour/terrain.js; scripts/check-fire-modules.mjs | - |
+| Stream 23 — src/behaviours/fireGameplay.js | Fire gameplay factory | built | src/fire/behaviour/gameplay.js; scripts/check-fire-modules.mjs | - |
+| Stream 23 — src/behaviours/fire.js defineFire | defineFire with appCtx, planet frame and trunk streamer | owner-decision | src/fire/behaviour/fire.js (pure helpers) | Needs the app host (PARITY row 25). |
+| Stream 23 — src/shared/fire/fireKernel.js | Fire kernel: integer hash, lattice and checksum | built | src/fire/fireKernel.js, src/fire/fireLattice.js; scripts/check-fire.mjs | upstream cites this as PARITY row 26. Jayzee's ledger numbers it row 25. |
+| Stream 24 (client editor modules) — client/editor/EditorAutosave.js | IndexedDB recovery write, read and delete | owner-decision | - | Needs IndexedDB in a browser host (PARITY rows 39 and 59). |
+| Stream 24 — client/editor/EditorFsBrowse.js, EditorApps.js | File-browser save base and app category | owner-decision | - | Editor UI with DOM dependency. |
+| Stream 24 — client/editor (28-file cluster, 5950 lines) | Remaining editor modules | owner-decision | - | DOM editor UI. Jayzee has no client/editor tree. |
+| Stream 25 (editor server-side modules in src/sdk) — src/sdk/EditOpLog.js | Edit operation log with 10000 cap and pruning | missing | - | Pure log with no jayzee module and no decision recorded. |
+| Stream 25 — src/sdk/AgentEditServer.js | Agent edit server | owner-decision | - | HTTP surface on a live server (PARITY row 48). |
+| Stream 25 — src/sdk/PlaceInstances.js | Instance scopes, lifetimes and room id | missing | - | No module. Jayzee's room routing does not cover instance scopes. |
+| Stream 25 — src/sdk/PrefabSpawner.js | Prefab spawner with wall-clock timing and Math.random ids | missing | - | Not ported. A port needs a seeded id source. |
+| Stream 25 — src/sdk/EditorHandlersSerialize.js | Entity and world serialization | missing | - | No module. |
+| Stream 25 part 2 (src/sdk modules) — src/sdk/AppManifest.js | validateManifest | missing | - | No module. Used by spoint's marketplace bin. |
+| Stream 25 part 2 — src/sdk/ChaseCamera.js | Chase camera defaults | missing | - | No module and no importer in spoint. |
+| Stream 25 part 2 — src/sdk/DevAppModuleVersions.js, DevHmrGraph.js, ReloadHandlers.js, ReloadManager.js | Dev server module versioning, import-map graph and reload | owner-decision | src/sdk/DevHmr.js (partial dev surface) | Dev-server file watching and restart need a host (PARITY row 48). |
+| Stream 25 part 2 — src/sdk/FreddieBridge.js | Freddie message validation and layout | missing | - | No module. |
+| Stream 25 part 2 — src/sdk/PublicBenchmark.js | collectBenchmark | missing | - | No module. |
+| Stream 25 part 2 — src/sdk/RoomLog.js | RoomLog | missing | - | No module. |
+| Stream 25 part 2 — src/sdk/RoomProcessWorker.js, WorkerBoot.js | Room child process and worker bootstrap | owner-decision | - | Process fork and worker host (PARITY rows 47 and 48). |
+| Stream 25 part 2 — src/sdk/ServerIdentity.js, ServerTimeOfDay.js | Server identity and time-of-day | missing | - | No module. |
+| Stream 25 part 2 — src/sdk/SharedEventEnvelope.js, appEventSender.js | Event envelope and sender stamp | missing | - | No module. |
+| Stream 25 part 2 — src/sdk/scatterSpec.js, TextureAtlas.js | Scatter spec sampling and atlas layout | missing | - | No module. |
+| Stream 26 (src/behaviours modules) — src/behaviours/fluid3d.js | createFluid3DBody | owner-decision | - | Needs the SPH solver and Rapier world (PARITY row 51). |
+| Stream 26 — src/behaviours/buoyancy.js, cameraRig.js | defineBuoyancy and defineCameraRig | missing | - | No module and no decision recorded. |
+| Stream 26 — src/behaviours/checkpoint.js | defineCheckpoint | missing | - | No module. |
+| Stream 26 — src/behaviours/decisionPipe.js, decisionRuntime.js | Decision pipe and runtime | missing | - | No module. |
+| Stream 26 — src/behaviours/destructibleSpec.js | validateDestructibleSpec | built | src/behaviours/destructiblePool.js; scripts/check-behaviour-health-destructible.mjs | - |
+| Stream 26 — src/behaviours/game-fsm.js | GameFSMError and the FSM interpreter | built | src/behaviours/game-fsm.js; scripts/check-behaviours.mjs | Interpreter only, not xstate. Timers run on an injected clock. |
+| Stream 26 — src/behaviours/gamemode.js | defineGameMode | missing | - | No module. |
+| Stream 26 — src/behaviours/pickup.js, shrinking-zone.js | definePickup and defineShrinkingZone | missing | - | No module. |
+| Stream 26 — src/behaviours/projectile.js, projectileGravity.js | sweepProjectile and stepProjectile | missing | - | No module. |
+| Stream 26 — src/behaviours/specBoundary.js | parseDefineSpec | built | src/behaviours/specBoundary.js; scripts/check-behaviours.mjs | - |
+| Stream 26 — src/behaviours/steering.js, teams.js | defineSteering and team palette | missing | - | No module. |
+| Stream 26 — src/behaviours/trade.js, weapon.js | settleTrade and defineWeapon | missing | - | No module. combat.js covers only a rules subset. |
+| Stream 26 — src/behaviours/voxels.js | createVoxelPart | missing | - | Jayzee's upstream-builtins/voxels.js is a different API. |
+| Stream 27 (src/apps modules) — src/apps/AccountState.js, AppSeats.js | AccountStateError and SeatError | missing | - | No module. |
+| Stream 27 — src/apps/AppBehaviours.js, AppGameplay.js | BEHAVIOUR_FACTORIES and footprint intrusion constant | missing | - | No module. |
+| Stream 27 — src/apps/AppLoader.js, appsManifest.js | App loader and manifest entry resolution | missing | - | No module. Disk loading is host-side but no decision is recorded. |
+| Stream 27 — src/apps/AppPhysics.js, AppRuntimePhysics.js | parseInteractable and mixinPhysics | owner-decision | - | Jolt host (PARITY rows 7 and 9). |
+| Stream 27 — src/apps/AppRuntimeState.js, AppRuntimeStaticMotion.js | Tagged app state and transform capture | missing | - | No module. |
+| Stream 27 — src/apps/AppRuntimeTick.js | mixinTick | partial | src/apps/hookOrder.js | Only the hook order is ported. The tick mixin needs a tick-loop host (PARITY row 18). |
+| Stream 27 — src/apps/ComponentPool.js | createComponentPool | partial | src/behaviours/healthPool.js, src/behaviours/destructiblePool.js | Concrete pools exist for health and destructible. The generic factory is not ported. |
+| Stream 27 — src/apps/CustomVersion.js, EcsEntityMap.js | installCustomVersion and createEcsEntityMap | missing | - | No module. |
+| Stream 27 — src/apps/EventBus.js | EventBus | missing | - | No module. |
+| Stream 27 — src/apps/HotReloadQueue.js | HotReloadQueue | built | src/hot/hotReloadQueue.js; scripts/check-hot-reload.mjs | Coalescing lives in the separate coalescer. |
+| Stream 27 — src/apps/SurfaceSelector.js, SurfaceSelectorRuntime.js | Surface selector parse and runtime | missing | - | No module. |
+| Stream 27 — src/apps/appImports.js | ENGINE_ALIASES | missing | - | No module. |
+
+Counts: 153 rows. built 59, partial 26, missing 34, owner-decision 34.
+## 3. upstream FEATURESET streams 18 to 58 and improvement items
+
+| Ref | Feature | Status | Jayzee proof | Note |
+|---|---|---|---|---|
+| upstream FEATURESET Stream 18: SDK server HTTP, static serving and server surface | COEP value require-corp | partial | src/sandbox/paths.js (COEP_VALUE); scripts/check-sandbox.mjs | Constant only; the header is set by a host server, not ported |
+| upstream FEATURESET Stream 18: SDK server HTTP, static serving and server surface | COEP header sent with COOP on static responses | owner-decision | - | Needs a live HTTP response; PARITY row 48 leaves StaticHandler open |
+| upstream FEATURESET Stream 18: SDK server HTTP, static serving and server surface | Baked path with .. refused and files contained to the served root | partial | src/sandbox/paths.js (resolveWithinRoot); scripts/check-sandbox.mjs | Path rule ported; realpath and symlink step and the file server are host work |
+| upstream FEATURESET Stream 18: SDK server HTTP, static serving and server surface | Timing-safe token comparison | built | src/sandbox/authCompare.js; scripts/check-sandbox.mjs | Gate covers equal, unequal, length mismatch and non-string input |
+| upstream FEATURESET Stream 18: SDK server HTTP, static serving and server surface | Editor token check on upload route and socket message token | owner-decision | src/sandbox/authCompare.js (helper only) | Route and socket wiring need a live server (PARITY row 48) |
+| upstream FEATURESET Stream 18: SDK server HTTP, static serving and server surface | Loopback-only routes | owner-decision | - | HTTP route wiring |
+| upstream FEATURESET Stream 18: SDK server HTTP, static serving and server surface | Wildcard CORS origin on the API | owner-decision | - | Host HTTP policy; jayzee sets no CORS policy |
+| upstream FEATURESET Stream 18: SDK server HTTP, static serving and server surface | Server API entry and route mounting | owner-decision | src/sdk/index.js; scripts/check-sdk-surfaces.mjs | Routes mount on a live context; PARITY row 48 open |
+| upstream FEATURESET Stream 18: SDK server HTTP, static serving and server surface | SES preflight with fail-closed reason codes and already-locked-down handling | built | src/sandbox/ses.js; scripts/check-sandbox.mjs | Injected SES import; PARITY row 36 |
+| upstream FEATURESET Stream 18: SDK server HTTP, static serving and server surface | Upload size cap, content type, extension and multipart parser | partial | src/sdk/UploadHandler.js; scripts/check-sdk-surfaces.mjs | Boundary, extension, head check and parser ported; file writes open (PARITY row 48) |
+| upstream FEATURESET Stream 18: SDK server HTTP, static serving and server surface | On-demand minimap bake cap of 64 concurrent | owner-decision | - | MinimapBake bakes in a worker (PARITY row 48 open) |
+| upstream FEATURESET Stream 18: SDK server HTTP, static serving and server surface | World snapshot format version 1 and world name resolution | partial | src/persistence-pure/worldPersistence.js; scripts/check-world-persistence.mjs | Restore never compares the fingerprint (PARITY row 33) |
+| upstream FEATURESET Stream 18: SDK server HTTP, static serving and server surface | Room orchestrator scoring and query parsing | partial | src/sdk/RoomOrchestratorHttp.js; scripts/check-sdk-surfaces.mjs | Pure scoring and query parse built; router and worker registration handlers owner-decision |
+| upstream FEATURESET Stream 18: SDK server HTTP, static serving and server surface | Cron step rule and OR rule for two restricted day fields | built | src/sdk/cronSchedule.js; scripts/check-sdk-surfaces.mjs | Gates refuse malformed expressions and fire on either day field |
+| upstream FEATURESET Stream 18: SDK server HTTP, static serving and server surface | LLM job caps: 32 messages and 8000 prompt characters | built | src/sdk/llmJobs.js; scripts/check-sdk-surfaces.mjs | Caps built; the provider is injected and not ported (PARITY row 48) |
+| upstream FEATURESET Stream 18: SDK server HTTP, static serving and server surface | No CSP, HSTS or CORP header set in spoint | owner-decision | - | Negative in spoint; jayzee sets no host headers either |
+| upstream FEATURESET Stream 18: SDK server HTTP, static serving and server surface | No rate limit on upload, static or LLM routes | owner-decision | - | Server rate policy is a host decision |
+| upstream FEATURESET Stream 19: terrain and chart reanchor | Planet frame surface solve and ground memo | built | src/terrain-pure/planetFrame.js; scripts/check-terrain-pure.mjs | PARITY row 50 |
+| upstream FEATURESET Stream 19: terrain and chart reanchor | Chart anchor constants: 32 anchors per face and 28 degree reanchor angle | built | src/chart-pure/chartAnchor.js; scripts/check-chart-anchor.mjs | PARITY row 30 |
+| upstream FEATURESET Stream 19: terrain and chart reanchor | ChartReanchorService and reanchor policy | built | src/chart-pure/chartReanchorService.js; src/chart-pure/chartReanchorPolicy.js; scripts/check-chart-reanchor.mjs | 23 PASS (PARITY row 30) |
+| upstream FEATURESET Stream 19: terrain and chart reanchor | ChartReanchorTerrain migrator and field lattice tilt | partial | src/terrain-pure/chartReanchorTerrain.js; src/terrain-pure/fieldLatticeTilt.js; scripts/check-chart-reanchor.mjs | spoint createFieldLattice not ported; the lattice is passed in |
+| upstream FEATURESET Stream 19: terrain and chart reanchor | chartState wiring (attachServerChartMigrators) | missing | - | Wiring not ported; no decision recorded |
+| upstream FEATURESET Stream 19: terrain and chart reanchor | ColliderStreamer and the chartEpoch use in FieldLattice | missing | - | No module; createFieldLattice not ported (PARITY row 30) |
+| upstream FEATURESET Stream 19: terrain and chart reanchor | Heightfield terrain physics: bake, stale-code refusal and CPU fallback | built | src/terrain-pure/heightfieldPhysics.js; scripts/check-heightfield-physics.mjs | PARITY row 22; the .hf codec is injected |
+| upstream FEATURESET Stream 19: terrain and chart reanchor | CaveSDF sphere field and polygonize | built | src/terrain-pure/caveSdf.js; scripts/check-terrain-pure.mjs; scripts/check-marching-drift.mjs | PARITY rows 24 and 50 |
+| upstream FEATURESET Stream 19: terrain and chart reanchor | CaveMeshes client mesh assembly | owner-decision | - | Mesh assembly needs three.js; only the pure parts are ported |
+| upstream FEATURESET Stream 19: terrain and chart reanchor | GrassPlacementLod blade reach and chunk LOD | missing | - | No jayzee module; src/terrain-pure/grassDecal.js is a different unit |
+| upstream FEATURESET Stream 19: terrain and chart reanchor | BiomeOverride strokes and load | built | src/terrain-pure/biomeOverride.js; scripts/check-terrain-pure.mjs | PARITY row 50 |
+| upstream FEATURESET Stream 19: terrain and chart reanchor | CavePatches spherical cave and SDF sphere | built | src/terrain-pure/cavePatches.js; scripts/check-terrain-pure.mjs; scripts/check-marching-drift.mjs | PARITY row 50 |
+| upstream FEATURESET Stream 19: terrain and chart reanchor | StaticTileIndex tile size and margin | partial | src/physics-extras/staticTiles.js; scripts/check-physics-extras.mjs | Tile keys and spans ported; World.createStaticTileIndex wiring not ported |
+| upstream FEATURESET Stream 19: terrain and chart reanchor | ClimateCache | built | src/terrain-pure/climateCache.js; scripts/check-terrain-pure.mjs | PARITY row 50 |
+| upstream FEATURESET Stream 20: client render, editor and HUD, XR, and packages | Cascade 0 never renders when the sun casts no shadow | partial | src/client-pure/cascadeShadow.js; scripts/check-client-pure.mjs | Selection math only; ShadowPipeline is owner-decision |
+| upstream FEATURESET Stream 20: client render, editor and HUD, XR, and packages | ShadowPipeline cascade rendering | owner-decision | - | three.js or WebGPU render (PARITY row 38) |
+| upstream FEATURESET Stream 20: client render, editor and HUD, XR, and packages | Shadow cost probe backend and split support | partial | src/client-pure/shadowCostStats.js; scripts/check-client-pure.mjs | Statistics only; the probe needs a renderer |
+| upstream FEATURESET Stream 20: client render, editor and HUD, XR, and packages | Scene occlusion and WebGPU Hi-Z tier | owner-decision | - | WebGPU tier in the streaming-gltf package |
+| upstream FEATURESET Stream 20: client render, editor and HUD, XR, and packages | Cull freeze: instanced and batched meshes to manual cull | built | src/render/cullFreeze.js; scripts/check-render.mjs | PARITY row 38 |
+| upstream FEATURESET Stream 20: client render, editor and HUD, XR, and packages | Cluster LOD mesh renders at most once per frame | owner-decision | - | three.js mesh render |
+| upstream FEATURESET Stream 20: client render, editor and HUD, XR, and packages | Progressive LOD extension key (EP_progressive_lod or local extras) | partial | src/packages/streaming-gltf/progressive-lod-schema.js; src/packages/streaming-gltf/schema/*.json; scripts/check-packages.mjs | Schemas copied; the browser loader reading the key is owner-decision |
+| upstream FEATURESET Stream 20: client render, editor and HUD, XR, and packages | Teleport arc BVH threshold and XR pointer flag | owner-decision | - | XR runtime |
+| upstream FEATURESET Stream 20: client render, editor and HUD, XR, and packages | Editor and HUD exports (createEditPanel, createRoomCodeUI) | owner-decision | - | DOM (PARITY row 39) |
+| upstream FEATURESET Stream 20: client render, editor and HUD, XR, and packages | Frame budget of 16.67 ms | built | src/client-pure/qualityGovernor.js; scripts/check-client-pure.mjs | PARITY row 57 |
+| upstream FEATURESET Stream 20: client render, editor and HUD, XR, and packages | Quality tier choice against the creator maximum | built | src/client-pure/qualityTierChoice.js; scripts/check-client-pure.mjs | PARITY row 57 |
+| upstream FEATURESET Stream 20: client render, editor and HUD, XR, and packages | Quality presets table | built | src/client-pure/qualityPresets.js; scripts/check-client-pure.mjs | PARITY row 57 |
+| upstream FEATURESET Stream 20: client render, editor and HUD, XR, and packages | ECS package createWorld and createQuery | built | src/packages/ecs/world.js; src/packages/ecs/query.js; scripts/check-packages.mjs | PARITY row 53 |
+| upstream FEATURESET Stream 20: client render, editor and HUD, XR, and packages | Mapspinner createRenderer and createPlanet | partial | src/packages/mapspinner/index.js; scripts/check-packages.mjs | Pure functions only; createRenderer needs a GL context (owner-decision) |
+| upstream FEATURESET Stream 20: client render, editor and HUD, XR, and packages | spoint-core Rust crate | partial | src/packages/spoint-core/index.js; src/packages/spoint-core/quaternion.js; src/packages/spoint-core/hash.js; scripts/check-packages.mjs | JavaScript port; Rust-specific items are OPEN (AGENTS.md) |
+| upstream FEATURESET Stream 23: fire behaviour modules | Weather reader: kinds and snow rain fraction | built | src/fire/behaviour/weather.js; scripts/check-fire-modules.mjs | Exported through src/fire/index.js |
+| upstream FEATURESET Stream 23: fire behaviour modules | Fire spec, defaults and validation | built | src/fire/behaviour/spec.js; scripts/check-fire-modules.mjs | Exported through src/fire/index.js |
+| upstream FEATURESET Stream 23: fire behaviour modules | Firebreak fuel construction | built | src/fire/behaviour/terrain.js; scripts/check-fire-modules.mjs | Refusals for radius, water and kind samplers |
+| upstream FEATURESET Stream 23: fire behaviour modules | Fire gameplay factory | built | src/fire/behaviour/gameplay.js; scripts/check-fire-modules.mjs | Injected getWorld and frameOf |
+| upstream FEATURESET Stream 24: client editor modules | Client editor modules (28 files: autosave, file browser, apps, panels) | owner-decision | - | Editor UI and IndexedDB autosave are DOM and browser storage (PARITY row 39) |
+| upstream FEATURESET Stream 25: editor server-side modules in src/sdk | EditOpLog ten thousand entry cap and tail prune | missing | - | Pure module; no decision recorded |
+| upstream FEATURESET Stream 25: editor server-side modules in src/sdk | AgentEditServer | owner-decision | - | Server edit surface (PARITY row 48) |
+| upstream FEATURESET Stream 25: editor server-side modules in src/sdk | PlaceInstances scopes, lifetimes and room id | missing | - | Pure; no decision recorded |
+| upstream FEATURESET Stream 25: editor server-side modules in src/sdk | PrefabSpawner | missing | - | Needs an app runtime (PARITY row 31 covers hook order only) |
+| upstream FEATURESET Stream 25: editor server-side modules in src/sdk | EditorHandlersSerialize | missing | - | Editor serializer; worldPersistence.js covers the snapshot format only |
+| upstream FEATURESET Stream 25, part 2: src/sdk modules with no upstream mention | AppManifest validation | missing | - | Pure; no decision recorded |
+| upstream FEATURESET Stream 25, part 2: src/sdk modules with no upstream mention | ChaseCamera defaults | owner-decision | - | Camera rig, render side |
+| upstream FEATURESET Stream 25, part 2: src/sdk modules with no upstream mention | DevAppModuleVersions | owner-decision | - | Dev server file watch |
+| upstream FEATURESET Stream 25, part 2: src/sdk modules with no upstream mention | DevHmrGraph import map reader | owner-decision | src/sdk/DevHmr.js (flag only) | Reads dev HTML; dev server host |
+| upstream FEATURESET Stream 25, part 2: src/sdk modules with no upstream mention | FreddieBridge message validation and layouts | missing | - | Pure validation; no decision recorded |
+| upstream FEATURESET Stream 25, part 2: src/sdk modules with no upstream mention | PublicBenchmark | owner-decision | - | Reads a live server context |
+| upstream FEATURESET Stream 25, part 2: src/sdk modules with no upstream mention | ReloadHandlers and ReloadManager | owner-decision | - | Live reload of server modules; process host |
+| upstream FEATURESET Stream 25, part 2: src/sdk modules with no upstream mention | RoomLog | missing | - | No decision recorded |
+| upstream FEATURESET Stream 25, part 2: src/sdk modules with no upstream mention | RoomProcessWorker | owner-decision | - | Worker process (PARITY row 48) |
+| upstream FEATURESET Stream 25, part 2: src/sdk modules with no upstream mention | ServerIdentity | owner-decision | - | Process and environment identity |
+| upstream FEATURESET Stream 25, part 2: src/sdk modules with no upstream mention | ServerTimeOfDay | missing | - | No decision recorded |
+| upstream FEATURESET Stream 25, part 2: src/sdk modules with no upstream mention | SharedEventEnvelope | missing | - | No decision recorded |
+| upstream FEATURESET Stream 25, part 2: src/sdk modules with no upstream mention | TextureAtlas layout | missing | - | Pure layout; used by the render side |
+| upstream FEATURESET Stream 25, part 2: src/sdk modules with no upstream mention | WorkerBoot | owner-decision | - | Worker entry (PARITY row 45 transport) |
+| upstream FEATURESET Stream 25, part 2: src/sdk modules with no upstream mention | appEventSender stamp | missing | - | No decision recorded |
+| upstream FEATURESET Stream 25, part 2: src/sdk modules with no upstream mention | scatterSpec parse, hash and sample | missing | - | Deterministic and pure; no decision recorded |
+| upstream FEATURESET Stream 26: src/behaviours modules with no upstream mention | buoyancy | missing | - | No decision recorded |
+| upstream FEATURESET Stream 26: src/behaviours modules with no upstream mention | cameraRig | owner-decision | - | Camera rig, render side |
+| upstream FEATURESET Stream 26: src/behaviours modules with no upstream mention | checkpoint | missing | - | No decision recorded |
+| upstream FEATURESET Stream 26: src/behaviours modules with no upstream mention | decision runtime and pipe | missing | - | Pure with an injected ask; no decision recorded |
+| upstream FEATURESET Stream 26: src/behaviours modules with no upstream mention | destructibleSpec validation | built | src/behaviours/destructiblePool.js; scripts/check-behaviour-health-destructible.mjs | Destructible core built (PARITY row 51) |
+| upstream FEATURESET Stream 26: src/behaviours modules with no upstream mention | fluid3d | owner-decision | - | SPH solver open (PARITY row 51) |
+| upstream FEATURESET Stream 26: src/behaviours modules with no upstream mention | game-fsm (GameFSMError and interpreter) | built | src/behaviours/game-fsm.js; scripts/check-behaviours.mjs | PARITY row 51 |
+| upstream FEATURESET Stream 26: src/behaviours modules with no upstream mention | gamemode | missing | - | No decision recorded |
+| upstream FEATURESET Stream 26: src/behaviours modules with no upstream mention | pickup | missing | - | No decision recorded |
+| upstream FEATURESET Stream 26: src/behaviours modules with no upstream mention | projectile sweep | missing | - | No decision recorded |
+| upstream FEATURESET Stream 26: src/behaviours modules with no upstream mention | projectile gravity step | missing | - | No decision recorded |
+| upstream FEATURESET Stream 26: src/behaviours modules with no upstream mention | shrinking zone | missing | - | No decision recorded |
+| upstream FEATURESET Stream 26: src/behaviours modules with no upstream mention | specBoundary parse | built | src/behaviours/specBoundary.js; scripts/check-behaviours.mjs | PARITY row 51 |
+| upstream FEATURESET Stream 26: src/behaviours modules with no upstream mention | steering | missing | - | No decision recorded |
+| upstream FEATURESET Stream 26: src/behaviours modules with no upstream mention | teams colourblind-safe palette | missing | - | No decision recorded |
+| upstream FEATURESET Stream 26: src/behaviours modules with no upstream mention | trade settlement | missing | - | No decision recorded |
+| upstream FEATURESET Stream 26: src/behaviours modules with no upstream mention | voxels part builder | missing | - | upstream-builtins/voxels.js is the upstream API, not this function |
+| upstream FEATURESET Stream 26: src/behaviours modules with no upstream mention | weapon | missing | - | No decision recorded |
+| upstream FEATURESET Stream 27: src/apps modules with no upstream mention | AccountState | missing | - | No decision recorded |
+| upstream FEATURESET Stream 27: src/apps modules with no upstream mention | AppBehaviours factory registry | missing | - | No decision recorded |
+| upstream FEATURESET Stream 27: src/apps modules with no upstream mention | AppGameplay footprint intrusion constant | missing | - | No decision recorded |
+| upstream FEATURESET Stream 27: src/apps modules with no upstream mention | AppLoader | owner-decision | - | Loads app folders from disk (host) |
+| upstream FEATURESET Stream 27: src/apps modules with no upstream mention | AppPhysics parseInteractable | missing | - | No decision recorded |
+| upstream FEATURESET Stream 27: src/apps modules with no upstream mention | AppRuntimePhysics mixin | owner-decision | - | Jolt-bound physics mixin |
+| upstream FEATURESET Stream 27: src/apps modules with no upstream mention | AppRuntimeState tag and untag | missing | - | No decision recorded |
+| upstream FEATURESET Stream 27: src/apps modules with no upstream mention | AppRuntimeStaticMotion captureTransform | missing | - | No decision recorded |
+| upstream FEATURESET Stream 27: src/apps modules with no upstream mention | AppRuntimeTick mixin | partial | src/apps/hookOrder.js; scripts/check-hook-order.mjs | Hook order built (PARITY row 31); tick mixin not ported |
+| upstream FEATURESET Stream 27: src/apps modules with no upstream mention | AppSeats | missing | - | No decision recorded |
+| upstream FEATURESET Stream 27: src/apps modules with no upstream mention | ComponentPool | partial | src/behaviours/healthPool.js; src/behaviours/destructiblePool.js; scripts/check-behaviour-health-destructible.mjs | Two pool consumers; the generic factory is not ported |
+| upstream FEATURESET Stream 27: src/apps modules with no upstream mention | CustomVersion | missing | - | No decision recorded |
+| upstream FEATURESET Stream 27: src/apps modules with no upstream mention | EcsEntityMap | missing | - | No decision recorded |
+| upstream FEATURESET Stream 27: src/apps modules with no upstream mention | EventBus | missing | - | No decision recorded |
+| upstream FEATURESET Stream 27: src/apps modules with no upstream mention | HotReloadQueue | built | src/hot/hotReloadQueue.js; src/hot/coalescer.js; scripts/check-hot-reload.mjs | PARITY row 39, 17 PASS |
+| upstream FEATURESET Stream 27: src/apps modules with no upstream mention | SurfaceSelector parse | missing | - | No decision recorded |
+| upstream FEATURESET Stream 27: src/apps modules with no upstream mention | SurfaceSelectorRuntime | owner-decision | - | Touch channel swap in client UI |
+| upstream FEATURESET Stream 27: src/apps modules with no upstream mention | appImports engine aliases | owner-decision | - | Browser import map |
+| upstream FEATURESET Stream 27: src/apps modules with no upstream mention | appsManifest resolveAppEntry | owner-decision | - | Filesystem app discovery and serving |
+| upstream FEATURESET Stream 28: ServerBoot and StaticCache | ServerBoot | owner-decision | - | Process boot and shutdown (PARITY row 48) |
+| upstream FEATURESET Stream 28: ServerBoot and StaticCache | StaticCache serving and cache policy | owner-decision | - | HTTP host |
+| upstream FEATURESET Stream 28: ServerBoot and StaticCache | StaticCache pure helpers (ByteBudgetLRU, parseRange, compress) | missing | - | Pure; no decision recorded |
+| upstream FEATURESET Stream 28: ServerBoot and StaticCache | chartState migratePlayers | missing | - | PARITY row 42 names it as an unwired caller |
+| upstream FEATURESET Stream 28: ServerBoot and StaticCache | chartState migrateWorldAnchors | missing | - | No decision recorded |
+| upstream FEATURESET Stream 29: client HUD modules with no upstream mention | 17 client HUD modules (chat, emote wheel, minimap, menus, loading, lobby) | owner-decision | - | DOM panels, canvas and CSS (PARITY row 39) |
+| upstream FEATURESET Stream 30: src/procgen modules with no upstream mention | LSystem expansion and turtle | missing | - | Pure; no decision recorded |
+| upstream FEATURESET Stream 30: src/procgen modules with no upstream mention | NoiseTerrain (createNoise2D, createFbm2D, heightfield) | missing | - | Not the same as upstream-builtins/noise.js |
+| upstream FEATURESET Stream 30: src/procgen modules with no upstream mention | TextureScript paintTexture | missing | - | Pure; no decision recorded |
+| upstream FEATURESET Stream 30: src/procgen modules with no upstream mention | WFC wave-function collapse | missing | - | Pure; no decision recorded |
+| upstream FEATURESET Stream 31: src/effects modules with no upstream mention | DamageEffects | owner-decision | - | Three.js audio and scene |
+| upstream FEATURESET Stream 31: src/effects modules with no upstream mention | fxProgram parser and simulation | missing | - | upstream-builtins/fx.js is the upstream timing model, not this |
+| upstream FEATURESET Stream 32: src/physics modules with no upstream mention | DracoDecompressor | owner-decision | src/physics-extras/glb.js (refuses Draco) | WASM decoder; no Draco fixture |
+| upstream FEATURESET Stream 32: src/physics modules with no upstream mention | GLBLoader | partial | src/physics-extras/glb.js; scripts/check-physics-extras.mjs | Container, mesh and placement ported; index type 5121 and Draco or Meshopt refused |
+| upstream FEATURESET Stream 32: src/physics modules with no upstream mention | GLBMath matrix helpers | built | src/physics-extras/math.js; scripts/check-physics-extras.mjs | mat4TRS gated |
+| upstream FEATURESET Stream 32: src/physics modules with no upstream mention | MeshoptDecompressor | owner-decision | src/physics-extras/meshopt.js (refuses float stride not a multiple of 4) | WASM decoder |
+| upstream FEATURESET Stream 32: src/physics modules with no upstream mention | pivotTransform | built | src/physics-extras/pivotTransform.js; scripts/check-physics-extras.mjs | PARITY row 49 |
+| upstream FEATURESET Stream 32: src/physics modules with no upstream mention | surfaceVelocity | built | src/physics-extras/surfaceVelocity.js; scripts/check-physics-extras.mjs | PARITY row 49 |
+| upstream FEATURESET Stream 33: src/shared modules with no upstream mention | MinimapBiome biomeColor | missing | - | No decision recorded |
+| upstream FEATURESET Stream 33: src/shared modules with no upstream mention | SpawnSurface columnSurfaces | built | src/sessions-pure/spawnSurface.js; scripts/check-sessions.mjs | Silent terrainY branch kept (see improvement rows) |
+| upstream FEATURESET Stream 33: src/shared modules with no upstream mention | ballistics elevation | missing | - | upstream-builtins/ballistics.js is solveShot, a different function |
+| upstream FEATURESET Stream 33: src/shared modules with no upstream mention | bookmarks listBookmarks | missing | - | No decision recorded |
+| upstream FEATURESET Stream 33: src/shared modules with no upstream mention | canonicalJSON | built | src/rollback-pure/canonicalJSON.js; scripts/check-rollback.mjs; scripts/check-lockstep.mjs | Shared by rollback, lockstep and world persistence |
+| upstream FEATURESET Stream 33: src/shared modules with no upstream mention | clusterAssignment | built | src/clusters-pure/clusterAssignment.js; scripts/check-cluster-handoff.mjs | PARITY row 29 |
+| upstream FEATURESET Stream 33: src/shared modules with no upstream mention | colliderLattice | missing | - | No decision recorded |
+| upstream FEATURESET Stream 33: src/shared modules with no upstream mention | equipment | missing | - | No decision recorded |
+| upstream FEATURESET Stream 33: src/shared modules with no upstream mention | materialSlots | missing | - | No decision recorded |
+| upstream FEATURESET Stream 33: src/shared modules with no upstream mention | modelLoadErrors | owner-decision | - | Model loading in client and editor |
+| upstream FEATURESET Stream 33: src/shared modules with no upstream mention | relevanceRadius | built | src/spatial-pure/relevanceRadius.js; src/aoi-pure/relevanceRadius.js; scripts/check-octree.mjs; scripts/check-aoi.mjs | Default radius 200 m |
+| upstream FEATURESET Stream 33: src/shared modules with no upstream mention | vec3 readVec3 | partial | src/physics-extras/math.js; scripts/check-physics-extras.mjs | Ported; no gate names readVec3 directly |
+| upstream FEATURESET Stream 33: src/shared modules with no upstream mention | worldPresets | missing | - | No decision recorded |
+| upstream FEATURESET Stream 33: src/shared modules with no upstream mention | worldResolve | missing | - | No decision recorded |
+| upstream FEATURESET Stream 34: top-level bin boot and tooling scripts | create-app, create-project and templates scaffolding | owner-decision | - | Writes project files; CLI host (PARITY row 58) |
+| upstream FEATURESET Stream 34: top-level bin boot and tooling scripts | room-orchestrator-boot, room-worker-boot and router-boot | owner-decision | - | Process boot (PARITY rows 48 and 58) |
+| upstream FEATURESET Stream 34: top-level bin boot and tooling scripts | marketplace-install and marketplace-registry | owner-decision | - | Network registry; unreferenced in spoint (PARITY row 58) |
+| upstream FEATURESET Stream 35: client/core grass family with no upstream mention | GrassClump alpha texture | owner-decision | - | Canvas texture |
+| upstream FEATURESET Stream 35: client/core grass family with no upstream mention | GrassMaterial | owner-decision | - | Shader material |
+| upstream FEATURESET Stream 35: client/core grass family with no upstream mention | GrassTSL | owner-decision | - | TSL shader |
+| upstream FEATURESET Stream 35: client/core grass family with no upstream mention | GrassWindField | partial | src/render/grassWind.js; scripts/check-render.mjs | Pure wind functions; field object is render side |
+| upstream FEATURESET Stream 36: client/core environment tint and weather modules with no upstream mention | WeatherGpu, WeatherMaterials and WeatherMaterialsTSL | owner-decision | - | GPU and TSL materials |
+| upstream FEATURESET Stream 36: client/core environment tint and weather modules with no upstream mention | WetnessTint and WetnessTintTSL | owner-decision | - | three.js and TSL |
+| upstream FEATURESET Stream 36: client/core environment tint and weather modules with no upstream mention | UnderwaterTint and UnderwaterTintTSL | owner-decision | - | three.js and TSL |
+| upstream FEATURESET Stream 36: client/core environment tint and weather modules with no upstream mention | PostFxLook | built | src/render/postFxLook.js; scripts/check-render.mjs | PARITY row 38 |
+| upstream FEATURESET Stream 37: client/core culling, occlusion and terrain occlusion modules | CullingHub | partial | src/client-pure/cullingHub.js; scripts/check-client-pure.mjs | Hub logic ported; no GL probe |
+| upstream FEATURESET Stream 37: client/core culling, occlusion and terrain occlusion modules | TerrainOcclusion, WebGPUCullingHubIntegration and WebGPUCullingProbe | owner-decision | - | GL and WebGPU queries |
+| upstream FEATURESET Stream 37: client/core culling, occlusion and terrain occlusion modules | OcclusionPolicy | built | src/render/occlusionPolicy.js; scripts/check-render.mjs | PARITY row 38 |
+| upstream FEATURESET Stream 37: client/core culling, occlusion and terrain occlusion modules | OcclusionQueryBudget | built | src/render/occlusionQueryBudget.js; scripts/check-render.mjs | PARITY row 38 |
+| upstream FEATURESET Stream 38: client/core bloom and FSR1 modules with no upstream mention | Bloom, BloomWebGPU, FSR1 and FSR1WebGPU | owner-decision | - | Post-fx rendering open (PARITY row 38) |
+| upstream FEATURESET Stream 39: client/core screen-space ambient occlusion and reflection modules with no upstream mention | SSAO, SSAOWebGPU, SSR and SSRWebGPU | owner-decision | - | Post-fx rendering open (PARITY row 38) |
+| upstream FEATURESET Stream 40: client/core player LOD and vertex-animation-texture modules with no upstream mention | PlayerLOD and PlayerLODTSL | owner-decision | - | Render LOD, not the netcode player LOD |
+| upstream FEATURESET Stream 40: client/core player LOD and vertex-animation-texture modules with no upstream mention | PlayerVAT, PlayerVATBake and PlayerVATTSL | owner-decision | - | GPU animation texture bake |
+| upstream FEATURESET Stream 41: client/core rock and vegetation shading modules with no upstream mention | Rock placement, shapes and triangle table | partial | src/terrain-pure/rockPlacement.js; src/terrain-pure/rockShapes.js; src/terrain-pure/rockTriTable.js; scripts/check-terrain-pure.mjs | Rocks.js mesh build is owner-decision |
+| upstream FEATURESET Stream 41: client/core rock and vegetation shading modules with no upstream mention | RocksTSL, VegetationTSL and VegetationAmbientTSL | owner-decision | - | TSL shaders |
+| upstream FEATURESET Stream 42: vegetation core, build and impostor-tier modules with no upstream mention | Vegetation and VegetationBuild | partial | src/terrain-pure/vegPlacement.js; scripts/check-terrain-pure.mjs | Placement pure; the three.js build and ez-tree are owner-decision |
+| upstream FEATURESET Stream 42: vegetation core, build and impostor-tier modules with no upstream mention | VegImpostorTier | partial | src/client-pure/impostorTier.js; scripts/check-client-pure.mjs | Layout ported; GPU tier owner-decision |
+| upstream FEATURESET Stream 43: WebGPU instancing pair with no upstream mention | WebGPULodInstancer and WebGPUInstancing | owner-decision | - | WebGPU |
+| upstream FEATURESET Stream 44: render graph and program readiness modules with no upstream mention | RenderGraph and RenderGraph.nodes | owner-decision | - | three.js render graph |
+| upstream FEATURESET Stream 44: render graph and program readiness modules with no upstream mention | ProgramReadiness | partial | src/client-pure/programReadiness.js; scripts/check-client-pure.mjs | Defer rule ported; render side owner-decision |
+| upstream FEATURESET Stream 45: client/core diagnostics and profiling probes with no upstream mention | PerformanceProfiler, OverdrawProbe, MeshDebug, ColliderDebug and RuntimeStats | owner-decision | - | Renderer and DOM probes |
+| upstream FEATURESET Stream 45: client/core diagnostics and profiling probes with no upstream mention | FrameMetrics | partial | src/client-pure/frameMetrics.js; scripts/check-client-pure.mjs | Frame statistics ported; probes owner-decision |
+| upstream FEATURESET Stream 46: client/core scheduling, yield, load-gate and band modules with no upstream mention | StreamingScheduler scoring | built | src/client-pure/streamingScheduler.js; scripts/check-client-pure.mjs | PARITY row 57 |
+| upstream FEATURESET Stream 46: client/core scheduling, yield, load-gate and band modules with no upstream mention | PlacementScheduler | owner-decision | - | Camera pose from three.js |
+| upstream FEATURESET Stream 46: client/core scheduling, yield, load-gate and band modules with no upstream mention | macrotaskYield and modelLoadGate | owner-decision | - | Browser task queue and model fetch |
+| upstream FEATURESET Stream 46: client/core scheduling, yield, load-gate and band modules with no upstream mention | TileExtent commit | missing | - | Pure bounds with an injected sampler; no decision recorded |
+| upstream FEATURESET Stream 46: client/core scheduling, yield, load-gate and band modules with no upstream mention | drawBands | built | src/client-pure/drawBands.js; scripts/check-client-pure.mjs | PARITY row 57 |
+| upstream FEATURESET Stream 47: client/core touch and keybinding input modules with no upstream mention | MobileControls | owner-decision | - | DOM touch controls |
+| upstream FEATURESET Stream 47: client/core touch and keybinding input modules with no upstream mention | TouchDraft and TouchSurfaceSpec | built | src/client-pure/touchDraft.js; src/client-pure/touchSurfaceSpec.js; scripts/check-client-pure.mjs | PARITY row 57 |
+| upstream FEATURESET Stream 47: client/core touch and keybinding input modules with no upstream mention | keybindings default table | missing | - | No decision recorded |
+| upstream FEATURESET Stream 48: client boot, connection and loading state modules with no upstream mention | ClientMachine state machine | missing | - | Jayzee has ReconnectManager as a plain table, not this machine |
+| upstream FEATURESET Stream 48: client boot, connection and loading state modules with no upstream mention | LoadingMachine state machine | missing | - | No decision recorded |
+| upstream FEATURESET Stream 48: client boot, connection and loading state modules with no upstream mention | ConnectionStatus | owner-decision | - | DOM status UI |
+| upstream FEATURESET Stream 48: client boot, connection and loading state modules with no upstream mention | PreviewReload | owner-decision | - | EventSource dev reload |
+| upstream FEATURESET Stream 49: client/core relocation, transform lerp and floating origin modules with no upstream mention | RelocationSearch | partial | src/sessions-pure/relocationTarget.js; scripts/check-relocation-solve.mjs | dirToLocalXZ gated; searchBookmark needs bookmarks (missing) |
+| upstream FEATURESET Stream 49: client/core relocation, transform lerp and floating origin modules with no upstream mention | RelocationSettle | owner-decision | - | Idle frames and render |
+| upstream FEATURESET Stream 49: client/core relocation, transform lerp and floating origin modules with no upstream mention | TransformLerp | missing | - | src/transport/transformRing.js is the ring, not the lerp |
+| upstream FEATURESET Stream 49: client/core relocation, transform lerp and floating origin modules with no upstream mention | FloatingOrigin | built | src/render/floatingOrigin.js; scripts/check-render.mjs | PARITY row 38 |
+| upstream FEATURESET Stream 50: client/core decal, cache sweep, exact patch frame and multi viewport modules with no upstream mention | DecalSystem | owner-decision | - | three.js decals |
+| upstream FEATURESET Stream 50: client/core decal, cache sweep, exact patch frame and multi viewport modules with no upstream mention | CacheRevalidationSweep | missing | - | No decision recorded |
+| upstream FEATURESET Stream 50: client/core decal, cache sweep, exact patch frame and multi viewport modules with no upstream mention | ExactPatchFrame | missing | - | No decision recorded |
+| upstream FEATURESET Stream 50: client/core decal, cache sweep, exact patch frame and multi viewport modules with no upstream mention | MultiViewport | owner-decision | - | Renderer viewports |
+| upstream FEATURESET Stream 51: client/core expression, tree texture, replay, grid, shadow and editor kit modules with no upstream mention | ExpressionCodes | built | src/render/expressionCodes.js; scripts/check-render.mjs | PARITY row 38 |
+| upstream FEATURESET Stream 51: client/core expression, tree texture, replay, grid, shadow and editor kit modules with no upstream mention | TreeTextureBudget | built | src/render/treeTextureBudget.js; scripts/check-render.mjs | PARITY row 38 |
+| upstream FEATURESET Stream 51: client/core expression, tree texture, replay, grid, shadow and editor kit modules with no upstream mention | ReplayBuffer | built | src/client-pure/replayBuffer.js; scripts/check-client-pure.mjs | PARITY row 57 |
+| upstream FEATURESET Stream 51: client/core expression, tree texture, replay, grid, shadow and editor kit modules with no upstream mention | GroundNodeGrid | built | src/client-pure/groundNodeGrid.js; scripts/check-client-pure.mjs | PARITY row 57 |
+| upstream FEATURESET Stream 51: client/core expression, tree texture, replay, grid, shadow and editor kit modules with no upstream mention | CascadeShadowSelectTSL | owner-decision | - | Patches THREE.ShaderChunk at import |
+| upstream FEATURESET Stream 51: client/core expression, tree texture, replay, grid, shadow and editor kit modules with no upstream mention | ShadowLayers constant | owner-decision | - | three.js layer |
+| upstream FEATURESET Stream 51: client/core expression, tree texture, replay, grid, shadow and editor kit modules with no upstream mention | EditorKit dynamic import | owner-decision | - | Editor kit package |
+| upstream FEATURESET Stream 52: client/core dev tools, scene graph, spectator, debug log, frame capture and sculpt overlay modules with no upstream mention | DevToolsIntegration, SceneGraph, SpectatorMode and SculptOverlay | owner-decision | - | Renderer, scene and camera objects |
+| upstream FEATURESET Stream 52: client/core dev tools, scene graph, spectator, debug log, frame capture and sculpt overlay modules with no upstream mention | debug-log namespace reader | owner-decision | - | Reads the browser query string |
+| upstream FEATURESET Stream 52: client/core dev tools, scene graph, spectator, debug log, frame capture and sculpt overlay modules with no upstream mention | frameCapture | owner-decision | - | Canvas capture |
+| upstream FEATURESET Stream 53: client/core worker render protocol, time of day and world panels modules with no upstream mention | WorkerRenderProtocol | owner-decision | - | OffscreenCanvas render worker; transport contract is partial under PARITY row 45 |
+| upstream FEATURESET Stream 53: client/core worker render protocol, time of day and world panels modules with no upstream mention | TimeOfDay | owner-decision | - | Sun and ambient render objects |
+| upstream FEATURESET Stream 53: client/core worker render protocol, time of day and world panels modules with no upstream mention | WorldPanels | owner-decision | - | Canvas panels |
+| upstream FEATURESET Stream 54: client/core fluid surface, mapspinner feasibility probe and static instance store modules with no upstream mention | FluidSurface | owner-decision | - | Fluid solver open (PARITY row 51) |
+| upstream FEATURESET Stream 54: client/core fluid surface, mapspinner feasibility probe and static instance store modules with no upstream mention | MapspinnerWebGPUFeasibility | owner-decision | - | WebGPU probe |
+| upstream FEATURESET Stream 54: client/core fluid surface, mapspinner feasibility probe and static instance store modules with no upstream mention | StaticInstanceStore | owner-decision | - | three.js InstancedMesh and BVH |
+| upstream FEATURESET Stream 55: client/core three VDRS, terrain backdrop and scene setup modules with no upstream mention | ThreeVdrs | owner-decision | - | three.js render |
+| upstream FEATURESET Stream 55: client/core three VDRS, terrain backdrop and scene setup modules with no upstream mention | TerrainBackdrop | owner-decision | - | three.js render |
+| upstream FEATURESET Stream 55: client/core three VDRS, terrain backdrop and scene setup modules with no upstream mention | SceneSetup | owner-decision | - | three.js scene setup |
+| upstream FEATURESET Stream 56: edge Cloudflare Durable Object files with no upstream mention | edge/cf-do files (accept-request, jolt-edge-init, spoint-do, do-client-probe) | owner-decision | - | Cloudflare host (PARITY row 58) |
+| upstream FEATURESET Stream 57: src/sdk modules with no per-file citation | WorldLocator worldRoots | owner-decision | - | Filesystem world discovery |
+| upstream FEATURESET Stream 57: src/sdk modules with no per-file citation | RoomHealth | built | src/sdk/RoomHealth.js; scripts/check-sdk-surfaces.mjs | PARITY row 48 |
+| upstream FEATURESET Stream 57: src/sdk modules with no per-file citation | RoomPick | built | src/sdk/RoomPick.js; scripts/check-sdk-surfaces.mjs | PARITY row 48 |
+| upstream FEATURESET Stream 57: src/sdk modules with no per-file citation | RoomRouting | built | src/sdk/RoomRouting.js; scripts/check-sdk-surfaces.mjs | PARITY row 48 |
+| upstream FEATURESET Stream 57: src/sdk modules with no per-file citation | SceneImport mapSceneObject | missing | - | No decision recorded |
+| upstream FEATURESET Stream 57: src/sdk modules with no per-file citation | TiledImport importTiledMap | missing | - | No decision recorded |
+| upstream FEATURESET Stream 57: src/sdk modules with no per-file citation | scaffold | owner-decision | - | Writes project files; CLI |
+| upstream FEATURESET Stream 58: src/sdk server presence, room directory, agent authoring and nostr auth modules | NostrAuthServer | owner-decision | - | Relay transport (PARITY row 48) |
+| upstream FEATURESET Stream 58: src/sdk server presence, room directory, agent authoring and nostr auth modules | ServerPresence | owner-decision | - | Presence server |
+| upstream FEATURESET Stream 58: src/sdk server presence, room directory, agent authoring and nostr auth modules | RoomDirectory | owner-decision | - | Starts servers (PARITY row 48) |
+| upstream FEATURESET Stream 58: src/sdk server presence, room directory, agent authoring and nostr auth modules | AgentAuthoringAPI | partial | src/sdk/AgentAuthoringAPI.js; scripts/check-sdk-surfaces.mjs | encodeAgentEntity ported; handler owner-decision |
+| upstream FEATURESET Improvement opportunities (not behaviour to match) | SessionStore silent TTL default of 30000 | owner-decision | src/sessions-pure/sessionStore.js | Jayzee keeps the same fallback (options.ttl or default) |
+| upstream FEATURESET Improvement opportunities (not behaviour to match) | StatsSystem silent experience-per-level default of 100 | owner-decision | src/game/StatsSystem.js | Jayzee keeps the fallback |
+| upstream FEATURESET Improvement opportunities (not behaviour to match) | SESCompartmentEvaluator budget check with no caller | owner-decision | src/sandbox/ses.js (defines __checkBudget, no caller); src/sandbox/limits.js; scripts/check-script-limits.mjs | Jayzee copies the uncalled check; the step budget is enforced in limits.js |
+| upstream FEATURESET Improvement opportunities (not behaviour to match) | BakeCodeVersion GLB transform pin inputs | owner-decision | - | Bake pins are not ported |
+| upstream FEATURESET Improvement opportunities (not behaviour to match) | Streams 33 to 35 silent defaults and sentinels (SpawnSurface terrainY, colliderLattice, MinimapBiome, bin env defaults, grass density) | owner-decision | src/sessions-pure/spawnSurface.js (terrainY branch at line 68) | Not improved in jayzee |
+| upstream FEATURESET Improvement opportunities (not behaviour to match) | Streams 36 to 40 silent defaults in render, post-fx and vegetation | owner-decision | - | Render side not ported |
+| upstream FEATURESET Improvement opportunities (not behaviour to match) | Streams 41 to 46 silent defaults in rocks, vegetation, instancing, profiling and scheduling | owner-decision | - | Render side not ported |
+| upstream FEATURESET Improvement opportunities (not behaviour to match) | Streams 47 to 58 silent defaults and sentinels in HUD, edge, scene and sdk | owner-decision | - | Client, edge and host code not ported |
+| upstream FEATURESET Improvement opportunities (not behaviour to match) | LineBasicNodeMaterial linewidth example in the reference | owner-decision | src/upstream-builtins/three.js | Open for upstream; width holds only for Line2NodeMaterial and no witness exists |
+
+Rows: 229. built 46, partial 25, missing 64, owner-decision 94.
+## 4. spoint README features and jayzee-only directories
+
+| Ref | Feature | Status | Jayzee proof | Note |
+|---|---|---|---|---|
+| spoint README Creating apps | App module hooks: server setup, update, onInteract, onCollision; client setup and render | partial | src/apps/hookOrder.js; scripts/check-hook-order.mjs | Hook runner only. onInteract and onCollision are not dispatched. |
+| spoint README Creating apps | bin/create-app.js scaffold | missing | - | No bin/ directory in jayzee. PARITY row 58 names it as spoint tooling. |
+| spoint README Creating apps | Per-app module loaded from apps/<name>/index.js | owner-decision | - | Per-world dynamic import is a host concern, as the README's production build section says. |
+| spoint README World config | port | owner-decision | - | Socket listener. This package runs no server process. |
+| spoint README World config | tickRate | partial | src/tick-pure/tickScheduler.js; scripts/check-tick-scheduler.mjs | The README default of 64 is not pinned by the gate. |
+| spoint README World config | gravity | partial | src/world/World.js; scripts/check-kernel.mjs; scripts/check-world.mjs | Kernel integration is built (row 4). The README default is not checked. |
+| spoint README World config | movement block (maxSpeed, sprintSpeed, accel, friction, stopSpeed, jumpImpulse) | partial | src/motion-pure/movement.js; scripts/check-movement.mjs | Keys are read. The module default maxSpeed is 7.0 against the README's 14. |
+| spoint README World config | player block (health, capsule size, modelScale, feetOffset) | missing | src/player-defaults-pure/playerDefaults.js; - | Module exists, but its values differ from the README (capsule radius 0.4, half height 0.9) and no gate covers it. Status is missing because partial needs a gate. |
+| spoint README World config | scene block (sky colour, sun, sun position) | owner-decision | src/render/index.js; scripts/check-render.mjs | Scene lighting needs WebGL or WebGPU. The gate covers the headless subset only. |
+| spoint README World config | camera block (fov, shoulder offset, zoom stages) | missing | - | No module and no recorded decision. |
+| spoint README World config | entities list (static map model, app entity) | partial | src/stage-pure/stage.js; scripts/check-stage.mjs | Stage shapes are built. GLB loading is partial under row 49. |
+| spoint README World config | playerModel and spawnPoint | partial | src/stage-pure/stage.js; scripts/check-stage.mjs | Fields are stored. VRM loading is host-side. |
+| spoint README Server-Side ctx API | ctx.state, persistent across hot reload | partial | src/persistence-pure/; scripts/check-world-persistence.mjs | Restore is witnessed. Carry-over through hot reload is not. |
+| spoint README Server-Side ctx API | ctx.entity (id, position, velocity, custom, destroy) | missing | - | No entity object module. World holds bodies by index. |
+| spoint README Server-Side ctx API | ctx.physics.addBoxCollider | owner-decision | src/world/World.js; scripts/check-world.mjs | Jolt collider API. The kernel takes boxes, but not through this method. |
+| spoint README Server-Side ctx API | ctx.physics sphere, capsule, trimesh and convex-from-model colliders | owner-decision | src/physics-extras/glb.js; scripts/check-physics-extras.mjs | Jolt bodies. Draco and Meshopt primitives are refused. |
+| spoint README Server-Side ctx API | ctx.interactable (prompt and radius) | missing | - | No module. Interaction has no port. |
+| spoint README Server-Side ctx API | ctx.world spawn, destroy, getEntity, query | partial | src/world/query.js; scripts/check-world-query.mjs | Query is witnessed. Spawn and destroy need an entity model that is not ported. |
+| spoint README Server-Side ctx API | ctx.players getAll, send, broadcast, setPosition | owner-decision | src/netcode/Authority.js; scripts/check-sdk-surfaces.mjs | Sending needs sockets. The ServerAPI routes are open (row 48). |
+| spoint README Server-Side ctx API | ctx.time tick, deltaTime, elapsed, after, every | partial | src/tick-pure/tickScheduler.js; src/behaviours/game-fsm.js; scripts/check-tick-scheduler.mjs; scripts/check-behaviours.mjs | after() runs on an injected clock in the FSM. The ctx.time object is not built. |
+| spoint README Server-Side ctx API | ctx.bus on and emit, with wildcard | missing | - | No event bus module. |
+| spoint README Server-Side ctx API | ctx.lagCompensator.getPlayerStateAtTime | built | src/netcode/lagCompensation.js; scripts/check-lag-compensation.mjs | The 1000 ms window and the 256-sample ring are witnessed (row 10). |
+| spoint README Server-Side ctx API | ctx.raycast(origin, dir, maxDist) | partial | src/world/query.js; scripts/check-world-query.mjs | Raycast is in the query module (row 8 partial). |
+| spoint README Client Engine API | engine.scene, engine.camera, engine.renderer, engine.THREE | owner-decision | src/render/index.js; scripts/check-render.mjs | Needs WebGL or WebGPU and the three.js module. |
+| spoint README Client Engine API | engine.client (network client or in-Worker BrowserServer) | owner-decision | src/client/index.js; scripts/check-client-loops.mjs | Needs sockets or a Worker. |
+| spoint README Client Engine API | engine.playerId | partial | src/game/playerId.js; scripts/check-game-systems.mjs | The gate imports the game barrel. No direct check of the module was found. |
+| spoint README Client Engine API | engine.cam (camera controller) | owner-decision | - | DOM input. No recorded port. |
+| spoint README Client Engine API | engine.players getMesh, getState, getAnimator | owner-decision | src/animation/animationSystem.js; scripts/check-animation.mjs | getMesh needs three.js. The state and animator logic is partial (row 55). |
+| spoint README Editor (in-browser) | P toggles editor mode | owner-decision | - | DOM editor UI (row 39). |
+| spoint README Editor (in-browser) | G, R, S gizmo modes and F focus | owner-decision | - | DOM and three.js gizmo (row 39). |
+| spoint README Editor (in-browser) | Del delete and drag-and-drop .glb placement | owner-decision | - | DOM editor UI. GLB file IO is async and host-side (row 49). |
+| spoint README Singleplayer Mode | ?singleplayer runs the server in a Worker | partial | src/transport/workerTransport.js; src/transport/workerMessages.js; src/worker-dispatch-pure/workerDispatch.js; scripts/check-worker-bridge.mjs; scripts/check-worker-dispatch.mjs | Message dispatch is built. BrowserServer is not ported (row 37). |
+| spoint README Singleplayer Mode | ?world=<name> selection and boot refusal on a bad world module | missing | - | No name-based world resolver found in src/. |
+| spoint README Architecture | server.js entry point | owner-decision | - | Process entry for a host. This package has none. |
+| spoint README Architecture | src/sdk/server.js creates subsystems | partial | src/sdk/index.js; scripts/check-sdk-surfaces.mjs | Non-HTTP surfaces only (row 48). |
+| spoint README Architecture | src/sdk/TickHandler.js per-tick order | partial | src/tick-authority-pure/tickOrder.js; scripts/check-tick-order.mjs | Order is witnessed with injected steps. The physics and collision steps belong to the host (row 18). |
+| spoint README Architecture | src/physics/World.js (Jolt wrapper) | owner-decision | src/world/World.js; scripts/check-world.mjs | Jolt is not in jayzee (row 6). The kernel-backed World replaces it. |
+| spoint README Architecture | src/netcode/PhysicsIntegration.js (CharacterVirtual per player) | owner-decision | src/motion-pure/characterStep.js; scripts/check-character-step.mjs | Jolt CharacterVirtual (row 7 partial). |
+| spoint README Architecture | src/apps/AppRuntime.js lifecycle | partial | src/apps/hookOrder.js; scripts/check-hook-order.mjs | Hook order only. The entity system is not ported. |
+| spoint README Architecture | client/app.js (three.js renderer, VRM, input loop) | owner-decision | src/render/index.js; scripts/check-render.mjs | DOM, three.js and VRM. |
+| spoint README Architecture | client/BrowserServer.js | owner-decision | src/transport/workerTransport.js; scripts/check-worker-bridge.mjs | Worker host. Not ported (row 37). |
+| spoint README Production Build | npm run build:client (esbuild bundle of client/app.js) | owner-decision | scripts/build-site.mjs; scripts/check-site.mjs | Jayzee's site build is its own bundle. The spoint client bundle needs esbuild and the DOM. |
+| spoint README Production Build | buildStaticDirs mounts dist/client ahead of the raw client | owner-decision | - | HTTP static handler (row 48 open). |
+| spoint README Production Build | Externals (three, mapspinner, jolt-physics) and dynamic world imports | owner-decision | - | Packaging is a host concern. This package has no client bundler step. |
+| spoint README Publishing | node scripts/static-export.mjs (itch.io and GitHub Pages export) | partial | scripts/build-site.mjs; scripts/check-site.mjs | Jayzee's static COI site is gated. Spoint's app export is not ported. |
+| spoint README Publishing | docs/publish.md recipe, base-path handling, verification steps | owner-decision | - | Deploy host decision. |
+| jayzee-only src/apps | Hook order runner (onSpawn, onInput, update, lateUpdate) | built | src/apps/hookOrder.js; scripts/check-hook-order.mjs | Spawn-derived (learnings 69 to 74). Spoint's AppRuntime.js is the reference. |
+| jayzee-only src/bundle | Jayzee's own freshness stamp | partial | src/bundle/freshness.js; src/bundle/index.js; scripts/check-bundle-freshness.mjs | Spoint's bundle gate is not ported (row 58). |
+| jayzee-only src/kernel | Integer wasm physics kernel | built | src/kernel/; scripts/build-kernel.mjs; scripts/check-kernel.mjs; scripts/check-world.mjs | Rows 4 and 5. No spoint counterpart, since spoint uses Jolt. |
+| jayzee-only src/sandbox | Script limits and fail-closed evaluator | built | src/sandbox/limits.js; src/sandbox/index.js; scripts/check-sandbox.mjs; scripts/check-script-limits.mjs | limits.js is spawn-only (row 32). The evaluator ports spoint's SESCompartmentEvaluator (row 36). |
+| jayzee-only src/spawn | Spawn feed, head, ledger keys and named errors | built | src/spawn/; scripts/check-spawn.mjs; scripts/check-spawn-named-errors.mjs; scripts/check-named-asset-redirect.mjs | Spawn-only. No spoint path (rows 59 and 60). |
+| jayzee-only src/upstream | Upstream endpoint catalog | partial | src/upstream/endpoints.js; src/upstream/index.js; scripts/check-upstream-endpoints.mjs | Catalog only. Jayzee serves no HTTP (row 65 open). |
+| jayzee-only src/upstream-builtins | Upstream builtin modules, 21 served names | partial | src/upstream-builtins/; scripts/check-upstream-builtins.mjs; scripts/check-upstream-builtin*.mjs | Row 64 open. Bodies are bound by digest. Most calls are scoped negatives that refuse. |
+| jayzee-only src/upstream-doors | Upstream HTTP door catalog and dispatch | built | src/upstream-doors/; scripts/check-upstream-doors.mjs; scripts/check-upstream-door-routes.mjs; scripts/check-upstream-door-dispatch.mjs | Built for catalog counts and dispatch rules (row 61). |
+| jayzee-only src/upstream-reference | Upstream reference file counts | partial | src/upstream-reference/; scripts/check-upstream-reference.mjs | Row 65 open. The 62-path header count is not reconciled. |
+| jayzee-only src/upstream-skills | Upstream served skills | partial | src/upstream-skills/; scripts/check-upstream-skills.mjs; scripts/check-upstream-skill-bodies.mjs; scripts/check-upstream-skill-registry.mjs | Row 63 open. 23 served skills, 47 directory entries. |
+| jayzee-only src/upstream-tome | Upstream tome API index and section lookup | built | src/upstream-tome/; scripts/check-upstream-tome.mjs; scripts/check-upstream-tome-lookup.mjs; scripts/check-upstream-tome-bodies.mjs | Built for index counts and lookup (row 62). |
+| jayzee-only src/world | Kernel-backed World and queries | partial | src/world/World.js; src/world/query.js; scripts/check-world.mjs; scripts/check-world-query.mjs | Row 4 is built. Rows 8 and 33 are partial. Replaces spoint's Jolt physics/World.js. |
+
+Rows: 58. Built: 7. Partial: 22. Missing: 7. Owner-decision: 22. Slice A is 46 rows and slice B is 12 rows. Read-only slice: nothing was written, edited or committed, and npm test was not run.
+## 5. Totals
+
+| Source | Rows | built | partial | missing | owner-decision |
+|---|---|---|---|---|---|
+| Upstream gap register | 67 | 23 | 16 | 0 | 28 |
+| 2. spoint FEATURES.md rows 1 to 60 | 60 | 44 | 8 | 5 | 3 |
+| 2. spoint FEATURES.md rows 61 to 120 | 60 | 28 | 10 | 6 | 16 |
+| 2. spoint FEATURES.md rows 121 to 176 (mapspinner) | 56 | 6 | 6 | 4 | 40 |
+| 3. upstream FEATURESET streams 11 to 27 (plus stream 17 subsections, spawn learning and migrators) | 153 | 59 | 26 | 34 | 34 |
+| 3. upstream FEATURESET streams 18 to 58 and improvement items | 229 | 46 | 25 | 64 | 94 |
+| 4. spoint README features and jayzee-only directories | 58 | 7 | 22 | 7 | 22 |
+
+## 6. Reconciliation and open items
+
+- spoint docs/FEATURES.md is present in the spoint checkout and was used as a source for section 2. It covers netcode, protocol, client, sharding, static, animation and mapspinner only. Other spoint areas (physics, apps, behaviours, terrain, editor, SDK, edge) are covered in section 3 through the upstream streams, and section 4 through the README.
+- The census statuses in sections 2 to 4 are the owners' readings from the sources. Each proof path was checked to exist. The gate scripts named in the proof column were not all re-run for this ledger; npm test runs the gates in the package.json chain.
+- 120 rows are missing, which means no jayzee module and no recorded decision. Those rows are open work, not owner decisions. The done condition is not met until each is either implemented with a gate or assigned an owner decision.
+- 209 rows are owner-decision. They need a host, a licence, a Jolt, DOM, WebGPU, socket or worker dependency, or evidence the owner must supply.
+- The upstream gap register rows (section 1) are the implementation queue. Their statuses come from docs/PARITY.md at this commit.
