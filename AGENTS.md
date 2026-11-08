@@ -141,3 +141,5 @@ Non-obvious facts for automated edits. Architecture and measured costs live in d
 - `applyChartTransfer` in `src/netcode/lagChartTransfer.js` checks the transfer for `point`, `vec` and `look` before it moves anything, so a bad transfer leaves the history on one chart. spoint throws partway through and leaves the history split.
 - `PredictionEngine` takes two required clocks, `options.now` (knockback window, default `recordKnockback` time) and `options.renderNow` (reconciliation decay), and throws a TypeError without either.
 - The first `getRenderState` after a correction shows the whole offset, because `ReconciliationEngine#decay` treats its first call as zero elapsed time.
+- `SnapshotProcessor` refuses a player record that is not 22 bytes and an entity record that is not 29 bytes with a RangeError, where spoint reads a truncated record silently.
+- `SnapshotProcessor` reads its injected `now` only when a snapshot timestamp is missing or 0, as spoint does, and throws a TypeError when no clock was given.
