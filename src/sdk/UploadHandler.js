@@ -1,4 +1,6 @@
-import { extname } from 'node:path'
+import { createWriteStream, existsSync, mkdirSync, renameSync, unlinkSync } from 'node:fs'
+import { randomUUID } from 'node:crypto'
+import { extname, resolve } from 'node:path'
 
 export const UPLOAD_MAX_BYTES = 50 * 1024 * 1024
 
@@ -102,5 +104,79 @@ export class MultipartUploadParser {
       buf = buf.subarray(boundaryPos)
       this.state = STATE_HEADERS
     }
+  }
+}
+
+export function createUploadHandler({ modelsDir }) {
+  const dir = resolve(modelsDir)
+  mkdirSync(dir, { recursive: true })
+
+  return function handleUpload(req, res) {
+    const boundary = uploadBoundary(req.headers['content-type'])
+    if (boundary === null) { res.writeHead(400); res.end('no boundary'); return }
+
+    const tmpPath = resolve(dir, randomUUID() + '.part')
+    const removeTmp = () => { if (existsSync(tmpPath)) unlinkSync(tmpPath) }
+    const upload = { finished: false, size: 0, filename: null, writeStream: null, head: Buffer.alloc(0), headChecked: false }
+    const parser = new MultipartUploadParser(boundary)
+
+    const fail = (status, message) => {
+      if (upload.finished) return
+      upload.finished = true
+      const reply = () => { res.writeHead(status); res.end(message); req.destroy() }
+      if (upload.writeStream && !upload.writeStream.closed) {
+        upload.writeStream.once('close', () => { removeTmp(); reply() })
+        upload.writeStream.destroy()
+      } else {
+        removeTmp()
+        reply()
+      }
+    }
+
+    parser.onFileStart = (name) => {
+      upload.filename = name
+      if (uploadExtension(name) === null) { fail(400, 'invalid type'); return }
+      upload.writeStream = createWriteStream(tmpPath)
+      upload.writeStream.on('error', () => fail(500, 'error'))
+    }
+    parser.onFileData = (chunk) => {
+      if (upload.finished || !upload.writeStream) return
+      upload.size += chunk.length
+      if (uploadTooLarge(upload.size)) { fail(413, 'too large'); return }
+      if (!upload.headChecked) {
+        upload.head = Buffer.concat([upload.head, chunk])
+        if (upload.head.length >= MAGIC_SNIFF_BYTES || parser.fileEnded) {
+          upload.headChecked = true
+          if (!uploadHeadAccepted(uploadExtension(upload.filename), upload.head)) { fail(400, 'invalid file content'); return }
+        }
+      }
+      upload.writeStream.write(chunk)
+    }
+
+    req.on('data', (chunk) => {
+      if (upload.finished) return
+      try { parser.write(chunk) } catch { fail(400, 'malformed multipart body') }
+    })
+    req.on('end', () => {
+      if (upload.finished) return
+      if (upload.filename === null) { fail(400, 'no file'); return }
+      if (!upload.headChecked && !uploadHeadAccepted(uploadExtension(upload.filename), upload.head)) { fail(400, 'invalid file content'); return }
+      upload.writeStream.end(() => {
+        if (upload.finished) return
+        upload.finished = true
+        const name = randomUUID() + uploadExtension(upload.filename)
+        try {
+          renameSync(tmpPath, resolve(dir, name))
+        } catch {
+          removeTmp()
+          res.writeHead(500)
+          res.end('error')
+          return
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ url: '/data/models/' + name }))
+      })
+    })
+    req.on('error', () => fail(500, 'error'))
   }
 }
