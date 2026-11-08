@@ -1,0 +1,109 @@
+{
+  "source": "spoint src/apps/AppLoader.js: watchAll, debounce 100 ms, onFileChange, stopWatching",
+  "initial": [
+    {
+      "name": "flat",
+      "label": "v1"
+    },
+    {
+      "name": "folder",
+      "label": "f1"
+    }
+  ],
+  "steps": [
+    {
+      "step": "two writes inside the debounce window reload once",
+      "reloads": [
+        {
+          "name": "flat",
+          "label": "v2"
+        }
+      ],
+      "clientReloads": [
+        {
+          "name": "flat",
+          "code": "export default { label: 'v2' }\n"
+        }
+      ],
+      "trees": [
+        "flat.js"
+      ]
+    },
+    {
+      "step": "an edit to a folder app reloads the folder by name",
+      "reloads": [
+        {
+          "name": "folder",
+          "label": "f2"
+        }
+      ],
+      "clientReloads": [
+        {
+          "name": "folder",
+          "code": "export default { label: 'f2' }\n"
+        }
+      ],
+      "trees": [
+        "folder/index.js"
+      ]
+    },
+    {
+      "step": "a nested non-index file reloads its folder app",
+      "reloads": [
+        {
+          "name": "folder",
+          "label": "f2"
+        }
+      ],
+      "clientReloads": [
+        {
+          "name": "folder",
+          "code": "export default { label: 'f2' }\n"
+        }
+      ],
+      "trees": [
+        "folder/helper.js"
+      ]
+    },
+    {
+      "step": "a non-js file is reported and reloads nothing",
+      "reloads": [],
+      "clientReloads": [],
+      "trees": [
+        "notes.txt"
+      ]
+    },
+    {
+      "step": "a refused source is not reloaded",
+      "reloads": [],
+      "clientReloads": [],
+      "trees": [
+        "flat.js"
+      ]
+    },
+    {
+      "step": "the next valid edit loads the new source, not a cached module",
+      "reloads": [
+        {
+          "name": "flat",
+          "label": "v3"
+        }
+      ],
+      "clientReloads": [
+        {
+          "name": "flat",
+          "code": "export default { label: 'v3' }\n"
+        }
+      ],
+      "trees": [
+        "flat.js"
+      ]
+    },
+    {
+      "step": "an edit after stopWatching reloads nothing",
+      "reloads": [],
+      "clientReloads": [],
+      "trees": []
+    }
+  ]
+}

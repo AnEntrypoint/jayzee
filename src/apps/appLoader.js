@@ -5,14 +5,18 @@ const BLOCKED_PATTERNS = [
 
 const REFUSAL_BLOCKED_PATTERN = 'app-source-blocked-pattern'
 
+const FILE_CHANGE_DEBOUNCE_MS = 100
+
 const byName = (a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0)
 
-export function createAppLoader({ runtime, host, dirs = ['./apps'], log = console }) {
+export function createAppLoader({ runtime, host, dirs = ['./apps'], log = console, onReload = null, onTreeChange = null }) {
   if (typeof runtime?.registerApp !== 'function') throw new TypeError('createAppLoader needs runtime.registerApp')
   for (const method of ['join', 'exists', 'readFile', 'listDir', 'importModule']) {
     if (typeof host?.[method] !== 'function') throw new TypeError('createAppLoader needs host.' + method)
   }
   const loaded = new Map()
+  const watchers = []
+  const debounceTimers = new Map()
 
   function validate(source, name) {
     for (const pattern of BLOCKED_PATTERNS) {
@@ -95,12 +99,62 @@ export function createAppLoader({ runtime, host, dirs = ['./apps'], log = consol
     return appDef
   }
 
+  function nameOfChange(filename) {
+    const parts = filename.replace(/\\/g, '/').split('/')
+    return parts.length > 1 ? parts[0] : parts[0].slice(0, -3)
+  }
+
+  async function reloadApp(name) {
+    log.log('[AppLoader] reloading ' + name)
+    const appDef = await loadApp(name)
+    if (!appDef) return
+    runtime.queueReload(name, appDef, onReload ? (n) => onReload(n, loaded.get(n)?.clientCode) : null)
+    log.log('[AppLoader] queued hot reload ' + name)
+  }
+
+  function debounceFileChange(name) {
+    if (debounceTimers.has(name)) host.clearTimer(debounceTimers.get(name))
+    const timer = host.setTimer(() => {
+      debounceTimers.delete(name)
+      reloadApp(name).catch((error) => log.error('[AppLoader] reload error for ' + name + ': ' + error.message))
+    }, FILE_CHANGE_DEBOUNCE_MS)
+    debounceTimers.set(name, timer)
+  }
+
+  function onWatchEvent(filename) {
+    if (onTreeChange) onTreeChange(filename)
+    if (!filename.endsWith('.js')) return
+    debounceFileChange(nameOfChange(filename))
+  }
+
+  async function watchAll() {
+    if (typeof host.watch !== 'function' || typeof host.setTimer !== 'function' || typeof host.clearTimer !== 'function') {
+      throw new TypeError('watchAll needs host.watch, host.setTimer and host.clearTimer')
+    }
+    if (typeof runtime.queueReload !== 'function') throw new TypeError('watchAll needs runtime.queueReload')
+    for (const dir of dirs) {
+      if (!(await host.exists(dir))) {
+        log.debug('[AppLoader] skipping watch for missing directory: ' + dir)
+        continue
+      }
+      watchers.push(host.watch(dir, onWatchEvent, (error) => log.error('[AppLoader] watch error: ' + error.message)))
+    }
+  }
+
+  function stopWatching() {
+    for (const stop of watchers.splice(0)) stop()
+    for (const timer of debounceTimers.values()) host.clearTimer(timer)
+    debounceTimers.clear()
+  }
+
   return {
     loadAll,
     loadApp,
     loadFromModule,
     resolvePath,
     validate,
+    watchAll,
+    stopWatching,
     getLoaded: () => Array.from(loaded.keys()),
     getClientModules() {
       const modules = {}
