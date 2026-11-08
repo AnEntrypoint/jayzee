@@ -88,6 +88,7 @@ Non-obvious facts for automated edits. Architecture and measured costs live in d
 - `TransformRingWriter` refuses a write or release while the ring generation is odd. `readCut` over a locked ring returns `consistent: false` and marks its poses stale.
 - `src/transport/wireweaveFraming.js` frames items with big-endian lengths. The gate checks a payload that starts with the batch prefix only when it is sent alone, not when it is joined with others.
 - `src/transport/webTransportPolicy.js` uses port 4433 unless a port is given. The error backoff starts at 10 ms, doubles, and stops at 1000 ms.
+- `applyMovement` in `src/motion-pure/movement.js` fires a buffered jump only on a tick that carries an input object, as spoint does. A `null` input skips the buffer, so a host that lands with no input object keeps the jump armed until the next input.
 - `src/animation/locomotion.js` exports `LAND_DELAY_MS` (500), but no transition reads it. A jump lands on the first grounded tick whose vertical velocity is at or below zero. `settledState` returns null for a NaN speed.
 - `src/animation/blend.js` floors the 2D sample distance at 0.01 and gives weight only to the three nearest samples. Without the floor, a query on a sample would take nearly all the weight.
 - `checkFreshness` in `src/bundle/freshness.js` reports the first source that is `added`, `changed` or `removed`, and it throws on a missing or duplicate source path. A stamp must be version 1. Content is hashed as given, so a string and its UTF-8 bytes have the same digest.
