@@ -89,6 +89,7 @@
     "check:clusters": "node scripts/check-clusters.mjs",
     "check:tick-authority": "node scripts/check-tick-authority.mjs",
     "check:tick-order": "node scripts/check-tick-order.mjs",
+    "check:marching-drift": "node scripts/check-marching-drift.mjs",
     "check:row16-client-decoder": "node scripts/check-row16-client-decoder.mjs",
     "check:animation-control": "node scripts/check-animation-control.mjs",
     "check:animation-rig": "node scripts/check-animation-rig.mjs",
