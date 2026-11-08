@@ -146,3 +146,5 @@ Non-obvious facts for automated edits. Architecture and measured costs live in d
 - `createTerrainReanchor` in `src/terrain-pure/chartReanchorTerrain.js` throws a TypeError without a `now()` clock. spoint `createFieldLattice` is not ported, so a migrate needs a lattice passed in.
 - `createChartReanchorService` runs every terrain migrator before any state migrator. The first terrain gate that refuses leaves the frame unchanged and is tallied under its reason.
 - `scripts/fixtures/spoint/cluster-handoff.json` is written by `node scripts/gen-cluster-handoff-fixture.mjs [spointRoot]`. spoint `ClusterHandoff` cannot be imported in Node as it is, because `RegionRouter.js` pulls in the HTTP server and three.js, so the generator loads only a slice of it.
+- The atmosphere modules in `src/packages/mapspinner` work in kilometres (`ATM_BOTTOM` 6360, `ATM_TOP` 6500), not the metres of `PLANET_RADIUS_M`.
+- `scripts/check-mapspinner-fields.mjs` imports spoint from `/workspace/spoint`, so it is a script rather than part of `npm test`.
