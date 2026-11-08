@@ -112,7 +112,7 @@ Every row id from the upstream register appears below as row N. Titles and gate 
 | spoint FEATURES row 23 | Event log | built | src/anticheat/EventLog.js; scripts/check-event-log.mjs | |
 | spoint FEATURES row 24 | Snapshot encoder with self block and tombstones | built | src/snapshot-lod-pure/snapshotEncoder.js, src/snapshot-lod-pure/selfBlock.js; scripts/check-snapshot-lod.mjs | |
 | spoint FEATURES row 25 | Player LOD tiers (full and reduced) | built | src/snapshot-lod-pure/playerLod.js, src/snapshot-lod-pure/snapshotEncoder.js; scripts/check-snapshot-lod.mjs | classifyPlayerTiers |
-| spoint FEATURES row 26 | Binary snapshot records (full and reduced pose) | partial | src/wire/binSnapshot.js; scripts/check-bin-snapshot.mjs | Full 29 and 22 byte records built; reduced pose is a msgpack tuple and stays open (PARITY row 40) |
+| spoint FEATURES row 26 | Binary snapshot records (full and reduced pose) | built | src/wire/binSnapshot.js; scripts/check-bin-snapshot.mjs; scripts/check-reduced-pose.mjs | Full 29 and 22 byte records built. The reduced pose tuple is gated against spoint packReducedPlayerPose and its msgpack bytes (scripts/fixtures/spoint/reduced-pose.json): the bytes match for the five fixture poses. The standard pack is not byte-compatible with msgpackr in general, so the shipped packer stays open (PARITY row 40). |
 | spoint FEATURES row 27 | Snapshot packer | owner-decision | - | Spoint packs with msgpackr-backed pack; msgpackr is a devDependency held pending the owner's licence decision |
 | spoint FEATURES row 28 | Teleport hold | built | src/sessions-pure/teleportHold.js; scripts/check-sessions.mjs, scripts/check-tick-authority.mjs | |
 | spoint FEATURES row 29 | Peer simulation session | partial | src/lockstep-pure/peerSimSession.js, src/rollback-pure/peerSimRuntime.js; scripts/check-lockstep.mjs, scripts/check-rollback-peer.mjs | Lockstep path built; rollback capture and apply need a host and are not wired (PARITY row 12) |
@@ -740,7 +740,7 @@ Rows: 58. Built: 7. Partial: 22. Missing: 7. Owner-decision: 22. Slice A is 46 r
 | Source | Rows | built | partial | missing | owner-decision |
 |---|---|---|---|---|---|
 | Upstream gap register | 67 | 23 | 16 | 0 | 28 |
-| 2. spoint FEATURES.md rows 1 to 60 | 60 | 46 | 8 | 0 | 6 |
+| 2. spoint FEATURES.md rows 1 to 60 | 60 | 47 | 7 | 0 | 6 |
 | 2. spoint FEATURES.md rows 61 to 120 | 60 | 31 | 10 | 0 | 19 |
 | 2. spoint FEATURES.md rows 121 to 176 (mapspinner) | 56 | 7 | 6 | 0 | 43 |
 | 3. upstream FEATURESET streams 11 to 27 (plus stream 17 subsections, spawn learning and migrators) | 153 | 90 | 25 | 0 | 38 |

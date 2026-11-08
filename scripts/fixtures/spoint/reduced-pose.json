@@ -1,0 +1,149 @@
+{
+  "source": "spoint src/netcode/SnapshotBinFormat.js packReducedPlayerPose and unpackReducedPlayerPose; spoint src/protocol/msgpack.js pack",
+  "cases": [
+    {
+      "input": {
+        "id": 1,
+        "x": 0,
+        "z": 0,
+        "yawN": 0
+      },
+      "tuple": [
+        1,
+        0,
+        0,
+        0,
+        1
+      ],
+      "hex": "950100000001",
+      "decoded": {
+        "id": 1,
+        "x": 0,
+        "z": 0,
+        "yawN": 0,
+        "tier": 1
+      }
+    },
+    {
+      "input": {
+        "id": 7,
+        "x": 12.34,
+        "z": -5.67,
+        "yawN": 128
+      },
+      "tuple": [
+        7,
+        1234,
+        -567,
+        128,
+        1
+      ],
+      "hex": "9507cd04d2d1fdc9cc8001",
+      "decoded": {
+        "id": 7,
+        "x": 12.34,
+        "z": -5.67,
+        "yawN": 128,
+        "tier": 1
+      }
+    },
+    {
+      "input": {
+        "id": 300,
+        "x": -1000.5,
+        "z": 1000.25,
+        "yawN": 255
+      },
+      "tuple": [
+        300,
+        -100050,
+        100025,
+        255,
+        1
+      ],
+      "hex": "95cd012cd2fffe792ece000186b9ccff01",
+      "decoded": {
+        "id": 300,
+        "x": -1000.5,
+        "z": 1000.25,
+        "yawN": 255,
+        "tier": 1
+      }
+    },
+    {
+      "input": {
+        "id": 65536,
+        "x": 0.01,
+        "z": -0.01,
+        "yawN": 1
+      },
+      "tuple": [
+        65536,
+        1,
+        -1,
+        1,
+        1
+      ],
+      "hex": "95ce0001000001ff0101",
+      "decoded": {
+        "id": 65536,
+        "x": 0.01,
+        "z": -0.01,
+        "yawN": 1,
+        "tier": 1
+      }
+    },
+    {
+      "input": {
+        "id": 2,
+        "x": 21474836.47,
+        "z": -21474836.47,
+        "yawN": 0
+      },
+      "tuple": [
+        2,
+        2147483647,
+        -2147483647,
+        0,
+        1
+      ],
+      "hex": "9502ce7fffffffd2800000010001",
+      "decoded": {
+        "id": 2,
+        "x": 21474836.47,
+        "z": -21474836.47,
+        "yawN": 0,
+        "tier": 1
+      }
+    }
+  ],
+  "errors": [
+    {
+      "input": {
+        "id": 3,
+        "x": "NaN",
+        "z": 0,
+        "yawN": 0
+      },
+      "error": "RangeError"
+    },
+    {
+      "input": {
+        "id": 4,
+        "x": 0,
+        "z": 21474836.48,
+        "yawN": 0
+      },
+      "error": "RangeError"
+    },
+    {
+      "input": {
+        "id": 5,
+        "x": "Infinity",
+        "z": 0,
+        "yawN": 0
+      },
+      "error": "RangeError"
+    }
+  ]
+}
