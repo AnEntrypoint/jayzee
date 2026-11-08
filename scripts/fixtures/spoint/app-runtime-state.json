@@ -1,0 +1,2727 @@
+{
+  "generatedFrom": "spoint src/apps/AppRuntimeState.js (tagAppState, untagAppState) and src/apps/AppRuntimeStaticMotion.js (captureTransform, mixinStaticMotion)",
+  "tags": [
+    {
+      "name": "tag: null, undefined, 0, empty string, false and NaN return null",
+      "op": "tag",
+      "input": null,
+      "expect": {
+        "value": null
+      }
+    },
+    {
+      "name": "tag: undefined input returns null",
+      "op": "tag",
+      "input": {
+        "$undef": true
+      },
+      "expect": {
+        "value": null
+      }
+    },
+    {
+      "name": "tag: zero input returns null",
+      "op": "tag",
+      "input": 0,
+      "expect": {
+        "value": null
+      }
+    },
+    {
+      "name": "tag: empty string input returns null",
+      "op": "tag",
+      "input": "",
+      "expect": {
+        "value": null
+      }
+    },
+    {
+      "name": "tag: false input returns null",
+      "op": "tag",
+      "input": false,
+      "expect": {
+        "value": null
+      }
+    },
+    {
+      "name": "tag: NaN input returns null",
+      "op": "tag",
+      "input": {
+        "$num": "NaN"
+      },
+      "expect": {
+        "value": null
+      }
+    },
+    {
+      "name": "tag: a Map and a Set keep insertion order",
+      "op": "tag",
+      "input": {
+        "m": {
+          "$map": [
+            [
+              "a",
+              1
+            ],
+            [
+              "b",
+              2
+            ]
+          ]
+        },
+        "s": {
+          "$set": [
+            3,
+            4
+          ]
+        },
+        "n": 5
+      },
+      "expect": {
+        "value": {
+          "m": {
+            "__type": "Map",
+            "entries": [
+              [
+                "a",
+                1
+              ],
+              [
+                "b",
+                2
+              ]
+            ]
+          },
+          "s": {
+            "__type": "Set",
+            "values": [
+              3,
+              4
+            ]
+          },
+          "n": 5
+        }
+      }
+    },
+    {
+      "name": "tag: a Map nested in a Map entry and a Set nested in that",
+      "op": "tag",
+      "input": {
+        "$map": [
+          [
+            "outer",
+            {
+              "$map": [
+                [
+                  "inner",
+                  {
+                    "$set": [
+                      "x"
+                    ]
+                  }
+                ]
+              ]
+            }
+          ]
+        ]
+      },
+      "expect": {
+        "value": {
+          "__type": "Map",
+          "entries": [
+            [
+              "outer",
+              {
+                "__type": "Map",
+                "entries": [
+                  [
+                    "inner",
+                    {
+                      "__type": "Set",
+                      "values": [
+                        "x"
+                      ]
+                    }
+                  ]
+                ]
+              }
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "name": "tag: an object key in a Map is kept as an object",
+      "op": "tag",
+      "input": {
+        "$map": [
+          [
+            {
+              "k": 1
+            },
+            2
+          ]
+        ]
+      },
+      "expect": {
+        "value": {
+          "__type": "Map",
+          "entries": [
+            [
+              {
+                "k": 1
+              },
+              2
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "name": "tag: undefined object values are dropped",
+      "op": "tag",
+      "input": {
+        "a": {
+          "$undef": true
+        },
+        "b": 1
+      },
+      "expect": {
+        "value": {
+          "b": 1
+        }
+      }
+    },
+    {
+      "name": "tag: undefined array items become null",
+      "op": "tag",
+      "input": [
+        {
+          "$undef": true
+        },
+        2
+      ],
+      "expect": {
+        "value": [
+          null,
+          2
+        ]
+      }
+    },
+    {
+      "name": "tag: NaN in a plain object becomes null",
+      "op": "tag",
+      "input": {
+        "x": {
+          "$num": "NaN"
+        }
+      },
+      "expect": {
+        "value": {
+          "x": null
+        }
+      }
+    },
+    {
+      "name": "tag: an empty Map and an empty Set",
+      "op": "tag",
+      "input": {
+        "m": {
+          "$map": []
+        },
+        "s": {
+          "$set": []
+        }
+      },
+      "expect": {
+        "value": {
+          "m": {
+            "__type": "Map",
+            "entries": []
+          },
+          "s": {
+            "__type": "Set",
+            "values": []
+          }
+        }
+      }
+    },
+    {
+      "name": "tag: a Date is serialised by its toJSON",
+      "op": "tag",
+      "input": {
+        "d": {
+          "$date": "2026-01-02T03:04:05.000Z"
+        }
+      },
+      "expect": {
+        "value": {
+          "d": "2026-01-02T03:04:05.000Z"
+        }
+      }
+    },
+    {
+      "name": "tag: a function at the top level throws SyntaxError",
+      "op": "tag",
+      "input": {
+        "$fn": true
+      },
+      "expect": {
+        "throws": "SyntaxError"
+      }
+    },
+    {
+      "name": "untag: null, undefined, 0, empty string, false and NaN return null",
+      "op": "untag",
+      "input": null,
+      "expect": {
+        "value": null
+      }
+    },
+    {
+      "name": "untag: undefined input returns null",
+      "op": "untag",
+      "input": {
+        "$undef": true
+      },
+      "expect": {
+        "value": null
+      }
+    },
+    {
+      "name": "untag: zero input returns null",
+      "op": "untag",
+      "input": 0,
+      "expect": {
+        "value": null
+      }
+    },
+    {
+      "name": "untag: empty string input returns null",
+      "op": "untag",
+      "input": "",
+      "expect": {
+        "value": null
+      }
+    },
+    {
+      "name": "untag: false input returns null",
+      "op": "untag",
+      "input": false,
+      "expect": {
+        "value": null
+      }
+    },
+    {
+      "name": "untag: NaN input returns null",
+      "op": "untag",
+      "input": {
+        "$num": "NaN"
+      },
+      "expect": {
+        "value": null
+      }
+    },
+    {
+      "name": "untag: a tagged Map holding a tagged Set is restored",
+      "op": "untag",
+      "input": {
+        "__type": "Map",
+        "entries": [
+          [
+            "k",
+            {
+              "__type": "Set",
+              "values": [
+                1,
+                2
+              ]
+            }
+          ]
+        ]
+      },
+      "expect": {
+        "value": {
+          "$map": [
+            [
+              "k",
+              {
+                "$set": [
+                  1,
+                  2
+                ]
+              }
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "name": "untag: a Map entries field that is not an array stays plain",
+      "op": "untag",
+      "input": {
+        "__type": "Map",
+        "entries": "not-an-array"
+      },
+      "expect": {
+        "value": {
+          "__type": "Map",
+          "entries": "not-an-array"
+        }
+      }
+    },
+    {
+      "name": "untag: a Set values field that is not an array stays plain",
+      "op": "untag",
+      "input": {
+        "__type": "Set",
+        "values": {
+          "0": 1
+        }
+      },
+      "expect": {
+        "value": {
+          "__type": "Set",
+          "values": {
+            "0": 1
+          }
+        }
+      }
+    },
+    {
+      "name": "untag: extra keys on a tagged Map are dropped",
+      "op": "untag",
+      "input": {
+        "__type": "Map",
+        "entries": [
+          [
+            "a",
+            1
+          ]
+        ],
+        "extra": 2
+      },
+      "expect": {
+        "value": {
+          "$map": [
+            [
+              "a",
+              1
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "name": "untag: a Map entry that is not a pair throws TypeError",
+      "op": "untag",
+      "input": {
+        "__type": "Map",
+        "entries": [
+          1,
+          2
+        ]
+      },
+      "expect": {
+        "throws": "TypeError"
+      }
+    },
+    {
+      "name": "untag: a live Map is serialised to an empty object first",
+      "op": "untag",
+      "input": {
+        "$map": [
+          [
+            "a",
+            1
+          ]
+        ]
+      },
+      "expect": {
+        "value": {}
+      }
+    },
+    {
+      "name": "untag: a plain number passes through",
+      "op": "untag",
+      "input": 5,
+      "expect": {
+        "value": 5
+      }
+    },
+    {
+      "name": "untag: a plain object with no tags passes through",
+      "op": "untag",
+      "input": {
+        "a": [
+          1,
+          {
+            "b": "c"
+          }
+        ]
+      },
+      "expect": {
+        "value": {
+          "a": [
+            1,
+            {
+              "b": "c"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "roundtrip: a Map and a Set with nesting survive tag then untag",
+      "op": "roundtrip",
+      "input": {
+        "m": {
+          "$map": [
+            [
+              "a",
+              {
+                "$set": [
+                  1,
+                  2
+                ]
+              }
+            ]
+          ]
+        },
+        "n": [
+          1,
+          "two"
+        ]
+      },
+      "expect": {
+        "value": {
+          "m": {
+            "$map": [
+              [
+                "a",
+                {
+                  "$set": [
+                    1,
+                    2
+                  ]
+                }
+              ]
+            ]
+          },
+          "n": [
+            1,
+            "two"
+          ]
+        }
+      }
+    },
+    {
+      "name": "roundtrip: a top-level Map survives tag then untag",
+      "op": "roundtrip",
+      "input": {
+        "$map": [
+          [
+            1,
+            "one"
+          ],
+          [
+            2,
+            "two"
+          ]
+        ]
+      },
+      "expect": {
+        "value": {
+          "$map": [
+            [
+              1,
+              "one"
+            ],
+            [
+              2,
+              "two"
+            ]
+          ]
+        }
+      }
+    }
+  ],
+  "captures": [
+    {
+      "name": "captureTransform: an all-zero pose on a zeroed snapshot reports no change",
+      "xfLength": 11,
+      "preset": null,
+      "steps": [
+        {
+          "e": {
+            "position": [
+              0,
+              0,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              0,
+              0,
+              0
+            ]
+          }
+        }
+      ],
+      "expect": [
+        {
+          "ret": false,
+          "xf": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "name": "captureTransform: first pose reports a change, the same pose does not, and each component change is seen",
+      "xfLength": 11,
+      "preset": null,
+      "steps": [
+        {
+          "e": {
+            "position": [
+              1,
+              2,
+              3
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          }
+        },
+        {
+          "e": {
+            "position": [
+              1,
+              2,
+              3
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          }
+        },
+        {
+          "e": {
+            "position": [
+              1.5,
+              2,
+              3
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          }
+        },
+        {
+          "e": {
+            "position": [
+              1.5,
+              2,
+              3
+            ],
+            "rotation": [
+              0,
+              0,
+              0.1,
+              1
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          }
+        },
+        {
+          "e": {
+            "position": [
+              1.5,
+              2,
+              3
+            ],
+            "rotation": [
+              0,
+              0,
+              0.1,
+              1
+            ],
+            "scale": [
+              1,
+              1,
+              2
+            ]
+          }
+        },
+        {
+          "e": {
+            "position": [
+              1.5,
+              2,
+              3
+            ],
+            "rotation": [
+              0,
+              0,
+              0.1,
+              1
+            ],
+            "scale": [
+              1,
+              1,
+              2
+            ]
+          }
+        }
+      ],
+      "expect": [
+        {
+          "ret": true,
+          "xf": [
+            1,
+            2,
+            3,
+            0,
+            0,
+            0,
+            1,
+            1,
+            1,
+            1,
+            0
+          ]
+        },
+        {
+          "ret": false,
+          "xf": [
+            1,
+            2,
+            3,
+            0,
+            0,
+            0,
+            1,
+            1,
+            1,
+            1,
+            0
+          ]
+        },
+        {
+          "ret": true,
+          "xf": [
+            1.5,
+            2,
+            3,
+            0,
+            0,
+            0,
+            1,
+            1,
+            1,
+            1,
+            0
+          ]
+        },
+        {
+          "ret": true,
+          "xf": [
+            1.5,
+            2,
+            3,
+            0,
+            0,
+            0.1,
+            1,
+            1,
+            1,
+            1,
+            0
+          ]
+        },
+        {
+          "ret": true,
+          "xf": [
+            1.5,
+            2,
+            3,
+            0,
+            0,
+            0.1,
+            1,
+            1,
+            1,
+            2,
+            0
+          ]
+        },
+        {
+          "ret": false,
+          "xf": [
+            1.5,
+            2,
+            3,
+            0,
+            0,
+            0.1,
+            1,
+            1,
+            1,
+            2,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "name": "captureTransform: negative zero against zero is not a change and does not overwrite",
+      "xfLength": 11,
+      "preset": null,
+      "steps": [
+        {
+          "e": {
+            "position": [
+              {
+                "$num": "-0"
+              },
+              0,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          }
+        },
+        {
+          "e": {
+            "position": [
+              {
+                "$num": "-0"
+              },
+              0,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          }
+        }
+      ],
+      "expect": [
+        {
+          "ret": true,
+          "xf": [
+            {
+              "$num": "-0"
+            },
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            1,
+            1,
+            1,
+            0
+          ]
+        },
+        {
+          "ret": false,
+          "xf": [
+            {
+              "$num": "-0"
+            },
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            1,
+            1,
+            1,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "name": "captureTransform: NaN in a component reports a change on every capture",
+      "xfLength": 11,
+      "preset": null,
+      "steps": [
+        {
+          "e": {
+            "position": [
+              {
+                "$num": "NaN"
+              },
+              0,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          }
+        },
+        {
+          "e": {
+            "position": [
+              {
+                "$num": "NaN"
+              },
+              0,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          }
+        }
+      ],
+      "expect": [
+        {
+          "ret": true,
+          "xf": [
+            {
+              "$num": "NaN"
+            },
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            1,
+            1,
+            1,
+            0
+          ]
+        },
+        {
+          "ret": true,
+          "xf": [
+            {
+              "$num": "NaN"
+            },
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            1,
+            1,
+            1,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "name": "captureTransform: trailing slots beyond the ten pose values are left alone",
+      "xfLength": 12,
+      "preset": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        7,
+        9
+      ],
+      "steps": [
+        {
+          "e": {
+            "position": [
+              4,
+              5,
+              6
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          }
+        }
+      ],
+      "expect": [
+        {
+          "ret": true,
+          "xf": [
+            4,
+            5,
+            6,
+            0,
+            0,
+            0,
+            1,
+            1,
+            1,
+            1,
+            7,
+            9
+          ]
+        }
+      ]
+    },
+    {
+      "name": "captureTransform: a short position array stores NaN for the missing components",
+      "xfLength": 11,
+      "preset": null,
+      "steps": [
+        {
+          "e": {
+            "position": [
+              1
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          }
+        }
+      ],
+      "expect": [
+        {
+          "ret": true,
+          "xf": [
+            1,
+            {
+              "$num": "NaN"
+            },
+            {
+              "$num": "NaN"
+            },
+            0,
+            0,
+            0,
+            1,
+            1,
+            1,
+            1,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "name": "captureTransform: an entity with no position throws TypeError",
+      "xfLength": 11,
+      "preset": null,
+      "steps": [
+        {
+          "e": {
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          }
+        }
+      ],
+      "expect": [
+        {
+          "throws": "TypeError",
+          "xf": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      ]
+    }
+  ],
+  "tracks": [
+    {
+      "name": "tracking: a new static entity is captured and does not start moving",
+      "steps": [
+        {
+          "op": "tick",
+          "idle": 3,
+          "staticIds": [
+            1
+          ],
+          "entities": [
+            [
+              1,
+              {
+                "position": [
+                  0,
+                  0,
+                  0
+                ],
+                "rotation": [
+                  0,
+                  0,
+                  0,
+                  1
+                ],
+                "scale": [
+                  1,
+                  1,
+                  1
+                ]
+              }
+            ]
+          ]
+        }
+      ],
+      "expect": [
+        {
+          "moving": [],
+          "staticVersion": 0,
+          "motionVersion": 0,
+          "xfs": [
+            [
+              1,
+              [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                1,
+                1,
+                1,
+                1,
+                0
+              ]
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "name": "tracking: a static entity whose pose changes joins the moving set",
+      "steps": [
+        {
+          "op": "tick",
+          "idle": 3,
+          "staticIds": [
+            1
+          ],
+          "entities": [
+            [
+              1,
+              {
+                "position": [
+                  0,
+                  0,
+                  0
+                ],
+                "rotation": [
+                  0,
+                  0,
+                  0,
+                  1
+                ],
+                "scale": [
+                  1,
+                  1,
+                  1
+                ]
+              }
+            ]
+          ]
+        },
+        {
+          "op": "tick",
+          "idle": 3,
+          "staticIds": [
+            1
+          ],
+          "entities": [
+            [
+              1,
+              {
+                "position": [
+                  1,
+                  0,
+                  0
+                ],
+                "rotation": [
+                  0,
+                  0,
+                  0,
+                  1
+                ],
+                "scale": [
+                  1,
+                  1,
+                  1
+                ]
+              }
+            ]
+          ]
+        }
+      ],
+      "expect": [
+        {
+          "moving": [],
+          "staticVersion": 0,
+          "motionVersion": 0,
+          "xfs": [
+            [
+              1,
+              [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                1,
+                1,
+                1,
+                1,
+                0
+              ]
+            ]
+          ]
+        },
+        {
+          "moving": [
+            1
+          ],
+          "staticVersion": 0,
+          "motionVersion": 0,
+          "xfs": [
+            [
+              1,
+              [
+                1,
+                0,
+                0,
+                0,
+                0,
+                0,
+                1,
+                1,
+                1,
+                1,
+                0
+              ]
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "name": "tracking: a moving entity is demoted after idle snapshots and the static version is bumped",
+      "steps": [
+        {
+          "op": "tick",
+          "idle": 3,
+          "staticIds": [
+            1
+          ],
+          "entities": [
+            [
+              1,
+              {
+                "position": [
+                  0,
+                  0,
+                  0
+                ],
+                "rotation": [
+                  0,
+                  0,
+                  0,
+                  1
+                ],
+                "scale": [
+                  1,
+                  1,
+                  1
+                ]
+              }
+            ]
+          ]
+        },
+        {
+          "op": "tick",
+          "idle": 3,
+          "staticIds": [
+            1
+          ],
+          "entities": [
+            [
+              1,
+              {
+                "position": [
+                  1,
+                  0,
+                  0
+                ],
+                "rotation": [
+                  0,
+                  0,
+                  0,
+                  1
+                ],
+                "scale": [
+                  1,
+                  1,
+                  1
+                ]
+              }
+            ]
+          ]
+        },
+        {
+          "op": "tick",
+          "idle": 3,
+          "staticIds": [
+            1
+          ],
+          "entities": [
+            [
+              1,
+              {
+                "position": [
+                  1,
+                  0,
+                  0
+                ],
+                "rotation": [
+                  0,
+                  0,
+                  0,
+                  1
+                ],
+                "scale": [
+                  1,
+                  1,
+                  1
+                ]
+              }
+            ]
+          ]
+        },
+        {
+          "op": "tick",
+          "idle": 3,
+          "staticIds": [
+            1
+          ],
+          "entities": [
+            [
+              1,
+              {
+                "position": [
+                  1,
+                  0,
+                  0
+                ],
+                "rotation": [
+                  0,
+                  0,
+                  0,
+                  1
+                ],
+                "scale": [
+                  1,
+                  1,
+                  1
+                ]
+              }
+            ]
+          ]
+        },
+        {
+          "op": "tick",
+          "idle": 3,
+          "staticIds": [
+            1
+          ],
+          "entities": [
+            [
+              1,
+              {
+                "position": [
+                  1,
+                  0,
+                  0
+                ],
+                "rotation": [
+                  0,
+                  0,
+                  0,
+                  1
+                ],
+                "scale": [
+                  1,
+                  1,
+                  1
+                ]
+              }
+            ]
+          ]
+        }
+      ],
+      "expect": [
+        {
+          "moving": [],
+          "staticVersion": 0,
+          "motionVersion": 0,
+          "xfs": [
+            [
+              1,
+              [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                1,
+                1,
+                1,
+                1,
+                0
+              ]
+            ]
+          ]
+        },
+        {
+          "moving": [
+            1
+          ],
+          "staticVersion": 0,
+          "motionVersion": 0,
+          "xfs": [
+            [
+              1,
+              [
+                1,
+                0,
+                0,
+                0,
+                0,
+                0,
+                1,
+                1,
+                1,
+                1,
+                0
+              ]
+            ]
+          ]
+        },
+        {
+          "moving": [
+            1
+          ],
+          "staticVersion": 0,
+          "motionVersion": 0,
+          "xfs": [
+            [
+              1,
+              [
+                1,
+                0,
+                0,
+                0,
+                0,
+                0,
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            ]
+          ]
+        },
+        {
+          "moving": [
+            1
+          ],
+          "staticVersion": 0,
+          "motionVersion": 0,
+          "xfs": [
+            [
+              1,
+              [
+                1,
+                0,
+                0,
+                0,
+                0,
+                0,
+                1,
+                1,
+                1,
+                1,
+                2
+              ]
+            ]
+          ]
+        },
+        {
+          "moving": [],
+          "staticVersion": 1,
+          "motionVersion": 1,
+          "xfs": [
+            [
+              1,
+              [
+                1,
+                0,
+                0,
+                0,
+                0,
+                0,
+                1,
+                1,
+                1,
+                1,
+                3
+              ]
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "name": "tracking: a pending static re-encode stops a changed entity from starting to move, until the next tick",
+      "steps": [
+        {
+          "op": "tick",
+          "idle": 3,
+          "staticIds": [
+            2
+          ],
+          "entities": [
+            [
+              2,
+              {
+                "position": [
+                  0,
+                  0,
+                  0
+                ],
+                "rotation": [
+                  0,
+                  0,
+                  0,
+                  1
+                ],
+                "scale": [
+                  1,
+                  1,
+                  1
+                ]
+              }
+            ]
+          ]
+        },
+        {
+          "op": "bump"
+        },
+        {
+          "op": "tick",
+          "idle": 3,
+          "staticIds": [
+            2
+          ],
+          "entities": [
+            [
+              2,
+              {
+                "position": [
+                  1,
+                  0,
+                  0
+                ],
+                "rotation": [
+                  0,
+                  0,
+                  0,
+                  1
+                ],
+                "scale": [
+                  1,
+                  1,
+                  1
+                ]
+              }
+            ]
+          ]
+        },
+        {
+          "op": "tick",
+          "idle": 3,
+          "staticIds": [
+            2
+          ],
+          "entities": [
+            [
+              2,
+              {
+                "position": [
+                  1,
+                  0,
+                  0
+                ],
+                "rotation": [
+                  0,
+                  0,
+                  0,
+                  1
+                ],
+                "scale": [
+                  1,
+                  1,
+                  1
+                ]
+              }
+            ]
+          ]
+        },
+        {
+          "op": "tick",
+          "idle": 3,
+          "staticIds": [
+            2
+          ],
+          "entities": [
+            [
+              2,
+              {
+                "position": [
+                  2,
+                  0,
+                  0
+                ],
+                "rotation": [
+                  0,
+                  0,
+                  0,
+                  1
+                ],
+                "scale": [
+                  1,
+                  1,
+                  1
+                ]
+              }
+            ]
+          ]
+        }
+      ],
+      "expect": [
+        {
+          "moving": [],
+          "staticVersion": 0,
+          "motionVersion": 0,
+          "xfs": [
+            [
+              2,
+              [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                1,
+                1,
+                1,
+                1,
+                0
+              ]
+            ]
+          ]
+        },
+        {
+          "moving": [],
+          "staticVersion": 1,
+          "motionVersion": 0,
+          "xfs": [
+            [
+              2,
+              [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                1,
+                1,
+                1,
+                1,
+                0
+              ]
+            ]
+          ]
+        },
+        {
+          "moving": [],
+          "staticVersion": 1,
+          "motionVersion": 1,
+          "xfs": [
+            [
+              2,
+              [
+                1,
+                0,
+                0,
+                0,
+                0,
+                0,
+                1,
+                1,
+                1,
+                1,
+                0
+              ]
+            ]
+          ]
+        },
+        {
+          "moving": [],
+          "staticVersion": 1,
+          "motionVersion": 1,
+          "xfs": [
+            [
+              2,
+              [
+                1,
+                0,
+                0,
+                0,
+                0,
+                0,
+                1,
+                1,
+                1,
+                1,
+                0
+              ]
+            ]
+          ]
+        },
+        {
+          "moving": [
+            2
+          ],
+          "staticVersion": 1,
+          "motionVersion": 1,
+          "xfs": [
+            [
+              2,
+              [
+                2,
+                0,
+                0,
+                0,
+                0,
+                0,
+                1,
+                1,
+                1,
+                1,
+                0
+              ]
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "name": "tracking: a change during the idle count restarts it",
+      "steps": [
+        {
+          "op": "tick",
+          "idle": 3,
+          "staticIds": [
+            4
+          ],
+          "entities": [
+            [
+              4,
+              {
+                "position": [
+                  0,
+                  0,
+                  0
+                ],
+                "rotation": [
+                  0,
+                  0,
+                  0,
+                  1
+                ],
+                "scale": [
+                  1,
+                  1,
+                  1
+                ]
+              }
+            ]
+          ]
+        },
+        {
+          "op": "tick",
+          "idle": 3,
+          "staticIds": [
+            4
+          ],
+          "entities": [
+            [
+              4,
+              {
+                "position": [
+                  1,
+                  0,
+                  0
+                ],
+                "rotation": [
+                  0,
+                  0,
+                  0,
+                  1
+                ],
+                "scale": [
+                  1,
+                  1,
+                  1
+                ]
+              }
+            ]
+          ]
+        },
+        {
+          "op": "tick",
+          "idle": 3,
+          "staticIds": [
+            4
+          ],
+          "entities": [
+            [
+              4,
+              {
+                "position": [
+                  1,
+                  0,
+                  0
+                ],
+                "rotation": [
+                  0,
+                  0,
+                  0,
+                  1
+                ],
+                "scale": [
+                  1,
+                  1,
+                  1
+                ]
+              }
+            ]
+          ]
+        },
+        {
+          "op": "tick",
+          "idle": 3,
+          "staticIds": [
+            4
+          ],
+          "entities": [
+            [
+              4,
+              {
+                "position": [
+                  2,
+                  0,
+                  0
+                ],
+                "rotation": [
+                  0,
+                  0,
+                  0,
+                  1
+                ],
+                "scale": [
+                  1,
+                  1,
+                  1
+                ]
+              }
+            ]
+          ]
+        },
+        {
+          "op": "tick",
+          "idle": 3,
+          "staticIds": [
+            4
+          ],
+          "entities": [
+            [
+              4,
+              {
+                "position": [
+                  2,
+                  0,
+                  0
+                ],
+                "rotation": [
+                  0,
+                  0,
+                  0,
+                  1
+                ],
+                "scale": [
+                  1,
+                  1,
+                  1
+                ]
+              }
+            ]
+          ]
+        },
+        {
+          "op": "tick",
+          "idle": 3,
+          "staticIds": [
+            4
+          ],
+          "entities": [
+            [
+              4,
+              {
+                "position": [
+                  2,
+                  0,
+                  0
+                ],
+                "rotation": [
+                  0,
+                  0,
+                  0,
+                  1
+                ],
+                "scale": [
+                  1,
+                  1,
+                  1
+                ]
+              }
+            ]
+          ]
+        },
+        {
+          "op": "tick",
+          "idle": 3,
+          "staticIds": [
+            4
+          ],
+          "entities": [
+            [
+              4,
+              {
+                "position": [
+                  2,
+                  0,
+                  0
+                ],
+                "rotation": [
+                  0,
+                  0,
+                  0,
+                  1
+                ],
+                "scale": [
+                  1,
+                  1,
+                  1
+                ]
+              }
+            ]
+          ]
+        }
+      ],
+      "expect": [
+        {
+          "moving": [],
+          "staticVersion": 0,
+          "motionVersion": 0,
+          "xfs": [
+            [
+              4,
+              [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                1,
+                1,
+                1,
+                1,
+                0
+              ]
+            ]
+          ]
+        },
+        {
+          "moving": [
+            4
+          ],
+          "staticVersion": 0,
+          "motionVersion": 0,
+          "xfs": [
+            [
+              4,
+              [
+                1,
+                0,
+                0,
+                0,
+                0,
+                0,
+                1,
+                1,
+                1,
+                1,
+                0
+              ]
+            ]
+          ]
+        },
+        {
+          "moving": [
+            4
+          ],
+          "staticVersion": 0,
+          "motionVersion": 0,
+          "xfs": [
+            [
+              4,
+              [
+                1,
+                0,
+                0,
+                0,
+                0,
+                0,
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            ]
+          ]
+        },
+        {
+          "moving": [
+            4
+          ],
+          "staticVersion": 0,
+          "motionVersion": 0,
+          "xfs": [
+            [
+              4,
+              [
+                2,
+                0,
+                0,
+                0,
+                0,
+                0,
+                1,
+                1,
+                1,
+                1,
+                0
+              ]
+            ]
+          ]
+        },
+        {
+          "moving": [
+            4
+          ],
+          "staticVersion": 0,
+          "motionVersion": 0,
+          "xfs": [
+            [
+              4,
+              [
+                2,
+                0,
+                0,
+                0,
+                0,
+                0,
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            ]
+          ]
+        },
+        {
+          "moving": [
+            4
+          ],
+          "staticVersion": 0,
+          "motionVersion": 0,
+          "xfs": [
+            [
+              4,
+              [
+                2,
+                0,
+                0,
+                0,
+                0,
+                0,
+                1,
+                1,
+                1,
+                1,
+                2
+              ]
+            ]
+          ]
+        },
+        {
+          "moving": [],
+          "staticVersion": 1,
+          "motionVersion": 1,
+          "xfs": [
+            [
+              4,
+              [
+                2,
+                0,
+                0,
+                0,
+                0,
+                0,
+                1,
+                1,
+                1,
+                1,
+                3
+              ]
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "name": "tracking: a missing entity is skipped and keeps its snapshot",
+      "steps": [
+        {
+          "op": "tick",
+          "idle": 3,
+          "staticIds": [
+            3
+          ],
+          "entities": [
+            [
+              3,
+              {
+                "position": [
+                  0,
+                  0,
+                  0
+                ],
+                "rotation": [
+                  0,
+                  0,
+                  0,
+                  1
+                ],
+                "scale": [
+                  1,
+                  1,
+                  1
+                ]
+              }
+            ]
+          ]
+        },
+        {
+          "op": "tick",
+          "idle": 3,
+          "staticIds": [
+            3
+          ],
+          "entities": []
+        },
+        {
+          "op": "tick",
+          "idle": 3,
+          "staticIds": [
+            3
+          ],
+          "entities": [
+            [
+              3,
+              {
+                "position": [
+                  5,
+                  0,
+                  0
+                ],
+                "rotation": [
+                  0,
+                  0,
+                  0,
+                  1
+                ],
+                "scale": [
+                  1,
+                  1,
+                  1
+                ]
+              }
+            ]
+          ]
+        }
+      ],
+      "expect": [
+        {
+          "moving": [],
+          "staticVersion": 0,
+          "motionVersion": 0,
+          "xfs": [
+            [
+              3,
+              [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                1,
+                1,
+                1,
+                1,
+                0
+              ]
+            ]
+          ]
+        },
+        {
+          "moving": [],
+          "staticVersion": 0,
+          "motionVersion": 0,
+          "xfs": [
+            [
+              3,
+              [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                1,
+                1,
+                1,
+                1,
+                0
+              ]
+            ]
+          ]
+        },
+        {
+          "moving": [
+            3
+          ],
+          "staticVersion": 0,
+          "motionVersion": 0,
+          "xfs": [
+            [
+              3,
+              [
+                5,
+                0,
+                0,
+                0,
+                0,
+                0,
+                1,
+                1,
+                1,
+                1,
+                0
+              ]
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "name": "tracking: forgetStaticMotion drops the snapshot and the moving flag",
+      "steps": [
+        {
+          "op": "tick",
+          "idle": 3,
+          "staticIds": [
+            2
+          ],
+          "entities": [
+            [
+              2,
+              {
+                "position": [
+                  0,
+                  0,
+                  0
+                ],
+                "rotation": [
+                  0,
+                  0,
+                  0,
+                  1
+                ],
+                "scale": [
+                  1,
+                  1,
+                  1
+                ]
+              }
+            ]
+          ]
+        },
+        {
+          "op": "tick",
+          "idle": 3,
+          "staticIds": [
+            2
+          ],
+          "entities": [
+            [
+              2,
+              {
+                "position": [
+                  1,
+                  0,
+                  0
+                ],
+                "rotation": [
+                  0,
+                  0,
+                  0,
+                  1
+                ],
+                "scale": [
+                  1,
+                  1,
+                  1
+                ]
+              }
+            ]
+          ]
+        },
+        {
+          "op": "forget",
+          "id": 2
+        },
+        {
+          "op": "tick",
+          "idle": 3,
+          "staticIds": [
+            2
+          ],
+          "entities": [
+            [
+              2,
+              {
+                "position": [
+                  1,
+                  0,
+                  0
+                ],
+                "rotation": [
+                  0,
+                  0,
+                  0,
+                  1
+                ],
+                "scale": [
+                  1,
+                  1,
+                  1
+                ]
+              }
+            ]
+          ]
+        }
+      ],
+      "expect": [
+        {
+          "moving": [],
+          "staticVersion": 0,
+          "motionVersion": 0,
+          "xfs": [
+            [
+              2,
+              [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                1,
+                1,
+                1,
+                1,
+                0
+              ]
+            ]
+          ]
+        },
+        {
+          "moving": [
+            2
+          ],
+          "staticVersion": 0,
+          "motionVersion": 0,
+          "xfs": [
+            [
+              2,
+              [
+                1,
+                0,
+                0,
+                0,
+                0,
+                0,
+                1,
+                1,
+                1,
+                1,
+                0
+              ]
+            ]
+          ]
+        },
+        {
+          "moving": [],
+          "staticVersion": 0,
+          "motionVersion": 0,
+          "xfs": []
+        },
+        {
+          "moving": [],
+          "staticVersion": 0,
+          "motionVersion": 0,
+          "xfs": [
+            [
+              2,
+              [
+                1,
+                0,
+                0,
+                0,
+                0,
+                0,
+                1,
+                1,
+                1,
+                1,
+                0
+              ]
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "name": "tracking: an idle count of 1 demotes on the first unchanged tick",
+      "steps": [
+        {
+          "op": "tick",
+          "idle": 1,
+          "staticIds": [
+            5
+          ],
+          "entities": [
+            [
+              5,
+              {
+                "position": [
+                  0,
+                  0,
+                  0
+                ],
+                "rotation": [
+                  0,
+                  0,
+                  0,
+                  1
+                ],
+                "scale": [
+                  1,
+                  1,
+                  1
+                ]
+              }
+            ]
+          ]
+        },
+        {
+          "op": "tick",
+          "idle": 1,
+          "staticIds": [
+            5
+          ],
+          "entities": [
+            [
+              5,
+              {
+                "position": [
+                  1,
+                  0,
+                  0
+                ],
+                "rotation": [
+                  0,
+                  0,
+                  0,
+                  1
+                ],
+                "scale": [
+                  1,
+                  1,
+                  1
+                ]
+              }
+            ]
+          ]
+        },
+        {
+          "op": "tick",
+          "idle": 1,
+          "staticIds": [
+            5
+          ],
+          "entities": [
+            [
+              5,
+              {
+                "position": [
+                  1,
+                  0,
+                  0
+                ],
+                "rotation": [
+                  0,
+                  0,
+                  0,
+                  1
+                ],
+                "scale": [
+                  1,
+                  1,
+                  1
+                ]
+              }
+            ]
+          ]
+        }
+      ],
+      "expect": [
+        {
+          "moving": [],
+          "staticVersion": 0,
+          "motionVersion": 0,
+          "xfs": [
+            [
+              5,
+              [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                1,
+                1,
+                1,
+                1,
+                0
+              ]
+            ]
+          ]
+        },
+        {
+          "moving": [
+            5
+          ],
+          "staticVersion": 0,
+          "motionVersion": 0,
+          "xfs": [
+            [
+              5,
+              [
+                1,
+                0,
+                0,
+                0,
+                0,
+                0,
+                1,
+                1,
+                1,
+                1,
+                0
+              ]
+            ]
+          ]
+        },
+        {
+          "moving": [],
+          "staticVersion": 1,
+          "motionVersion": 1,
+          "xfs": [
+            [
+              5,
+              [
+                1,
+                0,
+                0,
+                0,
+                0,
+                0,
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            ]
+          ]
+        }
+      ]
+    }
+  ]
+}
