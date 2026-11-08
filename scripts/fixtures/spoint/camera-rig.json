@@ -1,0 +1,953 @@
+{
+ "source": "spoint src/behaviours/cameraRig.js (defineCameraRig, run by scripts/lib/cameraRigScenarios.mjs)",
+ "scenarios": [
+  {
+   "name": "orbit",
+   "build": {
+    "ok": true
+   },
+   "trace": [
+    {
+     "label": "look",
+     "ok": true,
+     "value": true
+    },
+    {
+     "label": "update-a",
+     "ok": true,
+     "value": {
+      "position": [
+       -0.39896360393723485,
+       2.0788488291556777,
+       5.716665795262627
+      ],
+      "target": [
+       1,
+       1.6,
+       2
+      ],
+      "layer": "orbit",
+      "done": false,
+      "applied": 1
+     }
+    },
+    {
+     "label": "pitch-clamp",
+     "ok": true,
+     "value": true
+    },
+    {
+     "label": "update-b",
+     "ok": true,
+     "value": {
+      "position": [
+       -4.510597200518214,
+       -0.6281563438689051,
+       8.356517885799152
+      ],
+      "target": [
+       -4,
+       3.1,
+       7
+      ],
+      "layer": "orbit",
+      "done": false,
+      "applied": 2
+     }
+    },
+    {
+     "label": "input-omitted",
+     "ok": true,
+     "value": true
+    },
+    {
+     "label": "input-null",
+     "ok": true,
+     "value": true
+    },
+    {
+     "label": "top",
+     "ok": true,
+     "value": "orbit"
+    },
+    {
+     "label": "other-player-top",
+     "ok": true,
+     "value": "orbit"
+    },
+    {
+     "label": "layer-ids",
+     "ok": true,
+     "value": [
+      "orbit"
+     ]
+    },
+    {
+     "label": "remove",
+     "ok": true,
+     "value": null
+    },
+    {
+     "label": "top-after-remove",
+     "ok": true,
+     "value": "orbit"
+    }
+   ]
+  },
+  {
+   "name": "orbit-defaults",
+   "build": {
+    "ok": true
+   },
+   "trace": [
+    {
+     "label": "update",
+     "ok": true,
+     "value": {
+      "position": [
+       1,
+       1.6,
+       6
+      ],
+      "target": [
+       1,
+       1.6,
+       2
+      ],
+      "layer": "o",
+      "done": false,
+      "applied": 1
+     }
+    },
+    {
+     "label": "look-nan",
+     "ok": true,
+     "value": true
+    }
+   ]
+  },
+  {
+   "name": "chase",
+   "build": {
+    "ok": true
+   },
+   "trace": [
+    {
+     "label": "update-a",
+     "ok": true,
+     "value": {
+      "position": [
+       -0.7731212399680372,
+       3,
+       -3.7320189347536363
+      ],
+      "target": [
+       1,
+       1,
+       2
+      ],
+      "layer": "chase",
+      "done": false,
+      "applied": 1
+     }
+    },
+    {
+     "label": "update-b",
+     "ok": true,
+     "value": {
+      "position": [
+       1.179256199893242,
+       4.5,
+       10.029076627599146
+      ],
+      "target": [
+       -4,
+       2.5,
+       7
+      ],
+      "layer": "chase",
+      "done": false,
+      "applied": 2
+     }
+    },
+    {
+     "label": "input-no-handler",
+     "ok": true,
+     "value": false
+    }
+   ]
+  },
+  {
+   "name": "chase-defaults",
+   "build": {
+    "ok": true
+   },
+   "trace": [
+    {
+     "label": "update",
+     "ok": true,
+     "value": {
+      "position": [
+       0.31604683324436866,
+       3.5,
+       9.524230522999288
+      ],
+      "target": [
+       -4,
+       2.7,
+       7
+      ],
+      "layer": "chase",
+      "done": false,
+      "applied": 1
+     }
+    }
+   ]
+  },
+  {
+   "name": "first-person",
+   "build": {
+    "ok": true
+   },
+   "trace": [
+    {
+     "label": "look",
+     "ok": true,
+     "value": true
+    },
+    {
+     "label": "update-a",
+     "ok": true,
+     "value": {
+      "position": [
+       1,
+       1.7,
+       2
+      ],
+      "target": [
+       0.8761555417928317,
+       1.220574461395797,
+       1.131199848581135
+      ],
+      "layer": "fp",
+      "done": false,
+      "applied": 1
+     }
+    },
+    {
+     "label": "look-back",
+     "ok": true,
+     "value": true
+    },
+    {
+     "label": "update-b",
+     "ok": true,
+     "value": {
+      "position": [
+       -4,
+       3.2,
+       7
+      ],
+      "target": [
+       -4.757537487431485,
+       3.679425538604203,
+       6.556955862164882
+      ],
+      "layer": "fp",
+      "done": false,
+      "applied": 2
+     }
+    }
+   ]
+  },
+  {
+   "name": "cutscene",
+   "build": {
+    "ok": true
+   },
+   "trace": [
+    {
+     "label": "tick-0",
+     "ok": true,
+     "value": {
+      "position": [
+       5,
+       0,
+       0
+      ],
+      "target": [
+       0,
+       0,
+       -1
+      ],
+      "layer": "cut",
+      "done": false,
+      "applied": 1
+     }
+    },
+    {
+     "label": "tick-1",
+     "ok": true,
+     "value": {
+      "position": [
+       10,
+       0,
+       0
+      ],
+      "target": [
+       0,
+       0,
+       -1
+      ],
+      "layer": "cut",
+      "done": false,
+      "applied": 2
+     }
+    },
+    {
+     "label": "tick-2",
+     "ok": true,
+     "value": {
+      "position": [
+       10,
+       1.25,
+       0
+      ],
+      "target": [
+       0,
+       0.25,
+       -0.75
+      ],
+      "layer": "cut",
+      "done": false,
+      "applied": 3
+     }
+    },
+    {
+     "label": "tick-3",
+     "ok": true,
+     "value": {
+      "position": [
+       10,
+       2.5,
+       0
+      ],
+      "target": [
+       0,
+       0.5,
+       -0.5
+      ],
+      "layer": "cut",
+      "done": false,
+      "applied": 4
+     }
+    },
+    {
+     "label": "tick-4",
+     "ok": true,
+     "value": {
+      "position": [
+       10,
+       3.75,
+       0
+      ],
+      "target": [
+       0,
+       0.75,
+       -0.25
+      ],
+      "layer": "cut",
+      "done": false,
+      "applied": 5
+     }
+    },
+    {
+     "label": "tick-5",
+     "ok": true,
+     "value": {
+      "position": [
+       10,
+       5,
+       0
+      ],
+      "target": [
+       0,
+       1,
+       0
+      ],
+      "layer": "cut",
+      "done": true,
+      "applied": 6
+     }
+    },
+    {
+     "label": "tick-6",
+     "ok": true,
+     "value": {
+      "position": [
+       10,
+       5,
+       0
+      ],
+      "target": [
+       0,
+       1,
+       0
+      ],
+      "layer": "cut",
+      "done": true,
+      "applied": 7
+     }
+    },
+    {
+     "label": "tick-7",
+     "ok": true,
+     "value": {
+      "position": [
+       10,
+       5,
+       0
+      ],
+      "target": [
+       0,
+       1,
+       0
+      ],
+      "layer": "cut",
+      "done": true,
+      "applied": 8
+     }
+    }
+   ]
+  },
+  {
+   "name": "cutscene-loop",
+   "build": {
+    "ok": true
+   },
+   "trace": [
+    {
+     "label": "tick-0",
+     "ok": true,
+     "value": {
+      "position": [
+       10,
+       1.75,
+       0
+      ],
+      "target": [
+       0,
+       0.35,
+       -0.65
+      ],
+      "layer": "cut",
+      "done": false,
+      "applied": 1
+     }
+    },
+    {
+     "label": "tick-1",
+     "ok": true,
+     "value": {
+      "position": [
+       3.999999999999999,
+       0,
+       0
+      ],
+      "target": [
+       0,
+       0,
+       -1
+      ],
+      "layer": "cut",
+      "done": false,
+      "applied": 2
+     }
+    },
+    {
+     "label": "tick-2",
+     "ok": true,
+     "value": {
+      "position": [
+       10,
+       2.749999999999999,
+       0
+      ],
+      "target": [
+       0,
+       0.5499999999999998,
+       -0.4500000000000002
+      ],
+      "layer": "cut",
+      "done": false,
+      "applied": 3
+     }
+    },
+    {
+     "label": "tick-3",
+     "ok": true,
+     "value": {
+      "position": [
+       7.999999999999998,
+       0,
+       0
+      ],
+      "target": [
+       0,
+       0,
+       -1
+      ],
+      "layer": "cut",
+      "done": false,
+      "applied": 4
+     }
+    }
+   ]
+  },
+  {
+   "name": "custom",
+   "build": {
+    "ok": true
+   },
+   "trace": [
+    {
+     "label": "update-1",
+     "ok": true,
+     "value": {
+      "position": [
+       1,
+       0,
+       0.5
+      ],
+      "target": [
+       0,
+       0,
+       0
+      ],
+      "layer": "c",
+      "done": false,
+      "applied": 1
+     }
+    },
+    {
+     "label": "input-5",
+     "ok": true,
+     "value": true
+    },
+    {
+     "label": "update-2",
+     "ok": true,
+     "value": {
+      "position": [
+       7,
+       1.5,
+       0.25
+      ],
+      "target": [
+       0,
+       0,
+       0
+      ],
+      "layer": "c",
+      "done": true,
+      "applied": 2
+     }
+    },
+    {
+     "label": "update-3",
+     "ok": true,
+     "value": {
+      "position": [
+       8,
+       1.5,
+       0.25
+      ],
+      "target": [
+       0,
+       0,
+       0
+      ],
+      "layer": "c",
+      "done": true,
+      "applied": 3
+     }
+    }
+   ]
+  },
+  {
+   "name": "custom-defaults",
+   "build": {
+    "ok": true
+   },
+   "trace": [
+    {
+     "label": "input-no-handler",
+     "ok": true,
+     "value": false
+    },
+    {
+     "label": "update",
+     "ok": true,
+     "value": {
+      "position": [
+       1,
+       2,
+       3
+      ],
+      "target": [
+       4,
+       5,
+       6
+      ],
+      "layer": "c",
+      "done": false,
+      "applied": 1
+     }
+    }
+   ]
+  },
+  {
+   "name": "defaults-first-layer",
+   "build": {
+    "ok": true
+   },
+   "trace": [
+    {
+     "label": "top",
+     "ok": true,
+     "value": "a"
+    },
+    {
+     "label": "layer-ids",
+     "ok": true,
+     "value": [
+      "a",
+      "b"
+     ]
+    }
+   ]
+  },
+  {
+   "name": "stack",
+   "build": {
+    "ok": true
+   },
+   "trace": [
+    {
+     "label": "before-push",
+     "ok": true,
+     "value": "base"
+    },
+    {
+     "label": "push-top",
+     "ok": true,
+     "value": null
+    },
+    {
+     "label": "top-after-push",
+     "ok": true,
+     "value": "top"
+    },
+    {
+     "label": "update-top",
+     "ok": true,
+     "value": {
+      "position": [
+       -0.4776010333066978,
+       2,
+       -2.7766824456280297
+      ],
+      "target": [
+       1,
+       1.2,
+       2
+      ],
+      "layer": "top",
+      "done": false,
+      "applied": 1
+     }
+    },
+    {
+     "label": "push-mid",
+     "ok": true,
+     "value": null
+    },
+    {
+     "label": "top-after-mid",
+     "ok": true,
+     "value": "top"
+    },
+    {
+     "label": "input-mid",
+     "ok": true,
+     "value": true
+    },
+    {
+     "label": "pop-top",
+     "ok": true,
+     "value": null
+    },
+    {
+     "label": "top-after-pop",
+     "ok": true,
+     "value": "mid"
+    },
+    {
+     "label": "pop-default-noop",
+     "ok": true,
+     "value": null
+    },
+    {
+     "label": "top-after-default-pop",
+     "ok": true,
+     "value": "mid"
+    },
+    {
+     "label": "update-mid",
+     "ok": true,
+     "value": {
+      "position": [
+       -4,
+       3.1,
+       7
+      ],
+      "target": [
+       -4.099813450629046,
+       3.080001333306667,
+       7.994805171078243
+      ],
+      "layer": "mid",
+      "done": false,
+      "applied": 2
+     }
+    },
+    {
+     "label": "push-unknown",
+     "ok": false,
+     "name": "TypeError",
+     "message": "[cameraRig] push: layer \"zz\" is not declared",
+     "reasonCode": "push-unknown-layer",
+     "code": null
+    }
+   ]
+  },
+  {
+   "name": "refuse-null-spec",
+   "build": {
+    "ok": false,
+    "name": "TypeError",
+    "message": "[cameraRig] spec must be an object",
+    "reasonCode": "spec-not-object"
+   },
+   "trace": []
+  },
+  {
+   "name": "refuse-array-spec",
+   "build": {
+    "ok": false,
+    "name": "TypeError",
+    "message": "[cameraRig] spec must be an object",
+    "reasonCode": "spec-not-object"
+   },
+   "trace": []
+  },
+  {
+   "name": "refuse-no-layers",
+   "build": {
+    "ok": false,
+    "name": "TypeError",
+    "message": "[cameraRig] spec.layers must be a non-empty array",
+    "reasonCode": "no-layers"
+   },
+   "trace": []
+  },
+  {
+   "name": "refuse-empty-layers",
+   "build": {
+    "ok": false,
+    "name": "TypeError",
+    "message": "[cameraRig] spec.layers must be a non-empty array",
+    "reasonCode": "no-layers"
+   },
+   "trace": []
+  },
+  {
+   "name": "refuse-layer-not-object",
+   "build": {
+    "ok": false,
+    "name": "TypeError",
+    "message": "[cameraRig] each layer must be an object",
+    "reasonCode": "layer-not-object"
+   },
+   "trace": []
+  },
+  {
+   "name": "refuse-layer-no-id",
+   "build": {
+    "ok": false,
+    "name": "TypeError",
+    "message": "[cameraRig] each layer needs a non-empty string id",
+    "reasonCode": "layer-no-id"
+   },
+   "trace": []
+  },
+  {
+   "name": "refuse-layer-unknown-kind",
+   "build": {
+    "ok": false,
+    "name": "TypeError",
+    "message": "[cameraRig] layer \"a\" has unknown kind \"dolly\"",
+    "reasonCode": "layer-unknown-kind"
+   },
+   "trace": []
+  },
+  {
+   "name": "refuse-duplicate-id",
+   "build": {
+    "ok": false,
+    "name": "TypeError",
+    "message": "[cameraRig] layer id \"a\" is declared twice",
+    "reasonCode": "layer-duplicate-id"
+   },
+   "trace": []
+  },
+  {
+   "name": "refuse-default-unknown",
+   "build": {
+    "ok": false,
+    "name": "TypeError",
+    "message": "[cameraRig] default layer \"zz\" is not declared",
+    "reasonCode": "default-unknown"
+   },
+   "trace": []
+  },
+  {
+   "name": "refuse-cutscene-no-frames",
+   "build": {
+    "ok": false,
+    "name": "TypeError",
+    "message": "[cameraRig] cutscene layer needs a non-empty frames array",
+    "reasonCode": "cutscene-no-frames"
+   },
+   "trace": []
+  },
+  {
+   "name": "refuse-cutscene-bad-frame",
+   "build": {
+    "ok": false,
+    "name": "TypeError",
+    "message": "[cameraRig] cutscene frame needs finite t, position[3] and target[3]: {\"t\":\"x\",\"position\":[0,0,0],\"target\":[0,0,0]}",
+    "reasonCode": "cutscene-bad-frame"
+   },
+   "trace": []
+  },
+  {
+   "name": "refuse-cutscene-unsorted",
+   "build": {
+    "ok": false,
+    "name": "TypeError",
+    "message": "[cameraRig] cutscene frames must be sorted by ascending t",
+    "reasonCode": "cutscene-unsorted"
+   },
+   "trace": []
+  },
+  {
+   "name": "refuse-custom-no-update",
+   "build": {
+    "ok": false,
+    "name": "TypeError",
+    "message": "[cameraRig] custom layer needs an update(state, pose, dt) function",
+    "reasonCode": "custom-no-update"
+   },
+   "trace": []
+  },
+  {
+   "name": "refuse-bad-pose",
+   "build": {
+    "ok": true
+   },
+   "trace": [
+    {
+     "label": "no-yaw",
+     "ok": false,
+     "name": "TypeError",
+     "message": "[cameraRig] update: pose needs position[3] and finite yaw",
+     "reasonCode": "pose-invalid",
+     "code": null
+    },
+    {
+     "label": "short-position",
+     "ok": false,
+     "name": "TypeError",
+     "message": "[cameraRig] update: pose needs position[3] and finite yaw",
+     "reasonCode": "pose-invalid",
+     "code": null
+    },
+    {
+     "label": "nan-yaw",
+     "ok": false,
+     "name": "TypeError",
+     "message": "[cameraRig] update: pose needs position[3] and finite yaw",
+     "reasonCode": "pose-invalid",
+     "code": null
+    }
+   ]
+  },
+  {
+   "name": "refuse-bad-dt",
+   "build": {
+    "ok": true
+   },
+   "trace": [
+    {
+     "label": "negative",
+     "ok": false,
+     "name": "TypeError",
+     "message": "[cameraRig] update: dt must be a finite non-negative number",
+     "reasonCode": "dt-invalid",
+     "code": null
+    },
+    {
+     "label": "nan",
+     "ok": false,
+     "name": "TypeError",
+     "message": "[cameraRig] update: dt must be a finite non-negative number",
+     "reasonCode": "dt-invalid",
+     "code": null
+    }
+   ]
+  },
+  {
+   "name": "refuse-camera-invalid",
+   "build": {
+    "ok": true
+   },
+   "trace": [
+    {
+     "label": "update",
+     "ok": false,
+     "name": "TypeError",
+     "message": "[cameraRig] layer \"c\" returned a non-finite camera",
+     "reasonCode": "camera-invalid",
+     "code": null
+    }
+   ]
+  },
+  {
+   "name": "refuse-push-unknown",
+   "build": {
+    "ok": true
+   },
+   "trace": [
+    {
+     "label": "push",
+     "ok": false,
+     "name": "TypeError",
+     "message": "[cameraRig] push: layer \"zz\" is not declared",
+     "reasonCode": "push-unknown-layer",
+     "code": null
+    }
+   ]
+  }
+ ]
+}

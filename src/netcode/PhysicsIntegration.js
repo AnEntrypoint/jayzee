@@ -1,0 +1,231 @@
+import { waterlineLocalY } from '../terrain-pure/planetFrame.js'
+import { verticalVelocity } from '../motion-pure/characterStep.js'
+import { PLAYER_DEFAULTS } from '../player-defaults-pure/playerDefaults.js'
+
+const KILL_PLANE_Y = -100
+const KILL_DEPTH_BELOW_TERRAIN_M = 100
+
+const SWIM_GRAVITY_MUL = 0.15
+const SWIM_DRAG = 1.5
+const SWIM_UP_SPEED = 2.2
+const SWIM_SINK_SPEED = -0.6
+
+export class PhysicsIntegration {
+  constructor(config = {}) {
+    this.physicsWorld = config.physicsWorld || null
+    this.config = {
+      gravity: config.gravity ?? [0, -9.81, 0],
+      capsuleRadius: config.capsuleRadius ?? PLAYER_DEFAULTS.capsuleRadius,
+      capsuleHalfHeight: config.capsuleHalfHeight ?? PLAYER_DEFAULTS.capsuleHalfHeight,
+      crouchHalfHeight: config.crouchHalfHeight ?? 0.45,
+      ankleClearance: config.ankleClearance ?? 0.1,
+      playerMass: config.playerMass ?? PLAYER_DEFAULTS.mass
+    }
+    this._derivePhysicalHalfHeight()
+    this.playerBodies = new Map()
+    this._crouchStates = new Map()
+  }
+
+  _derivePhysicalHalfHeight() {
+    if (!Number.isFinite(this.config.capsuleHalfHeight) || this.config.capsuleHalfHeight <= 0) this.config.capsuleHalfHeight = PLAYER_DEFAULTS.capsuleHalfHeight
+    if (!Number.isFinite(this.config.ankleClearance) || this.config.capsuleHalfHeight + this.config.ankleClearance <= 0) this.config.ankleClearance = 0
+    this._physicalHalfHeight = this.config.capsuleHalfHeight + this.config.ankleClearance
+  }
+
+  applyPlayerConfig(pc) {
+    if (!pc) return
+    if (Number.isFinite(pc.capsuleRadius) && pc.capsuleRadius > 0) this.config.capsuleRadius = pc.capsuleRadius
+    if (Number.isFinite(pc.capsuleHalfHeight) && pc.capsuleHalfHeight > 0) this.config.capsuleHalfHeight = pc.capsuleHalfHeight
+    if (Number.isFinite(pc.crouchHalfHeight) && pc.crouchHalfHeight > 0) {
+      this.config.crouchHalfHeight = pc.crouchHalfHeight
+      const charMgr = this.physicsWorld?._charMgr
+      if (charMgr) charMgr.crouchHalfHeight = pc.crouchHalfHeight
+    }
+    if (Number.isFinite(pc.mass) && pc.mass > 0) this.config.playerMass = pc.mass
+    this._derivePhysicalHalfHeight()
+  }
+
+  setPhysicsWorld(world) {
+    this.physicsWorld = world
+  }
+
+  standingCentreY(groundY) {
+    return groundY + this._physicalHalfHeight + this.config.capsuleRadius
+  }
+
+  _submersionFrac(y, x = 0, z = 0) {
+    const waterlineY = waterlineLocalY(this.physicsWorld?._planetFrame, x, z)
+    if (waterlineY == null) return 0
+    const halfHeight = this._physicalHalfHeight
+    const bottomY = y - halfHeight
+    const span = 2 * halfHeight
+    return Math.max(0, Math.min(1, (waterlineY - bottomY) / span))
+  }
+
+  _resolveSwimVelocity(state, deltaTime, gravityVy, jumpHeld) {
+    const submersionFrac = this._submersionFrac(state.position[1], state.position[0], state.position[2])
+    const swimming = submersionFrac > 0.5
+    state.swimming = swimming
+    if (!swimming) return { vy: gravityVy, dragMul: 1 }
+    const g = this.config.gravity[1]
+    let vy = state.velocity[1] + g * SWIM_GRAVITY_MUL * deltaTime
+    if (jumpHeld) vy = Math.max(vy, SWIM_UP_SPEED)
+    else vy = Math.max(SWIM_SINK_SPEED, vy)
+    const dragMul = Math.max(0, 1 - SWIM_DRAG * deltaTime)
+    return { vy, dragMul }
+  }
+
+  addPlayerCollider(playerId, radius = 0.4) {
+    const radiusUnsafeForJolt = !Number.isFinite(radius) || radius <= 0
+    if (radiusUnsafeForJolt) radius = 0.4
+    if (this.playerBodies.has(playerId)) {
+      this.removePlayerCollider(playerId)
+    }
+    if (!this.physicsWorld) {
+      this.playerBodies.set(playerId, { id: playerId, charId: null, onGround: false })
+      return
+    }
+    const charId = this.physicsWorld.addPlayerCharacter(
+      radius,
+      this._physicalHalfHeight,
+      [0, 5, 0],
+      this.config.playerMass
+    )
+    this.playerBodies.set(playerId, { id: playerId, charId, onGround: false })
+    this._crouchStates.set(playerId, false)
+  }
+
+  snapshotCrouchStates() { return new Map(this._crouchStates) }
+
+  restoreCrouchStates(snap) {
+    this._crouchStates.clear()
+    for (const [id, v] of snap) this._crouchStates.set(id, v)
+  }
+
+  removePlayerCollider(playerId) {
+    const data = this.playerBodies.get(playerId)
+    if (data?.charId && this.physicsWorld) {
+      this.physicsWorld.removeCharacter(data.charId)
+    }
+    this.playerBodies.delete(playerId)
+    this._crouchStates.delete(playerId)
+  }
+
+  resyncPlayerFromPhysics(playerId, state) {
+    const data = this.playerBodies.get(playerId)
+    if (!data || !data.charId || !this.physicsWorld) return
+    this.physicsWorld.readCharacterPosition(data.charId, state.position)
+    this.physicsWorld.readCharacterVelocity(data.charId, state.velocity)
+    data.onGround = state.swimming ? false : this.physicsWorld.getCharacterGroundState(data.charId)
+    state.onGround = data.onGround
+    this._readGroundNormal(data.charId, state)
+  }
+
+  _readGroundNormal(charId, state) {
+    const n = state.groundNormal || (state.groundNormal = [0, 1, 0])
+    const ok = state.onGround && typeof this.physicsWorld.readCharacterGroundNormal === 'function' && this.physicsWorld.readCharacterGroundNormal(charId, n)
+    if (!ok) { n[0] = 0; n[1] = 1; n[2] = 0 }
+    const w = state.wallNormals || (state.wallNormals = [])
+    if (typeof this.physicsWorld.readCharacterWallNormals === 'function') this.physicsWorld.readCharacterWallNormals(charId, w)
+    else w.length = 0
+  }
+
+  updatePlayerPhysics(playerId, state, deltaTime) {
+    const data = this.playerBodies.get(playerId)
+    if (!data || !data.charId || !this.physicsWorld) {
+      return this._fallbackPhysics(playerId, state, deltaTime)
+    }
+    const charId = data.charId
+    const onGround = data.onGround
+    let vy = verticalVelocity(state.velocity[1], onGround, this.config.gravity[1], deltaTime)
+    const swim = this._resolveSwimVelocity(state, deltaTime, vy, !!state._jumpHeld)
+    vy = swim.vy
+    const vx = state.velocity[0] * swim.dragMul, vz = state.velocity[2] * swim.dragMul
+    this.physicsWorld.setCharacterVelocity(charId, [vx, vy, vz])
+    this.physicsWorld.updateCharacter(charId, deltaTime)
+    this.physicsWorld.readCharacterPosition(charId, state.position)
+    this.physicsWorld.readCharacterVelocity(charId, state.velocity)
+    data.onGround = state.swimming ? false : this.physicsWorld.getCharacterGroundState(charId)
+    state.onGround = data.onGround
+    this._readGroundNormal(charId, state)
+    const p = state.position
+    const supported = state.onGround && Number.isFinite(p[0] + p[1] + p[2])
+    if (!supported && this._applyKillPlane(state)) {
+      this.physicsWorld.setCharacterPosition(charId, state.position)
+    }
+    return state
+  }
+
+  _killPlaneY(x, z) {
+    const groundY = this.physicsWorld?.terrainHeightAt?.(x, z)
+    return Number.isFinite(groundY) ? groundY - KILL_DEPTH_BELOW_TERRAIN_M : KILL_PLANE_Y
+  }
+
+  _applyKillPlane(state) {
+    const p = state.position
+    const killY = this._killPlaneY(p[0], p[2])
+    const badY = !Number.isFinite(p[1]) || p[1] < killY
+    const badX = !Number.isFinite(p[0])
+    const badZ = !Number.isFinite(p[2])
+    if (badY || badX || badZ) {
+      p[0] = Number.isFinite(p[0]) ? p[0] : 0
+      p[1] = killY
+      p[2] = Number.isFinite(p[2]) ? p[2] : 0
+      state.velocity[0] = 0; state.velocity[1] = 0; state.velocity[2] = 0
+      return true
+    }
+    return false
+  }
+
+  _fallbackPhysics(playerId, state, deltaTime) {
+    const gravityVy = state.velocity[1] + this.config.gravity[1] * deltaTime
+    const swim = this._resolveSwimVelocity(state, deltaTime, gravityVy, !!state._jumpHeld)
+    state.velocity[0] *= swim.dragMul
+    state.velocity[1] = swim.vy
+    state.velocity[2] *= swim.dragMul
+    state.position[0] += state.velocity[0] * deltaTime
+    state.position[1] += state.velocity[1] * deltaTime
+    state.position[2] += state.velocity[2] * deltaTime
+    state.onGround = this._applyKillPlane(state)
+    return state
+  }
+
+  setPlayerPosition(playerId, position) {
+    const data = this.playerBodies.get(playerId)
+    if (data?.charId && this.physicsWorld) {
+      this.physicsWorld.setCharacterPosition(data.charId, position)
+    }
+  }
+
+  getPlayerPosition(playerId) {
+    const data = this.playerBodies.get(playerId)
+    if (data?.charId && this.physicsWorld) {
+      return this.physicsWorld.getCharacterPosition(data.charId)
+    }
+    return [0, 0, 0]
+  }
+
+  raycast(origin, direction, maxDistance) {
+    if (!this.physicsWorld) return { hit: false, distance: maxDistance }
+    return this.physicsWorld.raycast(origin, direction, maxDistance)
+  }
+
+  validateMovement(playerId, newPosition, oldPosition) {
+    const distance = Math.hypot(
+      newPosition[0] - oldPosition[0],
+      newPosition[1] - oldPosition[1],
+      newPosition[2] - oldPosition[2]
+    )
+    if (distance > 2.0) return { valid: false, reason: 'move_too_far', distance }
+    return { valid: true }
+  }
+
+  setCrouch(playerId, isCrouching) {
+    const data = this.playerBodies.get(playerId)
+    if (!data?.charId || !this.physicsWorld) return
+    const currentState = this._crouchStates.get(playerId)
+    if (currentState === isCrouching) return
+    this.physicsWorld.setCharacterCrouch(data.charId, isCrouching)
+    this._crouchStates.set(playerId, isCrouching)
+  }
+}

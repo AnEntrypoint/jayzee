@@ -1,0 +1,2588 @@
+{
+ "source": "spoint src/netcode/PhysicsIntegration.js (run by scripts/lib/physicsIntegrationScenarios.mjs with its scripted physics world)",
+ "scenarios": [
+  {
+   "name": "fallback-falls",
+   "trace": [
+    {
+     "label": "step-0",
+     "ok": true,
+     "value": {
+      "position": [
+       0.5,
+       4.386875,
+       -0.25
+      ],
+      "velocity": [
+       2,
+       -2.4525,
+       -1
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": null,
+      "wallNormals": null
+     }
+    },
+    {
+     "label": "step-1",
+     "ok": true,
+     "value": {
+      "position": [
+       1,
+       3.1606249999999996,
+       -0.5
+      ],
+      "velocity": [
+       2,
+       -4.905,
+       -1
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": null,
+      "wallNormals": null
+     }
+    },
+    {
+     "label": "step-2",
+     "ok": true,
+     "value": {
+      "position": [
+       1.5,
+       1.3212499999999996,
+       -0.75
+      ],
+      "velocity": [
+       2,
+       -7.3575,
+       -1
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": null,
+      "wallNormals": null
+     }
+    },
+    {
+     "label": "step-3",
+     "ok": true,
+     "value": {
+      "position": [
+       2,
+       -1.1312500000000005,
+       -1
+      ],
+      "velocity": [
+       2,
+       -9.81,
+       -1
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": null,
+      "wallNormals": null
+     }
+    },
+    {
+     "label": "step-4",
+     "ok": true,
+     "value": {
+      "position": [
+       2.5,
+       -4.196875,
+       -1.25
+      ],
+      "velocity": [
+       2,
+       -12.262500000000001,
+       -1
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": null,
+      "wallNormals": null
+     }
+    },
+    {
+     "label": "step-5",
+     "ok": true,
+     "value": {
+      "position": [
+       3,
+       -7.875625000000001,
+       -1.5
+      ],
+      "velocity": [
+       2,
+       -14.715000000000002,
+       -1
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": null,
+      "wallNormals": null
+     }
+    },
+    {
+     "label": "step-6",
+     "ok": true,
+     "value": {
+      "position": [
+       3.5,
+       -12.1675,
+       -1.75
+      ],
+      "velocity": [
+       2,
+       -17.1675,
+       -1
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": null,
+      "wallNormals": null
+     }
+    },
+    {
+     "label": "step-7",
+     "ok": true,
+     "value": {
+      "position": [
+       4,
+       -17.0725,
+       -2
+      ],
+      "velocity": [
+       2,
+       -19.62,
+       -1
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": null,
+      "wallNormals": null
+     }
+    },
+    {
+     "label": "position",
+     "ok": true,
+     "value": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "label": "validate-far",
+     "ok": true,
+     "value": {
+      "valid": false,
+      "reason": "move_too_far",
+      "distance": 3
+     }
+    },
+    {
+     "label": "validate-near",
+     "ok": true,
+     "value": {
+      "valid": true
+     }
+    },
+    {
+     "label": "raycast-no-world",
+     "ok": true,
+     "value": {
+      "hit": false,
+      "distance": 10
+     }
+    },
+    {
+     "label": "standing-centre",
+     "ok": true,
+     "value": 3.4
+    },
+    {
+     "label": "remove",
+     "ok": true,
+     "value": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "label": "after-remove-step",
+     "ok": true,
+     "value": {
+      "position": [
+       4.5,
+       -22.590625000000003,
+       -2.25
+      ],
+      "velocity": [
+       2,
+       -22.0725,
+       -1
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": null,
+      "wallNormals": null
+     }
+    }
+   ]
+  },
+  {
+   "name": "fallback-kill-plane",
+   "trace": [
+    {
+     "label": "kill",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       -100,
+       0
+      ],
+      "velocity": [
+       0,
+       0,
+       0
+      ],
+      "onGround": true,
+      "swimming": false,
+      "groundNormal": null,
+      "wallNormals": null
+     }
+    },
+    {
+     "label": "nan-x",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       -100,
+       1
+      ],
+      "velocity": [
+       0,
+       0,
+       0
+      ],
+      "onGround": true,
+      "swimming": false,
+      "groundNormal": null,
+      "wallNormals": null
+     }
+    }
+   ]
+  },
+  {
+   "name": "jolt-fall-and-jump",
+   "trace": [
+    {
+     "label": "step-0",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       4.99760498046875,
+       0
+      ],
+      "velocity": [
+       0,
+       -0.15328125,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "step-1",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       4.99281494140625,
+       0
+      ],
+      "velocity": [
+       0,
+       -0.3065625,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "step-2",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       4.9856298828125,
+       0
+      ],
+      "velocity": [
+       0,
+       -0.45984375,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "step-3",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       4.9760498046874995,
+       0
+      ],
+      "velocity": [
+       0,
+       -0.613125,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "step-4",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       4.96407470703125,
+       0
+      ],
+      "velocity": [
+       0,
+       -0.7664062500000001,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "step-5",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       4.9497045898437495,
+       0
+      ],
+      "velocity": [
+       0,
+       -0.9196875000000001,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "step-6",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       4.932939453125,
+       0
+      ],
+      "velocity": [
+       0,
+       -1.07296875,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "step-7",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       4.913779296875,
+       0
+      ],
+      "velocity": [
+       0,
+       -1.22625,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "step-8",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       4.89222412109375,
+       0
+      ],
+      "velocity": [
+       0,
+       -1.37953125,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "step-9",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       4.86827392578125,
+       0
+      ],
+      "velocity": [
+       0,
+       -1.5328125000000001,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "step-10",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       4.8419287109375,
+       0
+      ],
+      "velocity": [
+       0,
+       -1.6860937500000002,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "step-11",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       4.8131884765625,
+       0
+      ],
+      "velocity": [
+       0,
+       -1.8393750000000002,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "step-12",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       4.78205322265625,
+       0
+      ],
+      "velocity": [
+       0,
+       -1.9926562500000002,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "step-13",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       4.74852294921875,
+       0
+      ],
+      "velocity": [
+       0,
+       -2.1459375,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "step-14",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       4.71259765625,
+       0
+      ],
+      "velocity": [
+       0,
+       -2.29921875,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "step-15",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       4.67427734375,
+       0
+      ],
+      "velocity": [
+       0,
+       -2.4525,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "step-16",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       4.63356201171875,
+       0
+      ],
+      "velocity": [
+       0,
+       -2.60578125,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "step-17",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       4.5904516601562495,
+       0
+      ],
+      "velocity": [
+       0,
+       -2.7590625,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "step-18",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       4.5449462890625,
+       0
+      ],
+      "velocity": [
+       0,
+       -2.9123437500000002,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "step-19",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       4.4970458984374995,
+       0
+      ],
+      "velocity": [
+       0,
+       -3.0656250000000003,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "step-20",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       4.44675048828125,
+       0
+      ],
+      "velocity": [
+       0,
+       -3.2189062500000003,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "step-21",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       4.39406005859375,
+       0
+      ],
+      "velocity": [
+       0,
+       -3.3721875000000003,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "step-22",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       4.338974609375,
+       0
+      ],
+      "velocity": [
+       0,
+       -3.5254687500000004,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "step-23",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       4.281494140625,
+       0
+      ],
+      "velocity": [
+       0,
+       -3.6787500000000004,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "step-24",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       4.22161865234375,
+       0
+      ],
+      "velocity": [
+       0,
+       -3.8320312500000004,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "step-25",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       4.15934814453125,
+       0
+      ],
+      "velocity": [
+       0,
+       -3.9853125000000005,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "step-26",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       4.0946826171875,
+       0
+      ],
+      "velocity": [
+       0,
+       -4.13859375,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "step-27",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       4.0276220703125,
+       0
+      ],
+      "velocity": [
+       0,
+       -4.291875,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "step-28",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       3.95816650390625,
+       0
+      ],
+      "velocity": [
+       0,
+       -4.44515625,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "step-29",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       3.88631591796875,
+       0
+      ],
+      "velocity": [
+       0,
+       -4.5984375,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "step-30",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       3.8120703125,
+       0
+      ],
+      "velocity": [
+       0,
+       -4.75171875,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "step-31",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       3.7354296875,
+       0
+      ],
+      "velocity": [
+       0,
+       -4.905,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "step-32",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       3.65639404296875,
+       0
+      ],
+      "velocity": [
+       0,
+       -5.05828125,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "step-33",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       3.57496337890625,
+       0
+      ],
+      "velocity": [
+       0,
+       -5.2115625,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "step-34",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       3.4911376953124997,
+       0
+      ],
+      "velocity": [
+       0,
+       -5.36484375,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "step-35",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       3.4049169921874998,
+       0
+      ],
+      "velocity": [
+       0,
+       -5.518125,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "step-36",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       3.31630126953125,
+       0
+      ],
+      "velocity": [
+       0,
+       -5.67140625,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "step-37",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       3.2252905273437498,
+       0
+      ],
+      "velocity": [
+       0,
+       -5.8246875000000005,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "step-38",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       3.1318847656249997,
+       0
+      ],
+      "velocity": [
+       0,
+       -5.9779687500000005,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "step-39",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       3.036083984375,
+       0
+      ],
+      "velocity": [
+       0,
+       -6.1312500000000005,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "set-position",
+     "ok": true,
+     "value": [
+      12,
+      0.9,
+      0
+     ]
+    },
+    {
+     "label": "wall-step",
+     "ok": true,
+     "value": {
+      "position": [
+       12,
+       0.80180419921875,
+       0
+      ],
+      "velocity": [
+       0,
+       -6.284531250000001,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": [
+       [
+        -1,
+        0,
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "label": "resync",
+     "ok": true,
+     "value": {
+      "position": [
+       12,
+       0.80180419921875,
+       0
+      ],
+      "velocity": [
+       0,
+       -6.284531250000001,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": [
+       [
+        -1,
+        0,
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "label": "describe",
+     "ok": true,
+     "value": [
+      {
+       "id": 1,
+       "radius": 0.4,
+       "halfHeight": 1,
+       "mass": 120,
+       "position": [
+        12,
+        0.80180419921875,
+        0
+       ],
+       "velocity": [
+        0,
+        -6.284531250000001,
+        0
+       ],
+       "grounded": false,
+       "crouch": false,
+       "walls": [
+        [
+         -1,
+         0,
+         0
+        ]
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "jolt-crouch-and-config",
+   "trace": [
+    {
+     "label": "crouch-on",
+     "ok": true,
+     "value": [
+      [
+       "c",
+       true
+      ],
+      [
+       "d",
+       false
+      ]
+     ]
+    },
+    {
+     "label": "crouch-on-again",
+     "ok": true,
+     "value": [
+      [
+       "c",
+       true
+      ],
+      [
+       "d",
+       false
+      ]
+     ]
+    },
+    {
+     "label": "crouch-off",
+     "ok": true,
+     "value": [
+      [
+       "c",
+       false
+      ],
+      [
+       "d",
+       false
+      ]
+     ]
+    },
+    {
+     "label": "restore",
+     "ok": true,
+     "value": [
+      [
+       "c",
+       true
+      ],
+      [
+       "d",
+       false
+      ]
+     ]
+    },
+    {
+     "label": "apply-config",
+     "ok": true,
+     "value": {
+      "config": {
+       "gravity": [
+        0,
+        -9.81,
+        0
+       ],
+       "capsuleRadius": 0.5,
+       "capsuleHalfHeight": 1,
+       "crouchHalfHeight": 0.3,
+       "ankleClearance": 0.1,
+       "playerMass": 90
+      },
+      "physicalHalfHeight": 1.1,
+      "charMgr": {
+       "crouchHalfHeight": 0.3
+      }
+     }
+    },
+    {
+     "label": "apply-bad-config",
+     "ok": true,
+     "value": {
+      "config": {
+       "gravity": [
+        0,
+        -9.81,
+        0
+       ],
+       "capsuleRadius": 0.5,
+       "capsuleHalfHeight": 1,
+       "crouchHalfHeight": 0.3,
+       "ankleClearance": 0.1,
+       "playerMass": 90
+      },
+      "physicalHalfHeight": 1.1
+     }
+    },
+    {
+     "label": "describe",
+     "ok": true,
+     "value": [
+      {
+       "id": 1,
+       "radius": 0.4,
+       "halfHeight": 1,
+       "mass": 120,
+       "position": [
+        0,
+        5,
+        0
+       ],
+       "velocity": [
+        0,
+        0,
+        0
+       ],
+       "grounded": false,
+       "crouch": false,
+       "walls": []
+      },
+      {
+       "id": 2,
+       "radius": 0.4,
+       "halfHeight": 1,
+       "mass": 120,
+       "position": [
+        0,
+        5,
+        0
+       ],
+       "velocity": [
+        0,
+        0,
+        0
+       ],
+       "grounded": false,
+       "crouch": false,
+       "walls": []
+      }
+     ]
+    },
+    {
+     "label": "remove-c",
+     "ok": true,
+     "value": [
+      [
+       "d",
+       false
+      ]
+     ]
+    },
+    {
+     "label": "position-after-remove",
+     "ok": true,
+     "value": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "label": "describe-after-remove",
+     "ok": true,
+     "value": [
+      {
+       "id": 2,
+       "radius": 0.4,
+       "halfHeight": 1,
+       "mass": 120,
+       "position": [
+        0,
+        5,
+        0
+       ],
+       "velocity": [
+        0,
+        0,
+        0
+       ],
+       "grounded": false,
+       "crouch": false,
+       "walls": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "swim-with-characters",
+   "trace": [
+    {
+     "label": "step-0",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       4.990625,
+       0
+      ],
+      "velocity": [
+       0,
+       -0.6,
+       0
+      ],
+      "onGround": false,
+      "swimming": true,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "step-1",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       4.97885498046875,
+       0
+      ],
+      "velocity": [
+       0,
+       -0.75328125,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "step-2",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       4.96468994140625,
+       0
+      ],
+      "velocity": [
+       0,
+       -0.9065625,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "step-3",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       4.948129882812499,
+       0
+      ],
+      "velocity": [
+       0,
+       -1.05984375,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "step-4",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       4.9291748046874995,
+       0
+      ],
+      "velocity": [
+       0,
+       -1.213125,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "step-5",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       4.907824707031249,
+       0
+      ],
+      "velocity": [
+       0,
+       -1.36640625,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "step-6",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       4.88407958984375,
+       0
+      ],
+      "velocity": [
+       0,
+       -1.5196875,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "step-7",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       4.857939453125,
+       0
+      ],
+      "velocity": [
+       0,
+       -1.6729687500000001,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "step-8",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       4.8294042968749995,
+       0
+      ],
+      "velocity": [
+       0,
+       -1.8262500000000002,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "step-9",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       4.79847412109375,
+       0
+      ],
+      "velocity": [
+       0,
+       -1.9795312500000002,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "step-10",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       4.76514892578125,
+       0
+      ],
+      "velocity": [
+       0,
+       -2.1328125,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "step-11",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       4.7294287109374995,
+       0
+      ],
+      "velocity": [
+       0,
+       -2.28609375,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "step-12",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       4.6913134765625,
+       0
+      ],
+      "velocity": [
+       0,
+       -2.439375,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "step-13",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       4.65080322265625,
+       0
+      ],
+      "velocity": [
+       0,
+       -2.59265625,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "step-14",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       4.607897949218749,
+       0
+      ],
+      "velocity": [
+       0,
+       -2.7459375,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "step-15",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       4.5625976562499995,
+       0
+      ],
+      "velocity": [
+       0,
+       -2.89921875,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "step-16",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       4.514902343749999,
+       0
+      ],
+      "velocity": [
+       0,
+       -3.0525,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "step-17",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       4.46481201171875,
+       0
+      ],
+      "velocity": [
+       0,
+       -3.2057812500000002,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "step-18",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       4.41232666015625,
+       0
+      ],
+      "velocity": [
+       0,
+       -3.3590625000000003,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "step-19",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       4.3574462890625,
+       0
+      ],
+      "velocity": [
+       0,
+       -3.5123437500000003,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "step-20",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       4.3001708984375,
+       0
+      ],
+      "velocity": [
+       0,
+       -3.6656250000000004,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "step-21",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       4.24050048828125,
+       0
+      ],
+      "velocity": [
+       0,
+       -3.8189062500000004,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "step-22",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       4.17843505859375,
+       0
+      ],
+      "velocity": [
+       0,
+       -3.9721875000000004,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "step-23",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       4.113974609375,
+       0
+      ],
+      "velocity": [
+       0,
+       -4.1254687500000005,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "step-24",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       4.047119140625,
+       0
+      ],
+      "velocity": [
+       0,
+       -4.2787500000000005,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "step-25",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       3.97786865234375,
+       0
+      ],
+      "velocity": [
+       0,
+       -4.4320312500000005,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "step-26",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       3.90622314453125,
+       0
+      ],
+      "velocity": [
+       0,
+       -4.585312500000001,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "step-27",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       3.8321826171874998,
+       0
+      ],
+      "velocity": [
+       0,
+       -4.738593750000001,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "step-28",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       3.7557470703124998,
+       0
+      ],
+      "velocity": [
+       0,
+       -4.891875000000001,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "step-29",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       3.67691650390625,
+       0
+      ],
+      "velocity": [
+       0,
+       -5.045156250000001,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    }
+   ]
+  },
+  {
+   "name": "swim-fallback-without-character",
+   "trace": [
+    {
+     "label": "step-0",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       0.99856298828125,
+       0
+      ],
+      "velocity": [
+       0,
+       -0.045984375,
+       0
+      ],
+      "onGround": false,
+      "swimming": true,
+      "groundNormal": null,
+      "wallNormals": null
+     }
+    },
+    {
+     "label": "step-1",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       0.99568896484375,
+       0
+      ],
+      "velocity": [
+       0,
+       -0.09196875,
+       0
+      ],
+      "onGround": false,
+      "swimming": true,
+      "groundNormal": null,
+      "wallNormals": null
+     }
+    },
+    {
+     "label": "step-2",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       0.9913779296875,
+       0
+      ],
+      "velocity": [
+       0,
+       -0.137953125,
+       0
+      ],
+      "onGround": false,
+      "swimming": true,
+      "groundNormal": null,
+      "wallNormals": null
+     }
+    },
+    {
+     "label": "step-3",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       1.0601279296875001,
+       0
+      ],
+      "velocity": [
+       0,
+       2.2,
+       0
+      ],
+      "onGround": false,
+      "swimming": true,
+      "groundNormal": null,
+      "wallNormals": null
+     }
+    },
+    {
+     "label": "step-4",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       1.1274409179687501,
+       0
+      ],
+      "velocity": [
+       0,
+       2.154015625,
+       0
+      ],
+      "onGround": false,
+      "swimming": true,
+      "groundNormal": null,
+      "wallNormals": null
+     }
+    },
+    {
+     "label": "step-5",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       1.1933168945312502,
+       0
+      ],
+      "velocity": [
+       0,
+       2.10803125,
+       0
+      ],
+      "onGround": false,
+      "swimming": true,
+      "groundNormal": null,
+      "wallNormals": null
+     }
+    }
+   ]
+  },
+  {
+   "name": "jolt-kill-plane",
+   "trace": [
+    {
+     "label": "kill",
+     "ok": true,
+     "value": {
+      "position": [
+       0,
+       -100,
+       0
+      ],
+      "velocity": [
+       0,
+       0,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": []
+     }
+    },
+    {
+     "label": "describe",
+     "ok": true,
+     "value": [
+      {
+       "id": 1,
+       "radius": 0.4,
+       "halfHeight": 1,
+       "mass": 120,
+       "position": [
+        0,
+        -100,
+        0
+       ],
+       "velocity": [
+        0,
+        -0.15328125,
+        0
+       ],
+       "grounded": false,
+       "crouch": false,
+       "walls": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "wall-and-ground-normals",
+   "trace": [
+    {
+     "label": "step-0",
+     "ok": true,
+     "value": {
+      "position": [
+       11.015625,
+       1.1976049804687499,
+       0
+      ],
+      "velocity": [
+       1,
+       -0.15328125,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": [
+       [
+        -1,
+        0,
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "label": "step-1",
+     "ok": true,
+     "value": {
+      "position": [
+       11.03125,
+       1.1928149414062499,
+       0
+      ],
+      "velocity": [
+       1,
+       -0.3065625,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": [
+       [
+        -1,
+        0,
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "label": "step-2",
+     "ok": true,
+     "value": {
+      "position": [
+       11.046875,
+       1.1856298828124998,
+       0
+      ],
+      "velocity": [
+       1,
+       -0.45984375,
+       0
+      ],
+      "onGround": false,
+      "swimming": false,
+      "groundNormal": [
+       0,
+       1,
+       0
+      ],
+      "wallNormals": [
+       [
+        -1,
+        0,
+        0
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "name": "no-character-and-raycast",
+   "trace": [
+    {
+     "label": "set-no-world",
+     "ok": true,
+     "value": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "label": "crouch-no-world",
+     "ok": true,
+     "value": []
+    },
+    {
+     "label": "raycast-up",
+     "ok": true,
+     "value": {
+      "hit": false,
+      "distance": 10
+     }
+    },
+    {
+     "label": "raycast-short",
+     "ok": true,
+     "value": {
+      "hit": false,
+      "distance": 3
+     }
+    },
+    {
+     "label": "raycast-hit",
+     "ok": true,
+     "value": {
+      "hit": true,
+      "distance": 5
+     }
+    },
+    {
+     "label": "set-world-unknown-char",
+     "ok": true,
+     "value": [
+      0,
+      0,
+      0
+     ]
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,281 @@
+{
+ "source": "spoint src/apps/AppContext.js entity proxy (_buildEntityProxy) over a fake runtime whose destroyEntity removes the entity",
+ "spawn": {
+  "position": [
+   1,
+   2,
+   3
+  ],
+  "custom": {
+   "team": "red"
+  }
+ },
+ "ops": [
+  {
+   "op": "get",
+   "field": "position"
+  },
+  {
+   "op": "set",
+   "field": "position",
+   "value": [
+    4,
+    5,
+    6
+   ]
+  },
+  {
+   "op": "get",
+   "field": "position"
+  },
+  {
+   "op": "set",
+   "field": "position",
+   "value": [
+    1,
+    2
+   ]
+  },
+  {
+   "op": "set",
+   "field": "position",
+   "value": [
+    1,
+    "$NaN",
+    3
+   ]
+  },
+  {
+   "op": "get",
+   "field": "velocity"
+  },
+  {
+   "op": "set",
+   "field": "velocity",
+   "value": [
+    0,
+    1,
+    0
+   ]
+  },
+  {
+   "op": "get",
+   "field": "velocity"
+  },
+  {
+   "op": "set",
+   "field": "velocity",
+   "value": [
+    0,
+    "$NaN",
+    0
+   ]
+  },
+  {
+   "op": "get",
+   "field": "custom"
+  },
+  {
+   "op": "set",
+   "field": "custom",
+   "value": {
+    "hp": 3
+   }
+  },
+  {
+   "op": "get",
+   "field": "custom"
+  },
+  {
+   "op": "set",
+   "field": "custom",
+   "value": [
+    1
+   ]
+  },
+  {
+   "op": "set",
+   "field": "custom",
+   "value": "text"
+  },
+  {
+   "op": "set",
+   "field": "custom",
+   "value": null
+  },
+  {
+   "op": "get",
+   "field": "custom"
+  },
+  {
+   "op": "destroy"
+  },
+  {
+   "op": "destroy"
+  },
+  {
+   "op": "get",
+   "field": "position"
+  },
+  {
+   "op": "set",
+   "field": "velocity",
+   "value": [
+    0,
+    0,
+    0
+   ]
+  },
+  {
+   "op": "get",
+   "field": "custom"
+  }
+ ],
+ "trace": [
+  {
+   "label": "0:get position",
+   "ok": true,
+   "value": [
+    1,
+    2,
+    3
+   ]
+  },
+  {
+   "label": "1:set position",
+   "ok": true,
+   "value": null
+  },
+  {
+   "label": "2:get position",
+   "ok": true,
+   "value": [
+    4,
+    5,
+    6
+   ]
+  },
+  {
+   "label": "3:set position",
+   "ok": false,
+   "name": "TypeError",
+   "message": "entity.position must be a length-3 array of finite numbers",
+   "reasonCode": null,
+   "code": null
+  },
+  {
+   "label": "4:set position",
+   "ok": false,
+   "name": "TypeError",
+   "message": "entity.position must be a length-3 array of finite numbers",
+   "reasonCode": null,
+   "code": null
+  },
+  {
+   "label": "5:get velocity",
+   "ok": true,
+   "value": [
+    0,
+    0,
+    0
+   ]
+  },
+  {
+   "label": "6:set velocity",
+   "ok": true,
+   "value": null
+  },
+  {
+   "label": "7:get velocity",
+   "ok": true,
+   "value": [
+    0,
+    1,
+    0
+   ]
+  },
+  {
+   "label": "8:set velocity",
+   "ok": false,
+   "name": "TypeError",
+   "message": "entity.velocity must be a length-3 array of finite numbers",
+   "reasonCode": null,
+   "code": null
+  },
+  {
+   "label": "9:get custom",
+   "ok": true,
+   "value": {
+    "team": "red"
+   }
+  },
+  {
+   "label": "10:set custom",
+   "ok": true,
+   "value": null
+  },
+  {
+   "label": "11:get custom",
+   "ok": true,
+   "value": {
+    "hp": 3
+   }
+  },
+  {
+   "label": "12:set custom",
+   "ok": false,
+   "name": "TypeError",
+   "message": "entity.custom must be null or a plain object",
+   "reasonCode": null,
+   "code": null
+  },
+  {
+   "label": "13:set custom",
+   "ok": false,
+   "name": "TypeError",
+   "message": "entity.custom must be null or a plain object",
+   "reasonCode": null,
+   "code": null
+  },
+  {
+   "label": "14:set custom",
+   "ok": true,
+   "value": null
+  },
+  {
+   "label": "15:get custom",
+   "ok": true,
+   "value": null
+  },
+  {
+   "label": "16:destroy",
+   "ok": true,
+   "value": null
+  },
+  {
+   "label": "17:destroy",
+   "ok": true,
+   "value": null
+  },
+  {
+   "label": "18:get position",
+   "ok": true,
+   "value": [
+    4,
+    5,
+    6
+   ]
+  },
+  {
+   "label": "19:set velocity",
+   "ok": true,
+   "value": null
+  },
+  {
+   "label": "20:get custom",
+   "ok": true,
+   "value": null
+  }
+ ],
+ "runtimeDestroyCalls": 2
+}
