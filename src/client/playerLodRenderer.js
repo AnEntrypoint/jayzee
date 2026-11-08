@@ -3,6 +3,9 @@ import { createPlayerLodPlanner } from '../client-pure/playerLodPlanner.js'
 import { TIER_DOT } from '../client-pure/playerTierSplit.js'
 import { CROWD_DOT_SIZE, decodeCrowdDots } from './crowdDots.js'
 import { CROWD_DOT_CELL_M } from '../snapshot-lod-pure/constants.js'
+import { createCrowdDotRendererWebGPU } from './playerLodRendererWebGPU.js'
+import { isWebGPUInstancingSupported } from './webgpuInstancing.js'
+import { makeDotGeometry } from './dotGeometry.js'
 
 const DOT_COLOR = 0xffcc66
 const DOT_OPACITY = 0.85
@@ -21,11 +24,7 @@ const BILLBOARD_BLOCK = [
   '}',
 ].join(LINE)
 
-export const makeDotGeometry = (size) => {
-  const geo = new THREE.PlaneGeometry(size, size)
-  geo.rotateX(-Math.PI / 2)
-  return geo
-}
+export { makeDotGeometry }
 
 export const makeDotMaterial = () => {
   const mat = new THREE.MeshBasicMaterial({ color: DOT_COLOR, transparent: true, opacity: DOT_OPACITY, depthWrite: false })
@@ -36,6 +35,11 @@ export const makeDotMaterial = () => {
 }
 
 export function createCrowdDotRenderer(scene, opts = {}) {
+  if (isWebGPUInstancingSupported(opts.renderer)) return createCrowdDotRendererWebGPU(scene, opts)
+  return createCrowdDotRendererWebGL(scene, opts)
+}
+
+export function createCrowdDotRendererWebGL(scene, opts = {}) {
   const dotCellM = opts.dotCellM || CROWD_DOT_CELL_M
   const dotSize = opts.dotSize || CROWD_DOT_SIZE
   let capacity = opts.capacity || DOT_CAPACITY
