@@ -149,3 +149,88 @@ The dispatcher owns docs/ENGINE.md, so these are recorded here and not edited.
 - Decision. Open, not fixed. Phase A forbids runs, and a fix without a reproduction would be a guess. Phase B first reproduces the hang with a host harness, then traces it with the existing backtrace build, then fixes the cause and reruns `check-engine-planet`.
 - Witness needed. `scripts/check-engine-planet.mjs` reaches RESULT on the fixed build, with the sphere settle claim at R plus radius within 0.05 m.
 - Status: open. Unvalidated.
+
+## Phase A rollout (written, not built, not run)
+
+Every item below is `unvalidated`. Nothing in this section was compiled. The C++ was checked by reading the Jolt v5.3.0 headers and by grep, and the JavaScript by `node --check`. Phase B builds, runs each witness named here, fixes the failures, and only then pushes.
+
+### Memory plan, arena and allocator (ENGINE.md Memory, Bridge, phase 4)
+- Files: `engine/src/arena.h/.cpp` (one static arena of `ENGINE_ARENA_BYTES`, set in CMake to the tier minus 4 MiB), `engine/src/budget.h/.cpp` (`budget::Capacity` and `plan`), `engine/src/pool_alloc.h/.cpp` (size-class blocks carved from the arena, Jolt hooks), `engine/src/world.h/.cpp`, `engine/src/bridge.h/.cpp`, `engine/src/engine_core.cpp` (`engine_init(players, workers, budgetBytes)`, `engine_layout`, `engine_arena_used`, `engine_arena_seal`, `engine_allocation_failures`), `src/engine/EngineWorld.js` (`resolvePlan`, `loadEngineModule`, `seal`, `arenaUsed`, `allocationFailures`, `layout`), `src/engine/bridge.js` (`readLayout`, `createBridge(module, layout)`).
+- Witness: `scripts/check-engine-core.mjs` memory gates with the new init arguments; `scripts/check-engine-bridge.mjs` gates 1 to 7 (slot counts now come from `readLayout`); `scripts/check-engine-pools.mjs` gate 6 (allocations since warm-up zero); `engine/test/witness_phase4_pools.cpp`; `engine/test/witness_phase3_bridge.cpp`.
+- Decisions taken in code, for the dispatcher to accept or change:
+  - The memory is one module with one static arena. The budget chooses the player count inside that arena, so the budget never changes the wasm memory size. This answers Problems item 1 without a tier-per-build model, and it means the module always reserves `ENGINE_ARENA_BYTES`.
+  - Body, pair and contact maxima are derived from the body tier: Jolt bodies = bodies + statics + trunks + 3, pairs = bodies × 4, contacts = bodies × 5 / 2. The old fixed `+1` covered only the ground body.
+  - Body tiers: `players ≤ 16: 512 + 32p`, `≤ 256: 1024 + 16p`, `≤ 1024: 2048 + 8p`.
+  - `allocationsSinceWarmup` counts arena carves after `markWarmup`. A Jolt allocation served from a free block is not counted. `allocationsTotal` counts every carve, including init.
+  - `ENGINE_THREADS` selects `JobSystemThreadPool(maxJobs, maxBarriers, workers − 1)`. Only the single-threaded path is in scope for Phase A.
+  - Leak variant keeps its `malloc` on purpose, as the witness. Cached views assume fixed memory, so the leak variant reads detached views once memory grows.
+- Per-unit costs, as estimated in code: body 119 bytes plus 1024 for Jolt; static, trunk or fixed body 512; contact 384; pair 128; Jolt fixed 524,288; Jolt temp 16 MiB; pool prime 669,696; page slot 1033 (×64); vegetation cell 772 (×1024); material 64; texture 32; light 32; input slot 20 (×8 per player); event 16 (×256); interest cell 516 (×1024); snapshot 29 × 128 per player; baseline history 29 × 128 × 8 per player; codec 69,648; worker scratch 65,536 each; slack 1 MiB.
+- Totals from `budget::plan`, one worker: 64 players 28,696,656 bytes (27.4 MiB); 256 players 43,174,992 (41.2 MiB); 1024 players 82,344,016 (78.5 MiB). With eight workers: 256 players 43,633,744 (41.6 MiB); 1024 players 82,802,768 (79.0 MiB). At the 64 MiB default budget, 1024 players is refused, and the largest count that fits is 744.
+- UNVERIFIED: the Jolt per-body, per-static, per-contact and per-pair costs are estimates. Witness: measure `PhysicsSystem::Init` and a full body footprint in Phase B against these.
+- UNVERIFIED on emscripten 4.0.10: the four memory exports and the `ENGINE_THREADS` branch, which is not compiled.
+
+### Proposed by jayzee: capacity table for ENGINE.md Memory
+
+This is proposed text for the dispatcher to place under the Memory section. The contract file is not edited here.
+
+> **Proposed by jayzee.** The budget chooses the player count. Everything else follows from it, and the arena holds all of it.
+>
+> | Players | Bodies | Arena, 1 worker | Arena, 8 workers | Snapshot segment per client | Baseline history per client |
+> |---|---|---|---|---|---|
+> | 64 | 2048 | 27.4 MiB | not computed | 4,752 B | 33,856 B (33 B entries, estimate in the memory plan: 29,696 B) |
+> | 256 | 5120 | 41.2 MiB | 41.6 MiB | 4,752 B | as above |
+> | 1024 | 10240 | 78.5 MiB, over the 64 MiB tier | 79.0 MiB | 4,752 B | as above |
+>
+> Per-client snapshot segment is `16 + 37 × visiblePerClient` with 128 visible. Baseline history is `baselineDepth × (8 + 33 × visiblePerClient)` with depth 8. The 1024-player row needs a larger tier than 64 MiB.
+
+Phase B recomputes the table from `bytesFor` and replaces the estimate above.
+
+### Materials and textures owned by C++ (phase 8, ENGINE.md Client resources)
+- Files: `engine/src/textures.h/.cpp` (texture slots, handle allocator with generations 1 to 65534 and retirement), `engine/src/materials.h/.cpp` (40-byte material slots, ten words, albedo as a texture handle), `engine/src/exports_materials.cpp`, `src/engine/materials.js` (`createMaterials`, `createTextures`, constants), `src/client/resourcePools.js` (`createMaterialPool` and `createTexturePool` now require a wasm host and throw a TypeError without one), `scripts/check-client-resource-pools.mjs` (material and texture gates removed), `scripts/check-engine-materials.mjs` (the material and texture gates against the module), `scripts/check-hygiene.mjs` (one scope line).
+- Witness: `scripts/check-engine-materials.mjs` for the three material gates and the churn gate; `engine/test/witness_phase8_resources.cpp` for the native refusals, retirement at generation 65534, and churn of 10000 cycles with unchanged arena and view offset.
+- Deviations: handles and albedo are `double` on the boundary, so a fraction is refused by C++ rather than truncated by `ToInt32`. Format codes 1 (RGBA8 UNORM) and 2 (RGBA8 sRGB) are chosen here; the brief named none. C++ holds slot metadata only. The texture pool's pixels are a JavaScript `Uint8Array` passed in, not a region in engine memory. The renderer reads texture pixels from engine memory, so this must be carved in Phase B before the renderer can draw an albedo from the pool. The browser page `scripts/browser/client-resource-pools-browser.js` now passes the wasm table and a JavaScript pixel buffer.
+- UNVERIFIED: no per-call object creation in the pools is witnessed only by reading. A JavaScript `Number` passed to an `f32` export is rounded at the boundary; the gate uses values exact in f32.
+
+### Interest management and snapshot delta (large player counts)
+- Files: `engine/src/interest.h/.cpp` (CSR grid over XZ cells, per-client visibility lists, `bytesFor`, `bind`), `engine/src/snapshot_delta.h/.cpp` (baseline ring and delta writer), `engine/src/exports_interest.cpp`, `src/engine/interest.js` (`createInterest`), `scripts/check-engine-interest.mjs`, `engine/src/world.h` (`slotExtent()`).
+- Witness: `scripts/check-engine-interest.mjs`. Constants: 1024 bodies with 64 clients; an unchanged delta is 16 bytes of header; a moved body appears once; visible count never exceeds `visiblePerClient`.
+- Decisions for the dispatcher: the ring stores 33 bytes per entry (body index plus record), because removed-body detection needs each baseline's index. The newest state is the current visibility list, so the usable baselines are `baselineDepth − 1`. Rotation is the identity and scale is (1, 1, 1), because the World has no per-body rotation word or scale yet. Ticks are 32-bit in the interest API; the host passes the low 32 bits. Clients store integer cell indices, not positions, so interest state is integer. Truncation is counted per update, not cumulatively.
+- Known gap: `interest::update` is fed `slotExtent()` (the fresh-slot count), not the live count, so a world with holes reads every slot it has ever issued.
+- UNVERIFIED: `std::sort`, `std::lower_bound` and `memcpy` under `-fno-exceptions -fno-rtti` in the emscripten build. The gate's assumption that `set_position` takes effect after one `engine_tick`.
+
+### Renderer in the module, WebGPU and WebGL2 (phases 10 and 11)
+- Files: `engine/src/render/render_frame.h/.cpp` (GPU-free frame plan: page layers, body records, prop compaction, material resolve, frustum planes, FNV checksum), `engine/src/render/render_backend.h`, `engine/src/render/render_webgpu.h/.cpp` (through `webgpu_cpp.h`, three WGSL modules), `engine/src/render/render_webgl2.h/.cpp` (GLSL ES 3.00, CPU culling, instanced draws), `engine/src/exports_render.cpp` (25 exports), `src/engine/renderer.js` (`loadRenderer`, `createRenderer`, `chooseBackend`), `scripts/check-engine-render.mjs`, `scripts/browser/engine-render.html` and `engine-render-browser.js` (one page for phase 10 with `?phase=10` and phase 11 with `?phase=11`).
+- Witness, not run: `engine-render.html?phase=10` in a self-launched Chromium with `allocations_since_warmup == 0`, the per-frame API call count, and the checksum. `?phase=11` with `navigatorLike` lacking `gpu`, the same checksum and the same counters.
+- Deviations: single-threaded only. No render pthread or OffscreenCanvas flag, so UNVERIFIED for ENGINE.md's threading row. No `WEBGL_multi_draw`: one instanced draw per prop class plus one terrain draw. Lights are one flat fixed buffer with a count, not clusters. Props are a built-in cube until the shape library has vertex and index buffers. Terrain placement comes from the host (`placePage`), because the planet frame has no cell-to-world inverse. WebGPU culls on the GPU, but the witness's visible counts come from the CPU plan, since reading GPU counts back needs mapping. A swapchain view is created each frame and counted in the API calls. Capacities are constants (four prop classes, 4096 body slots, 64 page layers, 64 albedo layers, 256 lights and materials), not `budget::Capacity`.
+- Body slots at 4096 are below the 10240 bodies of the 1024-player tier. Bodies beyond 4096 are not drawn. This is a deviation to fix in Phase B by deriving the constant from the budget.
+- The witness budgets (64 API calls per frame, 600 frames) are placeholders, not measurements.
+- UNVERIFIED (ENGINE.md Open items and phase text): shared device across threads; OffscreenCanvas presentation from the emscripten port; one indirect-args buffer cost (phase 10 measure); the wasm-to-JS glue cost per WebGPU call (benchmark); R32Float terrain pages and unfiltered `textureLoad`; JSPI on Safari (no `WaitAny` is used, but the check is still owed).
+- UNVERIFIED Dawn names, none checkable without emsdk headers: `emscripten_webgpu_get_device` and `preinitializedWebGPUDevice`, `wgpu::Device::Acquire`, `SurfaceDescriptorFromCanvasHTMLSelector`, `ShaderSourceWGSL`, synchronous `CreateComputePipeline`, `TexelCopyTextureInfo` and `TexelCopyBufferLayout`, `depthWriteEnabled` as bool, and the `StringView` entry points. The surface format is fixed at BGRA8Unorm.
+- Not implemented: the three.js control page. ENGINE.md phase 10 needs it for the reference images.
+- Upload gap: a page re-staged while still resident needs `engine_render_mark_page(slot)` after commit. The streamer must call it, and no streamer is in Phase A.
+
+### Witnesses for phases 2 to 8 in C++ (second witness, native host build)
+- Files: `engine/test/harness.h`, `engine/test/witness_phase2_world.cpp` through `witness_phase8_resources.cpp`, `engine/test/main_all.cpp`, `engine/test/build_host.sh` (compile line as text, not run).
+- Gate counts: phase 2 has 16 checks and 14 printed values; phase 3 has 21; phase 4 has 17; phase 5 has 24; phase 6 has 33; phase 7 has 23; phase 8 has 46.
+- Expected numbers are constants in the files, and the list of names each witness uses is in the phase reports. Phase 4 runs 65535 spawn and despawn cycles on one slot of a capacity-2 world: generations 0 to 65534, the retired count is 1 after 65535, and the next spawn lands in slot 1. The churn of 10000 bodies in batches of 16 on capacity 64 has zero allocations after warm-up.
+- The host build uses `ENGINE_ARENA_BYTES=268435456ull`, which is larger than the wasm arena. The witness agent suspected that a 64 MiB arena cannot hold the phase 6 witness's two 16 MiB temp allocators at once. That is UNVERIFIED and is checked in Phase B by measuring `arena::used()` at the phase 6 witness.
+- UNVERIFIED: the witness names may change under the parallel edits. Phase B re-checks every name against the headers first.
+
+### Integration fixes made after the agents reported
+- `engine_init` now binds the planet state, the vegetation field, the codec scratch, the materials, the textures and the interest state. Before this, the first `tickBatch` dereferenced a null planet pointer. The witness agent found it.
+- The codec exports read `codecScratch->bytes`, `values`, `counts` and `packetEpoch`, not the removed statics.
+- `budget.cpp` no longer has three `static_assert`s on names that do not exist in the headers.
+- `engine/CMakeLists.txt`: the new sources, the 53 new exports from the sources, `ENGINE_ARENA_BYTES`, and `-sUSE_WEBGPU=1 -sMIN_WEBGL_VERSION=2 -sMAX_WEBGL_VERSION=2`.
+- The gates that called `_engine_init()` with no arguments now pass the plan. `scripts/check-engine-bridge.mjs` reads slot counts from the layout, and its two assertions against removed C constants are gone. `src/engine/renderer.js` passes the plan too.
+- `scripts/check-engine-render.mjs` expects `kBodySlots = 4096`, which matches the render constant.
+- The interest export feeds `slotExtent()`, not `count()`.
+
+### Deviations for the dispatcher to decide
+- Memory: one arena in one module, with the budget choosing the player count inside it (answers Problems item 1 by a different route from the tier model).
+- Memory: the allocator counts only fresh arena carves as allocations (changes the meaning of `allocations_since_warmup`).
+- Memory: the 1024-player tier does not fit in 64 MiB. Either the tier is 128 MiB or the player cap is 744 at 64 MiB.
+- Materials and textures: C++ owns the slots and handles, but the texture pixels are not yet in engine memory.
+- Interest: 33-byte ring entries; `baselineDepth − 1` usable baselines; constant rotation and scale; 32-bit ticks.
+- Renderer: single-threaded; no multi-draw; flat lights; cube props; constant capacities; 4096 body slots cap the 1024-player tier.
+- Phase 5: the planet stall recorded above, which Phase A does not fix because it cannot run.
+- The Phase 8 pool's generation rules are unchanged from gap closure 1.

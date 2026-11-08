@@ -47,15 +47,29 @@ FetchContent_MakeAvailable(JoltPhysics)
 
 add_executable(engine_core
   src/engine_core.cpp
+  src/arena.cpp
+  src/budget.cpp
+  src/pool_alloc.cpp
   src/world.cpp
   src/bridge.cpp
   src/planet_frame.cpp
   src/page_cache.cpp
   src/planet_shape.cpp
   src/vegetation.cpp
-  src/codec.cpp)
+  src/codec.cpp
+  src/textures.cpp
+  src/materials.cpp
+  src/exports_materials.cpp
+  src/interest.cpp
+  src/snapshot_delta.cpp
+  src/exports_interest.cpp
+  src/render/render_frame.cpp
+  src/render/render_webgpu.cpp
+  src/render/render_webgl2.cpp
+  src/exports_render.cpp)
 target_link_libraries(engine_core PRIVATE Jolt)
-target_compile_definitions(engine_core PRIVATE JPH_CROSS_PLATFORM_DETERMINISTIC)
+math(EXPR ENGINE_ARENA_BYTES "${ENGINE_TIER_BYTES} - 4 * 1024 * 1024")
+target_compile_definitions(engine_core PRIVATE JPH_CROSS_PLATFORM_DETERMINISTIC ENGINE_ARENA_BYTES=${ENGINE_ARENA_BYTES}ull)
 
 set(ENGINE_EXPORTS
   _engine_init
@@ -115,7 +129,60 @@ set(ENGINE_EXPORTS
   _engine_codec_encode_packet
   _engine_codec_decode_packet
   _engine_codec_packet_epoch
-  _engine_codec_counts)
+  _engine_codec_counts
+  _engine_allocation_failures
+  _engine_arena_seal
+  _engine_arena_used
+  _engine_interest_configure
+  _engine_interest_outside
+  _engine_interest_set_client
+  _engine_interest_truncated
+  _engine_interest_update
+  _engine_interest_visible_count
+  _engine_layout
+  _engine_material_add
+  _engine_material_count
+  _engine_material_is_live
+  _engine_material_live_count
+  _engine_material_remove
+  _engine_material_set
+  _engine_material_slot
+  _engine_material_stride_bytes
+  _engine_material_view_offset
+  _engine_render_albedo_staging
+  _engine_render_allocations_since_warmup
+  _engine_render_api_calls_last_frame
+  _engine_render_backend
+  _engine_render_bind_materials
+  _engine_render_body_classes
+  _engine_render_camera
+  _engine_render_checksum
+  _engine_render_commit_albedo
+  _engine_render_creates_after_seal
+  _engine_render_frame
+  _engine_render_frames
+  _engine_render_init
+  _engine_render_light_count
+  _engine_render_lights
+  _engine_render_mark_page
+  _engine_render_material_table
+  _engine_render_pages
+  _engine_render_place_page
+  _engine_render_placements
+  _engine_render_seal
+  _engine_render_set_light_count
+  _engine_render_unplace_page
+  _engine_render_uploads
+  _engine_render_visible
+  _engine_snapshot_capacity_bytes
+  _engine_snapshot_encode
+  _engine_snapshot_offset
+  _engine_texture_add
+  _engine_texture_count
+  _engine_texture_is_live
+  _engine_texture_layer
+  _engine_texture_live_count
+  _engine_texture_remove)
 string(JOIN "," ENGINE_EXPORT_LIST ${ENGINE_EXPORTS})
 
 target_link_options(engine_core PRIVATE
@@ -124,6 +191,9 @@ target_link_options(engine_core PRIVATE
   -sENVIRONMENT=web,node
   -sEXPORTED_RUNTIME_METHODS=HEAPU8,HEAP32,HEAPU32,HEAPF32,HEAPF64
   -sSTRICT=1
+  -sUSE_WEBGPU=1
+  -sMIN_WEBGL_VERSION=2
+  -sMAX_WEBGL_VERSION=2
   -sSTACK_SIZE=1048576
   -sINITIAL_MEMORY=${ENGINE_TIER_BYTES}
   -sEXPORTED_FUNCTIONS=${ENGINE_EXPORT_LIST})

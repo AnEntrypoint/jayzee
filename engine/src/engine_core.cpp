@@ -3,9 +3,15 @@
 
 #include <emscripten/emscripten.h>
 
+#include "arena.h"
 #include "bridge.h"
+#include "budget.h"
 #include "codec.h"
+#include "interest.h"
+#include "materials.h"
+#include "textures.h"
 #include "planet_frame.h"
+#include "pool_alloc.h"
 #include "vegetation.h"
 #include "world.h"
 
@@ -21,20 +27,137 @@ void leakBlock() {
 }
 #endif
 
-alignas(8) float stageRows[engine::kMaxBodies * engine::kBatchFloats];
-std::uint32_t stageHandles[engine::kMaxBodies];
+constexpr std::uint32_t kLayoutMagic = 0x31474e45u;
+constexpr std::uint32_t kLayoutVersion = 1;
+constexpr double kMaxBudgetBytes = 4294967296.0;
+
+enum LayoutWord : std::uint32_t {
+  kWordMagic,
+  kWordVersion,
+  kWordPlayers,
+  kWordBodies,
+  kWordWorkers,
+  kWordArenaBytes,
+  kWordUsedBytes,
+  kWordInputSlots,
+  kWordEventSlots,
+  kWordRegionCount,
+  kWordRegions,
+};
+
+enum Region : std::uint32_t {
+  kRegionControl,
+  kRegionInputs,
+  kRegionEvents,
+  kRegionTransforms,
+  kRegionPositions,
+  kRegionVelocities,
+  kRegionStageRows,
+  kRegionStageHandles,
+  kRegionPlanetScratch,
+  kRegionCodecBytes,
+  kRegionCodecValues,
+  kRegionCodecCounts,
+  kRegionCount,
+};
+
+constexpr std::uint32_t kLayoutWords = kWordRegions + kRegionCount;
+
+std::uint32_t layoutWords[kLayoutWords];
+engine::budget::Capacity capacity{};
+float* stageRows = nullptr;
+std::uint32_t* stageHandles = nullptr;
 std::int32_t planetScratch[4];
-alignas(8) std::uint8_t codecBytes[engine::codec::kScratchBytes];
-alignas(8) double codecValues[engine::codec::kScratchValues];
-std::int32_t codecCounts[4];
-std::uint32_t packetEpoch = 0;
+engine::codec::Scratch* codecScratch = nullptr;
+
+template <typename T>
+T* carveArray(std::size_t count) {
+  return static_cast<T*>(engine::arena::carve(sizeof(T) * count, alignof(T)));
+}
+
+std::uint32_t addressOf(const void* pointer) {
+  return static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(pointer));
+}
+
+void fillLayout() {
+  layoutWords[kWordMagic] = kLayoutMagic;
+  layoutWords[kWordVersion] = kLayoutVersion;
+  layoutWords[kWordPlayers] = capacity.players;
+  layoutWords[kWordBodies] = capacity.bodies;
+  layoutWords[kWordWorkers] = capacity.workers;
+  layoutWords[kWordArenaBytes] = static_cast<std::uint32_t>(capacity.arenaBytes);
+  layoutWords[kWordInputSlots] = engine::bridge::inputSlotCount();
+  layoutWords[kWordEventSlots] = engine::bridge::eventSlotCount();
+  layoutWords[kWordRegionCount] = kRegionCount;
+  layoutWords[kWordRegions + kRegionControl] = addressOf(engine::bridge::controlWords());
+  layoutWords[kWordRegions + kRegionInputs] = addressOf(engine::bridge::inputSlots());
+  layoutWords[kWordRegions + kRegionEvents] = addressOf(engine::bridge::eventSlots());
+  layoutWords[kWordRegions + kRegionTransforms] = addressOf(engine::world().transforms());
+  layoutWords[kWordRegions + kRegionPositions] = addressOf(engine::world().positions());
+  layoutWords[kWordRegions + kRegionVelocities] = addressOf(engine::world().velocities());
+  layoutWords[kWordRegions + kRegionStageRows] = addressOf(stageRows);
+  layoutWords[kWordRegions + kRegionStageHandles] = addressOf(stageHandles);
+  layoutWords[kWordRegions + kRegionPlanetScratch] = addressOf(planetScratch);
+  layoutWords[kWordRegions + kRegionCodecBytes] = addressOf(codecScratch->bytes);
+  layoutWords[kWordRegions + kRegionCodecValues] = addressOf(codecScratch->values);
+  layoutWords[kWordRegions + kRegionCodecCounts] = addressOf(codecScratch->counts);
+}
+
+int initialize(std::uint32_t players, std::uint32_t workers, double budgetBytes) {
+  if (!(budgetBytes >= 0.0) || budgetBytes > kMaxBudgetBytes) return engine::kRange;
+  if (engine::arena::sealed() || engine::arena::used() != 0) return engine::kAlreadyInitialized;
+  if (!engine::budget::plan(static_cast<std::uint64_t>(budgetBytes), players, workers, capacity)) return engine::kRange;
+  if (!engine::pool::prime(engine::pool::kPrimeCounts)) return engine::kFull;
+  const engine::Status joltStatus = engine::World::initialize();
+  if (joltStatus != engine::kOk) return joltStatus;
+  if (engine::world().bind(capacity) != engine::kOk) return engine::kFull;
+  if (engine::bridge::bind(capacity) != engine::kOk) return engine::kFull;
+  if (engine::planet::bind(engine::arena::carve(engine::planet::bytesFor(capacity.pageSlots), 16), capacity.pageSlots) == nullptr) {
+    return engine::kFull;
+  }
+  if (engine::vegetation::bind(engine::arena::carve(engine::vegetation::bytesFor(capacity.cellsPerSide, capacity.instancesPerCell), 16),
+                               capacity.cellsPerSide, capacity.instancesPerCell) == nullptr) {
+    return engine::kFull;
+  }
+  codecScratch = engine::codec::Scratch::bind(engine::arena::carve(engine::codec::Scratch::bytesFor(), 16));
+  if (codecScratch == nullptr) return engine::kFull;
+  if (engine::materials::bind(engine::arena::carve(engine::materials::bytesFor(capacity.materials), 8), capacity.materials) != engine::kOk) {
+    return engine::kFull;
+  }
+  if (engine::textures::bind(engine::arena::carve(engine::textures::bytesFor(capacity.textures), 8), capacity.textures) != engine::kOk) {
+    return engine::kFull;
+  }
+  if (!engine::interest::bind(engine::arena::carve(engine::interest::bytesFor(capacity), 8), capacity)) return engine::kFull;
+  stageRows = carveArray<float>(static_cast<std::size_t>(capacity.bodies) * engine::kBatchFloats);
+  stageHandles = carveArray<std::uint32_t>(capacity.bodies);
+  if (stageRows == nullptr || stageHandles == nullptr) return engine::kFull;
+  fillLayout();
+  return engine::kOk;
+}
 
 }
 
 extern "C" {
 
-EMSCRIPTEN_KEEPALIVE int engine_init() {
-  return engine::World::initialize();
+EMSCRIPTEN_KEEPALIVE int engine_init(std::uint32_t players, std::uint32_t workers, double budgetBytes) {
+  return initialize(players, workers, budgetBytes);
+}
+
+EMSCRIPTEN_KEEPALIVE std::uint64_t engine_arena_used() {
+  return static_cast<std::uint64_t>(engine::arena::used());
+}
+
+EMSCRIPTEN_KEEPALIVE void engine_arena_seal() {
+  engine::arena::seal();
+}
+
+EMSCRIPTEN_KEEPALIVE std::uint32_t* engine_layout() {
+  layoutWords[kWordUsedBytes] = static_cast<std::uint32_t>(engine::arena::used());
+  return layoutWords;
+}
+
+EMSCRIPTEN_KEEPALIVE std::uint64_t engine_allocation_failures() {
+  return engine::pool::failures();
 }
 
 EMSCRIPTEN_KEEPALIVE int engine_world_configure(std::uint32_t capacity, std::uint32_t tickRate, float gravity, float drag,
@@ -254,71 +377,71 @@ EMSCRIPTEN_KEEPALIVE std::uint64_t engine_veg_placed() {
 }
 
 EMSCRIPTEN_KEEPALIVE std::uint8_t* engine_codec_bytes() {
-  return codecBytes;
+  return codecScratch->bytes;
 }
 
 EMSCRIPTEN_KEEPALIVE double* engine_codec_values() {
-  return codecValues;
+  return codecScratch->values;
 }
 
 EMSCRIPTEN_KEEPALIVE int engine_codec_encode_entity() {
-  const bool ok = engine::codec::encodeEntity(codecValues, codecValues + 3, codecValues[6], codecValues + 7, codecValues[10], codecBytes);
+  const bool ok = engine::codec::encodeEntity(codecScratch->values, codecScratch->values + 3, codecScratch->values[6], codecScratch->values + 7, codecScratch->values[10], codecScratch->bytes);
   return ok ? engine::kOk : engine::kRange;
 }
 
 EMSCRIPTEN_KEEPALIVE int engine_codec_decode_entity(int length) {
   if (length < 0) return engine::kRange;
-  const bool ok = engine::codec::decodeEntity(codecBytes, static_cast<std::size_t>(length), codecValues, codecValues + 3, codecValues[6],
-                                              codecValues + 7, codecValues[10]);
+  const bool ok = engine::codec::decodeEntity(codecScratch->bytes, static_cast<std::size_t>(length), codecScratch->values, codecScratch->values + 3, codecScratch->values[6],
+                                              codecScratch->values + 7, codecScratch->values[10]);
   return ok ? engine::kOk : engine::kRange;
 }
 
 EMSCRIPTEN_KEEPALIVE int engine_codec_encode_player() {
-  const bool ok = engine::codec::encodePlayer(codecValues, codecValues + 3, codecValues[6], codecBytes);
+  const bool ok = engine::codec::encodePlayer(codecScratch->values, codecScratch->values + 3, codecScratch->values[6], codecScratch->bytes);
   return ok ? engine::kOk : engine::kRange;
 }
 
 EMSCRIPTEN_KEEPALIVE int engine_codec_decode_player(int length) {
   if (length < 0) return engine::kRange;
-  const bool ok = engine::codec::decodePlayer(codecBytes, static_cast<std::size_t>(length), codecValues, codecValues + 3, codecValues[6]);
+  const bool ok = engine::codec::decodePlayer(codecScratch->bytes, static_cast<std::size_t>(length), codecScratch->values, codecScratch->values + 3, codecScratch->values[6]);
   return ok ? engine::kOk : engine::kRange;
 }
 
 EMSCRIPTEN_KEEPALIVE int engine_codec_encode_quat() {
-  return engine::codec::encodeSmallestThree(codecValues, codecValues[4]) ? engine::kOk : engine::kRange;
+  return engine::codec::encodeSmallestThree(codecScratch->values, codecScratch->values[4]) ? engine::kOk : engine::kRange;
 }
 
 EMSCRIPTEN_KEEPALIVE int engine_codec_decode_quat() {
-  return engine::codec::decodeSmallestThree(codecValues[0], codecValues + 1) ? engine::kOk : engine::kRange;
+  return engine::codec::decodeSmallestThree(codecScratch->values[0], codecScratch->values + 1) ? engine::kOk : engine::kRange;
 }
 
 EMSCRIPTEN_KEEPALIVE int engine_codec_encode_inputs(int count) {
-  const int length = engine::codec::encodeInputs(codecValues, count, codecBytes);
+  const int length = engine::codec::encodeInputs(codecScratch->values, count, codecScratch->bytes);
   return length < 0 ? engine::kRange : length;
 }
 
 EMSCRIPTEN_KEEPALIVE int engine_codec_encode_packet(int buttons, int axes, double chartEpoch, int count) {
   const engine::codec::PacketSchema schema{buttons, axes};
-  return engine::codec::encodePacket(schema, codecValues, count, chartEpoch, codecBytes, codecCounts);
+  return engine::codec::encodePacket(schema, codecScratch->values, count, chartEpoch, codecScratch->bytes, codecScratch->counts);
 }
 
 EMSCRIPTEN_KEEPALIVE int engine_codec_decode_packet(int buttons, int axes, int length, int dropping, std::uint32_t dropAtOrBelow) {
   const engine::codec::PacketSchema schema{buttons, axes};
   const std::size_t size = length < 0 ? 0 : static_cast<std::size_t>(length);
-  return engine::codec::decodePacket(schema, codecBytes, size, dropping != 0, dropAtOrBelow, codecValues, packetEpoch);
+  return engine::codec::decodePacket(schema, codecScratch->bytes, size, dropping != 0, dropAtOrBelow, codecScratch->values, codecScratch->packetEpoch);
 }
 
 EMSCRIPTEN_KEEPALIVE std::uint32_t engine_codec_packet_epoch() {
-  return packetEpoch;
+  return codecScratch->packetEpoch;
 }
 
 EMSCRIPTEN_KEEPALIVE std::int32_t* engine_codec_counts() {
-  return codecCounts;
+  return codecScratch->counts;
 }
 
 EMSCRIPTEN_KEEPALIVE int engine_codec_decode_inputs(int length) {
   if (length < 0) return engine::kRange;
-  const int count = engine::codec::decodeInputs(codecBytes, static_cast<std::size_t>(length), codecValues);
+  const int count = engine::codec::decodeInputs(codecScratch->bytes, static_cast<std::size_t>(length), codecScratch->values);
   return count < 0 ? engine::kRange : count;
 }
 

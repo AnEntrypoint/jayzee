@@ -258,6 +258,9 @@
     "check:engine-planet": "node scripts/check-engine-planet.mjs",
     "check:engine-vegetation": "node scripts/check-engine-vegetation.mjs",
     "check:engine-codecs": "node scripts/check-engine-codecs.mjs",
+    "check:engine-materials": "node scripts/check-engine-materials.mjs",
+    "check:engine-interest": "node scripts/check-engine-interest.mjs",
+    "check:engine-render": "node scripts/check-engine-render.mjs",
     "gen:engine-codec-fixtures": "node scripts/gen-engine-codec-fixtures.mjs",
     "check:client-resource-pools": "node scripts/check-client-resource-pools.mjs"
   },
