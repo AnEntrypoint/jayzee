@@ -700,7 +700,7 @@ Rows: 229. built 46, partial 25, missing 64, owner-decision 94.
 | spoint README Server-Side ctx API | ctx.raycast(origin, dir, maxDist) | partial | src/world/query.js; scripts/check-world-query.mjs | Raycast is in the query module (row 8 partial). |
 | spoint README Client Engine API | engine.scene, engine.camera, engine.renderer, engine.THREE | owner-decision | src/render/index.js; scripts/check-render.mjs | Needs WebGL or WebGPU and the three.js module. |
 | spoint README Client Engine API | engine.client (network client or in-Worker BrowserServer) | owner-decision | src/client/index.js; scripts/check-client-loops.mjs | Needs sockets or a Worker. |
-| spoint README Client Engine API | engine.playerId | partial | src/game/playerId.js; scripts/check-game-systems.mjs | The gate imports the game barrel. No direct check of the module was found. |
+| spoint README Client Engine API | engine.playerId | built | src/game/playerId.js; scripts/check-player-id.mjs | gate scripts/check-player-id.mjs pins parsePlayerId and tryParsePlayerId to spoint src/game/playerId.js (fixture scripts/fixtures/spoint/player-id.json, written by scripts/gen-player-id-fixture.mjs): 17 inputs, each checked for the key and for the refusal. The barrel export check in scripts/check-game-systems.mjs is separate. |
 | spoint README Client Engine API | engine.cam (camera controller) | owner-decision | - | DOM input. No recorded port. |
 | spoint README Client Engine API | engine.players getMesh, getState, getAnimator | owner-decision | src/animation/animationSystem.js; scripts/check-animation.mjs | getMesh needs three.js. The state and animator logic is partial (row 55). |
 | spoint README Editor (in-browser) | P toggles editor mode | owner-decision | - | DOM editor UI (row 39). |
@@ -745,7 +745,7 @@ Rows: 58. Built: 7. Partial: 22. Missing: 7. Owner-decision: 22. Slice A is 46 r
 | 2. spoint FEATURES.md rows 121 to 176 (mapspinner) | 56 | 7 | 6 | 0 | 43 |
 | 3. upstream FEATURESET streams 11 to 27 (plus stream 17 subsections, spawn learning and migrators) | 153 | 89 | 26 | 0 | 38 |
 | 3. upstream FEATURESET streams 18 to 58 and improvement items | 229 | 107 | 25 | 0 | 97 |
-| 4. spoint README features and jayzee-only directories | 58 | 8 | 22 | 0 | 28 |
+| 4. spoint README features and jayzee-only directories | 58 | 9 | 21 | 0 | 28 |
 
 ## 6. Reconciliation and open items
 

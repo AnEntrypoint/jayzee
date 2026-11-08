@@ -1,0 +1,239 @@
+{
+  "source": "spoint src/game/playerId.js",
+  "cases": [
+    {
+      "label": "a non-empty string is its own key",
+      "args": [
+        "alice"
+      ],
+      "expect": {
+        "tryReturns": "alice",
+        "parse": {
+          "returns": "alice"
+        }
+      }
+    },
+    {
+      "label": "a numeric string keeps its digits",
+      "args": [
+        "42"
+      ],
+      "expect": {
+        "tryReturns": "42",
+        "parse": {
+          "returns": "42"
+        }
+      }
+    },
+    {
+      "label": "the empty string is refused",
+      "args": [
+        ""
+      ],
+      "expect": {
+        "tryReturns": null,
+        "parse": {
+          "throws": true,
+          "type": "TypeError",
+          "message": "[game] playerId must be a non-empty string or an integer, got string"
+        }
+      }
+    },
+    {
+      "label": "a positive integer becomes its decimal string",
+      "args": [
+        42
+      ],
+      "expect": {
+        "tryReturns": "42",
+        "parse": {
+          "returns": "42"
+        }
+      }
+    },
+    {
+      "label": "zero becomes \"0\"",
+      "args": [
+        0
+      ],
+      "expect": {
+        "tryReturns": "0",
+        "parse": {
+          "returns": "0"
+        }
+      }
+    },
+    {
+      "label": "negative zero becomes \"0\"",
+      "args": [
+        {
+          "$num": "-0"
+        }
+      ],
+      "expect": {
+        "tryReturns": "0",
+        "parse": {
+          "returns": "0"
+        }
+      }
+    },
+    {
+      "label": "a negative integer keeps its sign",
+      "args": [
+        -7
+      ],
+      "expect": {
+        "tryReturns": "-7",
+        "parse": {
+          "returns": "-7"
+        }
+      }
+    },
+    {
+      "label": "a safe integer is exact",
+      "args": [
+        9007199254740991
+      ],
+      "expect": {
+        "tryReturns": "9007199254740991",
+        "parse": {
+          "returns": "9007199254740991"
+        }
+      }
+    },
+    {
+      "label": "an integer above 2^53 uses exponent form",
+      "args": [
+        1e+21
+      ],
+      "expect": {
+        "tryReturns": "1e+21",
+        "parse": {
+          "returns": "1e+21"
+        }
+      }
+    },
+    {
+      "label": "a fraction is refused",
+      "args": [
+        1.5
+      ],
+      "expect": {
+        "tryReturns": null,
+        "parse": {
+          "throws": true,
+          "type": "TypeError",
+          "message": "[game] playerId must be a non-empty string or an integer, got number"
+        }
+      }
+    },
+    {
+      "label": "NaN is refused",
+      "args": [
+        {
+          "$num": "NaN"
+        }
+      ],
+      "expect": {
+        "tryReturns": null,
+        "parse": {
+          "throws": true,
+          "type": "TypeError",
+          "message": "[game] playerId must be a non-empty string or an integer, got number"
+        }
+      }
+    },
+    {
+      "label": "an infinity is refused",
+      "args": [
+        {
+          "$num": "Infinity"
+        }
+      ],
+      "expect": {
+        "tryReturns": null,
+        "parse": {
+          "throws": true,
+          "type": "TypeError",
+          "message": "[game] playerId must be a non-empty string or an integer, got number"
+        }
+      }
+    },
+    {
+      "label": "null is refused",
+      "args": [
+        null
+      ],
+      "expect": {
+        "tryReturns": null,
+        "parse": {
+          "throws": true,
+          "type": "TypeError",
+          "message": "[game] playerId must be a non-empty string or an integer, got object"
+        }
+      }
+    },
+    {
+      "label": "undefined is refused",
+      "args": [
+        {
+          "$undef": true
+        }
+      ],
+      "expect": {
+        "tryReturns": null,
+        "parse": {
+          "throws": true,
+          "type": "TypeError",
+          "message": "[game] playerId must be a non-empty string or an integer, got undefined"
+        }
+      }
+    },
+    {
+      "label": "a boolean is refused",
+      "args": [
+        true
+      ],
+      "expect": {
+        "tryReturns": null,
+        "parse": {
+          "throws": true,
+          "type": "TypeError",
+          "message": "[game] playerId must be a non-empty string or an integer, got boolean"
+        }
+      }
+    },
+    {
+      "label": "an array is refused",
+      "args": [
+        [
+          1
+        ]
+      ],
+      "expect": {
+        "tryReturns": null,
+        "parse": {
+          "throws": true,
+          "type": "TypeError",
+          "message": "[game] playerId must be a non-empty string or an integer, got object"
+        }
+      }
+    },
+    {
+      "label": "an object is refused",
+      "args": [
+        {
+          "id": 1
+        }
+      ],
+      "expect": {
+        "tryReturns": null,
+        "parse": {
+          "throws": true,
+          "type": "TypeError",
+          "message": "[game] playerId must be a non-empty string or an integer, got object"
+        }
+      }
+    }
+  ]
+}
