@@ -22,16 +22,21 @@ Consequences that follow from it:
 | Physics | Jolt compiled from source into the same module | Battle-tested, and inside the module there is no boundary between physics, terrain and codecs. |
 | Determinism | Jolt `CROSS_PLATFORM_DETERMINISTIC=ON`, `-ffp-contract=off`, no fast-math, fixed timestep | Client prediction and server authority must produce identical hashes. |
 | The jz kernel | Superseded | It stays only as the reference until the C++ core passes the same behavioural witnesses, then it is removed. |
-| Threads | Two builds with one API: multithreaded (pthreads and the Jolt job system) and single-threaded | Threads need `crossOriginIsolated`. GitHub Pages cannot set COOP and COEP headers, so the site needs a service-worker isolation shim or falls back to the single-threaded build. |
-| Rendering | Renderer in the same wasm module, C++ calling WebGPU through Dawn's `emdawnwebgpu` port (`webgpu_cpp.h`), with a WebGL2 path in the same module for browsers without WebGPU. three.js is retired once parity is witnessed. | Removes the JS scene graph and the per-object crossings. The research found no maintained option that targets Emscripten besides emdawnwebgpu. WebGPU is absent on many Linux and older-hardware browsers, so WebGL2 is required, not optional. |
+| Threads | Two builds with one API: multithreaded (pthreads and the Jolt job system) and single-threaded | Threads need `crossOriginIsolated`. GitHub Pages cannot set COOP and COEP headers, so Pages serves a service-worker isolation shim that sets them on the page's own responses (owner decision, 2026-11-08). Where the shim cannot take hold, the same game runs the single-threaded build behind the same API. |
+| Rendering | Renderer in the same wasm module, C++ calling WebGPU through Dawn's `emdawnwebgpu` port (`webgpu_cpp.h`), with a WebGL2 path in the same module for browsers without WebGPU. three.js is retired once parity is witnessed. Owner confirmed 2026-11-08. | Removes the JS scene graph and the per-object crossings. The research found no maintained option that targets Emscripten besides emdawnwebgpu. WebGPU is absent on many Linux and older-hardware browsers, so WebGL2 is required, not optional. |
 | Rendering library | Own thin renderer over `webgpu_cpp.h` and WebGL2, not a third-party engine | bgfx, Diligent and sokol_gfx all build both backends from Emscripten. sokol_gfx has no indirect draw and Diligent needs heavier isolation. bgfx and Diligent add indirection and per-frame state tracking that the crosstalk budget removes. Revisit if the own renderer's WebGPU path proves too costly to maintain (see Open items). |
 | Shared terrain data | One terrain page cache, written by the core, read by physics and by the renderer through `writeTexture` from the same slot | The same planet height is never computed twice. Physics and rendering read one fixed source, so there is no second terrain pass. |
 | GPU float use | GPU compute never feeds collision, prediction or the state hash | WGSL float results are not guaranteed bit-identical across vendors, so GPU results can differ. The GPU may compute display-only effects. |
+
+## Accepted deviations
+
+Owner decision (2026-11-08): a deviation from this contract is accepted and worked around when it follows from C++'s own limits, rather than copying the JS design. Jayzee lists each deviation under "Deviations for the dispatcher" in `docs/PENDING_VALIDATION.md`, with the row it changes. The dispatcher records each one here once reviewed.
 
 ## Memory
 
 - One `WebAssembly.Memory` sized at start from the device budget. Link with `ALLOW_MEMORY_GROWTH=0` and `INITIAL_MEMORY` equal to the budget. Because memory never grows, JS typed-array views over it never detach, so they are created once and kept.
 - The budget comes from `navigator.deviceMemory`, `navigator.hardwareConcurrency`, the GPU adapter limits and a per-platform table, all read once at boot. On the server it comes from configuration.
+- Player capacity tiers (owner decision, 2026-11-08): the default tier is 64 players and the top tier is 1024. `engine_init` takes the tier, and every region is sized from that tier's capacity table. A device that cannot hold the requested tier runs the highest tier its budget allows, reports the tier it runs, and never allocates above the budget.
 - Inside the memory, everything is carved into fixed regions at boot:
   - **Jolt arenas.** Jolt's allocator hooks (`JPH::Allocate`, `Free`, `AlignedAllocate`, `AlignedFree`) are pointed at engine pools before `RegisterTypes`. `TempAllocatorImpl` gets a fixed size. `PhysicsSystem::Init` gets fixed maxima for bodies, body pairs and contact constraints from the budget.
   - **Body pools.** Bodies for each prop class are created at boot with their shapes. Spawning takes a parked body from the pool and adds it with `BodyInterface::AddBodiesPrepare` and `AddBodiesFinalize` in one batch per tick. Despawning removes it in a batch and returns it to the pool. Pool ids carry a generation, so stale handles are rejected.
@@ -120,7 +125,7 @@ Each phase ends with a red witness on the old code and a green witness on the ne
 
 - Whether Jolt's job system stays deterministic across thread counts in the multithreaded wasm build. A cross-machine hash witness settles it.
 - The exact Jolt collision-dispatch entries needed for `CharacterVirtual` against the custom planet shape.
-- The isolation shim for GitHub Pages, or confirmation that the single-threaded build is the Pages default.
+- The service-worker isolation shim on GitHub Pages is decided (see the Threads row). Phase B witnesses it on the public site.
 - Whether the own renderer's WebGPU path is too costly to maintain. If it is, reconsider bgfx, which has a maintained WebGPU backend and a WebGL backend.
 - Measured cost of the wasm-to-JS glue per WebGPU call. The research found no published number, so benchmark 10 000 `wgpuRenderPassEncoderDraw` calls against the same loop in JavaScript.
 - Whether the emdawnwebgpu port in use presents correctly from a pthread with an OffscreenCanvas.
