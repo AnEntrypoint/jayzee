@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { gate, finish } from './lib/gate.mjs'
@@ -56,6 +56,11 @@ gate('a malformed index row or manifest line is refused rather than dropped', ()
   mustReject(() => parseSkillIndex('| id | name | description | bytes |\n|---|---|---|---|\n| a | A | d |\n'))
   mustReject(() => parseSkillIndex('| id | name | description | bytes |\n|---|---|---|---|\n| a | A | d | big |\n'))
   mustReject(() => parseManifest('abc 12 physics.md\n'))
+})
+
+gate('the fixture directory holds exactly the 47 manifest entries and MANIFEST.txt, and no other file', () => {
+  sameJson(readdirSync(fixtureDir).sort(), [...manifest.map((entry) => entry.name), 'MANIFEST.txt'].sort(), 'directory listing')
+  same(manifest.length, 47, 'manifest entries')
 })
 
 finish()

@@ -120,4 +120,31 @@ gate('a registry without a verifier is refused', () => {
   mustThrow(() => createSkillRegistry({}))
 })
 
+gate('every served skill, refused alone, leaves the registry without it, and the refusal names it (all 23)', () => {
+  for (const target of skills) {
+    const registry = createSkillRegistry({ verify: (skill) => skill.id !== target.id && verify(skill) })
+    let message = ''
+    for (const skill of skills) {
+      try {
+        registry.install(skill)
+      } catch (error) {
+        assert(skill.id === target.id, 'a skill other than ' + target.id + ' was refused: ' + skill.id)
+        message = error.message
+      }
+    }
+    assert(message.includes(target.id), 'refusal does not name ' + target.id)
+    same(registry.lookup(target.id), null, target.id + ' lookup after refusal')
+    same(registry.ids().length, 22, 'installed skills when ' + target.id + ' is refused')
+  }
+})
+
+gate('every served skill, forged in its body, is refused and leaves no record (all 23)', () => {
+  for (const skill of skills) {
+    const registry = createSkillRegistry({ verify })
+    mustThrow(() => registry.install({ ...skill, body: skill.body + 'x' }))
+    same(registry.lookup(skill.id), null, skill.id + ' lookup after forged install')
+    sameJson(registry.ids(), [], skill.id + ' ids after forged install')
+  }
+})
+
 finish()
