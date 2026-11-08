@@ -1,0 +1,77 @@
+{
+  "generatedFrom": "spoint src/apps/AppLoader.js loaded from a tree written to a temp directory by scripts/gen-app-loader-fixture.mjs",
+  "dirs": [
+    "apps",
+    "more"
+  ],
+  "tree": {
+    "package.json": "{\"type\":\"module\"}\n",
+    "apps/alpha.js": "export default { name: 'alpha' }\n",
+    "apps/beta/index.js": "export default { name: 'beta' }\n",
+    "apps/eta.js": "export default { name: 'eta-flat' }\n",
+    "apps/eta/index.js": "export default { name: 'eta-folder' }\n",
+    "apps/epsilon.js": "export default {}\n",
+    "apps/gamma.js": "export default { name: 'gamma' }\nconst stop = process.exit\n",
+    "apps/delta.js": "export default {  @@ not valid js\n",
+    "apps/theta.js": "const fs = require('fs')\nexport default { fs }\n",
+    "apps/iota.js": "export default { g: globalThis }\n",
+    "apps/zeta/readme.txt": "no entry point here\n",
+    "apps/rho.txt": "not an app\n",
+    "more/omega.js": "export default { name: 'omega' }\n",
+    "more/alpha.js": "export default { name: 'alpha-shadow' }\n",
+    "more/mu/index.js": "export default { name: 'mu' }\n"
+  },
+  "loadAll": {
+    "loaded": [
+      "alpha",
+      "beta",
+      "epsilon",
+      "eta",
+      "mu",
+      "omega"
+    ],
+    "failed": [
+      "delta",
+      "gamma",
+      "iota",
+      "theta"
+    ],
+    "refusals": [
+      {
+        "reasonCode": "app-source-blocked-pattern",
+        "app": "gamma",
+        "pattern": "process.exit"
+      },
+      {
+        "reasonCode": "app-source-blocked-pattern",
+        "app": "iota",
+        "pattern": "globalThis"
+      },
+      {
+        "reasonCode": "app-source-blocked-pattern",
+        "app": "theta",
+        "pattern": "require("
+      }
+    ]
+  },
+  "registered": [
+    "alpha",
+    "beta",
+    "epsilon",
+    "eta",
+    "mu",
+    "omega"
+  ],
+  "resolve": {
+    "alpha": "apps/alpha.js",
+    "beta": "apps/beta/index.js",
+    "eta": "apps/eta.js",
+    "zeta": null,
+    "gamma": "apps/gamma.js",
+    "missing": null,
+    "omega": "more/omega.js",
+    "mu": "more/mu/index.js",
+    "epsilon": "apps/epsilon.js",
+    "rho": null
+  }
+}

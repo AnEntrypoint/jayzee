@@ -1,0 +1,167 @@
+{
+ "generatedFrom": "spoint src/sdk/chartState/index.js with scripts/lib/chartStateServerScenarios.mjs, using spoint src/shared/chartTransfer.js",
+ "result": {
+  "attach": {
+   "appliedEpoch": 0,
+   "ledgerEpoch": 0,
+   "staticBudgetMs": 12.5,
+   "migrators": 1,
+   "gates": 1,
+   "tickCallbacks": 1,
+   "ctxLedgerIsHandle": true,
+   "appRuntimeLedgerIsHandle": true,
+   "chartServiceIsHandle": true,
+   "guardEpoch": 0
+  },
+  "guardAtBase": {
+   "position": [
+    0.9999999999999863,
+    2.0000000000002274,
+    3.000000000000009
+   ],
+   "rotation": null
+  },
+  "apply": {
+   "epoch": 1,
+   "tiltDeg": 19.432877538175063,
+   "dormantCarriedIntoSwitch": 0,
+   "players": {
+    "players": 0,
+    "bufferedInputs": 0,
+    "networkPlayers": 0,
+    "lagSamples": 0,
+    "characters": 0,
+    "groundedUpwardClamped": 0,
+    "stateVelocityClamped": 0
+   },
+   "entities": {
+    "roots": 1,
+    "children": 0,
+    "bodiesMoved": 0,
+    "attachments": 0,
+    "notified": 0,
+    "statics": {
+     "nearMoved": 0,
+     "budgetMoved": 0,
+     "parked": 0
+    }
+   },
+   "worldAnchors": {
+    "spawnPoints": 0,
+    "stageSpawnPoints": 0,
+    "rejoinStates": 0
+   }
+  },
+  "afterApply": {
+   "appliedEpoch": 1,
+   "ledgerEpoch": 1,
+   "lastReportEpoch": 1,
+   "entity": {
+    "position": [
+     230.7320441210333,
+     -51.25358236283137,
+     -230.66471862582634
+    ],
+    "velocity": [
+     0.9754410020677067,
+     -0.2155235247480494,
+     0.04543634850343356
+    ],
+    "rotation": [
+     -0.12759737557877562,
+     -0.008748713680129758,
+     -0.11046700401065394,
+     0.985616259392702
+    ]
+   },
+   "events": [
+    "chart_reanchor"
+   ]
+  },
+  "guardAfter": {
+   "epoch": 1,
+   "atBase": {
+    "position": [
+     221.76701264059528,
+     -53.6226393754248,
+     -247.5174863340052
+    ],
+    "rotation": null
+   }
+  },
+  "reapply": null,
+  "skipped": {
+   "name": "Error",
+   "message": "server chart state is at epoch 1 but was asked to apply epoch 3: applying it would mix chart frames"
+  },
+  "fault": {
+   "thrown": {
+    "name": "TypeError",
+    "message": "appRuntime.getPlayers is not a function or its return value is not iterable"
+   },
+   "recorded": {
+    "epoch": 1,
+    "migrator": "entities",
+    "message": "appRuntime.getPlayers is not a function or its return value is not iterable"
+   },
+   "stops": 1,
+   "appliedEpoch": 0
+  },
+  "blockers": [
+   {
+    "label": "none",
+    "reason": null
+   },
+   {
+    "label": "peer session",
+    "reason": "peer-simulated-session: every peer must agree on the switch tick, and a rollback would restore pre-switch chart-local state"
+   },
+   {
+    "label": "teleport hold",
+    "reason": "teleport-hold-active:p1"
+   },
+   {
+    "label": "trimesh builds",
+    "reason": "static-collider-builds-pending"
+   },
+   {
+    "label": "trimesh entities",
+    "reason": "static-collider-entities-pending"
+   },
+   {
+    "label": "setup in flight",
+    "reason": "app-setup-in-flight"
+   },
+   {
+    "label": "resimulation",
+    "reason": "resimulation-in-progress"
+   },
+   {
+    "label": "registered block",
+    "reason": "custom-block"
+   }
+  ],
+  "dormant": {
+   "drains": [
+    {
+     "budgetMs": 12.5,
+     "movers": 0
+    }
+   ],
+   "stats": {
+    "drained": 0
+   },
+   "staticBudgetMs": 12.5
+  },
+  "detach": {
+   "migrators": 0,
+   "gates": 0,
+   "tickCallbacks": 0,
+   "guardCleared": true
+  },
+  "missingFrame": {
+   "name": "Error",
+   "message": "attachServerChartMigrators needs the terrain planet frame on ctx.physics._planetFrame"
+  }
+ }
+}

@@ -1,0 +1,12 @@
+# __PROJECT_NAME__
+
+A jayzee app project. The engine is the `jayzee` npm dependency in `package.json`, and this directory holds the app code.
+
+## Layout
+
+- `apps/__PROJECT_NAME__/index.js`: the starter app for the template you chose.
+- `package.json`: the project name and the jayzee version it was created for.
+
+## Add another app project
+
+Run `npx jayzee-create-app --template simple my-next-app` in the directory that holds this project to create `my-next-app/`.

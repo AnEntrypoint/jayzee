@@ -1,0 +1,12 @@
+{
+  "name": "__PROJECT_NAME__",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "create-app": "jayzee-create-app"
+  },
+  "dependencies": {
+    "jayzee": "^__JAYZEE_VERSION__"
+  }
+}
