@@ -53,10 +53,10 @@ EMSCRIPTEN_KEEPALIVE int engine_world_add_trunk(float x, float y, float z, float
   return engine::world().addTrunk(trunk);
 }
 
-EMSCRIPTEN_KEEPALIVE int engine_spawn(float px, float py, float pz, float vx, float vy, float vz) {
+EMSCRIPTEN_KEEPALIVE double engine_spawn(float px, float py, float pz, float vx, float vy, float vz) {
   const float position[3] = {px, py, pz};
   const float velocity[3] = {vx, vy, vz};
-  return engine::world().spawn(position, velocity);
+  return static_cast<double>(engine::world().spawn(position, velocity));
 }
 
 EMSCRIPTEN_KEEPALIVE float* engine_stage() {

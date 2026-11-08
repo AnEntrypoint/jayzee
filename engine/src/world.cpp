@@ -28,7 +28,7 @@ namespace {
 
 constexpr JPH::ObjectLayer kLayerNonMoving = 0;
 constexpr JPH::ObjectLayer kLayerMoving = 1;
-constexpr JPH::uint kTempBytes = 4 * 1024 * 1024;
+constexpr JPH::uint kTempBytes = 16 * 1024 * 1024;
 constexpr JPH::uint kMaxBodyPairs = 16384;
 constexpr JPH::uint kMaxContactConstraints = 10240;
 constexpr float kGroundHalfExtent = 4096.0f;
@@ -287,12 +287,12 @@ Status World::addTrunk(const float* trunk) {
   return kOk;
 }
 
-int World::spawn(const float* position, const float* velocity) {
+std::int64_t World::spawn(const float* position, const float* velocity) {
   const float row[kBatchFloats] = {position[0], position[1], position[2], velocity[0], velocity[1], velocity[2]};
   std::uint32_t handle = 0;
   const int status = spawnBatch(row, 1, &handle);
   if (status < 0) return status;
-  return static_cast<int>(handle);
+  return static_cast<std::int64_t>(handle);
 }
 
 int World::spawnBatch(const float* rows, std::uint32_t count, std::uint32_t* handles) {

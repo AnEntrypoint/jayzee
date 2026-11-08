@@ -3,6 +3,8 @@
 
 #include <cstdint>
 
+#include "world.h"
+
 namespace engine::bridge {
 
 constexpr std::uint32_t kInputSlots = 256;
@@ -44,6 +46,7 @@ struct EventSlot {
 
 static_assert(sizeof(InputSlot) == 20);
 static_assert(sizeof(EventSlot) == 16);
+static_assert(sizeof(Transform) == 28);
 
 std::uint32_t* controlWords();
 InputSlot* inputSlots();

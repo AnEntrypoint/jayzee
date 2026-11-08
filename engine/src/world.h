@@ -65,7 +65,7 @@ class World {
   Status configurePlanet(double radius, double cellSize, double gravity, double maxHeight);
   Status attachVegetation();
   Status addTrunk(const float* trunk);
-  int spawn(const float* position, const float* velocity);
+  std::int64_t spawn(const float* position, const float* velocity);
   int spawnBatch(const float* rows, std::uint32_t count, std::uint32_t* handles);
   Status despawn(std::uint32_t handle);
   Status setPosition(std::uint32_t handle, const float* position);
