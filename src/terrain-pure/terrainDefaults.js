@@ -1,0 +1,110 @@
+const deepFreeze = (value) => {
+  if (value !== null && typeof value === 'object') {
+    for (const child of Object.values(value)) deepFreeze(child)
+    Object.freeze(value)
+  }
+  return value
+}
+
+export const RELIEF_DESIGN_RADIUS_M = 63600000.0
+
+export const TERRAIN_DEFAULTS = deepFreeze({
+  splitFactor: 0.25,
+  gridMeshSize: 9,
+  maxLevel: 11,
+
+  landBias: -100000.0,
+  detailOverlay: 53.0,
+  hiFreqCut: 1.0,
+  canyonDepth: 40.0,
+  cliffAmt: 5.0,
+  beachShelf: 0.0,
+  nrmStepM: 0,
+  mtnBandWide: 1.0,
+  climateRelief: 1.0,
+  isleWide: 0.55,
+  carveWide: 0.0,
+
+  exposure: 1.05,
+  reliefShade: 6.0,
+  skyFill: 0.3,
+  variationAmt: 0.05,
+  hazeMul: 0.4,
+  vertexAO: 0.0,
+  aoAmt: 0.0,
+  biomeWarp: 1.1,
+  nightFloor: 0.18,
+  termWidth: 0.45,
+  terminatorGlow: 0.6,
+  nightLights: 0.8,
+  lookSat: 1.25,
+  lookContrast: 1.0,
+  flatNormal: 0.0,
+
+  texMix: 1.0,
+  texNrmK: 0.4,
+  nrmLow: 0.4,
+  triSharp: 3.0,
+  texSat: 1.2,
+  texBright: 1.12,
+  biomeTint: 0.62,
+  texWarp: 1.0,
+  xSoft: 0.26,
+  xFinger: 0.2,
+  ordPush: 0.0,
+  texPhoto: 0.0,
+  texPhotoNear: 0.0,
+  xFade0: 100.0,
+  xFade1: 340.0,
+  texFar0: 0.0,
+  texFar1: 10000.0,
+  nrmFade0: 100.0,
+  nrmFade1: 1000.0,
+  octFar0: 1.5,
+  octFar1: 15.0,
+  texTile: 2400.0,
+
+  poolDispLo: [0.455, 0.408, 0.275, 0.404],
+  poolDispHi: [0.498, 0.545, 0.388, 0.486],
+  poolCover: 0.18,
+  poolSpecExpRough: 24.0,
+  poolSpecExpSharp: 256.0,
+  poolSlope0: 0.08,
+  poolSlope1: 0.25,
+
+  beachTop: 15.0,
+  beachWidth: 1.0,
+  bandWarp: 20.0,
+
+  bcDeepSea: [0.02, 0.06, 0.22],
+  bcSea: [0.08, 0.18, 0.38],
+  bcShore: [0.82, 0.76, 0.52],
+  bcLowland: [0.18, 0.38, 0.10],
+  bcGrass: [0.30, 0.46, 0.12],
+  bcRock: [0.48, 0.40, 0.30],
+  bcSnow: [0.94, 0.96, 1.00],
+  bandEdgesLo: [8.0, 20.0],
+  bandEdgesHi: [60.0, 100.0],
+  snowEdges: [120.0, 180.0],
+  seaDepthM: 580.0,
+  slopeRock: [0.25, 0.55],
+
+  uOceanDeep: [0.008, 0.025, 0.06],
+  uOceanShallow: [0.07, 0.22, 0.26],
+  uOceanK: [0.009, 0.004, 0.0018],
+})
+
+export const SHAPE_UNIFORM_DEFAULTS = deepFreeze({
+  uLandBias: TERRAIN_DEFAULTS.landBias,
+  uBeachShelfM: TERRAIN_DEFAULTS.beachShelf,
+  canyonDepthMul: TERRAIN_DEFAULTS.canyonDepth,
+  uDetailOverlay: TERRAIN_DEFAULTS.detailOverlay,
+  uHiFreqCut: TERRAIN_DEFAULTS.hiFreqCut,
+  uCarveWide: TERRAIN_DEFAULTS.carveWide,
+  uMtnBandWide: TERRAIN_DEFAULTS.mtnBandWide,
+  uClimateRelief: TERRAIN_DEFAULTS.climateRelief,
+  uIsleWide: TERRAIN_DEFAULTS.isleWide,
+  cliffAmt: TERRAIN_DEFAULTS.cliffAmt,
+})
+
+export default TERRAIN_DEFAULTS

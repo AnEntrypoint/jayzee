@@ -1,0 +1,1923 @@
+{
+  "generatedFrom": {
+    "ambient": "spoint packages/mapspinner/src/tsl/terrain-ambient-shared.js",
+    "defaults": "spoint packages/mapspinner/src/terrain-defaults.js",
+    "staticCache": "spoint src/sdk/StaticCache.js (ByteBudgetLRU, parseRange)",
+    "bakeCodeVersion": "spoint src/static/BakeCodeVersion.js (lists and bakeCodeVersion over spoint files)"
+  },
+  "ambient": {
+    "constants": {
+      "ACES_FILMIC": [
+        2.51,
+        0.03,
+        2.43,
+        0.59,
+        0.14
+      ],
+      "AMBIENT_FLOOR_ADD": [
+        0.02,
+        0.026,
+        0.038
+      ],
+      "AMBIENT_FLOOR_ALBEDO": 0.14,
+      "AP_GATE_KM": [
+        3,
+        120
+      ],
+      "DISPLAY_GAMMA_INV": 0.45454545454545453,
+      "INV_PI": 0.3183098861837907,
+      "LUMA": [
+        0.2126,
+        0.7152,
+        0.0722
+      ],
+      "NIGHT_FILL": [
+        0.06,
+        0.075,
+        0.11
+      ],
+      "RAYLEIGH_SKY_TINT": 0.4,
+      "SHADOW_CASCADE_NAME_PREFIX": "shadowCascade",
+      "SKY_BALANCE_TO_GREY": 0.35,
+      "SKY_DAY_MU": [
+        -0.1,
+        0.25
+      ],
+      "SKY_FILL_TINT": [
+        0.85,
+        0.92,
+        1.1
+      ],
+      "SKY_IRRADIANCE_SCALE": 0.075,
+      "SUN_DARK_LUMINANCE": 0.0001,
+      "SUN_IRRADIANCE_GAIN": 1.25,
+      "TERMINATOR_FADE_SIN": 0.17364817766693033,
+      "TERMINATOR_TINT": [
+        1,
+        0.55,
+        0.34
+      ]
+    },
+    "samples": [
+      {
+        "muS": -1,
+        "nightAmount": 1,
+        "dayShade": 0.18,
+        "sky": [
+          0,
+          0,
+          0
+        ],
+        "vegetation": {
+          "albedoMul": [
+            0,
+            0,
+            0
+          ],
+          "add": [
+            0,
+            0,
+            0
+          ],
+          "nightAmt": 1,
+          "dayShade": 0.18,
+          "sky": [
+            0,
+            0,
+            0
+          ]
+        },
+        "surface": {
+          "terrain": [
+            0.05,
+            0.1,
+            0.15
+          ],
+          "vegetation": [
+            0.05,
+            0.1,
+            0.15
+          ],
+          "sky": [
+            0,
+            0,
+            0
+          ],
+          "nightAmt": 1,
+          "dayShade": 0.18
+        }
+      },
+      {
+        "muS": -0.5,
+        "nightAmount": 1,
+        "dayShade": 0.18,
+        "sky": [
+          0,
+          0,
+          0
+        ],
+        "vegetation": {
+          "albedoMul": [
+            0,
+            0,
+            0
+          ],
+          "add": [
+            0,
+            0,
+            0
+          ],
+          "nightAmt": 1,
+          "dayShade": 0.18,
+          "sky": [
+            0,
+            0,
+            0
+          ]
+        },
+        "surface": {
+          "terrain": [
+            0.05,
+            0.1,
+            0.15
+          ],
+          "vegetation": [
+            0.05,
+            0.1,
+            0.15
+          ],
+          "sky": [
+            0,
+            0,
+            0
+          ],
+          "nightAmt": 1,
+          "dayShade": 0.18
+        }
+      },
+      {
+        "muS": -0.2,
+        "nightAmount": 0.41700960219478733,
+        "dayShade": 0.33466392318244176,
+        "sky": [
+          0,
+          0,
+          0
+        ],
+        "vegetation": {
+          "albedoMul": [
+            0.023319615912208512,
+            -0.03497942386831276,
+            -0.093278463648834
+          ],
+          "add": [
+            0.011659807956104254,
+            0.015157750342935528,
+            0.02215363511659808
+          ],
+          "nightAmt": 0.41700960219478733,
+          "dayShade": 0.33466392318244176,
+          "sky": [
+            0,
+            0,
+            0
+          ]
+        },
+        "surface": {
+          "terrain": [
+            0.07331961591220852,
+            0.09766803840877915,
+            0.12551440329218105
+          ],
+          "vegetation": [
+            0.05,
+            0.1,
+            0.15
+          ],
+          "sky": [
+            0,
+            0,
+            0
+          ],
+          "nightAmt": 0.41700960219478733,
+          "dayShade": 0.33466392318244176
+        }
+      },
+      {
+        "muS": -0.1,
+        "nightAmount": 0.12620027434842263,
+        "dayShade": 0.45558299039780514,
+        "sky": [
+          0,
+          0,
+          0
+        ],
+        "vegetation": {
+          "albedoMul": [
+            0.0349519890260631,
+            -0.05242798353909464,
+            -0.13980795610425237
+          ],
+          "add": [
+            0.01747599451303155,
+            0.02271879286694101,
+            0.03320438957475994
+          ],
+          "nightAmt": 0.12620027434842263,
+          "dayShade": 0.45558299039780514,
+          "sky": [
+            0,
+            0,
+            0
+          ]
+        },
+        "surface": {
+          "terrain": [
+            0.0849519890260631,
+            0.09650480109739369,
+            0.11330041152263376
+          ],
+          "vegetation": [
+            0.05,
+            0.1,
+            0.15
+          ],
+          "sky": [
+            0,
+            0,
+            0
+          ],
+          "nightAmt": 0.12620027434842263,
+          "dayShade": 0.45558299039780514
+        }
+      },
+      {
+        "muS": -0.05,
+        "nightAmount": 0.03429355281207136,
+        "dayShade": 0.5219478737997257,
+        "sky": [
+          0.0007031055171647232,
+          0.0006984013856851315,
+          0.000768826257507289
+        ],
+        "vegetation": {
+          "albedoMul": [
+            0.038852063324661054,
+            -0.05772007876568768,
+            -0.1542683065515463
+          ],
+          "add": [
+            0.019314128943758575,
+            0.025108367626886143,
+            0.03669684499314129
+          ],
+          "nightAmt": 0.03429355281207136,
+          "dayShade": 0.5219478737997257,
+          "sky": [
+            0.0007031055171647232,
+            0.0006984013856851315,
+            0.000768826257507289
+          ]
+        },
+        "surface": {
+          "terrain": [
+            0.0887401606060891,
+            0.09624832824404231,
+            0.10956269171736813
+          ],
+          "vegetation": [
+            0.05,
+            0.1,
+            0.15
+          ],
+          "sky": [
+            0.0007031055171647232,
+            0.0006984013856851315,
+            0.000768826257507289
+          ],
+          "nightAmt": 0.03429355281207136,
+          "dayShade": 0.5219478737997257
+        }
+      },
+      {
+        "muS": 0,
+        "nightAmount": 0,
+        "dayShade": 0.5900000000000001,
+        "sky": [
+          0.0025163776403790087,
+          0.0024995418013994174,
+          0.0027515887110787177
+        ],
+        "vegetation": {
+          "albedoMul": [
+            0.040800987880304486,
+            -0.05920437113368492,
+            -0.1591241421105519
+          ],
+          "add": [
+            0.02,
+            0.026,
+            0.038
+          ],
+          "nightAmt": 0,
+          "dayShade": 0.5900000000000001,
+          "sky": [
+            0.0025163776403790087,
+            0.0024995418013994174,
+            0.0027515887110787177
+          ]
+        },
+        "surface": {
+          "terrain": [
+            0.09040049394015225,
+            0.09639781443315754,
+            0.10843792894472404
+          ],
+          "vegetation": [
+            0.05,
+            0.1,
+            0.15
+          ],
+          "sky": [
+            0.0025163776403790087,
+            0.0024995418013994174,
+            0.0027515887110787177
+          ],
+          "nightAmt": 0,
+          "dayShade": 0.5900000000000001
+        }
+      },
+      {
+        "muS": 0.05,
+        "nightAmount": 0,
+        "dayShade": 0.6580521262002744,
+        "sky": [
+          0.004995749727223033,
+          0.004962325635131198,
+          0.0054627128822886326
+        ],
+        "vegetation": {
+          "albedoMul": [
+            0.041590196527075074,
+            -0.05842044269187448,
+            -0.15826116448418395
+          ],
+          "add": [
+            0.02,
+            0.026,
+            0.038
+          ],
+          "nightAmt": 0,
+          "dayShade": 0.6580521262002744,
+          "sky": [
+            0.004995749727223033,
+            0.004962325635131198,
+            0.0054627128822886326
+          ]
+        },
+        "surface": {
+          "terrain": [
+            0.09079509826353754,
+            0.09678977865406276,
+            0.10886941775790801
+          ],
+          "vegetation": [
+            0.05,
+            0.1,
+            0.15
+          ],
+          "sky": [
+            0.004995749727223033,
+            0.004962325635131198,
+            0.0054627128822886326
+          ],
+          "nightAmt": 0,
+          "dayShade": 0.6580521262002744
+        }
+      },
+      {
+        "muS": 0.1,
+        "nightAmount": 0,
+        "dayShade": 0.7244170096021949,
+        "sky": [
+          0.007697155135276969,
+          0.007645657274868807,
+          0.008416624292711374
+        ],
+        "vegetation": {
+          "albedoMul": [
+            0.042450080575049,
+            -0.057566311703036235,
+            -0.1573209052793353
+          ],
+          "add": [
+            0.02,
+            0.026,
+            0.038
+          ],
+          "nightAmt": 0,
+          "dayShade": 0.7244170096021949,
+          "sky": [
+            0.007697155135276969,
+            0.007645657274868807,
+            0.008416624292711374
+          ]
+        },
+        "surface": {
+          "terrain": [
+            0.09122504028752451,
+            0.09721684414848188,
+            0.10933954736033236
+          ],
+          "vegetation": [
+            0.05,
+            0.1,
+            0.15
+          ],
+          "sky": [
+            0.007697155135276969,
+            0.007645657274868807,
+            0.008416624292711374
+          ],
+          "nightAmt": 0,
+          "dayShade": 0.7244170096021949
+        }
+      },
+      {
+        "muS": 0.25,
+        "nightAmount": 0,
+        "dayShade": 0.8965157750342936,
+        "sky": [
+          0.012692904862499996,
+          0.01260798291,
+          0.013879337175
+        ],
+        "vegetation": {
+          "albedoMul": [
+            0.04404027710212406,
+            -0.05598675439491072,
+            -0.15558206976351927
+          ],
+          "add": [
+            0.02,
+            0.026,
+            0.038
+          ],
+          "nightAmt": 0,
+          "dayShade": 0.8965157750342936,
+          "sky": [
+            0.012692904862499996,
+            0.01260798291,
+            0.013879337175
+          ]
+        },
+        "surface": {
+          "terrain": [
+            0.09202013855106204,
+            0.09800662280254464,
+            0.11020896511824035
+          ],
+          "vegetation": [
+            0.05,
+            0.1,
+            0.15
+          ],
+          "sky": [
+            0.012692904862499996,
+            0.01260798291,
+            0.013879337175
+          ],
+          "nightAmt": 0,
+          "dayShade": 0.8965157750342936
+        }
+      },
+      {
+        "muS": 0.5,
+        "nightAmount": 0,
+        "dayShade": 1,
+        "sky": [
+          0.012692904862499996,
+          0.01260798291,
+          0.013879337175
+        ],
+        "vegetation": {
+          "albedoMul": [
+            0.04404027710212406,
+            -0.05598675439491072,
+            -0.15558206976351927
+          ],
+          "add": [
+            0.02,
+            0.026,
+            0.038
+          ],
+          "nightAmt": 0,
+          "dayShade": 1,
+          "sky": [
+            0.012692904862499996,
+            0.01260798291,
+            0.013879337175
+          ]
+        },
+        "surface": {
+          "terrain": [
+            0.09202013855106204,
+            0.09800662280254464,
+            0.11020896511824035
+          ],
+          "vegetation": [
+            0.05,
+            0.1,
+            0.15
+          ],
+          "sky": [
+            0.012692904862499996,
+            0.01260798291,
+            0.013879337175
+          ],
+          "nightAmt": 0,
+          "dayShade": 1
+        }
+      },
+      {
+        "muS": 1,
+        "nightAmount": 0,
+        "dayShade": 1,
+        "sky": [
+          0.012692904862499996,
+          0.01260798291,
+          0.013879337175
+        ],
+        "vegetation": {
+          "albedoMul": [
+            0.04404027710212406,
+            -0.05598675439491072,
+            -0.15558206976351927
+          ],
+          "add": [
+            0.02,
+            0.026,
+            0.038
+          ],
+          "nightAmt": 0,
+          "dayShade": 1,
+          "sky": [
+            0.012692904862499996,
+            0.01260798291,
+            0.013879337175
+          ]
+        },
+        "surface": {
+          "terrain": [
+            0.09202013855106204,
+            0.09800662280254464,
+            0.11020896511824035
+          ],
+          "vegetation": [
+            0.05,
+            0.1,
+            0.15
+          ],
+          "sky": [
+            0.012692904862499996,
+            0.01260798291,
+            0.013879337175
+          ],
+          "nightAmt": 0,
+          "dayShade": 1
+        }
+      }
+    ],
+    "grades": [
+      {
+        "rgb": [
+          0,
+          0,
+          0
+        ],
+        "options": {},
+        "out": [
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "rgb": [
+          0,
+          0,
+          0
+        ],
+        "options": {
+          "dayShade": 0.3,
+          "nightFill": [
+            0.06,
+            0.075,
+            0.11
+          ],
+          "exposure": 1.05,
+          "lookSat": 1.25,
+          "lookContrast": 1
+        },
+        "out": [
+          0.2724996678919312,
+          0.33325961980412533,
+          0.4468252414498287
+        ]
+      },
+      {
+        "rgb": [
+          0,
+          0,
+          0
+        ],
+        "options": {
+          "dayShade": 1,
+          "nightFill": [
+            0.1,
+            0.1,
+            0.1
+          ],
+          "exposure": 0.8,
+          "lookSat": 0.5,
+          "lookContrast": 1.3
+        },
+        "out": [
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "rgb": [
+          0.5,
+          0.4,
+          0.3
+        ],
+        "options": {},
+        "out": [
+          0.8025151002184169,
+          0.7562253035671571,
+          0.6874722435444011
+        ]
+      },
+      {
+        "rgb": [
+          0.5,
+          0.4,
+          0.3
+        ],
+        "options": {
+          "dayShade": 0.3,
+          "nightFill": [
+            0.06,
+            0.075,
+            0.11
+          ],
+          "exposure": 1.05,
+          "lookSat": 1.25,
+          "lookContrast": 1
+        },
+        "out": [
+          0.6091190933225618,
+          0.5834472080955925,
+          0.5922733433742212
+        ]
+      },
+      {
+        "rgb": [
+          0.5,
+          0.4,
+          0.3
+        ],
+        "options": {
+          "dayShade": 1,
+          "nightFill": [
+            0.1,
+            0.1,
+            0.1
+          ],
+          "exposure": 0.8,
+          "lookSat": 0.5,
+          "lookContrast": 1.3
+        },
+        "out": [
+          0.7917555508857961,
+          0.767005046496001,
+          0.7339780788053581
+        ]
+      },
+      {
+        "rgb": [
+          1,
+          1,
+          1
+        ],
+        "options": {},
+        "out": [
+          0.905492450252642,
+          0.905492450252642,
+          0.905492450252642
+        ]
+      },
+      {
+        "rgb": [
+          1,
+          1,
+          1
+        ],
+        "options": {
+          "dayShade": 0.3,
+          "nightFill": [
+            0.06,
+            0.075,
+            0.11
+          ],
+          "exposure": 1.05,
+          "lookSat": 1.25,
+          "lookContrast": 1
+        },
+        "out": [
+          0.7412698993093747,
+          0.7528451786577992,
+          0.7770922814586995
+        ]
+      },
+      {
+        "rgb": [
+          1,
+          1,
+          1
+        ],
+        "options": {
+          "dayShade": 1,
+          "nightFill": [
+            0.1,
+            0.1,
+            0.1
+          ],
+          "exposure": 0.8,
+          "lookSat": 0.5,
+          "lookContrast": 1.3
+        },
+        "out": [
+          0.9327278188312451,
+          0.9327278188312451,
+          0.9327278188312451
+        ]
+      },
+      {
+        "rgb": [
+          2,
+          -1,
+          0.1
+        ],
+        "options": {},
+        "out": [
+          0.905492450252642,
+          0,
+          0.38978594968059366
+        ]
+      },
+      {
+        "rgb": [
+          2,
+          -1,
+          0.1
+        ],
+        "options": {
+          "dayShade": 0.3,
+          "nightFill": [
+            0.06,
+            0.075,
+            0.11
+          ],
+          "exposure": 1.05,
+          "lookSat": 1.25,
+          "lookContrast": 1
+        },
+        "out": [
+          0.9295416172564638,
+          0,
+          0.5032512348270213
+        ]
+      },
+      {
+        "rgb": [
+          2,
+          -1,
+          0.1
+        ],
+        "options": {
+          "dayShade": 1,
+          "nightFill": [
+            0.1,
+            0.1,
+            0.1
+          ],
+          "exposure": 0.8,
+          "lookSat": 0.5,
+          "lookContrast": 1.3
+        },
+        "out": [
+          0.7260612060882754,
+          0,
+          0.38624068447131493
+        ]
+      }
+    ],
+    "channels": [
+      {
+        "x": -1,
+        "out": 0
+      },
+      {
+        "x": 0,
+        "out": 0
+      },
+      {
+        "x": 0.1,
+        "out": 0.1258396775638155
+      },
+      {
+        "x": 0.5,
+        "out": 0.6163069544364508
+      },
+      {
+        "x": 1,
+        "out": 0.8037974683544302
+      },
+      {
+        "x": 2,
+        "out": 0.8037974683544302
+      }
+    ],
+    "lumas": [
+      {
+        "rgb": [
+          0,
+          0,
+          0
+        ],
+        "out": 0
+      },
+      {
+        "rgb": [
+          0.5,
+          0.4,
+          0.3
+        ],
+        "out": 0.41404
+      },
+      {
+        "rgb": [
+          1,
+          1,
+          1
+        ],
+        "out": 1
+      },
+      {
+        "rgb": [
+          2,
+          -1,
+          0.1
+        ],
+        "out": -0.2827799999999999
+      }
+    ]
+  },
+  "defaults": {
+    "RELIEF_DESIGN_RADIUS_M": 63600000,
+    "TERRAIN_DEFAULTS": {
+      "splitFactor": 0.25,
+      "gridMeshSize": 9,
+      "maxLevel": 11,
+      "landBias": -100000,
+      "detailOverlay": 53,
+      "hiFreqCut": 1,
+      "canyonDepth": 40,
+      "cliffAmt": 5,
+      "beachShelf": 0,
+      "nrmStepM": 0,
+      "mtnBandWide": 1,
+      "climateRelief": 1,
+      "isleWide": 0.55,
+      "carveWide": 0,
+      "exposure": 1.05,
+      "reliefShade": 6,
+      "skyFill": 0.3,
+      "variationAmt": 0.05,
+      "hazeMul": 0.4,
+      "vertexAO": 0,
+      "aoAmt": 0,
+      "biomeWarp": 1.1,
+      "nightFloor": 0.18,
+      "termWidth": 0.45,
+      "terminatorGlow": 0.6,
+      "nightLights": 0.8,
+      "lookSat": 1.25,
+      "lookContrast": 1,
+      "flatNormal": 0,
+      "texMix": 1,
+      "texNrmK": 0.4,
+      "nrmLow": 0.4,
+      "triSharp": 3,
+      "texSat": 1.2,
+      "texBright": 1.12,
+      "biomeTint": 0.62,
+      "texWarp": 1,
+      "xSoft": 0.26,
+      "xFinger": 0.2,
+      "ordPush": 0,
+      "texPhoto": 0,
+      "texPhotoNear": 0,
+      "xFade0": 100,
+      "xFade1": 340,
+      "texFar0": 0,
+      "texFar1": 10000,
+      "nrmFade0": 100,
+      "nrmFade1": 1000,
+      "octFar0": 1.5,
+      "octFar1": 15,
+      "texTile": 2400,
+      "poolDispLo": [
+        0.455,
+        0.408,
+        0.275,
+        0.404
+      ],
+      "poolDispHi": [
+        0.498,
+        0.545,
+        0.388,
+        0.486
+      ],
+      "poolCover": 0.18,
+      "poolSpecExpRough": 24,
+      "poolSpecExpSharp": 256,
+      "poolSlope0": 0.08,
+      "poolSlope1": 0.25,
+      "beachTop": 15,
+      "beachWidth": 1,
+      "bandWarp": 20,
+      "bcDeepSea": [
+        0.02,
+        0.06,
+        0.22
+      ],
+      "bcSea": [
+        0.08,
+        0.18,
+        0.38
+      ],
+      "bcShore": [
+        0.82,
+        0.76,
+        0.52
+      ],
+      "bcLowland": [
+        0.18,
+        0.38,
+        0.1
+      ],
+      "bcGrass": [
+        0.3,
+        0.46,
+        0.12
+      ],
+      "bcRock": [
+        0.48,
+        0.4,
+        0.3
+      ],
+      "bcSnow": [
+        0.94,
+        0.96,
+        1
+      ],
+      "bandEdgesLo": [
+        8,
+        20
+      ],
+      "bandEdgesHi": [
+        60,
+        100
+      ],
+      "snowEdges": [
+        120,
+        180
+      ],
+      "seaDepthM": 580,
+      "slopeRock": [
+        0.25,
+        0.55
+      ],
+      "uOceanDeep": [
+        0.008,
+        0.025,
+        0.06
+      ],
+      "uOceanShallow": [
+        0.07,
+        0.22,
+        0.26
+      ],
+      "uOceanK": [
+        0.009,
+        0.004,
+        0.0018
+      ]
+    },
+    "SHAPE_UNIFORM_DEFAULTS": {
+      "uLandBias": -100000,
+      "uBeachShelfM": 0,
+      "canyonDepthMul": 40,
+      "uDetailOverlay": 53,
+      "uHiFreqCut": 1,
+      "uCarveWide": 0,
+      "uMtnBandWide": 1,
+      "uClimateRelief": 1,
+      "uIsleWide": 0.55,
+      "cliffAmt": 5
+    }
+  },
+  "parseRange": [
+    {
+      "header": "bytes=0-",
+      "total": 0,
+      "out": null
+    },
+    {
+      "header": "bytes=0-0",
+      "total": 0,
+      "out": null
+    },
+    {
+      "header": "bytes=-5",
+      "total": 0,
+      "out": null
+    },
+    {
+      "header": "bytes=-0",
+      "total": 0,
+      "out": null
+    },
+    {
+      "header": "bytes=5-2",
+      "total": 0,
+      "out": null
+    },
+    {
+      "header": "bytes=10-",
+      "total": 0,
+      "out": null
+    },
+    {
+      "header": "bytes=abc",
+      "total": 0,
+      "out": null
+    },
+    {
+      "header": "bytes=0-1,5-6",
+      "total": 0,
+      "out": null
+    },
+    {
+      "header": " bytes=0-1",
+      "total": 0,
+      "out": null
+    },
+    {
+      "header": "bytes=-",
+      "total": 0,
+      "out": null
+    },
+    {
+      "header": "bytes=3-7",
+      "total": 0,
+      "out": null
+    },
+    {
+      "header": "bytes=99-120",
+      "total": 0,
+      "out": null
+    },
+    {
+      "header": "bytes=0-99999",
+      "total": 0,
+      "out": null
+    },
+    {
+      "header": "bytes=-100",
+      "total": 0,
+      "out": null
+    },
+    {
+      "header": "bytes=-1",
+      "total": 0,
+      "out": null
+    },
+    {
+      "header": "bytes=1-1",
+      "total": 0,
+      "out": null
+    },
+    {
+      "header": "items=0-1",
+      "total": 0,
+      "out": null
+    },
+    {
+      "header": "",
+      "total": 0,
+      "out": null
+    },
+    {
+      "header": null,
+      "total": 0,
+      "out": null
+    },
+    {
+      "header": "bytes=2-3 , 9-9",
+      "total": 0,
+      "out": null
+    },
+    {
+      "header": "bytes=0x1-2",
+      "total": 0,
+      "out": null
+    },
+    {
+      "header": "bytes=00-03",
+      "total": 0,
+      "out": null
+    },
+    {
+      "header": "bytes=1-2-3",
+      "total": 0,
+      "out": null
+    },
+    {
+      "header": "bytes=999999999999999999999-",
+      "total": 0,
+      "out": null
+    },
+    {
+      "header": "bytes=-999999999999999999999",
+      "total": 0,
+      "out": null
+    },
+    {
+      "header": "bytes=-5 ",
+      "total": 0,
+      "out": null
+    },
+    {
+      "header": "bytes=0-",
+      "total": 1,
+      "out": {
+        "start": 0,
+        "end": 0
+      }
+    },
+    {
+      "header": "bytes=0-0",
+      "total": 1,
+      "out": {
+        "start": 0,
+        "end": 0
+      }
+    },
+    {
+      "header": "bytes=-5",
+      "total": 1,
+      "out": {
+        "start": 0,
+        "end": 0
+      }
+    },
+    {
+      "header": "bytes=-0",
+      "total": 1,
+      "out": null
+    },
+    {
+      "header": "bytes=5-2",
+      "total": 1,
+      "out": null
+    },
+    {
+      "header": "bytes=10-",
+      "total": 1,
+      "out": null
+    },
+    {
+      "header": "bytes=abc",
+      "total": 1,
+      "out": null
+    },
+    {
+      "header": "bytes=0-1,5-6",
+      "total": 1,
+      "out": {
+        "start": 0,
+        "end": 0
+      }
+    },
+    {
+      "header": " bytes=0-1",
+      "total": 1,
+      "out": null
+    },
+    {
+      "header": "bytes=-",
+      "total": 1,
+      "out": null
+    },
+    {
+      "header": "bytes=3-7",
+      "total": 1,
+      "out": null
+    },
+    {
+      "header": "bytes=99-120",
+      "total": 1,
+      "out": null
+    },
+    {
+      "header": "bytes=0-99999",
+      "total": 1,
+      "out": {
+        "start": 0,
+        "end": 0
+      }
+    },
+    {
+      "header": "bytes=-100",
+      "total": 1,
+      "out": {
+        "start": 0,
+        "end": 0
+      }
+    },
+    {
+      "header": "bytes=-1",
+      "total": 1,
+      "out": {
+        "start": 0,
+        "end": 0
+      }
+    },
+    {
+      "header": "bytes=1-1",
+      "total": 1,
+      "out": null
+    },
+    {
+      "header": "items=0-1",
+      "total": 1,
+      "out": null
+    },
+    {
+      "header": "",
+      "total": 1,
+      "out": null
+    },
+    {
+      "header": null,
+      "total": 1,
+      "out": null
+    },
+    {
+      "header": "bytes=2-3 , 9-9",
+      "total": 1,
+      "out": null
+    },
+    {
+      "header": "bytes=0x1-2",
+      "total": 1,
+      "out": null
+    },
+    {
+      "header": "bytes=00-03",
+      "total": 1,
+      "out": {
+        "start": 0,
+        "end": 0
+      }
+    },
+    {
+      "header": "bytes=1-2-3",
+      "total": 1,
+      "out": null
+    },
+    {
+      "header": "bytes=999999999999999999999-",
+      "total": 1,
+      "out": null
+    },
+    {
+      "header": "bytes=-999999999999999999999",
+      "total": 1,
+      "out": {
+        "start": 0,
+        "end": 0
+      }
+    },
+    {
+      "header": "bytes=-5 ",
+      "total": 1,
+      "out": {
+        "start": 0,
+        "end": 0
+      }
+    },
+    {
+      "header": "bytes=0-",
+      "total": 10,
+      "out": {
+        "start": 0,
+        "end": 9
+      }
+    },
+    {
+      "header": "bytes=0-0",
+      "total": 10,
+      "out": {
+        "start": 0,
+        "end": 0
+      }
+    },
+    {
+      "header": "bytes=-5",
+      "total": 10,
+      "out": {
+        "start": 5,
+        "end": 9
+      }
+    },
+    {
+      "header": "bytes=-0",
+      "total": 10,
+      "out": null
+    },
+    {
+      "header": "bytes=5-2",
+      "total": 10,
+      "out": null
+    },
+    {
+      "header": "bytes=10-",
+      "total": 10,
+      "out": null
+    },
+    {
+      "header": "bytes=abc",
+      "total": 10,
+      "out": null
+    },
+    {
+      "header": "bytes=0-1,5-6",
+      "total": 10,
+      "out": {
+        "start": 0,
+        "end": 1
+      }
+    },
+    {
+      "header": " bytes=0-1",
+      "total": 10,
+      "out": null
+    },
+    {
+      "header": "bytes=-",
+      "total": 10,
+      "out": null
+    },
+    {
+      "header": "bytes=3-7",
+      "total": 10,
+      "out": {
+        "start": 3,
+        "end": 7
+      }
+    },
+    {
+      "header": "bytes=99-120",
+      "total": 10,
+      "out": null
+    },
+    {
+      "header": "bytes=0-99999",
+      "total": 10,
+      "out": {
+        "start": 0,
+        "end": 9
+      }
+    },
+    {
+      "header": "bytes=-100",
+      "total": 10,
+      "out": {
+        "start": 0,
+        "end": 9
+      }
+    },
+    {
+      "header": "bytes=-1",
+      "total": 10,
+      "out": {
+        "start": 9,
+        "end": 9
+      }
+    },
+    {
+      "header": "bytes=1-1",
+      "total": 10,
+      "out": {
+        "start": 1,
+        "end": 1
+      }
+    },
+    {
+      "header": "items=0-1",
+      "total": 10,
+      "out": null
+    },
+    {
+      "header": "",
+      "total": 10,
+      "out": null
+    },
+    {
+      "header": null,
+      "total": 10,
+      "out": null
+    },
+    {
+      "header": "bytes=2-3 , 9-9",
+      "total": 10,
+      "out": {
+        "start": 2,
+        "end": 3
+      }
+    },
+    {
+      "header": "bytes=0x1-2",
+      "total": 10,
+      "out": null
+    },
+    {
+      "header": "bytes=00-03",
+      "total": 10,
+      "out": {
+        "start": 0,
+        "end": 3
+      }
+    },
+    {
+      "header": "bytes=1-2-3",
+      "total": 10,
+      "out": null
+    },
+    {
+      "header": "bytes=999999999999999999999-",
+      "total": 10,
+      "out": null
+    },
+    {
+      "header": "bytes=-999999999999999999999",
+      "total": 10,
+      "out": {
+        "start": 0,
+        "end": 9
+      }
+    },
+    {
+      "header": "bytes=-5 ",
+      "total": 10,
+      "out": {
+        "start": 5,
+        "end": 9
+      }
+    },
+    {
+      "header": "bytes=0-",
+      "total": 100,
+      "out": {
+        "start": 0,
+        "end": 99
+      }
+    },
+    {
+      "header": "bytes=0-0",
+      "total": 100,
+      "out": {
+        "start": 0,
+        "end": 0
+      }
+    },
+    {
+      "header": "bytes=-5",
+      "total": 100,
+      "out": {
+        "start": 95,
+        "end": 99
+      }
+    },
+    {
+      "header": "bytes=-0",
+      "total": 100,
+      "out": null
+    },
+    {
+      "header": "bytes=5-2",
+      "total": 100,
+      "out": null
+    },
+    {
+      "header": "bytes=10-",
+      "total": 100,
+      "out": {
+        "start": 10,
+        "end": 99
+      }
+    },
+    {
+      "header": "bytes=abc",
+      "total": 100,
+      "out": null
+    },
+    {
+      "header": "bytes=0-1,5-6",
+      "total": 100,
+      "out": {
+        "start": 0,
+        "end": 1
+      }
+    },
+    {
+      "header": " bytes=0-1",
+      "total": 100,
+      "out": null
+    },
+    {
+      "header": "bytes=-",
+      "total": 100,
+      "out": null
+    },
+    {
+      "header": "bytes=3-7",
+      "total": 100,
+      "out": {
+        "start": 3,
+        "end": 7
+      }
+    },
+    {
+      "header": "bytes=99-120",
+      "total": 100,
+      "out": {
+        "start": 99,
+        "end": 99
+      }
+    },
+    {
+      "header": "bytes=0-99999",
+      "total": 100,
+      "out": {
+        "start": 0,
+        "end": 99
+      }
+    },
+    {
+      "header": "bytes=-100",
+      "total": 100,
+      "out": {
+        "start": 0,
+        "end": 99
+      }
+    },
+    {
+      "header": "bytes=-1",
+      "total": 100,
+      "out": {
+        "start": 99,
+        "end": 99
+      }
+    },
+    {
+      "header": "bytes=1-1",
+      "total": 100,
+      "out": {
+        "start": 1,
+        "end": 1
+      }
+    },
+    {
+      "header": "items=0-1",
+      "total": 100,
+      "out": null
+    },
+    {
+      "header": "",
+      "total": 100,
+      "out": null
+    },
+    {
+      "header": null,
+      "total": 100,
+      "out": null
+    },
+    {
+      "header": "bytes=2-3 , 9-9",
+      "total": 100,
+      "out": {
+        "start": 2,
+        "end": 3
+      }
+    },
+    {
+      "header": "bytes=0x1-2",
+      "total": 100,
+      "out": null
+    },
+    {
+      "header": "bytes=00-03",
+      "total": 100,
+      "out": {
+        "start": 0,
+        "end": 3
+      }
+    },
+    {
+      "header": "bytes=1-2-3",
+      "total": 100,
+      "out": null
+    },
+    {
+      "header": "bytes=999999999999999999999-",
+      "total": 100,
+      "out": null
+    },
+    {
+      "header": "bytes=-999999999999999999999",
+      "total": 100,
+      "out": {
+        "start": 0,
+        "end": 99
+      }
+    },
+    {
+      "header": "bytes=-5 ",
+      "total": 100,
+      "out": {
+        "start": 95,
+        "end": 99
+      }
+    }
+  ],
+  "lru": {
+    "budget": 60,
+    "ops": [
+      {
+        "op": "set",
+        "key": "a",
+        "raw": 10
+      },
+      {
+        "op": "set",
+        "key": "b",
+        "raw": 20,
+        "variants": [
+          5
+        ]
+      },
+      {
+        "op": "get",
+        "key": "a"
+      },
+      {
+        "op": "set",
+        "key": "c",
+        "raw": 30
+      },
+      {
+        "op": "set",
+        "key": "d",
+        "content": 15
+      },
+      {
+        "op": "get",
+        "key": "b"
+      },
+      {
+        "op": "grow",
+        "key": "a",
+        "variant": 40
+      },
+      {
+        "op": "set",
+        "key": "e",
+        "raw": 4,
+        "variants": [
+          2,
+          3
+        ]
+      },
+      {
+        "op": "get",
+        "key": "zz"
+      },
+      {
+        "op": "delete",
+        "key": "c"
+      },
+      {
+        "op": "set",
+        "key": "b",
+        "raw": 1
+      },
+      {
+        "op": "set",
+        "key": "f",
+        "raw": 61
+      },
+      {
+        "op": "set",
+        "key": "g",
+        "raw": 25,
+        "content": 10
+      },
+      {
+        "op": "grow",
+        "key": "g",
+        "variant": 30
+      },
+      {
+        "op": "set",
+        "key": "h",
+        "raw": 0
+      }
+    ],
+    "trace": [
+      {
+        "keys": [
+          "a"
+        ],
+        "bytes": 10,
+        "got": null
+      },
+      {
+        "keys": [
+          "a",
+          "b"
+        ],
+        "bytes": 35,
+        "got": null
+      },
+      {
+        "keys": [
+          "b",
+          "a"
+        ],
+        "bytes": 35,
+        "got": "a"
+      },
+      {
+        "keys": [
+          "a",
+          "c"
+        ],
+        "bytes": 40,
+        "got": null
+      },
+      {
+        "keys": [
+          "a",
+          "c",
+          "d"
+        ],
+        "bytes": 55,
+        "got": null
+      },
+      {
+        "keys": [
+          "a",
+          "c",
+          "d"
+        ],
+        "bytes": 55,
+        "got": null
+      },
+      {
+        "keys": [
+          "c",
+          "d"
+        ],
+        "bytes": 45,
+        "got": null
+      },
+      {
+        "keys": [
+          "c",
+          "d",
+          "e"
+        ],
+        "bytes": 54,
+        "got": null
+      },
+      {
+        "keys": [
+          "c",
+          "d",
+          "e"
+        ],
+        "bytes": 54,
+        "got": null
+      },
+      {
+        "keys": [
+          "d",
+          "e"
+        ],
+        "bytes": 24,
+        "got": null
+      },
+      {
+        "keys": [
+          "d",
+          "e",
+          "b"
+        ],
+        "bytes": 25,
+        "got": null
+      },
+      {
+        "keys": [],
+        "bytes": 0,
+        "got": null
+      },
+      {
+        "keys": [
+          "g"
+        ],
+        "bytes": 35,
+        "got": null
+      },
+      {
+        "keys": [],
+        "bytes": 0,
+        "got": null
+      },
+      {
+        "keys": [
+          "h"
+        ],
+        "bytes": 0,
+        "got": null
+      }
+    ]
+  },
+  "bake": {
+    "lists": {
+      "BAKE_INPUTS_GLB_TRANSFORM": [
+        "./GLBTransformer.js",
+        "./GLBDraco.js",
+        "./GLBKtx2.js",
+        "./GLBVrmPassthrough.js",
+        "../shared/fnv1a.js"
+      ],
+      "BAKE_INPUTS_KTX2_EXTRACT": [
+        "./KTX2Extract.js",
+        "./GLBTransformer.js",
+        "./GLBDraco.js",
+        "./GLBKtx2.js",
+        "./GLBVrmPassthrough.js",
+        "../shared/fnv1a.js"
+      ],
+      "BAKE_INPUTS_PROGRESSIVE_BAKE": [
+        "../../packages/streaming-gltf/tools/bake-cluster.mjs",
+        "../../packages/streaming-gltf/src/meshlet-codec.js",
+        "../../packages/streaming-gltf/src/degenerate-triangles.js",
+        "../../packages/streaming-gltf/src/cluster-lod-mesh.js",
+        "../../packages/streaming-gltf/src/material-convergence.js"
+      ]
+    },
+    "crossCheck": {
+      "BAKE_INPUTS_GLB_TRANSFORM": {
+        "version": "4f9845251102",
+        "files": 5
+      },
+      "BAKE_INPUTS_KTX2_EXTRACT": {
+        "version": "766ec9018563",
+        "files": 6
+      },
+      "BAKE_INPUTS_PROGRESSIVE_BAKE": {
+        "version": "5880efd7a546",
+        "files": 5
+      }
+    }
+  }
+}
