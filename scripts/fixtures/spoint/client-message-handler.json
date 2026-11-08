@@ -1,0 +1,1913 @@
+{
+  "wireProtocolVersion": 5,
+  "wireStructHash": "732d5755",
+  "callbackNames": [
+    "onPlayerLeft",
+    "onWorldDef",
+    "onAppEvent",
+    "onHotReload",
+    "onAppModule",
+    "onAssetUpdate",
+    "onPeerRttTable",
+    "onEditorSelect",
+    "onMessage",
+    "onTerrainConfig",
+    "onTerrainSculptAck",
+    "onTerrainPaintBiomeAck",
+    "onGrassDecalSync",
+    "onTerrainSculptSync",
+    "onTimeOfDaySync",
+    "onWeatherSync",
+    "onEntityRemoved",
+    "onTeleportAck"
+  ],
+  "scenarios": {
+    "mirrorOn": {
+      "messages": [
+        {
+          "type": "HANDSHAKE_ACK",
+          "payload": {
+            "version": 5,
+            "structHash": "732d5755",
+            "playerId": 7,
+            "tickRate": 20,
+            "sessionToken": "tok-1"
+          }
+        },
+        {
+          "type": "WORLD_DEF",
+          "payload": {
+            "tickRate": 20,
+            "movement": {
+              "speed": 6
+            },
+            "gravity": [
+              0,
+              -9.81,
+              0
+            ],
+            "player": {
+              "capsuleRadius": 0.4
+            },
+            "netcode": null
+          }
+        },
+        {
+          "type": "COLLISION_CONFIG",
+          "payload": {
+            "radius": 0.4,
+            "halfHeight": 0.9,
+            "crouchHalfHeight": 0.45,
+            "maxSlopeAngle": 0.7,
+            "maxStepHeight": 0.4,
+            "stickToFloorDistance": 0.25,
+            "mass": 70,
+            "gravity": [
+              0,
+              -9.81,
+              0
+            ],
+            "tileM": 16,
+            "marginM": 3,
+            "forgetRing": 2
+          }
+        },
+        {
+          "type": "COLLISION_TILE",
+          "payload": {
+            "tx": 0,
+            "tz": 0,
+            "h": 12345,
+            "v": [
+              11,
+              48,
+              85,
+              122,
+              159,
+              196,
+              233,
+              14,
+              51,
+              88,
+              125,
+              162,
+              199,
+              236,
+              17,
+              54,
+              91,
+              128,
+              165,
+              202,
+              239,
+              20,
+              57,
+              94,
+              131,
+              168,
+              205,
+              242,
+              23,
+              60,
+              97,
+              134,
+              171,
+              208,
+              245,
+              26,
+              63,
+              100,
+              137,
+              174,
+              211,
+              248,
+              29,
+              66,
+              103,
+              140,
+              177,
+              214,
+              251,
+              32,
+              69,
+              106,
+              143,
+              180,
+              217,
+              254,
+              35,
+              72,
+              109,
+              146,
+              183,
+              220,
+              1,
+              38,
+              75,
+              112,
+              149,
+              186,
+              223,
+              4,
+              41,
+              78
+            ]
+          }
+        },
+        {
+          "type": "COLLISION_TILE",
+          "payload": {
+            "tx": -1,
+            "tz": 2,
+            "h": 4294967295,
+            "v": [
+              5,
+              42,
+              79,
+              116,
+              153,
+              190,
+              227,
+              8,
+              45,
+              82,
+              119,
+              156,
+              193,
+              230,
+              11,
+              48,
+              85,
+              122,
+              159,
+              196,
+              233,
+              14,
+              51,
+              88,
+              125,
+              162,
+              199,
+              236,
+              17,
+              54,
+              91,
+              128,
+              165,
+              202,
+              239,
+              20
+            ]
+          }
+        },
+        {
+          "type": "COLLISION_TILE",
+          "payload": {
+            "tx": 3,
+            "tz": 3,
+            "h": 7,
+            "v": [
+              9,
+              46,
+              83,
+              120,
+              157,
+              194,
+              231,
+              12,
+              49,
+              86,
+              123,
+              160,
+              197,
+              234,
+              15,
+              52,
+              89,
+              126,
+              163,
+              200,
+              237,
+              18,
+              55,
+              92,
+              129,
+              166,
+              203,
+              240,
+              21,
+              58,
+              95,
+              132,
+              169,
+              206,
+              243
+            ]
+          }
+        },
+        {
+          "type": "COLLISION_CONFIG",
+          "payload": {
+            "radius": 0.4,
+            "halfHeight": 0.9,
+            "crouchHalfHeight": 0.45,
+            "maxSlopeAngle": 0.7,
+            "maxStepHeight": 0.4,
+            "stickToFloorDistance": 0.25,
+            "mass": 70,
+            "gravity": [
+              0,
+              -9.81,
+              0
+            ],
+            "tileM": 16,
+            "marginM": 3,
+            "forgetRing": 2
+          }
+        },
+        {
+          "type": "COLLISION_CONFIG",
+          "payload": {
+            "radius": 0.4,
+            "halfHeight": 0.9,
+            "crouchHalfHeight": 0.45,
+            "maxSlopeAngle": 0.7,
+            "maxStepHeight": 0.5,
+            "stickToFloorDistance": 0.25,
+            "mass": 70,
+            "gravity": [
+              0,
+              -9.81,
+              0
+            ],
+            "tileM": 16,
+            "marginM": 3,
+            "forgetRing": 2
+          }
+        },
+        {
+          "type": "DISCONNECT_REASON",
+          "payload": {
+            "code": 4
+          }
+        },
+        {
+          "type": "DISCONNECT_REASON",
+          "payload": {
+            "code": 6,
+            "version": 4
+          }
+        },
+        {
+          "type": "PLAYER_LEAVE",
+          "payload": {
+            "playerId": 9
+          }
+        },
+        {
+          "type": "SNAPSHOT",
+          "payload": {
+            "tick": 5,
+            "players": []
+          }
+        },
+        {
+          "type": "STATE_RECOVERY",
+          "payload": {
+            "snapshot": {
+              "tick": 6
+            }
+          }
+        },
+        {
+          "type": "APP_EVENT",
+          "payload": {
+            "name": "ping"
+          }
+        },
+        {
+          "type": "HOT_RELOAD",
+          "payload": {
+            "url": "/a.js"
+          }
+        },
+        {
+          "type": "APP_MODULE",
+          "payload": {
+            "path": "b"
+          }
+        },
+        {
+          "type": "ASSET_UPDATE",
+          "payload": {
+            "id": 1
+          }
+        },
+        {
+          "type": "PEER_RTT_TABLE",
+          "payload": {
+            "rtt": {
+              "8": 20
+            },
+            "pubkeys": {
+              "8": "k"
+            }
+          }
+        },
+        {
+          "type": "EDITOR_SELECT",
+          "payload": {
+            "id": 2
+          }
+        },
+        {
+          "type": "APP_LIST",
+          "payload": {
+            "apps": [
+              "a"
+            ]
+          }
+        },
+        {
+          "type": "TERRAIN_CONFIG",
+          "payload": {
+            "seed": 1
+          }
+        },
+        {
+          "type": "DESTROY_ENTITY",
+          "payload": {
+            "entityId": 5
+          }
+        },
+        {
+          "type": "TELEPORT_ACK",
+          "payload": {
+            "op": "to",
+            "phase": "placed",
+            "ok": true,
+            "position": [
+              0,
+              1,
+              0
+            ],
+            "velocity": [
+              0,
+              0,
+              0
+            ],
+            "tick": 3
+          }
+        },
+        {
+          "type": "RECONNECT_ACK",
+          "payload": {
+            "localPlayerId": 7,
+            "playerId": 7,
+            "position": [
+              1,
+              2,
+              3
+            ],
+            "health": 100,
+            "tickRate": 20,
+            "sessionToken": "tok-2",
+            "structHash": "732d5755"
+          }
+        },
+        {
+          "type": "COLLISION_CONFIG",
+          "payload": {
+            "radius": 0.4,
+            "halfHeight": 0.9,
+            "crouchHalfHeight": 0.45,
+            "maxSlopeAngle": 0.7,
+            "maxStepHeight": 0.4,
+            "stickToFloorDistance": 0.25,
+            "mass": 70,
+            "gravity": [
+              0,
+              -9.81,
+              0
+            ],
+            "tileM": 16,
+            "marginM": 3,
+            "forgetRing": 2
+          }
+        },
+        {
+          "type": "COLLISION_TILE",
+          "payload": {
+            "tx": 0,
+            "tz": 0,
+            "h": 99,
+            "v": [
+              3,
+              40,
+              77,
+              114,
+              151,
+              188,
+              225,
+              6,
+              43,
+              80,
+              117,
+              154,
+              191,
+              228,
+              9,
+              46,
+              83,
+              120,
+              157,
+              194,
+              231,
+              12,
+              49,
+              86,
+              123,
+              160,
+              197,
+              234,
+              15,
+              52,
+              89,
+              126,
+              163,
+              200,
+              237,
+              18
+            ]
+          }
+        },
+        {
+          "id": 254,
+          "payload": {}
+        }
+      ],
+      "steps": [
+        {
+          "type": "HANDSHAKE_ACK",
+          "id": 2,
+          "returns": {
+            "sessionToken": "tok-1"
+          },
+          "playerId": 7,
+          "events": []
+        },
+        {
+          "type": "WORLD_DEF",
+          "id": 113,
+          "returns": null,
+          "playerId": 7,
+          "events": [
+            {
+              "cb": "onWorldDef",
+              "args": [
+                {
+                  "tickRate": 20,
+                  "movement": {
+                    "speed": 6
+                  },
+                  "gravity": [
+                    0,
+                    -9.81,
+                    0
+                  ],
+                  "player": {
+                    "capsuleRadius": 0.4
+                  },
+                  "netcode": null
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "COLLISION_CONFIG",
+          "id": 196,
+          "returns": null,
+          "playerId": 7,
+          "events": [
+            {
+              "mirror": "sameConfig",
+              "args": [
+                {
+                  "radius": 0.4,
+                  "halfHeight": 0.9,
+                  "crouchHalfHeight": 0.45,
+                  "maxSlopeAngle": 0.7,
+                  "maxStepHeight": 0.4,
+                  "stickToFloorDistance": 0.25,
+                  "mass": 70,
+                  "gravity": [
+                    0,
+                    -9.81,
+                    0
+                  ],
+                  "tileM": 16,
+                  "marginM": 3,
+                  "forgetRing": 2
+                }
+              ]
+            },
+            {
+              "mirror": "configure",
+              "args": [
+                {
+                  "radius": 0.4,
+                  "halfHeight": 0.9,
+                  "crouchHalfHeight": 0.45,
+                  "maxSlopeAngle": 0.7,
+                  "maxStepHeight": 0.4,
+                  "stickToFloorDistance": 0.25,
+                  "mass": 70,
+                  "gravity": [
+                    0,
+                    -9.81,
+                    0
+                  ],
+                  "tileM": 16,
+                  "marginM": 3,
+                  "forgetRing": 2
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "COLLISION_TILE",
+          "id": 197,
+          "returns": null,
+          "playerId": 7,
+          "events": [
+            {
+              "mirror": "onTile",
+              "args": [
+                {
+                  "tx": 0,
+                  "tz": 0,
+                  "h": 12345,
+                  "bytes": 72,
+                  "sha256": "f1ea2423d41c019f186e07091035dfdd3627392a51584d753295a86810066c61"
+                },
+                [
+                  0,
+                  0,
+                  0
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "type": "COLLISION_TILE",
+          "id": 197,
+          "returns": null,
+          "playerId": 7,
+          "events": [
+            {
+              "mirror": "onTile",
+              "args": [
+                {
+                  "tx": -1,
+                  "tz": 2,
+                  "h": 4294967295,
+                  "bytes": 36,
+                  "sha256": "3baa9824bb4356bb0dfd52da84341ced87d453d62608a548cb81b0f671d198aa"
+                },
+                [
+                  0,
+                  0,
+                  0
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "type": "COLLISION_TILE",
+          "id": 197,
+          "returns": null,
+          "playerId": 7,
+          "events": [
+            {
+              "mirror": "onTile",
+              "args": [
+                {
+                  "tx": 3,
+                  "tz": 3,
+                  "h": 7,
+                  "bytes": 35,
+                  "sha256": "7ef959884382a76b7149fa1860d2af118d33c5f358b8400b3dd2643fe0a5f08f"
+                },
+                [
+                  0,
+                  0,
+                  0
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "type": "COLLISION_CONFIG",
+          "id": 196,
+          "returns": null,
+          "playerId": 7,
+          "events": [
+            {
+              "mirror": "sameConfig",
+              "args": [
+                {
+                  "radius": 0.4,
+                  "halfHeight": 0.9,
+                  "crouchHalfHeight": 0.45,
+                  "maxSlopeAngle": 0.7,
+                  "maxStepHeight": 0.4,
+                  "stickToFloorDistance": 0.25,
+                  "mass": 70,
+                  "gravity": [
+                    0,
+                    -9.81,
+                    0
+                  ],
+                  "tileM": 16,
+                  "marginM": 3,
+                  "forgetRing": 2
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "COLLISION_CONFIG",
+          "id": 196,
+          "returns": null,
+          "playerId": 7,
+          "events": [
+            {
+              "mirror": "sameConfig",
+              "args": [
+                {
+                  "radius": 0.4,
+                  "halfHeight": 0.9,
+                  "crouchHalfHeight": 0.45,
+                  "maxSlopeAngle": 0.7,
+                  "maxStepHeight": 0.5,
+                  "stickToFloorDistance": 0.25,
+                  "mass": 70,
+                  "gravity": [
+                    0,
+                    -9.81,
+                    0
+                  ],
+                  "tileM": 16,
+                  "marginM": 3,
+                  "forgetRing": 2
+                }
+              ]
+            },
+            {
+              "mirror": "configure",
+              "args": [
+                {
+                  "radius": 0.4,
+                  "halfHeight": 0.9,
+                  "crouchHalfHeight": 0.45,
+                  "maxSlopeAngle": 0.7,
+                  "maxStepHeight": 0.5,
+                  "stickToFloorDistance": 0.25,
+                  "mass": 70,
+                  "gravity": [
+                    0,
+                    -9.81,
+                    0
+                  ],
+                  "tileM": 16,
+                  "marginM": 3,
+                  "forgetRing": 2
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "DISCONNECT_REASON",
+          "id": 99,
+          "returns": {
+            "invalidate": true
+          },
+          "playerId": 7,
+          "events": []
+        },
+        {
+          "type": "DISCONNECT_REASON",
+          "id": 99,
+          "returns": {
+            "protocolMismatch": "[client] server v4 rejected this v5 client (protocol mismatch); hard-reload"
+          },
+          "playerId": 7,
+          "events": []
+        },
+        {
+          "type": "PLAYER_LEAVE",
+          "id": 33,
+          "returns": null,
+          "playerId": 7,
+          "events": [
+            {
+              "snap": "removePlayer",
+              "args": [
+                9
+              ]
+            },
+            {
+              "cb": "onPlayerLeft",
+              "args": [
+                9
+              ]
+            }
+          ]
+        },
+        {
+          "type": "SNAPSHOT",
+          "id": 16,
+          "returns": {
+            "tick": 5,
+            "players": []
+          },
+          "playerId": 7,
+          "events": []
+        },
+        {
+          "type": "STATE_RECOVERY",
+          "id": 98,
+          "returns": {
+            "tick": 6
+          },
+          "playerId": 7,
+          "events": []
+        },
+        {
+          "type": "APP_EVENT",
+          "id": 51,
+          "returns": null,
+          "playerId": 7,
+          "events": [
+            {
+              "cb": "onAppEvent",
+              "args": [
+                {
+                  "name": "ping"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "HOT_RELOAD",
+          "id": 112,
+          "returns": null,
+          "playerId": 7,
+          "events": [
+            {
+              "cb": "onHotReload",
+              "args": [
+                {
+                  "url": "/a.js"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "APP_MODULE",
+          "id": 114,
+          "returns": null,
+          "playerId": 7,
+          "events": [
+            {
+              "cb": "onAppModule",
+              "args": [
+                {
+                  "path": "b"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "ASSET_UPDATE",
+          "id": 115,
+          "returns": null,
+          "playerId": 7,
+          "events": [
+            {
+              "cb": "onAssetUpdate",
+              "args": [
+                {
+                  "id": 1
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "PEER_RTT_TABLE",
+          "id": 193,
+          "returns": null,
+          "playerId": 7,
+          "events": [
+            {
+              "cb": "onPeerRttTable",
+              "args": [
+                {
+                  "rtt": {
+                    "8": 20
+                  },
+                  "pubkeys": {
+                    "8": "k"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "EDITOR_SELECT",
+          "id": 129,
+          "returns": null,
+          "playerId": 7,
+          "events": [
+            {
+              "cb": "onEditorSelect",
+              "args": [
+                {
+                  "id": 2
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "APP_LIST",
+          "id": 133,
+          "returns": null,
+          "playerId": 7,
+          "events": [
+            {
+              "cb": "onMessage",
+              "args": [
+                133,
+                {
+                  "apps": [
+                    "a"
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "TERRAIN_CONFIG",
+          "id": 156,
+          "returns": null,
+          "playerId": 7,
+          "events": [
+            {
+              "cb": "onTerrainConfig",
+              "args": [
+                {
+                  "seed": 1
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "DESTROY_ENTITY",
+          "id": 140,
+          "returns": null,
+          "playerId": 7,
+          "events": [
+            {
+              "cb": "onEntityRemoved",
+              "args": [
+                5
+              ]
+            }
+          ]
+        },
+        {
+          "type": "TELEPORT_ACK",
+          "id": 195,
+          "returns": null,
+          "playerId": 7,
+          "events": [
+            {
+              "cb": "onTeleportAck",
+              "args": [
+                {
+                  "op": "to",
+                  "phase": "placed",
+                  "ok": true,
+                  "position": [
+                    0,
+                    1,
+                    0
+                  ],
+                  "velocity": [
+                    0,
+                    0,
+                    0
+                  ],
+                  "tick": 3
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "RECONNECT_ACK",
+          "id": 97,
+          "returns": {
+            "sessionToken": "tok-2"
+          },
+          "playerId": 7,
+          "events": [
+            {
+              "snap": "clear",
+              "args": []
+            },
+            {
+              "cb": "onPlayerLeft",
+              "args": [
+                7
+              ]
+            }
+          ]
+        },
+        {
+          "type": "COLLISION_CONFIG",
+          "id": 196,
+          "returns": null,
+          "playerId": 7,
+          "events": [
+            {
+              "mirror": "sameConfig",
+              "args": [
+                {
+                  "radius": 0.4,
+                  "halfHeight": 0.9,
+                  "crouchHalfHeight": 0.45,
+                  "maxSlopeAngle": 0.7,
+                  "maxStepHeight": 0.4,
+                  "stickToFloorDistance": 0.25,
+                  "mass": 70,
+                  "gravity": [
+                    0,
+                    -9.81,
+                    0
+                  ],
+                  "tileM": 16,
+                  "marginM": 3,
+                  "forgetRing": 2
+                }
+              ]
+            },
+            {
+              "mirror": "configure",
+              "args": [
+                {
+                  "radius": 0.4,
+                  "halfHeight": 0.9,
+                  "crouchHalfHeight": 0.45,
+                  "maxSlopeAngle": 0.7,
+                  "maxStepHeight": 0.4,
+                  "stickToFloorDistance": 0.25,
+                  "mass": 70,
+                  "gravity": [
+                    0,
+                    -9.81,
+                    0
+                  ],
+                  "tileM": 16,
+                  "marginM": 3,
+                  "forgetRing": 2
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "COLLISION_TILE",
+          "id": 197,
+          "returns": null,
+          "playerId": 7,
+          "events": [
+            {
+              "mirror": "onTile",
+              "args": [
+                {
+                  "tx": 0,
+                  "tz": 0,
+                  "h": 99,
+                  "bytes": 36,
+                  "sha256": "92e1d30b315ab5dca70bcb13b605773d517e2ac0fde280ba9bd67cbcd4d4ff76"
+                },
+                [
+                  1,
+                  2,
+                  3
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "type": null,
+          "id": 254,
+          "returns": null,
+          "playerId": 7,
+          "events": []
+        }
+      ],
+      "final": {
+        "hasMirror": true,
+        "playerId": 7,
+        "structMismatch": false
+      }
+    },
+    "mirrorOff": {
+      "collisionMirror": false,
+      "messages": [
+        {
+          "type": "HANDSHAKE_ACK",
+          "payload": {
+            "version": 5,
+            "structHash": "732d5755",
+            "playerId": 7,
+            "tickRate": 20,
+            "sessionToken": "tok-1"
+          }
+        },
+        {
+          "type": "WORLD_DEF",
+          "payload": {
+            "tickRate": 20,
+            "movement": {
+              "speed": 6
+            },
+            "gravity": [
+              0,
+              -9.81,
+              0
+            ],
+            "player": {
+              "capsuleRadius": 0.4
+            },
+            "netcode": null
+          }
+        },
+        {
+          "type": "COLLISION_CONFIG",
+          "payload": {
+            "radius": 0.4,
+            "halfHeight": 0.9,
+            "crouchHalfHeight": 0.45,
+            "maxSlopeAngle": 0.7,
+            "maxStepHeight": 0.4,
+            "stickToFloorDistance": 0.25,
+            "mass": 70,
+            "gravity": [
+              0,
+              -9.81,
+              0
+            ],
+            "tileM": 16,
+            "marginM": 3,
+            "forgetRing": 2
+          }
+        },
+        {
+          "type": "COLLISION_TILE",
+          "payload": {
+            "tx": 0,
+            "tz": 0,
+            "h": 12345,
+            "v": [
+              11,
+              48,
+              85,
+              122,
+              159,
+              196,
+              233,
+              14,
+              51,
+              88,
+              125,
+              162,
+              199,
+              236,
+              17,
+              54,
+              91,
+              128,
+              165,
+              202,
+              239,
+              20,
+              57,
+              94,
+              131,
+              168,
+              205,
+              242,
+              23,
+              60,
+              97,
+              134,
+              171,
+              208,
+              245,
+              26,
+              63,
+              100,
+              137,
+              174,
+              211,
+              248,
+              29,
+              66,
+              103,
+              140,
+              177,
+              214,
+              251,
+              32,
+              69,
+              106,
+              143,
+              180,
+              217,
+              254,
+              35,
+              72,
+              109,
+              146,
+              183,
+              220,
+              1,
+              38,
+              75,
+              112,
+              149,
+              186,
+              223,
+              4,
+              41,
+              78
+            ]
+          }
+        },
+        {
+          "type": "COLLISION_TILE",
+          "payload": {
+            "tx": -1,
+            "tz": 2,
+            "h": 4294967295,
+            "v": [
+              5,
+              42,
+              79,
+              116,
+              153,
+              190,
+              227,
+              8,
+              45,
+              82,
+              119,
+              156,
+              193,
+              230,
+              11,
+              48,
+              85,
+              122,
+              159,
+              196,
+              233,
+              14,
+              51,
+              88,
+              125,
+              162,
+              199,
+              236,
+              17,
+              54,
+              91,
+              128,
+              165,
+              202,
+              239,
+              20
+            ]
+          }
+        },
+        {
+          "type": "COLLISION_TILE",
+          "payload": {
+            "tx": 3,
+            "tz": 3,
+            "h": 7,
+            "v": [
+              9,
+              46,
+              83,
+              120,
+              157,
+              194,
+              231,
+              12,
+              49,
+              86,
+              123,
+              160,
+              197,
+              234,
+              15,
+              52,
+              89,
+              126,
+              163,
+              200,
+              237,
+              18,
+              55,
+              92,
+              129,
+              166,
+              203,
+              240,
+              21,
+              58,
+              95,
+              132,
+              169,
+              206,
+              243
+            ]
+          }
+        },
+        {
+          "type": "COLLISION_CONFIG",
+          "payload": {
+            "radius": 0.4,
+            "halfHeight": 0.9,
+            "crouchHalfHeight": 0.45,
+            "maxSlopeAngle": 0.7,
+            "maxStepHeight": 0.4,
+            "stickToFloorDistance": 0.25,
+            "mass": 70,
+            "gravity": [
+              0,
+              -9.81,
+              0
+            ],
+            "tileM": 16,
+            "marginM": 3,
+            "forgetRing": 2
+          }
+        },
+        {
+          "type": "COLLISION_CONFIG",
+          "payload": {
+            "radius": 0.4,
+            "halfHeight": 0.9,
+            "crouchHalfHeight": 0.45,
+            "maxSlopeAngle": 0.7,
+            "maxStepHeight": 0.5,
+            "stickToFloorDistance": 0.25,
+            "mass": 70,
+            "gravity": [
+              0,
+              -9.81,
+              0
+            ],
+            "tileM": 16,
+            "marginM": 3,
+            "forgetRing": 2
+          }
+        },
+        {
+          "type": "DISCONNECT_REASON",
+          "payload": {
+            "code": 4
+          }
+        },
+        {
+          "type": "DISCONNECT_REASON",
+          "payload": {
+            "code": 6,
+            "version": 4
+          }
+        },
+        {
+          "type": "PLAYER_LEAVE",
+          "payload": {
+            "playerId": 9
+          }
+        },
+        {
+          "type": "SNAPSHOT",
+          "payload": {
+            "tick": 5,
+            "players": []
+          }
+        },
+        {
+          "type": "STATE_RECOVERY",
+          "payload": {
+            "snapshot": {
+              "tick": 6
+            }
+          }
+        },
+        {
+          "type": "APP_EVENT",
+          "payload": {
+            "name": "ping"
+          }
+        },
+        {
+          "type": "HOT_RELOAD",
+          "payload": {
+            "url": "/a.js"
+          }
+        },
+        {
+          "type": "APP_MODULE",
+          "payload": {
+            "path": "b"
+          }
+        },
+        {
+          "type": "ASSET_UPDATE",
+          "payload": {
+            "id": 1
+          }
+        },
+        {
+          "type": "PEER_RTT_TABLE",
+          "payload": {
+            "rtt": {
+              "8": 20
+            },
+            "pubkeys": {
+              "8": "k"
+            }
+          }
+        },
+        {
+          "type": "EDITOR_SELECT",
+          "payload": {
+            "id": 2
+          }
+        },
+        {
+          "type": "APP_LIST",
+          "payload": {
+            "apps": [
+              "a"
+            ]
+          }
+        },
+        {
+          "type": "TERRAIN_CONFIG",
+          "payload": {
+            "seed": 1
+          }
+        },
+        {
+          "type": "DESTROY_ENTITY",
+          "payload": {
+            "entityId": 5
+          }
+        },
+        {
+          "type": "TELEPORT_ACK",
+          "payload": {
+            "op": "to",
+            "phase": "placed",
+            "ok": true,
+            "position": [
+              0,
+              1,
+              0
+            ],
+            "velocity": [
+              0,
+              0,
+              0
+            ],
+            "tick": 3
+          }
+        },
+        {
+          "type": "RECONNECT_ACK",
+          "payload": {
+            "localPlayerId": 7,
+            "playerId": 7,
+            "position": [
+              1,
+              2,
+              3
+            ],
+            "health": 100,
+            "tickRate": 20,
+            "sessionToken": "tok-2",
+            "structHash": "732d5755"
+          }
+        },
+        {
+          "type": "COLLISION_CONFIG",
+          "payload": {
+            "radius": 0.4,
+            "halfHeight": 0.9,
+            "crouchHalfHeight": 0.45,
+            "maxSlopeAngle": 0.7,
+            "maxStepHeight": 0.4,
+            "stickToFloorDistance": 0.25,
+            "mass": 70,
+            "gravity": [
+              0,
+              -9.81,
+              0
+            ],
+            "tileM": 16,
+            "marginM": 3,
+            "forgetRing": 2
+          }
+        },
+        {
+          "type": "COLLISION_TILE",
+          "payload": {
+            "tx": 0,
+            "tz": 0,
+            "h": 99,
+            "v": [
+              3,
+              40,
+              77,
+              114,
+              151,
+              188,
+              225,
+              6,
+              43,
+              80,
+              117,
+              154,
+              191,
+              228,
+              9,
+              46,
+              83,
+              120,
+              157,
+              194,
+              231,
+              12,
+              49,
+              86,
+              123,
+              160,
+              197,
+              234,
+              15,
+              52,
+              89,
+              126,
+              163,
+              200,
+              237,
+              18
+            ]
+          }
+        },
+        {
+          "id": 254,
+          "payload": {}
+        }
+      ],
+      "steps": [
+        {
+          "type": "HANDSHAKE_ACK",
+          "id": 2,
+          "returns": {
+            "sessionToken": "tok-1"
+          },
+          "playerId": 7,
+          "events": []
+        },
+        {
+          "type": "WORLD_DEF",
+          "id": 113,
+          "returns": null,
+          "playerId": 7,
+          "events": [
+            {
+              "cb": "onWorldDef",
+              "args": [
+                {
+                  "tickRate": 20,
+                  "movement": {
+                    "speed": 6
+                  },
+                  "gravity": [
+                    0,
+                    -9.81,
+                    0
+                  ],
+                  "player": {
+                    "capsuleRadius": 0.4
+                  },
+                  "netcode": null
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "COLLISION_CONFIG",
+          "id": 196,
+          "returns": null,
+          "playerId": 7,
+          "events": []
+        },
+        {
+          "type": "COLLISION_TILE",
+          "id": 197,
+          "returns": null,
+          "playerId": 7,
+          "events": []
+        },
+        {
+          "type": "COLLISION_TILE",
+          "id": 197,
+          "returns": null,
+          "playerId": 7,
+          "events": []
+        },
+        {
+          "type": "COLLISION_TILE",
+          "id": 197,
+          "returns": null,
+          "playerId": 7,
+          "events": []
+        },
+        {
+          "type": "COLLISION_CONFIG",
+          "id": 196,
+          "returns": null,
+          "playerId": 7,
+          "events": []
+        },
+        {
+          "type": "COLLISION_CONFIG",
+          "id": 196,
+          "returns": null,
+          "playerId": 7,
+          "events": []
+        },
+        {
+          "type": "DISCONNECT_REASON",
+          "id": 99,
+          "returns": {
+            "invalidate": true
+          },
+          "playerId": 7,
+          "events": []
+        },
+        {
+          "type": "DISCONNECT_REASON",
+          "id": 99,
+          "returns": {
+            "protocolMismatch": "[client] server v4 rejected this v5 client (protocol mismatch); hard-reload"
+          },
+          "playerId": 7,
+          "events": []
+        },
+        {
+          "type": "PLAYER_LEAVE",
+          "id": 33,
+          "returns": null,
+          "playerId": 7,
+          "events": [
+            {
+              "snap": "removePlayer",
+              "args": [
+                9
+              ]
+            },
+            {
+              "cb": "onPlayerLeft",
+              "args": [
+                9
+              ]
+            }
+          ]
+        },
+        {
+          "type": "SNAPSHOT",
+          "id": 16,
+          "returns": {
+            "tick": 5,
+            "players": []
+          },
+          "playerId": 7,
+          "events": []
+        },
+        {
+          "type": "STATE_RECOVERY",
+          "id": 98,
+          "returns": {
+            "tick": 6
+          },
+          "playerId": 7,
+          "events": []
+        },
+        {
+          "type": "APP_EVENT",
+          "id": 51,
+          "returns": null,
+          "playerId": 7,
+          "events": [
+            {
+              "cb": "onAppEvent",
+              "args": [
+                {
+                  "name": "ping"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "HOT_RELOAD",
+          "id": 112,
+          "returns": null,
+          "playerId": 7,
+          "events": [
+            {
+              "cb": "onHotReload",
+              "args": [
+                {
+                  "url": "/a.js"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "APP_MODULE",
+          "id": 114,
+          "returns": null,
+          "playerId": 7,
+          "events": [
+            {
+              "cb": "onAppModule",
+              "args": [
+                {
+                  "path": "b"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "ASSET_UPDATE",
+          "id": 115,
+          "returns": null,
+          "playerId": 7,
+          "events": [
+            {
+              "cb": "onAssetUpdate",
+              "args": [
+                {
+                  "id": 1
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "PEER_RTT_TABLE",
+          "id": 193,
+          "returns": null,
+          "playerId": 7,
+          "events": [
+            {
+              "cb": "onPeerRttTable",
+              "args": [
+                {
+                  "rtt": {
+                    "8": 20
+                  },
+                  "pubkeys": {
+                    "8": "k"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "EDITOR_SELECT",
+          "id": 129,
+          "returns": null,
+          "playerId": 7,
+          "events": [
+            {
+              "cb": "onEditorSelect",
+              "args": [
+                {
+                  "id": 2
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "APP_LIST",
+          "id": 133,
+          "returns": null,
+          "playerId": 7,
+          "events": [
+            {
+              "cb": "onMessage",
+              "args": [
+                133,
+                {
+                  "apps": [
+                    "a"
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "TERRAIN_CONFIG",
+          "id": 156,
+          "returns": null,
+          "playerId": 7,
+          "events": [
+            {
+              "cb": "onTerrainConfig",
+              "args": [
+                {
+                  "seed": 1
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "DESTROY_ENTITY",
+          "id": 140,
+          "returns": null,
+          "playerId": 7,
+          "events": [
+            {
+              "cb": "onEntityRemoved",
+              "args": [
+                5
+              ]
+            }
+          ]
+        },
+        {
+          "type": "TELEPORT_ACK",
+          "id": 195,
+          "returns": null,
+          "playerId": 7,
+          "events": [
+            {
+              "cb": "onTeleportAck",
+              "args": [
+                {
+                  "op": "to",
+                  "phase": "placed",
+                  "ok": true,
+                  "position": [
+                    0,
+                    1,
+                    0
+                  ],
+                  "velocity": [
+                    0,
+                    0,
+                    0
+                  ],
+                  "tick": 3
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "RECONNECT_ACK",
+          "id": 97,
+          "returns": {
+            "sessionToken": "tok-2"
+          },
+          "playerId": 7,
+          "events": [
+            {
+              "snap": "clear",
+              "args": []
+            },
+            {
+              "cb": "onPlayerLeft",
+              "args": [
+                7
+              ]
+            }
+          ]
+        },
+        {
+          "type": "COLLISION_CONFIG",
+          "id": 196,
+          "returns": null,
+          "playerId": 7,
+          "events": []
+        },
+        {
+          "type": "COLLISION_TILE",
+          "id": 197,
+          "returns": null,
+          "playerId": 7,
+          "events": []
+        },
+        {
+          "type": null,
+          "id": 254,
+          "returns": null,
+          "playerId": 7,
+          "events": []
+        }
+      ],
+      "final": {
+        "hasMirror": false,
+        "playerId": 7,
+        "structMismatch": false
+      }
+    }
+  }
+}
