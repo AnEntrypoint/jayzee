@@ -81,6 +81,12 @@ class BroadPhaseLayers final : public JPH::BroadPhaseLayerInterface {
 
   JPH::BroadPhaseLayer GetBroadPhaseLayer(JPH::ObjectLayer layer) const override { return map_[layer]; }
 
+#if defined(JPH_EXTERNAL_PROFILE) || defined(JPH_PROFILE_ENABLED)
+  const char* GetBroadPhaseLayerName(JPH::BroadPhaseLayer layer) const override {
+    return layer == JPH::BroadPhaseLayer(0) ? "non-moving" : "moving";
+  }
+#endif
+
  private:
   JPH::BroadPhaseLayer map_[2];
 };
@@ -311,7 +317,7 @@ int World::spawnBatch(const float* rows, std::uint32_t count, std::uint32_t* han
     handles[i] = (static_cast<std::uint32_t>(generations_[slot]) << 16) | static_cast<std::uint32_t>(slot);
   }
   if (count > 0) {
-    const JPH::AddState state = bodies.AddBodiesPrepare(runtime_->batch, static_cast<int>(count));
+    const JPH::BodyInterface::AddState state = bodies.AddBodiesPrepare(runtime_->batch, static_cast<int>(count));
     bodies.AddBodiesFinalize(runtime_->batch, static_cast<int>(count), state, JPH::EActivation::Activate);
   }
   for (std::uint32_t i = 0; i < count; ++i) {

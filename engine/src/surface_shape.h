@@ -47,9 +47,9 @@ class SurfaceShape : public JPH::Shape {
 
   void CollideSoftBodyVertices(JPH::Mat44Arg, JPH::Vec3Arg, const JPH::CollideSoftBodyVertexIterator&, JPH::uint, int) const override {}
 
-  void GetTrianglesStart(JPH::GetTrianglesContext&, const JPH::AABox&, JPH::Vec3Arg, JPH::QuatArg, JPH::Vec3Arg) const override {}
+  void GetTrianglesStart(JPH::Shape::GetTrianglesContext&, const JPH::AABox&, JPH::Vec3Arg, JPH::QuatArg, JPH::Vec3Arg) const override {}
 
-  int GetTrianglesNext(JPH::GetTrianglesContext&, int, JPH::Float3*, const JPH::PhysicsMaterial**) const override { return 0; }
+  int GetTrianglesNext(JPH::Shape::GetTrianglesContext&, int, JPH::Float3*, const JPH::PhysicsMaterial**) const override { return 0; }
 
   JPH::Shape::Stats GetStats() const override { return JPH::Shape::Stats(sizeof(*this), 0); }
 
