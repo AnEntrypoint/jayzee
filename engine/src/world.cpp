@@ -80,6 +80,19 @@ void releaseBlock(char* raw) {
   blockFreeLists[c] = raw;
 }
 
+void primeBlockPools() {
+  constexpr std::uint32_t kPrimedBlocksPerClass = 8;
+  for (std::uint32_t c = kMinBlockClass; c <= kMaxBlockClass; ++c) {
+    for (std::uint32_t i = 0; i < kPrimedBlocksPerClass; ++i) {
+      char* raw = static_cast<char*>(std::malloc(std::size_t(1) << c));
+      if (raw == nullptr) return;
+      allocations += 1;
+      *reinterpret_cast<std::uint32_t*>(raw) = c;
+      releaseBlock(raw);
+    }
+  }
+}
+
 void* countedAllocate(std::size_t size) {
   char* raw = takeBlock(size);
   return raw == nullptr ? nullptr : raw + kBlockHeader;
@@ -236,6 +249,7 @@ Status World::configure(const Config& config) {
   drag_ = config.drag;
   restitution_ = config.restitution;
   planetGravity_ = 0.0f;
+  primeBlockPools();
   groundBody_ = kNoBody;
   planetBody_ = kNoBody;
   vegetationBody_ = kNoBody;
