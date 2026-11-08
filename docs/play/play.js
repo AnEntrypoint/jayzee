@@ -1,6 +1,14 @@
 import { World } from './src/world/World.js'
 import { loadKernel } from './src/kernel/load.js'
 import { createSettler } from './src/physics-pure/settler.js'
+import { locateSiteWorld, worldRequestOf } from './src/site/worldName.js'
+
+try {
+  locateSiteWorld(worldRequestOf(location.search, location.hash))
+} catch (error) {
+  document.getElementById('status').textContent = 'world refused: ' + error.message
+  throw error
+}
 
 const RADIUS = 0.35
 const TICK_RATE = 64

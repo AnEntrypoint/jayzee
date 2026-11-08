@@ -1,0 +1,431 @@
+{
+  "generatedBy": "scripts/gen-world-resolver.mjs",
+  "sources": {
+    "names": "src/shared/worldName.js (isWorldName, worldFileRel, worldFileCandidates, defaultWorldNameOf)",
+    "locate": "src/sdk/WorldLocator.js (readDefaultWorldName, locateWorld) run on a temporary project tree per case",
+    "search": "client/app.js:184-189 and 936-937 (search and hash merge, and the ?world check), transcribed because the client module needs the DOM"
+  },
+  "bootOnMissingModule": "client/app.js:1189 logs the failure and continues with no world definition; README.md:115 says the boot stops. Jayzee follows the README.",
+  "names": [
+    {
+      "value": "tps-game",
+      "valid": true,
+      "rel": "apps/world/tps-game.js",
+      "candidates": [
+        "apps/world/tps-game.js",
+        "apps/world/_fixtures/tps-game.js"
+      ]
+    },
+    {
+      "value": "a",
+      "valid": true,
+      "rel": "apps/world/a.js",
+      "candidates": [
+        "apps/world/a.js",
+        "apps/world/_fixtures/a.js"
+      ]
+    },
+    {
+      "value": "A_b-9",
+      "valid": true,
+      "rel": "apps/world/A_b-9.js",
+      "candidates": [
+        "apps/world/A_b-9.js",
+        "apps/world/_fixtures/A_b-9.js"
+      ]
+    },
+    {
+      "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "valid": true,
+      "rel": "apps/world/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.js",
+      "candidates": [
+        "apps/world/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.js",
+        "apps/world/_fixtures/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.js"
+      ]
+    },
+    {
+      "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "valid": false,
+      "refused": "TypeError"
+    },
+    {
+      "value": "",
+      "valid": false,
+      "refused": "TypeError"
+    },
+    {
+      "value": " ",
+      "valid": false,
+      "refused": "TypeError"
+    },
+    {
+      "value": "a/b",
+      "valid": false,
+      "refused": "TypeError"
+    },
+    {
+      "value": "../x",
+      "valid": false,
+      "refused": "TypeError"
+    },
+    {
+      "value": "a.b",
+      "valid": false,
+      "refused": "TypeError"
+    },
+    {
+      "value": "a b",
+      "valid": false,
+      "refused": "TypeError"
+    },
+    {
+      "value": "a%2Fb",
+      "valid": false,
+      "refused": "TypeError"
+    },
+    {
+      "value": "a+b",
+      "valid": false,
+      "refused": "TypeError"
+    },
+    {
+      "value": "é",
+      "valid": false,
+      "refused": "TypeError"
+    },
+    {
+      "value": "index",
+      "valid": true,
+      "rel": "apps/world/index.js",
+      "candidates": [
+        "apps/world/index.js",
+        "apps/world/_fixtures/index.js"
+      ]
+    },
+    {
+      "value": "_fixtures",
+      "valid": true,
+      "rel": "apps/world/_fixtures.js",
+      "candidates": [
+        "apps/world/_fixtures.js",
+        "apps/world/_fixtures/_fixtures.js"
+      ]
+    },
+    {
+      "value": "constructor",
+      "valid": true,
+      "rel": "apps/world/constructor.js",
+      "candidates": [
+        "apps/world/constructor.js",
+        "apps/world/_fixtures/constructor.js"
+      ]
+    },
+    {
+      "value": "tps-game.js",
+      "valid": false,
+      "refused": "TypeError"
+    },
+    {
+      "value": "a\nb",
+      "valid": false,
+      "refused": "TypeError"
+    },
+    {
+      "value": null,
+      "valid": false,
+      "refused": "TypeError"
+    },
+    {
+      "value": 3,
+      "valid": false,
+      "refused": "TypeError"
+    }
+  ],
+  "defaults": [
+    {
+      "module": {},
+      "name": "index"
+    },
+    {
+      "module": null,
+      "name": "index"
+    },
+    {
+      "module": {
+        "defaultWorld": "tps-game"
+      },
+      "name": "tps-game"
+    },
+    {
+      "module": {
+        "defaultWorld": "constructor"
+      },
+      "name": "constructor"
+    },
+    {
+      "module": {
+        "defaultWorld": "a/b"
+      },
+      "error": "TypeError"
+    },
+    {
+      "module": {
+        "defaultWorld": 3
+      },
+      "error": "TypeError"
+    },
+    {
+      "module": {
+        "defaultWorld": ""
+      },
+      "error": "TypeError"
+    }
+  ],
+  "locate": [
+    {
+      "id": "named-found",
+      "files": [
+        "apps/world/tps-game.js"
+      ],
+      "name": "tps-game",
+      "defaultName": null,
+      "result": {
+        "name": "tps-game",
+        "path": "apps/world/tps-game.js"
+      }
+    },
+    {
+      "id": "fixture-only",
+      "files": [
+        "apps/world/_fixtures/arena.js"
+      ],
+      "name": "arena",
+      "defaultName": null,
+      "result": {
+        "name": "arena",
+        "path": "apps/world/_fixtures/arena.js"
+      }
+    },
+    {
+      "id": "world-file-wins-over-fixture",
+      "files": [
+        "apps/world/arena.js",
+        "apps/world/_fixtures/arena.js"
+      ],
+      "name": "arena",
+      "defaultName": null,
+      "result": {
+        "name": "arena",
+        "path": "apps/world/arena.js"
+      }
+    },
+    {
+      "id": "named-missing",
+      "files": [],
+      "name": "tps-game",
+      "defaultName": null,
+      "result": {
+        "error": "Error"
+      }
+    },
+    {
+      "id": "invalid-name",
+      "files": [
+        "apps/world/a.js"
+      ],
+      "name": "a/b",
+      "defaultName": null,
+      "result": {
+        "error": "TypeError"
+      }
+    },
+    {
+      "id": "empty-name-uses-default",
+      "files": [
+        "apps/world/index.js",
+        "apps/world/arena.js"
+      ],
+      "name": "",
+      "defaultName": "arena",
+      "result": {
+        "name": "arena",
+        "path": "apps/world/arena.js"
+      }
+    },
+    {
+      "id": "default-from-index-fixture",
+      "files": [
+        "apps/world/index.js",
+        "apps/world/_fixtures/arena.js"
+      ],
+      "name": null,
+      "defaultName": "arena",
+      "result": {
+        "name": "arena",
+        "path": "apps/world/_fixtures/arena.js"
+      }
+    },
+    {
+      "id": "default-missing",
+      "files": [
+        "apps/world/index.js"
+      ],
+      "name": null,
+      "defaultName": "arena",
+      "result": {
+        "error": "Error"
+      }
+    },
+    {
+      "id": "default-is-index-itself",
+      "files": [
+        "apps/world/index.js"
+      ],
+      "name": null,
+      "defaultName": "index",
+      "result": {
+        "name": "index",
+        "path": "apps/world/index.js"
+      }
+    },
+    {
+      "id": "no-index-no-name",
+      "files": [],
+      "name": null,
+      "defaultName": null,
+      "result": {
+        "name": null,
+        "path": null
+      }
+    },
+    {
+      "id": "name-beats-default",
+      "files": [
+        "apps/world/index.js",
+        "apps/world/arena.js"
+      ],
+      "name": "arena",
+      "defaultName": "tps-game",
+      "result": {
+        "name": "arena",
+        "path": "apps/world/arena.js"
+      }
+    },
+    {
+      "id": "name-missing-beats-existing-default",
+      "files": [
+        "apps/world/index.js",
+        "apps/world/tps-game.js"
+      ],
+      "name": "arena",
+      "defaultName": "tps-game",
+      "result": {
+        "error": "Error"
+      }
+    }
+  ],
+  "search": [
+    {
+      "search": "?world=tps-game",
+      "hash": "",
+      "requested": "tps-game",
+      "refused": null
+    },
+    {
+      "search": "?world=",
+      "hash": "",
+      "requested": null,
+      "refused": null
+    },
+    {
+      "search": "",
+      "hash": "",
+      "requested": null,
+      "refused": null
+    },
+    {
+      "search": "?world=a/b",
+      "hash": "",
+      "requested": null,
+      "refused": "TypeError"
+    },
+    {
+      "search": "?world=%2e%2e",
+      "hash": "",
+      "requested": null,
+      "refused": "TypeError"
+    },
+    {
+      "search": "?world=a%20b",
+      "hash": "",
+      "requested": null,
+      "refused": "TypeError"
+    },
+    {
+      "search": "?world=x&world=y",
+      "hash": "",
+      "requested": "x",
+      "refused": null
+    },
+    {
+      "search": "",
+      "hash": "#/?world=arena",
+      "requested": "arena",
+      "refused": null
+    },
+    {
+      "search": "?world=",
+      "hash": "#/?world=arena",
+      "requested": null,
+      "refused": null
+    },
+    {
+      "search": "?world=arena",
+      "hash": "#/?world=tps-game",
+      "requested": "arena",
+      "refused": null
+    },
+    {
+      "search": "?world=a+b",
+      "hash": "",
+      "requested": null,
+      "refused": "TypeError"
+    },
+    {
+      "search": "?world=tps.game",
+      "hash": "",
+      "requested": null,
+      "refused": "TypeError"
+    },
+    {
+      "search": "?other=1&world=arena",
+      "hash": "",
+      "requested": "arena",
+      "refused": null
+    },
+    {
+      "search": "?world=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "hash": "",
+      "requested": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "refused": null
+    },
+    {
+      "search": "?world=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "hash": "",
+      "requested": null,
+      "refused": "TypeError"
+    },
+    {
+      "search": "?world=%C3%A9",
+      "hash": "",
+      "requested": null,
+      "refused": "TypeError"
+    },
+    {
+      "search": "?world=arena",
+      "hash": "",
+      "requested": "arena",
+      "refused": null
+    }
+  ]
+}

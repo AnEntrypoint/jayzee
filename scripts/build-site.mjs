@@ -1,6 +1,14 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
+import { locateSiteWorld } from '../src/site/worldName.js'
 import { planSite, SITE_DIR } from './lib/site.mjs'
+
+try {
+  locateSiteWorld(process.env.WORLD ?? null)
+} catch (error) {
+  console.error('build:site refused WORLD: ' + error.message)
+  process.exit(1)
+}
 
 const { files } = planSite()
 for (const { to, bytes } of files) {

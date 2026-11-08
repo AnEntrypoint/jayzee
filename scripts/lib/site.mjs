@@ -6,7 +6,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const jzRoot = join(root, 'node_modules', 'jz')
 
 export const SITE_DIR = join(root, 'docs', 'play')
-export const ENTRY_MODULES = ['src/world/World.js', 'src/physics-pure/settler.js']
+export const ENTRY_MODULES = ['src/world/World.js', 'src/physics-pure/settler.js', 'src/site/worldName.js']
 export const PAGE_FILES = ['site/index.html', 'site/play.js', 'site/coi-sw.js']
 export const IMPORT_MAP = { 'jz/interop': join(jzRoot, 'instantiate.js') }
 const SPECIFIER = /from '([^']+)'/g
