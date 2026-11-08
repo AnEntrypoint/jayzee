@@ -3,7 +3,7 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import assert from 'node:assert/strict'
 import { gate, finish } from './lib/gate.mjs'
-import { BRIDGE, createBridge } from '../src/engine/bridge.js'
+import { BRIDGE, createBridge, readLayout } from '../src/engine/bridge.js'
 import { loadEngineModule } from '../src/engine/EngineWorld.js'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -48,8 +48,6 @@ const wrapCalls = (module) => {
 }
 
 gate('the bridge constants in src/engine/bridge.js equal engine/src/bridge.h', () => {
-  assert.equal(BRIDGE.INPUT_SLOTS, cppValue('kInputSlots'))
-  assert.equal(BRIDGE.EVENT_SLOTS, cppValue('kEventSlots'))
   for (const [key, name] of Object.entries(CONTROL_NAMES)) assert.equal(BRIDGE.CONTROL[key], cppValue(name), name)
   for (const [key, name] of Object.entries(EVENT_NAMES)) assert.equal(BRIDGE.EVENT[key], cppValue(name), name)
   assert.ok(header.includes('sizeof(InputSlot) == 20'))
@@ -64,8 +62,8 @@ gate('the control, input, event and transform regions sit inside the module memo
   const module = await boot()
   const regions = [
     [module._engine_control(), 16 * 4],
-    [module._engine_inputs(), BRIDGE.INPUT_SLOTS * 20],
-    [module._engine_events(), BRIDGE.EVENT_SLOTS * 16],
+    [module._engine_inputs(), readLayout(module).inputSlots * 20],
+    [module._engine_events(), readLayout(module).eventSlots * 16],
     [module._engine_transforms(), 4096 * 28],
   ]
   for (const [pointer, bytes] of regions) {
@@ -118,7 +116,7 @@ gate('the input ring refuses a 257th unconsumed input and accepts again after on
   const module = await boot()
   const bridge = createBridge(module)
   bridge.drainEvents()
-  for (let i = 0; i < BRIDGE.INPUT_SLOTS; i++) assert.ok(bridge.pushInput(0, [0, 0, 0]) > 0)
+  for (let i = 0; i < readLayout(module).inputSlots; i++) assert.ok(bridge.pushInput(0, [0, 0, 0]) > 0)
   assert.equal(bridge.pushInput(0, [0, 0, 0]), -1)
   bridge.tick(1)
   assert.ok(bridge.pushInput(0, [0, 0, 0]) > 0)
@@ -129,9 +127,9 @@ gate('the event ring counts dropped events once it is full, and drains in order'
   const bridge = createBridge(module)
   bridge.drainEvents()
   for (let i = 0; i < 300; i++) bridge.tick(1)
-  assert.equal(bridge.droppedEvents(), 300 - BRIDGE.EVENT_SLOTS)
+  assert.equal(bridge.droppedEvents(), 300 - readLayout(module).eventSlots)
   const events = bridge.drainEvents()
-  assert.equal(events.length, BRIDGE.EVENT_SLOTS)
+  assert.equal(events.length, readLayout(module).eventSlots)
   for (const event of events) assert.equal(event.kind, BRIDGE.EVENT.TICKED)
   for (let i = 1; i < events.length; i++) assert.ok(events[i].b > events[i - 1].b)
 })

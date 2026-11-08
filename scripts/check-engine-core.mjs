@@ -22,7 +22,7 @@ gate('the wasm artifact hash equals the hash pinned in engine/artifacts.json', (
 const mod = await (await import(pathToFileURL(glue).href)).default()
 
 gate('engine_init returns 0 and the memory starts at the 64 MiB tier', () => {
-  assert.equal(mod._engine_init(), 0)
+  assert.equal(mod._engine_init(64, 1, TIER), 0)
   assert.equal(mod.HEAPU8.buffer.byteLength, TIER)
   assert.equal(Number(mod._engine_memory_bytes()), TIER)
 })

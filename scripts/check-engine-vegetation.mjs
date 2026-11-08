@@ -42,7 +42,7 @@ gate('a dense forest of 1024 trunks adds one vegetation body to the world', asyn
 })
 
 gate('a sphere fired into a trunk is stopped by it', async () => {
-  const world = await createEngineWorld({ capacity: 8, gravity: 0 })
+  const world = await createEngineWorld({ capacity: 8, gravity: 0, drag: 0 })
   world.configureVegetation({ origin: -16, cellSize: CELL })
   world.placeTree([10, 0, 10], 0, 1, TREE_CLASS.trunk)
   world.attachVegetation()
@@ -52,7 +52,7 @@ gate('a sphere fired into a trunk is stopped by it', async () => {
 })
 
 gate('a sphere fired past a trunk, outside its reach, passes it (control)', async () => {
-  const world = await createEngineWorld({ capacity: 8, gravity: 0 })
+  const world = await createEngineWorld({ capacity: 8, gravity: 0, drag: 0 })
   world.configureVegetation({ origin: -16, cellSize: CELL })
   world.placeTree([10, 0, 10], 0, 1, TREE_CLASS.trunk)
   world.attachVegetation()
@@ -62,7 +62,7 @@ gate('a sphere fired past a trunk, outside its reach, passes it (control)', asyn
 })
 
 gate('a rock stops a sphere and a pass-through class does not', async () => {
-  const rock = await createEngineWorld({ capacity: 8, gravity: 0 })
+  const rock = await createEngineWorld({ capacity: 8, gravity: 0, drag: 0 })
   rock.configureVegetation({ origin: -16, cellSize: CELL })
   rock.placeTree([10, 0, 10], 0, 1, TREE_CLASS.rock)
   rock.attachVegetation()
@@ -70,7 +70,7 @@ gate('a rock stops a sphere and a pass-through class does not', async () => {
   for (let t = 0; t < 128; t++) rock.step()
   assert.ok(rock.position(stopped)[0] < 9.3, 'the rock did not stop the sphere, x ' + rock.position(stopped)[0])
 
-  const pass = await createEngineWorld({ capacity: 8, gravity: 0 })
+  const pass = await createEngineWorld({ capacity: 8, gravity: 0, drag: 0 })
   pass.configureVegetation({ origin: -16, cellSize: CELL })
   pass.placeTree([10, 0, 10], 0, 1, TREE_CLASS.pass)
   pass.attachVegetation()

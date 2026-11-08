@@ -1,4 +1,6 @@
 import { createLightPool, createTexturePool, createMeshPool, createPipelineRegistry } from '../../src/client/resourcePools.js'
+import { loadEngineModule } from '../../src/engine/EngineWorld.js'
+import { createTextures } from '../../src/engine/materials.js'
 
 const FRAMES = 600
 const CHURN_PER_FRAME = 8
@@ -12,7 +14,8 @@ registry.register('props', () => ({ id: 'props' }))
 const compiledAtLoad = registry.seal()
 
 const lights = createLightPool(256)
-const textures = createTexturePool({ layers: 32, width: 64, height: 64 })
+const engine = await loadEngineModule()
+const textures = createTexturePool({ layers: 32, width: 64, height: 64, host: createTextures(engine), pixels: new Uint8Array(32 * 64 * 64 * 4) })
 const meshes = createMeshPool({ slots: 64, vertexCapacity: 3, indexCapacity: 3, stride: 3 })
 
 const p99 = (values) => {
