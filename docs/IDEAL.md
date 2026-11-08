@@ -56,7 +56,7 @@ Every row id from the upstream register appears below as row N. Titles and gate 
 | row 39 | Client rendering, shadows, post-fx and grass | 38 | owner-decision (WebGPU and WebGL) | scripts/check-render.mjs |
 | row 40 | Editor, hot reload and HUD panels | 39 | owner-decision (DOM editor and HUD) | scripts/check-hot-reload.mjs |
 | row 41 | Upstream's 93 documented endpoints (39 published, 21 per-game, 30 manual-only, 3 disabled) | U41 | built | scripts/check-upstream-endpoints.mjs |
-| row 42 | Binary snapshot format: 29-byte entity records, 22-byte player records, smallest-three qua | 40 | built | scripts/check-bin-snapshot.mjs; scripts/check-snapshot-packer.mjs |
+| row 42 | Binary snapshot format: 29-byte entity records, 22-byte player records, smallest-three qua | 40 | built | scripts/check-bin-snapshot.mjs; scripts/check-snapshot-packer.mjs; scripts/check-msgpack-packer.mjs; scripts/check-lod-tiers.mjs |
 | row 43 | Replay file .spointreplay, magic v2 | 41 | built | scripts/check-replay-file.mjs; scripts/check-replay-dialect.mjs; scripts/check-msgpackr-compat.mjs |
 | row 44 | Lag compensation, hitscan and the rewind spatial index | 42 | partial | scripts/check-lag-compensation.mjs, scripts/check-chart-transfer.mjs |
 | row 45 | Anticheat and lockstep helpers: CheatEjection, DesyncDetector, ConsensusVoter, EventLog, I | 43 | built | scripts/check-anticheat.mjs, scripts/check-event-log.mjs, scripts/check-consensus.mjs |
