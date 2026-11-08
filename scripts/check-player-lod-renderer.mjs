@@ -132,8 +132,8 @@ gate('the billboard shader puts its block on its own line after the begin_vertex
   const NL = String.fromCharCode(10)
   const shader = { vertexShader: 'void main() {' + NL + '#include <begin_vertex>' + NL + '}' }
   lib.makeDotMaterial().onBeforeCompile(shader)
-  assert.ok(shader.vertexShader.includes('#include <begin_vertex>' + NL + '{' + NL), 'the block does not start on its own line')
-  assert.ok(shader.vertexShader.includes('sx;' + NL + '}' + NL + '}'), 'the block does not end on its own line')
+  assert.ok(shader.vertexShader.includes('#include <begin_vertex>' + NL + '      {' + NL), 'the block does not start on its own line')
+  assert.ok(shader.vertexShader.includes('camUp * position.z;' + NL + '      }'), 'the block does not end on its own line')
 })
 
 gate('a non-finite viewer is refused and leaves the instances as they were', () => {

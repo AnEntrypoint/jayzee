@@ -1,0 +1,15 @@
+{
+  "source": {
+    "commit": "4df338a",
+    "files": [
+      "client/core/PlayerLOD.js",
+      "client/core/PlayerLODTSL.js"
+    ],
+    "sha256": {
+      "client/core/PlayerLOD.js": "b2f54a6ed95a09e74ff8b1c9ca059632cb0887ba68587e5e272626c430f55c48",
+      "client/core/PlayerLODTSL.js": "22e9616c77b70def1158adbd6c00180bf28cae5c7e5941d3fa9493a5231f970f"
+    }
+  },
+  "webglVertexShader": "#include <common>\n#include <begin_vertex>\n      {\n        vec3 worldPos = (instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;\n        vec3 toCam = normalize(cameraPosition - worldPos);\n        vec3 up = vec3(0.0, 1.0, 0.0);\n        vec3 right = normalize(cross(toCam, up));\n        vec3 camUp = cross(right, toCam);\n        transformed = right * position.x + camUp * position.z;\n      }\nvoid main() {}",
+  "tslSource": "function createDotMaterialTSL(matrixNode) {\n  const mat = new MeshBasicNodeMaterial({ color: 0xffcc66, transparent: true, opacity: 0.85, depthWrite: false })\n\n  mat.positionNode = Fn((builder) => {\n    const instanceMatrixNode = matrixNode || instanceMatrixNodeFor(builder.object)\n    const worldPos = instanceMatrixNode.mul(vec4(0.0, 0.0, 0.0, 1.0)).xyz\n    const toCam = cameraPosition.sub(worldPos).normalize()\n    const up = vec3(0.0, 1.0, 0.0)\n    const right = toCam.cross(up).normalize()\n    const camUp = right.cross(toCam)\n    const billboardLocal = right.mul(positionGeometry.x).add(camUp.mul(positionGeometry.z))\n    return instanceMatrixNode.mul(vec4(billboardLocal, 1.0)).xyz\n  })()\n\n  return mat\n}"
+}

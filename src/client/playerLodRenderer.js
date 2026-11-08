@@ -11,25 +11,24 @@ const DOT_COLOR = 0xffcc66
 const DOT_OPACITY = 0.85
 const DOT_RENDER_ORDER = 3
 const DOT_CAPACITY = 512
-const LINE = String.fromCharCode(10)
-const BILLBOARD_BLOCK = [
-  '{',
-  'vec3 worldPos = (instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;',
-  'vec3 toCam = normalize(cameraPosition - worldPos);',
-  'vec3 up = vec3(0.0, 1.0, 0.0);',
-  'vec3 right = normalize(cross(up, toCam));',
-  'vec3 camUp = cross(toCam, right);',
-  'float sx = length(instanceMatrix[0].xyz);',
-  'transformed = right * position.x * sx - camUp * position.z * sx;',
-  '}',
-].join(LINE)
+const BILLBOARD_REPLACEMENT = [
+  '#include <begin_vertex>',
+  '      {',
+  '        vec3 worldPos = (instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;',
+  '        vec3 toCam = normalize(cameraPosition - worldPos);',
+  '        vec3 up = vec3(0.0, 1.0, 0.0);',
+  '        vec3 right = normalize(cross(toCam, up));',
+  '        vec3 camUp = cross(right, toCam);',
+  '        transformed = right * position.x + camUp * position.z;',
+  '      }',
+].join(String.fromCharCode(10))
 
 export { makeDotGeometry }
 
 export const makeDotMaterial = () => {
   const mat = new THREE.MeshBasicMaterial({ color: DOT_COLOR, transparent: true, opacity: DOT_OPACITY, depthWrite: false })
   mat.onBeforeCompile = (shader) => {
-    shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>' + LINE + BILLBOARD_BLOCK)
+    shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', BILLBOARD_REPLACEMENT)
   }
   return mat
 }
