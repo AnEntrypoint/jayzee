@@ -59,4 +59,15 @@ gate('bucket rules place top-level files, the cli types directory and paths of e
   same(bucketOf('.spawn/reference/engine-deep/api-b.md'), 'engine-deep', 'engine-deep')
 })
 
+gate('all 563 tracked paths are distinct, sit under the reference root, have no whitespace, and fall in one of the nine measured buckets', () => {
+  same(new Set(paths).size, 563, 'distinct paths')
+  for (const path of paths) {
+    assert(path.startsWith('.spawn/reference/'), 'path outside the reference root: ' + path)
+    assert(!/\s/.test(path), 'path has whitespace: ' + path)
+    assert(Object.keys(sortedKeys(measured)).includes(bucketOf(path)), 'path falls in no measured bucket: ' + path)
+  }
+  same(Object.keys(measured).length, 9, 'measured buckets')
+  same(sumOf(measured, Object.keys(measured)), paths.length, 'bucket sum against every path')
+})
+
 finish()
