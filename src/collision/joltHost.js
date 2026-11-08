@@ -57,10 +57,14 @@ export async function createJoltHost({ gravity = [0, -9.81, 0], joltLimits = nul
 
   const host = {
     Jolt: J,
+    jolt,
+    physicsSystem,
+    bodyInterface,
     bodies,
     bodyIds,
     shapeKeys,
     reservationBytes: limits ? joltReservationBytes(limits) : null,
+    addBody,
     addStaticTriangles,
     enableStaticTiles,
     castRay,

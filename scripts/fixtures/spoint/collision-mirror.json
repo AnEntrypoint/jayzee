@@ -1,0 +1,2336 @@
+{
+  "source": "spoint src/client/CollisionMirror.js with src/physics/World.js PhysicsWorld, jolt-physics 1.1.0",
+  "cfg": {
+    "tileM": 16,
+    "marginM": 1,
+    "forgetRing": 2,
+    "gravity": [
+      0,
+      -9.81,
+      0
+    ],
+    "radius": 0.4,
+    "halfHeight": 0.9,
+    "crouchHalfHeight": 0.45,
+    "mass": 80,
+    "maxSlopeAngle": 0.7854,
+    "maxStepHeight": 0.4,
+    "stickToFloorDistance": 0.5
+  },
+  "records": [
+    {
+      "frame": 0,
+      "position": [
+        4,
+        1.9972749948501587,
+        4
+      ],
+      "velocity": [
+        0,
+        -0.16349999606609344,
+        0
+      ],
+      "onGround": false,
+      "groundY": null,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 1,
+      "position": [
+        4,
+        1.991824984550476,
+        4
+      ],
+      "velocity": [
+        0,
+        -0.3269999921321869,
+        0
+      ],
+      "onGround": false,
+      "groundY": null,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 2,
+      "position": [
+        4,
+        1.9836499691009521,
+        4
+      ],
+      "velocity": [
+        0,
+        -0.49050000309944153,
+        0
+      ],
+      "onGround": false,
+      "groundY": null,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 3,
+      "position": [
+        4,
+        1.972749948501587,
+        4
+      ],
+      "velocity": [
+        0,
+        -0.6539999842643738,
+        0
+      ],
+      "onGround": false,
+      "groundY": null,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 4,
+      "position": [
+        4,
+        1.9591249227523804,
+        4
+      ],
+      "velocity": [
+        0,
+        -0.8174999952316284,
+        0
+      ],
+      "onGround": false,
+      "groundY": null,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 5,
+      "position": [
+        4,
+        1.9427748918533325,
+        4
+      ],
+      "velocity": [
+        0,
+        -0.9810000061988831,
+        0
+      ],
+      "onGround": false,
+      "groundY": null,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 6,
+      "position": [
+        4,
+        1.9236998558044434,
+        4
+      ],
+      "velocity": [
+        0,
+        -1.1445000171661377,
+        0
+      ],
+      "onGround": false,
+      "groundY": null,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 7,
+      "position": [
+        4,
+        1.901899814605713,
+        4
+      ],
+      "velocity": [
+        0,
+        -1.3079999685287476,
+        0
+      ],
+      "onGround": false,
+      "groundY": null,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 8,
+      "position": [
+        4,
+        1.8773747682571411,
+        4
+      ],
+      "velocity": [
+        0,
+        -1.4714999198913574,
+        0
+      ],
+      "onGround": false,
+      "groundY": null,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 9,
+      "position": [
+        4,
+        1.850124716758728,
+        4
+      ],
+      "velocity": [
+        0,
+        -1.6349998712539673,
+        0
+      ],
+      "onGround": false,
+      "groundY": null,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 10,
+      "position": [
+        4,
+        1.8201496601104736,
+        4
+      ],
+      "velocity": [
+        0,
+        -1.7984998226165771,
+        0
+      ],
+      "onGround": false,
+      "groundY": null,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 11,
+      "position": [
+        4,
+        1.7874497175216675,
+        4
+      ],
+      "velocity": [
+        0,
+        -1.961999773979187,
+        0
+      ],
+      "onGround": false,
+      "groundY": null,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 12,
+      "position": [
+        4,
+        1.75202476978302,
+        4
+      ],
+      "velocity": [
+        0,
+        -2.125499725341797,
+        0
+      ],
+      "onGround": false,
+      "groundY": null,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 13,
+      "position": [
+        4,
+        1.7138748168945312,
+        4
+      ],
+      "velocity": [
+        0,
+        -2.2889997959136963,
+        0
+      ],
+      "onGround": false,
+      "groundY": null,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 14,
+      "position": [
+        4,
+        1.6729998588562012,
+        4
+      ],
+      "velocity": [
+        0,
+        -2.4524998664855957,
+        0
+      ],
+      "onGround": false,
+      "groundY": null,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 15,
+      "position": [
+        4,
+        1.6293998956680298,
+        4
+      ],
+      "velocity": [
+        0,
+        -2.615999937057495,
+        0
+      ],
+      "onGround": false,
+      "groundY": null,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 16,
+      "position": [
+        4,
+        1.583074927330017,
+        4
+      ],
+      "velocity": [
+        0,
+        -2.7795000076293945,
+        0
+      ],
+      "onGround": false,
+      "groundY": null,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 17,
+      "position": [
+        4,
+        1.534024953842163,
+        4
+      ],
+      "velocity": [
+        0,
+        -2.943000078201294,
+        0
+      ],
+      "onGround": false,
+      "groundY": null,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 18,
+      "position": [
+        4,
+        1.4822499752044678,
+        4
+      ],
+      "velocity": [
+        0,
+        -3.1065001487731934,
+        0
+      ],
+      "onGround": false,
+      "groundY": null,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 19,
+      "position": [
+        4,
+        1.4277499914169312,
+        4
+      ],
+      "velocity": [
+        0,
+        -3.2700002193450928,
+        0
+      ],
+      "onGround": false,
+      "groundY": null,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 20,
+      "position": [
+        4,
+        1.3705250024795532,
+        4
+      ],
+      "velocity": [
+        0,
+        -3.433500289916992,
+        0
+      ],
+      "onGround": false,
+      "groundY": null,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 21,
+      "position": [
+        4,
+        1.310575008392334,
+        4
+      ],
+      "velocity": [
+        0,
+        -3.5970003604888916,
+        0
+      ],
+      "onGround": false,
+      "groundY": null,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 22,
+      "position": [
+        4,
+        1.2999999523162842,
+        4
+      ],
+      "velocity": [
+        0,
+        -3.760500431060791,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 23,
+      "position": [
+        4,
+        1.2999999523162842,
+        4
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 24,
+      "position": [
+        4,
+        1.2999999523162842,
+        4
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 25,
+      "position": [
+        4,
+        1.2999999523162842,
+        4
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 26,
+      "position": [
+        4,
+        1.2999999523162842,
+        4
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 27,
+      "position": [
+        4,
+        1.2999999523162842,
+        4
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 28,
+      "position": [
+        4,
+        1.2999999523162842,
+        4
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 29,
+      "position": [
+        4,
+        1.2999999523162842,
+        4
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 30,
+      "position": [
+        4,
+        1.2999999523162842,
+        4
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 31,
+      "position": [
+        4,
+        1.2999999523162842,
+        4
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 32,
+      "position": [
+        4,
+        1.2999999523162842,
+        4
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 33,
+      "position": [
+        4,
+        1.2999999523162842,
+        4
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 34,
+      "position": [
+        4,
+        1.2999999523162842,
+        4
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 35,
+      "position": [
+        4,
+        1.2999999523162842,
+        4
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 36,
+      "position": [
+        4,
+        1.2999999523162842,
+        4
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 37,
+      "position": [
+        4,
+        1.2999999523162842,
+        4
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 38,
+      "position": [
+        4,
+        1.2999999523162842,
+        4
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 39,
+      "position": [
+        4,
+        1.2999999523162842,
+        4
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 40,
+      "position": [
+        4,
+        1.2999999523162842,
+        4
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 41,
+      "position": [
+        4,
+        1.2999999523162842,
+        4
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 42,
+      "position": [
+        4,
+        1.2999999523162842,
+        4
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 43,
+      "position": [
+        4,
+        1.2999999523162842,
+        4
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 44,
+      "position": [
+        4,
+        1.2999999523162842,
+        4
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 45,
+      "position": [
+        4,
+        1.2999999523162842,
+        4
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 46,
+      "position": [
+        4,
+        1.2999999523162842,
+        4
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 47,
+      "position": [
+        4,
+        1.2999999523162842,
+        4
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 48,
+      "position": [
+        4,
+        1.2999999523162842,
+        4
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 49,
+      "position": [
+        4,
+        1.2999999523162842,
+        4
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 50,
+      "position": [
+        4,
+        1.524999976158142,
+        4
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "onGround": false,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 51,
+      "position": [
+        4,
+        1.5222749710083008,
+        4
+      ],
+      "velocity": [
+        0,
+        -0.16349999606609344,
+        0
+      ],
+      "onGround": false,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 52,
+      "position": [
+        4,
+        1.5168249607086182,
+        4
+      ],
+      "velocity": [
+        0,
+        -0.3269999921321869,
+        0
+      ],
+      "onGround": false,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 53,
+      "position": [
+        4,
+        1.5086499452590942,
+        4
+      ],
+      "velocity": [
+        0,
+        -0.49050000309944153,
+        0
+      ],
+      "onGround": false,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 54,
+      "position": [
+        4,
+        1.497749924659729,
+        4
+      ],
+      "velocity": [
+        0,
+        -0.6539999842643738,
+        0
+      ],
+      "onGround": false,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 55,
+      "position": [
+        4,
+        1.4841248989105225,
+        4
+      ],
+      "velocity": [
+        0,
+        -0.8174999952316284,
+        0
+      ],
+      "onGround": false,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 56,
+      "position": [
+        4,
+        1.4677748680114746,
+        4
+      ],
+      "velocity": [
+        0,
+        -0.9810000061988831,
+        0
+      ],
+      "onGround": false,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 57,
+      "position": [
+        4,
+        1.4486998319625854,
+        4
+      ],
+      "velocity": [
+        0,
+        -1.1445000171661377,
+        0
+      ],
+      "onGround": false,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 58,
+      "position": [
+        4,
+        1.426899790763855,
+        4
+      ],
+      "velocity": [
+        0,
+        -1.3079999685287476,
+        0
+      ],
+      "onGround": false,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 59,
+      "position": [
+        4,
+        1.4023747444152832,
+        4
+      ],
+      "velocity": [
+        0,
+        -1.4714999198913574,
+        0
+      ],
+      "onGround": false,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 60,
+      "position": [
+        4,
+        1.3751246929168701,
+        4
+      ],
+      "velocity": [
+        0,
+        -1.6349998712539673,
+        0
+      ],
+      "onGround": false,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 61,
+      "position": [
+        4,
+        1.3451496362686157,
+        4
+      ],
+      "velocity": [
+        0,
+        -1.7984998226165771,
+        0
+      ],
+      "onGround": false,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 62,
+      "position": [
+        4,
+        1.3124496936798096,
+        4
+      ],
+      "velocity": [
+        0,
+        -1.961999773979187,
+        0
+      ],
+      "onGround": false,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 63,
+      "position": [
+        4,
+        1.2999999523162842,
+        4
+      ],
+      "velocity": [
+        0,
+        -2.125499725341797,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 64,
+      "position": [
+        4,
+        1.2999999523162842,
+        4
+      ],
+      "velocity": [
+        0,
+        -2.125499725341797,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 65,
+      "position": [
+        4,
+        1.2999999523162842,
+        4
+      ],
+      "velocity": [
+        0,
+        -2.125499725341797,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 66,
+      "position": [
+        4,
+        1.2999999523162842,
+        4
+      ],
+      "velocity": [
+        0,
+        -2.125499725341797,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 67,
+      "position": [
+        4,
+        1.2999999523162842,
+        4
+      ],
+      "velocity": [
+        0,
+        -2.125499725341797,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 68,
+      "position": [
+        4,
+        1.2999999523162842,
+        4
+      ],
+      "velocity": [
+        0,
+        -2.125499725341797,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 69,
+      "position": [
+        4,
+        1.2999999523162842,
+        4
+      ],
+      "velocity": [
+        0,
+        -2.125499725341797,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 70,
+      "position": [
+        4,
+        1.2999999523162842,
+        4
+      ],
+      "velocity": [
+        0,
+        -2.125499725341797,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 71,
+      "position": [
+        4,
+        1.2999999523162842,
+        4
+      ],
+      "velocity": [
+        0,
+        -2.125499725341797,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 72,
+      "position": [
+        4,
+        1.2999999523162842,
+        4
+      ],
+      "velocity": [
+        0,
+        -2.125499725341797,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 73,
+      "position": [
+        4,
+        1.2999999523162842,
+        4
+      ],
+      "velocity": [
+        0,
+        -2.125499725341797,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 74,
+      "position": [
+        4,
+        1.2999999523162842,
+        4
+      ],
+      "velocity": [
+        0,
+        -2.125499725341797,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 75,
+      "position": [
+        4,
+        1.2999999523162842,
+        4
+      ],
+      "velocity": [
+        0,
+        -2.125499725341797,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 76,
+      "position": [
+        4,
+        1.2999999523162842,
+        4
+      ],
+      "velocity": [
+        0,
+        -2.125499725341797,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 77,
+      "position": [
+        4,
+        1.2999999523162842,
+        4
+      ],
+      "velocity": [
+        0,
+        -2.125499725341797,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 78,
+      "position": [
+        4,
+        1.2999999523162842,
+        4
+      ],
+      "velocity": [
+        0,
+        -2.125499725341797,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 79,
+      "position": [
+        4,
+        1.2999999523162842,
+        4
+      ],
+      "velocity": [
+        0,
+        -2.125499725341797,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 80,
+      "position": [
+        4,
+        1.2999999523162842,
+        4
+      ],
+      "velocity": [
+        0,
+        -2.125499725341797,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 81,
+      "position": [
+        4,
+        1.2999999523162842,
+        4
+      ],
+      "velocity": [
+        0,
+        -2.125499725341797,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 82,
+      "position": [
+        4,
+        1.2999999523162842,
+        4
+      ],
+      "velocity": [
+        0,
+        -2.125499725341797,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 83,
+      "position": [
+        4,
+        1.2999999523162842,
+        4
+      ],
+      "velocity": [
+        0,
+        -2.125499725341797,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 84,
+      "position": [
+        4,
+        1.2999999523162842,
+        4
+      ],
+      "velocity": [
+        0,
+        -2.125499725341797,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 85,
+      "position": [
+        4,
+        1.2999999523162842,
+        4
+      ],
+      "velocity": [
+        0,
+        -2.125499725341797,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 86,
+      "position": [
+        4,
+        1.2999999523162842,
+        4
+      ],
+      "velocity": [
+        0,
+        -2.125499725341797,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 87,
+      "position": [
+        4,
+        1.2999999523162842,
+        4
+      ],
+      "velocity": [
+        0,
+        -2.125499725341797,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 88,
+      "position": [
+        4,
+        1.2999999523162842,
+        4
+      ],
+      "velocity": [
+        0,
+        -2.125499725341797,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 89,
+      "position": [
+        4,
+        1.2999999523162842,
+        4
+      ],
+      "velocity": [
+        0,
+        -2.125499725341797,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 90,
+      "position": [
+        9,
+        1.2999999523162842,
+        1
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 91,
+      "position": [
+        9,
+        1.2999999523162842,
+        1
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 92,
+      "position": [
+        9,
+        1.2999999523162842,
+        1
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 93,
+      "position": [
+        9,
+        1.2999999523162842,
+        1
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 94,
+      "position": [
+        9,
+        1.2999999523162842,
+        1
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 95,
+      "position": [
+        9,
+        1.2999999523162842,
+        1
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 96,
+      "position": [
+        9,
+        1.2999999523162842,
+        1
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 97,
+      "position": [
+        9,
+        1.2999999523162842,
+        1
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 98,
+      "position": [
+        9,
+        1.2999999523162842,
+        1
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 99,
+      "position": [
+        9,
+        1.2999999523162842,
+        1
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 100,
+      "position": [
+        9,
+        1.2999999523162842,
+        1
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 101,
+      "position": [
+        9,
+        1.2999999523162842,
+        1
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 102,
+      "position": [
+        9,
+        1.2999999523162842,
+        1
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 103,
+      "position": [
+        9,
+        1.2999999523162842,
+        1
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 104,
+      "position": [
+        9,
+        1.2999999523162842,
+        1
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 105,
+      "position": [
+        9,
+        1.2999999523162842,
+        1
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 106,
+      "position": [
+        9,
+        1.2999999523162842,
+        1
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 107,
+      "position": [
+        9,
+        1.2999999523162842,
+        1
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 108,
+      "position": [
+        9,
+        1.2999999523162842,
+        1
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "frame": 109,
+      "position": [
+        9,
+        1.2999999523162842,
+        1
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "onGround": true,
+      "groundY": 1.2999999523162842,
+      "groundNormal": [
+        0,
+        1,
+        0
+      ],
+      "covers": true
+    },
+    {
+      "outside": true,
+      "covers": false
+    }
+  ]
+}
