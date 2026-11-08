@@ -3,3 +3,5 @@ dist/
 runs/
 .playwriter/
 .env
+build/
+engine/out/
