@@ -258,7 +258,8 @@
     "check:engine-planet": "node scripts/check-engine-planet.mjs",
     "check:engine-vegetation": "node scripts/check-engine-vegetation.mjs",
     "check:engine-codecs": "node scripts/check-engine-codecs.mjs",
-    "gen:engine-codec-fixtures": "node scripts/gen-engine-codec-fixtures.mjs"
+    "gen:engine-codec-fixtures": "node scripts/gen-engine-codec-fixtures.mjs",
+    "check:client-resource-pools": "node scripts/check-client-resource-pools.mjs"
   },
   "dependencies": {
     "@pixiv/three-vrm": "3.5.5",

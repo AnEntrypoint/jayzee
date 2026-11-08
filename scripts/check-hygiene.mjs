@@ -13,6 +13,7 @@ const SCOPES = [
   { label: 'src/spawn/namedAssetRedirect.js', files: ['src/spawn/namedAssetRedirect.js'], hosts: [...HOST_STD, 'fetch', 'URL'], mathRandom: true },
   { label: 'src/physics-pure', dir: 'src/physics-pure', hosts: HOST_STD, mathRandom: true },
   { label: 'src/sandbox/limits.js', files: ['src/sandbox/limits.js'], hosts: HOST_STD, mathRandom: true },
+  { label: 'src/client/resourcePools.js', files: ['src/client/resourcePools.js'], hosts: HOST_STD, mathRandom: true },
   { label: 'src/world/query.js', files: ['src/world/query.js'], hosts: HOST_STD, mathRandom: true },
   { label: 'src/rollback-pure correctionObserver.js and peerSimRuntime.js', files: ['src/rollback-pure/correctionObserver.js', 'src/rollback-pure/peerSimRuntime.js'], hosts: ['process', 'performance', 'Date', 'setTimeout', 'setInterval', 'clearInterval', 'console', 'window', 'globalThis', 'require', 'Buffer'] },
   { label: 'src/tick-pure', dir: 'src/tick-pure', hosts: HOST_CLOCK },

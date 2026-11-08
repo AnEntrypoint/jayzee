@@ -103,3 +103,15 @@ The dispatcher owns docs/ENGINE.md, so these are recorded here and not edited.
 - Checked by reading the JS source, not by running it: the field offsets, the scale and velocity ranges, the quaternion levels, steps, span and shifts, the input packet layout, and the yaw step count. Those values were transcribed from `src/wire/binSnapshot.js`, `src/wire/quantize.js` and `src/protocol/input.js`, and the gate is what proves them equal.
 - To check in a build: the Emscripten exports for the byte and double scratch pointers, and the pointer-to-index conversion in the gate (byte offset for `HEAPU8`, byte offset divided by 8 for `HEAPF64`); `-ffp-contract=off` keeps the decode arithmetic unfused.
 - The fixture file does not exist until `gen:engine-codec-fixtures` is run in Phase B. The gate fails on a missing fixture, not on a mismatch.
+
+## Phase 8: client resource pools (coded, not built or run)
+- Files: `src/client/resourcePools.js` (a slot pool with generation handles, and light, texture-array, mesh and pipeline-registry pools over preallocated typed arrays), `scripts/check-client-resource-pools.mjs` (gate, not run, not in `npm test`), `scripts/browser/client-resource-pools.html` and `scripts/browser/client-resource-pools-browser.js` (witness page, not run), the package script `check:client-resource-pools`, and one scope line in `scripts/check-hygiene.mjs` for `src/client/resourcePools.js`.
+- Witness, not run: adding and removing lights, textures and meshes during play leaves frame-time p99 unchanged, and no pipeline compiles after seal. The page measures JavaScript-side frame time only, with a registry stand-in for compiled pipelines. The WebGPU render cost is phase 10's witness.
+- Decisions and deviations for the dispatcher to decide:
+  - This phase is JavaScript. ENGINE.md's slot rules belong to the wasm renderer (phase 10), so the module does not reach the GPU yet. Its pools are the slot layer phase 10 reads.
+  - The materials table in ENGINE.md is not coded.
+  - A handle is generation times 65536 plus slot, with generations 1 to 65535. A handle held across 65535 releases of its own slot resolves again, because the generation wraps. This is not guarded.
+  - Mutators throw a RangeError on a stale or unknown handle. `add` checks its input before it takes a slot, so a refused input leaves the pool unchanged, and returns -1 when the pool is full.
+  - Mesh indices are the mesh's own vertex indices. The renderer adds the vertex offset that `rangeInto` returns. Each slot has a fixed vertex and index capacity, so a mesh cannot grow into its neighbour.
+  - `seal()` compiles every registered pipeline. If a compile throws, the registry stays unsealed and its compile count is partial.
+- Unverified: the hygiene scope line was added without running `check:hygiene`. The no-allocation claim is witnessed only as buffer identity after churn, not by a heap diff. The page's own handle arrays allocate each frame, so its p99 includes that cost, and the cost has not been measured.
