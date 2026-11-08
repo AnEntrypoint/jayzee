@@ -1,0 +1,49 @@
+{
+  "source": {
+    "file": "src/terrain/CubeSphereCells.js",
+    "commit": "22dca25",
+    "sha256": "1f4c267a53754e397975fa438964299964071ed36eeae2b5f310ebdf49182e45"
+  },
+  "rows": [
+    {
+      "label": "cell (5, 63709, 63709) at 63710 cells per face",
+      "face": 5,
+      "cx": 63709,
+      "cy": 63709,
+      "cellsPerFace": 63710,
+      "key": 97420553821
+    },
+    {
+      "label": "cell (0, 11502, 11613) at 63710 cells per face",
+      "face": 0,
+      "cx": 11502,
+      "cy": 11613,
+      "cellsPerFace": 63710,
+      "key": 2931273309
+    },
+    {
+      "label": "cell (0, -1, 0) at 63710 cells per face",
+      "face": 0,
+      "cx": -1,
+      "cy": 0,
+      "cellsPerFace": 63710,
+      "key": -254848
+    },
+    {
+      "label": "cell (0, 16852, 13952) at 63710 cells per face",
+      "face": 0,
+      "cx": 16852,
+      "cy": 13952,
+      "cellsPerFace": 63710,
+      "key": 4294712448
+    },
+    {
+      "label": "cell (2, 2000000, 2000000) at 1000000000 cells per face",
+      "face": 2,
+      "cx": 2000000,
+      "cy": 2000000,
+      "cellsPerFace": 1000000000,
+      "threw": "RangeError"
+    }
+  ]
+}

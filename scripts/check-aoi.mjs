@@ -150,9 +150,9 @@ gate('neighbour ring is the eight cells around the centre', () => {
   assert.ok(planet.relevantIds.has(viewerId(solveCellViewer(4, 4, 4, 1000, 200))))
 })
 
-gate('packCellKey wraps int32 and collides at 64000 cells per face, as spoint does', () => {
-  assert.equal(packCellKey(0, 0, 0, 64000), packCellKey(0, 50330, 19248, 64000))
-  assert.equal(packCellKey(0, 50330, 19248, 64000), 0)
+gate('packCellKey is exact past int32 at 64000 cells per face, as spoint is at 22dca25', () => {
+  assert.notEqual(packCellKey(0, 0, 0, 64000), packCellKey(0, 50330, 19248, 64000))
+  assert.equal(packCellKey(0, 50330, 19248, 64000), 3 * 2 ** 32)
   assert.notEqual(packCellKey(0, 0, 0, 10), packCellKey(0, 50330, 19248, 10))
   const seen = new Set()
   for (let cx = 0; cx < 10; cx++) for (let cy = 0; cy < 10; cy++) seen.add(packCellKey(4, cx, cy, 10))
