@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>jayzee playable</title>
+<script type="importmap">{"imports":{"jz/interop":"./vendor/jz/instantiate.js"}}</script>
+<style>
+body { margin: 0; background: #101418; color: #d8dee9; font: 14px/1.4 monospace; }
+canvas { display: block; background: #1b2330; cursor: crosshair; }
+#status { margin: 0; padding: 8px 12px; white-space: pre; }
+</style>
+</head>
+<body>
+<canvas id="field" width="640" height="480"></canvas>
+<pre id="status">loading kernel</pre>
+<script type="module" src="./play.js"></script>
+</body>
+</html>

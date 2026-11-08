@@ -60,9 +60,16 @@ gate('a body that passes outside the box footprint keeps its velocity and is not
   assert(position[0] > PAST_BOX, 'a body outside the footprint was stopped; x is ' + position[0])
 })
 
-gate('a body that starts inside the expanded box is left as the step put it', () => {
-  const { position } = runOne({ x: 0, boxes: [BOX] })
-  assert(position[0] > PAST_BOX, 'the sweep corrected a body that started inside; x is ' + position[0])
+gate('a body that starts inside the expanded box is pushed back to its nearest face and loses its velocity into the box', () => {
+  const { position, velocity } = runOne({ x: 0, boxes: [BOX] })
+  near(position[0], -RADIUS, 'pushed-out x, the nearest face')
+  near(velocity[0], 0, 'velocity into the box after the push')
+})
+
+gate('a body resting on the near face and pushed into it stays on that face', () => {
+  const { position, velocity } = runOne({ x: -RADIUS, boxes: [BOX] })
+  near(position[0], -RADIUS, 'x at the face')
+  near(velocity[0], 0, 'velocity into the box')
 })
 
 gate('the sweep reports the entry time and face of a crossing, and nothing for a segment that stops short or misses', () => {

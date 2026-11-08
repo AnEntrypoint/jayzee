@@ -23,11 +23,31 @@ export const sweepSphereOverBox = (from, to, radius, box) => {
     if (tFar < exit) exit = tFar
     if (enter > exit) return null
   }
-  if (!(enter > 0 && enter <= 1)) return null
+  if (!(enter >= 0 && enter <= 1)) return null
   return { t: enter, axis, sign }
 }
 
+const strictlyInside = (point, box, radius) => [0, 1, 2].every((a) => point[a] > box.min[a] - radius && point[a] < box.max[a] + radius)
+
+const escapeFace = (point, box, radius, velocity) => {
+  let best = null
+  for (let a = 0; a < 3; a++) {
+    for (const [target, sign] of [[box.min[a] - radius, -1], [box.max[a] + radius, 1]]) {
+      const depth = Math.abs(point[a] - target)
+      if (best === null || depth < best.depth) best = { depth, axis: a, target, sign }
+    }
+  }
+  const position = [point[0], point[1], point[2]]
+  position[best.axis] = best.target
+  const normal = [0, 0, 0]
+  normal[best.axis] = best.sign
+  const into = velocity[0] * normal[0] + velocity[1] * normal[1] + velocity[2] * normal[2]
+  const next = [0, 1, 2].map((a) => (into < 0 ? velocity[a] - into * normal[a] : velocity[a]))
+  return { t: 0, position, velocity: next }
+}
+
 export const stopAtBox = (from, to, radius, box, velocity) => {
+  if (strictlyInside(from, box, radius)) return escapeFace(from, box, radius, velocity)
   const hit = sweepSphereOverBox(from, to, radius, box)
   if (hit === null) return null
   const position = [0, 1, 2].map((a) => from[a] + hit.t * (to[a] - from[a]))
