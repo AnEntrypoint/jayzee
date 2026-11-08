@@ -1,6 +1,7 @@
 import { JoltLimitsError, joltReservationBytes, resolveJoltLimits } from '../motion-pure/joltLimits.js'
 import { createStaticTileIndex, STATIC_TILE_M } from './staticTileIndex.js'
 import { createDormantStatics } from './dormantStatics.js'
+import { createVehicleBackend } from './vehicles.js'
 
 const LAYER_STATIC = 0
 const LAYER_DYNAMIC = 1
@@ -56,6 +57,7 @@ export async function createJoltHost({ gravity = [0, -9.81, 0], joltLimits = nul
   const shapeKeys = new Map()
   let staticTiles = null
   let dormant = null
+  let vehicles = null
 
   const host = {
     Jolt: J,
@@ -77,6 +79,11 @@ export async function createJoltHost({ gravity = [0, -9.81, 0], joltLimits = nul
       if (!dormant) dormant = createDormantStatics(host)
       return dormant
     },
+    get vehicles() {
+      if (!vehicles) vehicles = createVehicleBackend(host)
+      return vehicles
+    },
+    step: (dt, collisionSteps = 2) => jolt.Step(dt, collisionSteps),
     bodyCount: () => physicsSystem.GetNumBodies(),
     destroy,
   }
@@ -218,6 +225,7 @@ export async function createJoltHost({ gravity = [0, -9.81, 0], joltLimits = nul
   function destroy() {
     if (dormant) dormant.destroy()
     dormant = null
+    vehicles = null
     if (staticTiles) staticTiles.destroy()
     staticTiles = null
     for (const v of [origin, dir, normalPoint]) J.destroy(v)

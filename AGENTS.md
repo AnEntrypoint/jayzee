@@ -179,6 +179,7 @@ Non-obvious facts for automated edits. Architecture and measured costs live in d
 - The site resolver is `src/site/worldName.js`. `SITE_WORLD_FILES` is empty, so every named world is refused. Rebuild `docs/play` after any change to `site/play.js` or `src/site`.
 - Spoint `client/app.js` logs a failed world import and continues, but spoint README says boot stops. Jayzee follows the README.
 - `parseClusterLod` refuses a malformed `EP_cluster_lod` record with `ClusterLodRecordError` (code `cluster-lod-malformed`), as spoint does. It returns null only when the payload is absent or its cluster list is empty.
+- Read a body's chassis position through `BodyInterface.GetPosition(bodyId)`, not `Body.GetPosition()`. An unfreed `Body.GetPosition()` result makes a later vehicle or cast call throw `memory access out of bounds` a few ticks on (reproduced in spoint's `PhysicsWorld` with jolt-physics 1.1.0). `scripts/gen-vehicles-fixture.mjs` and `scripts/check-vehicles-spoint.mjs` read through the body interface. Spoint's own `Body.GetPosition()` readers have the same exposure.
 
 ## Dependencies and licences
 
