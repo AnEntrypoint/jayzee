@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { gate, finish } from './lib/gate.mjs'
 import { ENDPOINT_CLASSES, parseDocument, parseEndpoints, countsByClass, findCountMismatches } from '../src/upstream/index.js'
 
-const PARITY_ROW_41 = {
+const PARITY_ROW_U41 = {
   total: 93,
   counts: { published: 39, 'per-game': 21, 'manual-only': 30, disabled: 3 }
 }
@@ -52,26 +52,26 @@ gate('the doc states a total equal to the parsed row count', () => {
   assert(document.statedTotal === document.endpoints.length, 'doc states ' + document.statedTotal + ', parses ' + document.endpoints.length)
 })
 
-gate('the parsed total is 93, as the doc states and PARITY row 41 says', () => {
+gate('the parsed total is 93, as the doc states and PARITY row U41 says', () => {
   const document = parseDocument(fixtureText)
-  assert(document.endpoints.length === PARITY_ROW_41.total, 'parses ' + document.endpoints.length + ', expected ' + PARITY_ROW_41.total)
+  assert(document.endpoints.length === PARITY_ROW_U41.total, 'parses ' + document.endpoints.length + ', expected ' + PARITY_ROW_U41.total)
 })
 
 for (const className of ENDPOINT_CLASSES) {
-  gate('class ' + className + ': doc heading count equals parsed rows and PARITY row 41', () => {
+  gate('class ' + className + ': doc heading count equals parsed rows and PARITY row U41', () => {
     const document = parseDocument(fixtureText)
     const section = document.sections.find((candidate) => candidate.class === className)
     assert(section, 'no section for class')
     const parsed = section.endpoints.length
     assert(section.statedCount === parsed, 'doc states ' + section.statedCount + ', parses ' + parsed)
-    assert(parsed === PARITY_ROW_41.counts[className], 'parses ' + parsed + ', PARITY row 41 says ' + PARITY_ROW_41.counts[className])
+    assert(parsed === PARITY_ROW_U41.counts[className], 'parses ' + parsed + ', PARITY row U41 says ' + PARITY_ROW_U41.counts[className])
   })
 }
 
 gate('the class counts sum to the parsed total', () => {
   const counts = countsByClass(parseEndpoints(fixtureText))
   const sum = Object.values(counts).reduce((total, count) => total + count, 0)
-  assert(sum === PARITY_ROW_41.total, 'class counts sum to ' + sum)
+  assert(sum === PARITY_ROW_U41.total, 'class counts sum to ' + sum)
 })
 
 gate('findCountMismatches reports nothing for the fixture', () => {

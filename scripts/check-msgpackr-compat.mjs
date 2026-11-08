@@ -60,7 +60,7 @@ gate('a packer without the record dialect does not reproduce the fixture (contro
 })
 
 gate('OPEN, known difference: the shipped encodeReplay bytes differ from spoint, so the replay file is not byte-compatible yet', () => {
-  if (sameBytes(encodeReplay(meta.sample), bytes)) throw new Error('shipped encodeReplay now matches spoint: update row 43 and this claim')
+  if (sameBytes(encodeReplay(meta.sample), bytes)) throw new Error('shipped encodeReplay now matches spoint: update row 42 and this claim')
 })
 
 finish()

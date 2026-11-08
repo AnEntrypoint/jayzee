@@ -94,7 +94,7 @@ Non-obvious facts for automated edits. Architecture and measured costs live in d
 - `src/physics-extras/glb.js` refuses Draco and Meshopt primitives rather than decoding them. Their decoders are WASM and no Draco fixture exists. A float vertex stride that is not a multiple of 4 is refused in `src/physics-extras/meshopt.js`, where spoint yields NaN.
 - The hooks in `src/behaviours/health.js` and `src/behaviours/destructible.js` receive event objects, not `appCtx`, so a host that expects `appCtx` must adapt them.
 - `src/behaviours/game-fsm.js` runs `after(ms)` timers from `tick` on an injected clock, not wall-clock timers. Guards and actions also receive the send payload.
-- spoint's `findCostCorridor` defaults its budget to `Infinity`, and no 20000 constant exists in spoint's pathfinding sources. The 20000 figure in PARITY row 27 stays unverified until a source documents it.
+- spoint's `findCostCorridor` defaults its budget to `Infinity`, and no 20000 constant exists in spoint's pathfinding sources. The 20000 figure in PARITY row 26 stays unverified until a source documents it.
 - `src/terrain-pure/grassDecal.js` reads `Date.now` unless `opts.now` is given. `src/terrain-pure/planetFrame.js` logs through `console.error`, so a host that needs silent terrain has to filter it.
 - The marching tables in `src/terrain-pure/marchingCubes.js` and `src/terrain-pure/marchingEdges.js` are copies of spoint's tables. The hot-module-replacement tail of spoint's terrain modules is not ported.
 - `LOD_STEP` (7.2) in `src/packages/mapspinner/lod-config.js` is the tessellation step. The split distance is `splitFactor * LOD_STEP` scaled by the viewport term, and `lodDistFactor` does not read `LOD_STEP`, so doubling it puts the terrain one level finer at every distance.
