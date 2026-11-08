@@ -159,3 +159,4 @@ Non-obvious facts for automated edits. Architecture and measured costs live in d
 - `scripts/check-marching-drift.mjs` imports spoint terrain modules from `/workspace/spoint`, so it is a script and not part of `npm test`.
 - `scripts/fixtures/spoint/spline-erosion.json` is written by `scripts/gen-spline-erosion-fixture.mjs`, the only script that reads `/workspace/spoint`. The gate reads the fixture and runs in `npm test`.
 - `destroy` parks a destructible parent at `[0, -5000, 0]` (`PARK_OFFSET` in `src/behaviours/destructiblePool.js`), as spoint does, and the gate fails when that offset changes.
+- `UPLOAD_TOKEN` is read from `process.env` on every request by `src/sdk/UploadRoute.js`, so a token set after the route is made takes effect. Nothing in the repo loads `.env`; a host runs with `node --env-file=.env` (Node 22 flag) to load it.
