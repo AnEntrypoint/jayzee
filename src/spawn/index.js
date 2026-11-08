@@ -4,5 +4,5 @@ export { sha256Hex, verifyContent, parseHead, parseHeadResponse, worldStoreError
 export { parseManifest, bindFrames } from './manifest.js'
 export { normalizeFeedEntry, walkFeed } from './feed.js'
 export { parseResolve, classifyResolve } from './resolve.js'
-export { parseLedgerKey, cdnValue } from './ledger.js'
+export { ledgerBucket, ledgerKey, parseLedgerKey, cdnValue } from './ledger.js'
 export { uuidToHex } from './ids.js'

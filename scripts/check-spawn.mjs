@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { gate, finish } from './lib/gate.mjs'
-import { decodeName, encodeName, readFrames, sha256Hex, verifyContent, parseHead, parseHeadResponse, parseManifest, bindFrames, normalizeFeedEntry, walkFeed, parseResolve, classifyResolve, parseLedgerKey, cdnValue } from '../src/spawn/index.js'
+import { decodeName, encodeName, readFrames, sha256Hex, verifyContent, parseHead, parseHeadResponse, parseManifest, bindFrames, normalizeFeedEntry, walkFeed, parseResolve, classifyResolve, ledgerBucket, ledgerKey, parseLedgerKey, cdnValue } from '../src/spawn/index.js'
 
 const fixtures = join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'spawn')
 const bytesOf = (path) => readFileSync(join(fixtures, path))
@@ -213,15 +213,16 @@ gate('a 200 head response parses the head, and other statuses are refused', () =
 
 const glbRows = textOf('glb-rows.tsv').trim().split('\n').slice(1).map((line) => line.split('\t'))
 
-gate('a ledger key names the same cdn value as the GLB row url', () => {
+gate('a GLB row\'s ledger key is derived from its asset name, and parses back to the same cdn value', () => {
   for (const row of glbRows) {
     const sha = row[1]
     const url = row[2]
-    const key = 'world.assets/3d/~2fcdn~2fvalue.' + sha + '.glb.yaml'
-    const { bucket, asset } = parseLedgerKey(key)
-    assert(bucket === '3d', 'bucket ' + bucket)
-    assert(asset === '/cdn/value.' + sha + '.glb', 'asset ' + asset)
-    assert(cdnValue(asset).sha === sha, 'sha from asset does not match the row')
+    const asset = '/cdn/value.' + sha + '.glb'
+    const key = ledgerKey(asset)
+    assert(key === 'world.assets/' + ledgerBucket(asset) + '/~2fcdn~2fvalue.' + sha + '.glb.yaml', 'derived key ' + key)
+    const parsed = parseLedgerKey(key)
+    assert(parsed.asset === asset, 'asset ' + parsed.asset)
+    assert(cdnValue(parsed.asset).sha === sha, 'sha from asset does not match the row')
     assert(url.endsWith('/cdn/value.' + sha + '.glb'), 'row url does not name the same value')
   }
 })
@@ -250,30 +251,64 @@ gate('encodeName writes the witnessed "/" escape, and decodeName reverses it on 
   }
 })
 
-gate('encodeName refuses ":", "~" and capitals, which have no witnessed escape', () => {
-  for (const name of ['https://spawnfile.io', 'a~b', 'Upper']) {
-    let refused = false
-    try {
-      encodeName(name)
-    } catch {
-      refused = true
-    }
-    assert(refused, 'encodeName accepted ' + JSON.stringify(name))
+const sameText = (actual, expected, label) => {
+  assert(actual === expected, label + ' is ' + JSON.stringify(actual) + ', expected ' + JSON.stringify(expected))
+}
+
+gate('encodeName escapes ":", "~", capitals and "/" as upstream does, and leaves the literal set alone', () => {
+  sameText(encodeName('https://spawnfile.io'), 'https~3a~2f~2fspawnfile.io', 'colon and slash')
+  sameText(encodeName('a~b'), 'a~7eb', 'tilde')
+  sameText(encodeName('Upper'), '~55pper', 'capital')
+  sameText(encodeName('a-b_c.d0'), 'a-b_c.d0', 'literal set')
+})
+
+gate('encodeName of the spawnfile prefix matches the head of the upstream log key whose tail is elided', () => {
+  const loggedHead = 'https~3a~2f~2fspawnfile.io~2fprod~2fcharacter-assets~2f'
+  sameText(encodeName('https://spawnfile.io/prod/character-assets/'), loggedHead, 'encoded prefix')
+})
+
+gate('encodeName refuses a non-string, and ledgerKey refuses an asset name longer than 255 characters once encoded', () => {
+  let refused = false
+  try {
+    encodeName(5)
+  } catch (error) {
+    refused = error instanceof TypeError
+  }
+  assert(refused, 'encodeName accepted a non-string')
+  ledgerKey('a'.repeat(250))
+  let longRefused = false
+  try {
+    ledgerKey('a'.repeat(251))
+  } catch (error) {
+    longRefused = error instanceof RangeError
+  }
+  assert(longRefused, 'ledgerKey accepted a 251-character name')
+})
+
+const QUOTED_KEYS = [
+  ['world.assets/8f/~2fcdn~2fneutral-default-avatar.glb.yaml', '8f', '/cdn/neutral-default-avatar.glb'],
+  ['world.assets/0c/~2fcdn~2fvalue.3e56c3a73bcc685ac673ad7014685acb1cf3f832fdfb89e255621d9909ae82e2.glb.yaml', '0c', '/cdn/value.3e56c3a73bcc685ac673ad7014685acb1cf3f832fdfb89e255621d9909ae82e2.glb'],
+]
+
+gate('the upstream bucket rule (FNV-1a over the asset name, top byte) gives the printed bucket of each quoted full key', () => {
+  for (const [key, bucket, asset] of QUOTED_KEYS) {
+    const parsed = parseLedgerKey(key)
+    assert(parsed.bucket === bucket && parsed.asset === asset, 'quoted key parsed as ' + JSON.stringify(parsed))
+    assert(ledgerBucket(asset) === bucket, 'bucket of ' + asset + ' is ' + ledgerBucket(asset))
   }
 })
 
-gate('a ledger bucket is taken as any two lowercase hex characters, and no bucket rule is applied', () => {
-  const sha = glbRows[0][1]
-  for (const bucket of ['00', '3d', 'ff']) {
-    assert(parseLedgerKey('world.assets/' + bucket + '/~2fcdn~2fvalue.' + sha + '.glb.yaml').bucket === bucket, 'bucket ' + bucket + ' was rewritten')
+gate('a quoted key with any other bucket is refused, so the bucket is checked, not only its shape', () => {
+  for (const [key, bucket] of QUOTED_KEYS) {
+    const wrong = key.replace('world.assets/' + bucket + '/', 'world.assets/' + (bucket === '8f' ? '8e' : '8f') + '/')
+    let refused = false
+    try {
+      parseLedgerKey(wrong)
+    } catch {
+      refused = true
+    }
+    assert(refused, 'a key with a wrong bucket was accepted: ' + wrong)
   }
-  let refused = false
-  try {
-    parseLedgerKey('world.assets/zz/~2fcdn~2fvalue.' + sha + '.glb.yaml')
-  } catch {
-    refused = true
-  }
-  assert(refused, 'a non-hex bucket was accepted')
 })
 
 gate('the captured resolve redirects classify as redirects with their captured status and location', () => {

@@ -1,5 +1,5 @@
 const BARE_TILDE = /~(?![0-9a-f]{2})/
-const LITERAL = /^[a-z0-9.-]$/
+const HEX = '0123456789abcdef'
 
 export const decodeName = (name) => {
   if (typeof name !== 'string') throw new TypeError('encoded name must be a string')
@@ -11,13 +11,11 @@ export const decodeName = (name) => {
   })
 }
 
+const isLiteralByte = (byte) => (byte >= 97 && byte <= 122) || (byte >= 48 && byte <= 57) || byte === 46 || byte === 45 || byte === 95
+
 export const encodeName = (name) => {
   if (typeof name !== 'string') throw new TypeError('name must be a string')
-  return [...name]
-    .map((ch) => {
-      if (ch === '/') return '~2f'
-      if (LITERAL.test(ch)) return ch
-      throw new RangeError('no witnessed escape for character ' + JSON.stringify(ch) + '; only "/" is witnessed')
-    })
+  return [...new TextEncoder().encode(name)]
+    .map((byte) => (isLiteralByte(byte) ? String.fromCharCode(byte) : '~' + HEX[byte >> 4] + HEX[byte & 15]))
     .join('')
 }
