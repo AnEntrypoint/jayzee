@@ -164,6 +164,11 @@ const stopsAfterFirstStop = exact.server.stopCount
 await exact.player.stop()
 const stopsAfterSecondStop = exact.server.stopCount
 
+const failedLoad = await runReplay({ loadFails: true, extraTicks: 0 })
+const failedLoadStopsAfterLoad = failedLoad.server.stopCount
+await failedLoad.player.stop()
+const failedLoadStopsAfterPlayerStop = failedLoad.server.stopCount
+
 const tickEntriesOfExact = exact.server.trace.filter((entry) => entry.kind === 'tick')
 const inputEntriesOfExact = exact.server.trace.filter((entry) => entry.kind === 'input')
 const tickEntriesOfSilent = silent.server.trace.filter((entry) => entry.kind === 'tick')
@@ -431,6 +436,33 @@ gate('player stop calls the server stop once and clears the server', () => {
   strictEqual(stopsBeforePlayerStop, 0)
   strictEqual(stopsAfterFirstStop, 1)
   strictEqual(stopsAfterSecondStop, 1)
+})
+
+gate('a failed world load stops the server once in play, and a later player stop stops it again', () => {
+  strictEqual(failedLoadStopsAfterLoad, 1)
+  strictEqual(failedLoadStopsAfterPlayerStop, 2)
+})
+
+gate('a restarted recording keeps the first session start tick and seen players', () => {
+  const tickSystem = makeTickSystem()
+  const playerManager = makePlayerManager()
+  const recorder = new ReplayRecorder({ playerManager, tickSystem, clock: () => FIXED_CLOCK })
+  recorder.start()
+  tickSystem.currentTick = 4
+  tickSystem.fire(4, 1 / 60)
+  playerManager.addInput('p1', {}, 1)
+  recorder.registerPlayer('p1', 'one', null)
+  recorder.stop()
+  recorder.start()
+  tickSystem.currentTick = 20
+  tickSystem.fire(20, 1 / 60)
+  playerManager.addInput('p2', {}, 1)
+  recorder.registerPlayer('p2', 'two', null)
+  const restarted = decodeReplay(recorder.stop())
+  strictEqual(restarted.header.startTick, 4)
+  strictEqual(restarted.header.endTick, 20)
+  deepStrictEqual(restarted.inputs.map((entry) => entry.tick), [20])
+  deepStrictEqual(restarted.header.players.map((player) => player.id), ['p1', 'p2'])
 })
 
 gate('a successful play logs nothing and reports no error', () => {
