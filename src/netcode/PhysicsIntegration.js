@@ -228,4 +228,54 @@ export class PhysicsIntegration {
     this.physicsWorld.setCharacterCrouch(data.charId, isCrouching)
     this._crouchStates.set(playerId, isCrouching)
   }
+
+  _vehicleBackend() {
+    const backend = this.physicsWorld?.vehicles
+    if (!backend) throw new TypeError('PhysicsIntegration vehicles need a physics world with a vehicle backend')
+    return backend
+  }
+
+  createWheeledVehicle(chassisBodyId, wheelDefs, opts) {
+    return this._vehicleBackend().createWheeledVehicle(chassisBodyId, wheelDefs, opts)
+  }
+
+  createTrackedVehicle(chassisBodyId, wheelDefs, opts) {
+    return this._vehicleBackend().createTrackedVehicle(chassisBodyId, wheelDefs, opts)
+  }
+
+  setVehicleDriverInput(vehicleId, forward, right, brake, handbrake) {
+    return this._vehicleBackend().setVehicleDriverInput(vehicleId, forward, right, brake, handbrake)
+  }
+
+  setTrackedVehicleDriverInput(vehicleId, forward, left, right, brake) {
+    return this._vehicleBackend().setTrackedVehicleDriverInput(vehicleId, forward, left, right, brake)
+  }
+
+  getVehicleWheelTransform(vehicleId, wheelIndex) {
+    return this._vehicleBackend().getVehicleWheelTransform(vehicleId, wheelIndex)
+  }
+
+  getVehicleWheelSpeed(vehicleId, wheelIndex) {
+    return this._vehicleBackend().getVehicleWheelSpeed(vehicleId, wheelIndex)
+  }
+
+  isVehicleWheelGrounded(vehicleId, wheelIndex) {
+    return this._vehicleBackend().isVehicleWheelGrounded(vehicleId, wheelIndex)
+  }
+
+  removeVehicle(vehicleId) {
+    return this._vehicleBackend().removeVehicle(vehicleId)
+  }
+
+  solveTurretAim(rotation, direction, limits) {
+    return this._vehicleBackend().solveTurretAim(rotation, direction, limits)
+  }
+
+  solveEntityTurretAim(vehicleId, direction, limits) {
+    return this._vehicleBackend().solveEntityTurretAim(vehicleId, direction, limits)
+  }
+
+  get vehicleError() {
+    return this.physicsWorld?.vehicles?.lastError ?? null
+  }
 }
