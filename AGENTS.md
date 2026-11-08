@@ -180,6 +180,7 @@ Non-obvious facts for automated edits. Architecture and measured costs live in d
 - Spoint `client/app.js` logs a failed world import and continues, but spoint README says boot stops. Jayzee follows the README.
 - `parseClusterLod` refuses a malformed `EP_cluster_lod` record with `ClusterLodRecordError` (code `cluster-lod-malformed`), as spoint does. It returns null only when the payload is absent or its cluster list is empty.
 - Read a body's chassis position through `BodyInterface.GetPosition(bodyId)`, not `Body.GetPosition()`. An unfreed `Body.GetPosition()` result makes a later vehicle or cast call throw `memory access out of bounds` a few ticks on (reproduced in spoint's `PhysicsWorld` with jolt-physics 1.1.0). `scripts/gen-vehicles-fixture.mjs` and `scripts/check-vehicles-spoint.mjs` read through the body interface. Spoint's own `Body.GetPosition()` readers have the same exposure.
+- spoint client/core/PlayerVATBake.js is ported without its hot-module-replacement tail, as the terrain modules are, so bakeVAT and bakeVATMultiClip are the whole exported surface of src/vat/vatBake.js.
 
 ## Dependencies and licences
 
@@ -187,3 +188,4 @@ Non-obvious facts for automated edits. Architecture and measured costs live in d
 - `recast-navigation` 0.43.1, MIT, with `@recast-navigation/core`, `@recast-navigation/generators` and `@recast-navigation/wasm`, all 0.43.1 and MIT. Pinned exactly to the version spoint locks. Its WASM binary ships in `@recast-navigation/wasm`, and `src/pathfinding/recastBake.js` is the only importer.
 - `jolt-physics` 1.1.0, MIT (`node_modules/jolt-physics/LICENSE`). Pinned exactly to the version spoint locks. `src/collision/joltHost.js` loads it with `import('jolt-physics/wasm-compat')`, and `src/collision/dormantStatics.js` is the only other module that reads Jolt body state.
 - `castRay` in `src/collision/joltHost.js` refuses a ray that reaches a parked static with `unavailable: 'static-colliders-migrating'`, as spoint does. A host's `dormantStatics` is created on first use, so a ray cast before any park costs no dormant check.
+- three 0.185.1, MIT (node_modules/three/LICENSE). Pinned exactly to the version spoint locks. src/vat/vatBake.js is its only importer in jayzee, and bakeVAT needs no GL context: it drives an AnimationMixer and writes matrices into Float32Array texels.

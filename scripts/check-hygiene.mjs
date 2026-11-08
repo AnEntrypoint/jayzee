@@ -22,6 +22,7 @@ const SCOPES = [
   { label: 'src/upstream-tome', dir: 'src/upstream-tome', hosts: [...HOST_STD, 'URL'] },
   { label: 'src/upstream-reference', dir: 'src/upstream-reference', hosts: HOST_STD },
   { label: 'src/site', dir: 'src/site', hosts: HOST_STD, mathRandom: true },
+  { label: 'src/vat', dir: 'src/vat', hosts: HOST_STD, imports: false },
   { label: 'src/worker-dispatch-pure', dir: 'src/worker-dispatch-pure', hosts: [...HOST_STD, 'postMessage', 'self', 'document', 'Worker', 'fetch'] },
   { label: 'src/transport/workerTransport.js', files: ['src/transport/workerTransport.js'], hosts: ['self', 'postMessage', 'Worker', 'window', 'globalThis', 'process', 'require'], imports: false },
   { label: "missing-rows sdk-editor", files: ["src/sdk/EditOpLog.js","src/sdk/PlaceInstances.js","src/sdk/PrefabSpawner.js","src/sdk/AppManifest.js","src/sdk/FreddieBridge.js"], hosts: HOST_STD, mathRandom: true },

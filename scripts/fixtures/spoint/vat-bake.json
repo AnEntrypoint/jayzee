@@ -1,0 +1,16 @@
+{
+  "source": {
+    "file": "client/core/PlayerVATBake.js",
+    "sha256": "b1f5611409bb18d236d3d40cfb452fe91d28813afe02186c5d24c28f77877460",
+    "three": "0.185.1"
+  },
+  "rows": [
+    "{\"label\":s:\"bake the wave clip at the default sample rate\",\"value\":{\"duration\":n:1,\"frameCount\":n:25,\"normal\":{\"head\":[n:0,n:0,n:0,n:1,n:0,n:0,n:0,n:1],\"sha\":s:\"709d2544b308cdad2979978a09483b0c9e0952bc7c8ba83be7c4de6d434c0f7e\"},\"rowsPerFrame\":n:1,\"sampleHz\":n:24,\"texture\":{\"h\":n:25,\"head\":[n:0,n:0,n:0,n:1,n:0,n:0,n:0,n:1],\"maxAbs\":n:1,\"minFilter\":n:1003,\"sha\":s:\"0a2935c653f440d49e37fb5a65878afa15d0e02ddd7534bbac006403a40343b1\",\"w\":n:6,\"wrapS\":n:1001},\"vertexCount\":n:6,\"width\":n:6}}",
+    "{\"label\":s:\"bake the wave clip at 12 Hz with a 4 texel row cap\",\"value\":{\"duration\":n:1,\"frameCount\":n:13,\"normal\":{\"head\":[n:0,n:0,n:0,n:1,n:0,n:0,n:0,n:1],\"sha\":s:\"53e74a7af001db55bfba43a89559d9d6f3a2d1cd37c938233b78f64b1b3397ac\"},\"rowsPerFrame\":n:2,\"sampleHz\":n:12,\"texture\":{\"h\":n:26,\"head\":[n:0,n:0,n:0,n:1,n:0,n:0,n:0,n:1],\"maxAbs\":n:1,\"minFilter\":n:1003,\"sha\":s:\"876ee2c5e74109c409ef28e0019ea12e67cb1f1cd58412b830f24254ed631c3e\",\"w\":n:4,\"wrapS\":n:1001},\"vertexCount\":n:6,\"width\":n:4}}",
+    "{\"label\":s:\"bake without normals returns no normal texture\",\"value\":{\"hasNormals\":b:false,\"texture\":{\"h\":n:25,\"head\":[n:0,n:0,n:0,n:1,n:0,n:0,n:0,n:1],\"maxAbs\":n:1,\"minFilter\":n:1003,\"sha\":s:\"0a2935c653f440d49e37fb5a65878afa15d0e02ddd7534bbac006403a40343b1\",\"w\":n:6,\"wrapS\":n:1001}}}",
+    "{\"label\":s:\"multi clip from a Map bakes both clips by name\",\"value\":{\"idle\":{\"duration\":n:0.5,\"frameCount\":n:13,\"normal\":{\"head\":[n:0,n:0,n:0,n:1,n:0,n:0,n:0,n:1],\"sha\":s:\"dc75872704e6acea26ed9bdab7937c613e9e74bb365f6ede3e3b5613eca87d52\"},\"rowsPerFrame\":n:1,\"sampleHz\":n:24,\"texture\":{\"h\":n:13,\"head\":[n:0,n:0,n:0,n:1,n:0,n:0,n:0,n:1],\"maxAbs\":n:1,\"minFilter\":n:1003,\"sha\":s:\"552652651f8e7bbecdf6c9e23d8f1f9b66c2831340868e036393bc0090e47e91\",\"w\":n:6,\"wrapS\":n:1001},\"vertexCount\":n:6,\"width\":n:6},\"move\":{\"duration\":n:1,\"frameCount\":n:25,\"normal\":{\"head\":[n:0,n:0,n:0,n:1,n:0,n:0,n:0,n:1],\"sha\":s:\"709d2544b308cdad2979978a09483b0c9e0952bc7c8ba83be7c4de6d434c0f7e\"},\"rowsPerFrame\":n:1,\"sampleHz\":n:24,\"texture\":{\"h\":n:25,\"head\":[n:0,n:0,n:0,n:1,n:0,n:0,n:0,n:1],\"maxAbs\":n:1,\"minFilter\":n:1003,\"sha\":s:\"0a2935c653f440d49e37fb5a65878afa15d0e02ddd7534bbac006403a40343b1\",\"w\":n:6,\"wrapS\":n:1001},\"vertexCount\":n:6,\"width\":n:6},\"names\":[s:\"idle\",s:\"wave\"]}}",
+    "{\"label\":s:\"multi clip from an object with one name bakes that clip only\",\"value\":{\"bakedKeys\":[s:\"wave\"],\"idleIsMove\":b:true,\"names\":[s:\"wave\"]}}",
+    "{\"label\":s:\"a null clip is refused\",\"value\":{\"threw\":s:\"Cannot read properties of null (reading 'duration')\"}}",
+    "{\"label\":s:\"multi clip with an unknown name bakes nothing\",\"value\":{\"bakedKeys\":[],\"idle\":null,\"move\":null}}"
+  ]
+}
