@@ -1,0 +1,57 @@
+{
+  "source": {
+    "commit": "ad17a29",
+    "files": [
+      "client/core/Bloom.js",
+      "client/core/FSR1.js",
+      "client/core/SSR.js"
+    ],
+    "sha256": {
+      "client/core/Bloom.js": "49421ba0d716c0f19e49a28b253a2744e6e42dacffab81b17a0ef3f47bfc7c7a",
+      "client/core/FSR1.js": "ddf69d4935365edfd1608464b7be25903d2ef993207346859f195f3edd9c377d",
+      "client/core/SSR.js": "07b216a6fbdebfe93b8f4032eba3ef989794588cfeb5d34de7c8815bab4ba95a"
+    }
+  },
+  "bloom": {
+    "threshold": {
+      "vertexShader": "\n  varying vec2 vUv;\n  void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }\n",
+      "fragmentShader": "\n  precision highp float;\n  varying vec2 vUv;\n  uniform sampler2D tScene;\n  uniform float uThreshold;\n  uniform float uKnee;\n  void main() {\n    vec3 c = texture2D(tScene, vUv).rgb;\n    float lum = dot(c, vec3(0.2126, 0.7152, 0.0722));\n    float soft = clamp(lum - uThreshold + uKnee, 0.0, 2.0 * uKnee);\n    soft = soft * soft / max(0.0001, 4.0 * uKnee);\n    float contribution = max(soft, lum - uThreshold);\n    float scale = lum > 0.0001 ? contribution / lum : 0.0;\n    gl_FragColor = vec4(c * clamp(scale, 0.0, 1.0), 1.0);\n  }\n"
+    },
+    "blur": {
+      "vertexShader": "\n  varying vec2 vUv;\n  void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }\n",
+      "fragmentShader": "\n  precision highp float;\n  varying vec2 vUv;\n  uniform sampler2D tSource;\n  uniform vec2 uDirection;\n  void main() {\n    vec3 sum = texture2D(tSource, vUv).rgb * 0.227;\n    for (int i = 1; i <= 4; i++) {\n      float w = 0.194 - float(i) * 0.03;\n      vec2 o = uDirection * float(i);\n      sum += texture2D(tSource, vUv + o).rgb * w;\n      sum += texture2D(tSource, vUv - o).rgb * w;\n    }\n    gl_FragColor = vec4(max(sum, 0.0), 1.0);\n  }\n"
+    },
+    "composite": {
+      "vertexShader": "\n  varying vec2 vUv;\n  void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }\n",
+      "fragmentShader": "\n  precision highp float;\n  varying vec2 vUv;\n  uniform sampler2D tBloom;\n  uniform float uIntensity;\n  void main() {\n    gl_FragColor = vec4(texture2D(tBloom, vUv).rgb * uIntensity, 1.0);\n  }\n"
+    }
+  },
+  "fsr1": {
+    "easu": {
+      "vertexShader": "\n  varying vec2 vUv;\n  void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }\n",
+      "fragmentShader": "\n  precision highp float;\n  varying vec2 vUv;\n  uniform sampler2D tSource;\n  uniform vec2 uSrcTexel;\n  void main() {\n    vec2 uv = vUv;\n    vec3 center = texture2D(tSource, uv).rgb;\n    vec3 n = texture2D(tSource, uv + vec2(0.0, -uSrcTexel.y)).rgb;\n    vec3 s = texture2D(tSource, uv + vec2(0.0,  uSrcTexel.y)).rgb;\n    vec3 e = texture2D(tSource, uv + vec2( uSrcTexel.x, 0.0)).rgb;\n    vec3 w = texture2D(tSource, uv + vec2(-uSrcTexel.x, 0.0)).rgb;\n    float lc = dot(center, vec3(0.2126, 0.7152, 0.0722));\n    float ln = dot(n, vec3(0.2126, 0.7152, 0.0722));\n    float ls = dot(s, vec3(0.2126, 0.7152, 0.0722));\n    float le = dot(e, vec3(0.2126, 0.7152, 0.0722));\n    float lw = dot(w, vec3(0.2126, 0.7152, 0.0722));\n    float lmin = min(lc, min(min(ln, ls), min(le, lw)));\n    float lmax = max(lc, max(max(ln, ls), max(le, lw)));\n    float contrast = clamp((lmax - lmin) * 4.0, 0.0, 1.0);\n    vec3 dirAvg = (n + s + e + w) * 0.25;\n    vec3 sharp = center * (1.0 + contrast * 0.5) - dirAvg * (contrast * 0.5);\n    gl_FragColor = vec4(mix(center, sharp, contrast), 1.0);\n  }\n"
+    },
+    "rcas": {
+      "vertexShader": "\n  varying vec2 vUv;\n  void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }\n",
+      "fragmentShader": "\n  precision highp float;\n  varying vec2 vUv;\n  uniform sampler2D tSource;\n  uniform vec2 uTexel;\n  uniform float uSharpness;\n  void main() {\n    vec2 uv = vUv;\n    vec3 c  = texture2D(tSource, uv).rgb;\n    vec3 n  = texture2D(tSource, uv + vec2(0.0, -uTexel.y)).rgb;\n    vec3 s  = texture2D(tSource, uv + vec2(0.0,  uTexel.y)).rgb;\n    vec3 e  = texture2D(tSource, uv + vec2( uTexel.x, 0.0)).rgb;\n    vec3 w  = texture2D(tSource, uv + vec2(-uTexel.x, 0.0)).rgb;\n    vec3 mn4 = min(min(n, s), min(e, w));\n    vec3 mx4 = max(max(n, s), max(e, w));\n    vec3 mn = min(mn4, c);\n    vec3 mx = max(mx4, c);\n    vec3 reciprocalMx = 1.0 / max(mx, vec3(0.0001));\n    vec3 ampl = clamp(min(mn, vec3(2.0) - mx) * reciprocalMx, vec3(0.0), vec3(1.0));\n    ampl = sqrt(ampl);\n    vec3 w4 = ampl * mix(vec3(-0.125), vec3(-0.20), uSharpness);\n    vec3 numerator = w4 * (n + s + e + w) + c;\n    vec3 denominator = vec3(1.0) + 4.0 * w4;\n    vec3 result = numerator / denominator;\n    gl_FragColor = vec4(clamp(result, 0.0, 4.0), 1.0);\n  }\n"
+    },
+    "composite": {
+      "vertexShader": "\n  varying vec2 vUv;\n  void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }\n",
+      "fragmentShader": "\n        precision highp float;\n        varying vec2 vUv;\n        uniform sampler2D tSource;\n        void main() { gl_FragColor = vec4(texture2D(tSource, vUv).rgb, 1.0); }\n      "
+    }
+  },
+  "ssr": {
+    "ssr": {
+      "vertexShader": "\n  varying vec2 vUv;\n  void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }\n",
+      "fragmentShader": "\n  precision highp float;\n  varying vec2 vUv;\n  uniform sampler2D tGBuffer;\n  uniform sampler2D tScene;\n  uniform sampler2D tWetness;\n  uniform bool uHasWetness;\n  uniform float uWeatherWetness;\n  uniform vec2 uResolution;\n  uniform mat4 uProjectionMatrix;\n  uniform float uFovFactor;\n  uniform float uAspect;\n  uniform float uIntensity;\n  uniform float uMaxDistance;\n  uniform vec3 uCamWorld;\n  uniform float uBandHeight;\n  uniform mat3 uNormalViewToWorld;\n  uniform vec4 spointSea;\nuniform vec3 spointSeaShift;\nbool spointSeaEnabled() { return spointSea.z > 0.5; }\nfloat spointSeaSurfaceY(vec3 renderPos) {\n  vec2 a = renderPos.xz + spointSeaShift.xz;\n  float r2 = dot(a, a);\n  float rho = spointSea.y;\n  float drop = rho > 0.0 ? r2 / (rho + sqrt(max(rho * rho - r2, 0.0))) : 0.0;\n  return spointSea.x - spointSeaShift.y - drop;\n}\n\n  const int STEPS = 12;\n\n  vec3 reconstructViewPos(vec2 uv, float depth) {\n    vec2 ndc = uv * 2.0 - 1.0;\n    vec3 viewDir = normalize(vec3(ndc.x * uFovFactor * uAspect, ndc.y * uFovFactor, -1.0));\n    float t = depth / max(0.0001, -viewDir.z);\n    return viewDir * t;\n  }\n\n  vec3 viewToScreen(vec3 viewPos) {\n    vec4 clip = uProjectionMatrix * vec4(viewPos, 1.0);\n    if (clip.w <= 0.0) return vec3(-1.0);\n    vec2 ndc = clip.xy / clip.w;\n    return vec3(ndc * 0.5 + 0.5, -viewPos.z);\n  }\n\n  void main() {\n    vec4 center = texture2D(tGBuffer, vUv);\n    float centerDepth = center.a;\n    if (centerDepth <= 0.0) { gl_FragColor = vec4(0.0); return; }\n\n    vec3 centerNormal = normalize(center.rgb * 2.0 - 1.0);\n    vec3 centerPos = reconstructViewPos(vUv, centerDepth);\n\n    vec3 fragWorld = vec3(dot(uNormalViewToWorld[0], centerPos), dot(uNormalViewToWorld[1], centerPos), dot(uNormalViewToWorld[2], centerPos)) + uCamWorld;\n    float bandDist = spointSeaEnabled() ? abs(fragWorld.y - spointSeaSurfaceY(fragWorld)) : uBandHeight;\n    float bandFade = 1.0 - clamp(bandDist / uBandHeight, 0.0, 1.0);\n    float matWetness = uHasWetness ? texture2D(tWetness, vUv).r : 0.0;\n    float wetMask = max(max(bandFade, matWetness), uWeatherWetness);\n    if (wetMask <= 0.0) { gl_FragColor = vec4(0.0); return; }\n\n    vec3 viewDir = normalize(centerPos);\n    float ndotv = clamp(dot(centerNormal, -viewDir), 0.0, 1.0);\n    if (centerNormal.y < 0.3) { gl_FragColor = vec4(0.0); return; }\n    float fresnel = pow(1.0 - ndotv, 2.0);\n\n    vec3 reflectDir = reflect(viewDir, centerNormal);\n    if (reflectDir.z >= 0.0) { gl_FragColor = vec4(0.0); return; }\n\n    vec3 rayPos = centerPos;\n    float stepLen = uMaxDistance / float(STEPS);\n    vec4 result = vec4(0.0);\n    for (int i = 1; i <= STEPS; i++) {\n      rayPos += reflectDir * stepLen;\n      vec3 screenPos = viewToScreen(rayPos);\n      if (screenPos.x < 0.0 || screenPos.x > 1.0 || screenPos.y < 0.0 || screenPos.y > 1.0) break;\n      float sampledDepth = texture2D(tGBuffer, screenPos.xy).a;\n      if (sampledDepth <= 0.0) continue;\n      float rayDepth = screenPos.z;\n      float depthDiff = sampledDepth - rayDepth;\n      if (depthDiff > 0.0 && depthDiff < stepLen * 2.0) {\n        vec2 edgeFade = smoothstep(0.0, 0.08, screenPos.xy) * smoothstep(0.0, 0.08, 1.0 - screenPos.xy);\n        float fade = edgeFade.x * edgeFade.y * (1.0 - float(i) / float(STEPS));\n        result = vec4(texture2D(tScene, screenPos.xy).rgb, fade);\n        break;\n      }\n    }\n    gl_FragColor = vec4(result.rgb, result.a * fresnel * wetMask * uIntensity);\n  }\n"
+    },
+    "wetness": {
+      "vertexShader": "\n  void main() { gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }\n",
+      "fragmentShader": "\n  uniform float uWetness;\n  void main() { gl_FragColor = vec4(uWetness, 0.0, 0.0, 1.0); }\n"
+    },
+    "composite": {
+      "vertexShader": "\n  varying vec2 vUv;\n  void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }\n",
+      "fragmentShader": "\n  precision highp float;\n  varying vec2 vUv;\n  uniform sampler2D tSSR;\n  void main() {\n    vec4 c = texture2D(tSSR, vUv);\n    gl_FragColor = c;\n  }\n"
+    }
+  }
+}

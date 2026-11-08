@@ -1,0 +1,28 @@
+{
+  "source": {
+    "commit": "0094926",
+    "files": [
+      "client/core/SceneSetup.js"
+    ],
+    "sha256": {
+      "client/core/SceneSetup.js": "7a119ffcab9296c82ffec5de49c355e9bfb2518d5c9436e862241f243ff13da5"
+    }
+  },
+  "rows": [
+    "{\"label\":s:\"setupLights adds an ambient, a studio and a shadow-casting sun with a warm-up point light\",\"value\":{\"keys\":[s:\"ambient\",s:\"studio\",s:\"sun\",s:\"warmupPoint\"],\"lights\":{\"ambient\":{\"castShadow\":b:false,\"color\":n:16774358,\"intensity\":n:0.5,\"matrixAutoUpdate\":b:false,\"position\":[n:0,n:0,n:0],\"type\":s:\"AmbientLight\"},\"studio\":{\"castShadow\":b:false,\"color\":n:4491519,\"intensity\":n:0.4,\"matrixAutoUpdate\":b:true,\"position\":[n:-20,n:30,n:-10],\"type\":s:\"DirectionalLight\"},\"sun\":{\"castShadow\":b:true,\"color\":n:16777215,\"intensity\":n:1.5,\"matrixAutoUpdate\":b:true,\"position\":[n:21,n:50,n:20],\"type\":s:\"DirectionalLight\"},\"sunShadow\":{\"bias\":n:-0.0005,\"far\":n:200,\"mapSize\":[n:1024,n:1024],\"near\":n:0.5,\"normalBias\":n:0.05,\"radius\":n:4},\"warmup\":{\"castShadow\":b:false,\"color\":n:16777215,\"intensity\":n:0,\"matrixAutoUpdate\":b:false,\"position\":[n:0,n:0,n:0],\"type\":s:\"PointLight\"}},\"scene\":{\"background\":null,\"children\":[s:\"AmbientLight\",s:\"DirectionalLight\",s:\"DirectionalLight\",s:\"Object3D\",s:\"PointLight\"],\"fog\":null},\"sunTargetInScene\":b:true}}",
+    "{\"label\":s:\"applySceneConfig with a full exp2 fog and shadow settings sets the scene, lights and camera\",\"value\":{\"fogFar\":n:200,\"fov\":n:60,\"lights\":{\"ambient\":{\"castShadow\":b:false,\"color\":n:11184810,\"intensity\":n:0.7,\"matrixAutoUpdate\":b:false,\"position\":[n:0,n:0,n:0],\"type\":s:\"AmbientLight\"},\"studio\":{\"castShadow\":b:false,\"color\":n:255,\"intensity\":n:0.9,\"matrixAutoUpdate\":b:true,\"position\":[n:-4,n:5,n:-6],\"type\":s:\"DirectionalLight\"},\"sun\":{\"castShadow\":b:true,\"color\":n:16772829,\"intensity\":n:2,\"matrixAutoUpdate\":b:true,\"position\":[n:1,n:2,n:3],\"type\":s:\"DirectionalLight\"},\"sunShadow\":{\"bias\":n:-0.001,\"far\":n:200,\"mapSize\":[n:512,n:512],\"near\":n:0.5,\"normalBias\":n:0.2,\"radius\":n:3},\"warmup\":{\"castShadow\":b:false,\"color\":n:16777215,\"intensity\":n:0,\"matrixAutoUpdate\":b:false,\"position\":[n:0,n:0,n:0],\"type\":s:\"PointLight\"}},\"scene\":{\"background\":n:1122867,\"children\":[s:\"AmbientLight\",s:\"DirectionalLight\",s:\"DirectionalLight\",s:\"Object3D\",s:\"PointLight\"],\"fog\":{\"color\":n:4478310,\"density\":n:0.01,\"far\":null,\"kind\":s:\"FogExp2\",\"near\":null}}}}",
+    "{\"label\":s:\"applySceneConfig with a linear fog and no fog colour leaves the default linear fog\",\"value\":{\"fogFar\":n:200,\"scene\":{\"background\":null,\"children\":[s:\"AmbientLight\",s:\"DirectionalLight\",s:\"DirectionalLight\",s:\"Object3D\",s:\"PointLight\"],\"fog\":{\"color\":n:3359829,\"density\":null,\"far\":n:200,\"kind\":s:\"Fog\",\"near\":n:80}}}}",
+    "{\"label\":s:\"applySceneConfig with an empty config changes nothing\",\"value\":{\"unchanged\":b:true}}",
+    "{\"label\":s:\"createScene sets the sky colour, the exp2 fog and the fog far value\",\"value\":{\"fogFar\":n:200,\"scene\":{\"background\":n:8900331,\"children\":[],\"fog\":{\"color\":n:8900331,\"density\":n:0.0025,\"far\":null,\"kind\":s:\"FogExp2\",\"near\":null}}}}",
+    "{\"label\":s:\"the skeleton upload skip keeps the bone texture while the pose is unchanged\",\"value\":[{\"same\":b:true,\"version\":n:2},{\"same\":b:true,\"version\":n:2}]}",
+    "{\"label\":s:\"the skeleton upload skip swaps to a back texture when the pose changes\",\"value\":{\"firstValues\":[n:1,n:2,n:3],\"height\":n:4,\"swapped\":b:true,\"width\":n:4}}",
+    "{\"label\":s:\"limitTextureSize leaves a texture at or under 2048 pixels unchanged\",\"value\":{\"height\":n:512,\"needsUpdate\":b:false,\"same\":b:true,\"width\":n:1024}}",
+    "{\"label\":s:\"limitTextureSize scales a texture over 2048 pixels to 2048 on its long side\",\"value\":{\"drawn\":b:true,\"height\":n:512,\"needsUpdate\":b:true,\"width\":n:2048}}",
+    "{\"label\":s:\"waitForManifestResidence with no manifest returns at once\",\"value\":{\"aborted\":b:false,\"polls\":n:0,\"unresolved\":[]}}",
+    "{\"label\":s:\"waitForManifestResidence with a resolved manifest reports nothing unresolved\",\"value\":{\"aborted\":b:false,\"polls\":n:0,\"unresolved\":[]}}",
+    "{\"label\":s:\"waitForManifestResidence with an unresolved url and no wait reports that url\",\"value\":{\"aborted\":b:false,\"polls\":n:0,\"unresolved\":[s:\"b.glb\"]}}",
+    "{\"label\":s:\"installStuckPipelineRecovery leaves a WebGL renderer untouched\",\"value\":{\"onErrorInstalled\":b:false}}",
+    "{\"label\":s:\"installStuckPipelineRecovery counts two pipeline errors without a recovery\",\"value\":{\"count\":n:2,\"materialNeedsUpdate\":undefined}}",
+    "{\"label\":s:\"the warm-up and manifest residence constants equal spoint\",\"value\":{\"MANIFEST_RESIDENCE_MAX_POLLS\":n:200,\"MANIFEST_RESIDENCE_POLL_MS\":n:50,\"MANIFEST_RESIDENCE_WAIT_MS\":n:10000,\"MAX_UNMANIFESTED_WARMUP_MESHES\":n:50}}"
+  ]
+}
