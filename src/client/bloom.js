@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { BLOOM_FULLSCREEN_VERT, BLOOM_THRESHOLD_FRAG, BLOOM_BLUR_FRAG, BLOOM_COMPOSITE_FRAG } from '../render/postFxShaders.js'
+import { BloomWebGPU } from './bloomWebGPU.js'
 
 const KNEE = 0.15
 const sizeScratch = new THREE.Vector2()
@@ -180,8 +181,7 @@ export function buildBloomNodes(controls) {
 
 export function installBloom(ctx, renderer, controls) {
   if (!ctx.bloom) {
-    if (renderer && renderer.isWebGPURenderer) throw new Error('BloomWebGPU is not ported; installBloom takes a WebGL renderer')
-    ctx.bloom = new Bloom(renderer, controls)
+    ctx.bloom = renderer && renderer.isWebGPURenderer ? new BloomWebGPU(renderer, controls) : new Bloom(renderer, controls)
   }
   return ctx.bloom
 }
