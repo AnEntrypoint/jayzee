@@ -1,4 +1,5 @@
 const BARE_TILDE = /~(?![0-9a-f]{2})/
+const LITERAL = /^[a-z0-9.-]$/
 
 export const decodeName = (name) => {
   if (typeof name !== 'string') throw new TypeError('encoded name must be a string')
@@ -8,4 +9,15 @@ export const decodeName = (name) => {
     if (code > 0x7f) throw new RangeError('encoded name uses a non-ASCII escape ~' + hex)
     return String.fromCharCode(code)
   })
+}
+
+export const encodeName = (name) => {
+  if (typeof name !== 'string') throw new TypeError('name must be a string')
+  return [...name]
+    .map((ch) => {
+      if (ch === '/') return '~2f'
+      if (LITERAL.test(ch)) return ch
+      throw new RangeError('no witnessed escape for character ' + JSON.stringify(ch) + '; only "/" is witnessed')
+    })
+    .join('')
 }

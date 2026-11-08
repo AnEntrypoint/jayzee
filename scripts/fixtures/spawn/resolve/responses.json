@@ -1,0 +1,7 @@
+[
+  { "file": "redirect-apex.bin", "request": "https://spawn.co/api/resolve-adventure?address=zzz-probe", "status": 307, "location": "https://www.spawn.co/api/resolve-adventure?address=zzz-probe" },
+  { "file": "redirect-trailing-slash.bin", "request": "https://www.spawn.co/api/resolve-adventure/?address=zzz-probe", "status": 308, "location": "/api/resolve-adventure?address=zzz-probe" },
+  { "file": "redirect-http.bin", "request": "http://www.spawn.co/api/resolve-adventure?address=zzz-probe", "status": 308, "location": "https://www.spawn.co/api/resolve-adventure?address=zzz-probe" },
+  { "file": "bad-request.bin", "request": "https://www.spawn.co/api/resolve-adventure?address=", "status": 400, "location": null },
+  { "file": "not-found-live.bin", "request": "https://www.spawn.co/api/resolve-adventure?address=zzz-probe", "status": 200, "location": null }
+]

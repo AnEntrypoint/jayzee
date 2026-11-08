@@ -84,6 +84,38 @@ gate('an uninstalled skill is gone, and it can be installed again', () => {
   same(registry.lookup(skills[2].id).id, skills[2].id, 'lookup after reinstall')
 })
 
+gate('a verifier that refuses a skill leaves the registry without it, and names the skill', () => {
+  const refuseOne = (skill) => skill.id !== skills[3].id && verify(skill)
+  const registry = createSkillRegistry({ verify: refuseOne })
+  let message = ''
+  try {
+    registry.install(skills[3])
+  } catch (error) {
+    message = error.message
+  }
+  assert(message.includes(skills[3].id), 'refusal does not name ' + skills[3].id)
+  same(registry.lookup(skills[3].id), null, 'lookup of refused skill')
+  sameJson(registry.ids(), [], 'ids after refused install')
+})
+
+gate('a verifier that accepts a skill installs it, and a throwing verifier propagates its error', () => {
+  const accepting = createSkillRegistry({ verify: () => true })
+  same(accepting.install(skills[3]).id, skills[3].id, 'accepted install id')
+  const throwing = createSkillRegistry({
+    verify: () => {
+      throw new Error('verifier broke')
+    },
+  })
+  let propagated = ''
+  try {
+    throwing.install(skills[3])
+  } catch (error) {
+    propagated = error.message
+  }
+  same(propagated, 'verifier broke', 'propagated error')
+  sameJson(throwing.ids(), [], 'ids after throwing verifier')
+})
+
 gate('a registry without a verifier is refused', () => {
   mustThrow(() => createSkillRegistry({}))
 })

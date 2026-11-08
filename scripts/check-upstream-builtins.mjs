@@ -45,8 +45,23 @@ gate('the Tome index and the engine reference name the same 21 builtin modules',
   sameJson([...tomeNames].sort(), EXPECTED_NAMES, 'builtin names')
 })
 
-gate('the owner count of 23 is not claimed: no 23-name set is reproduced from these sources', () => {
-  mustReject(() => same(new Set([...tomeNames, 'extra-one', 'extra-two']).size, 21, 'padded set'))
+gate('the two sources together name 21 builtin modules, so the owner count of 23 is UNVERIFIED here', () => {
+  same(new Set([...engineNames, ...tomeNames]).size, 21, 'union of engine and Tome builtin names')
+})
+
+gate('every one of the 21 builtin names has its own check:upstream-builtin-<name> script in the npm test chain', () => {
+  const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
+  const inChain = new Set([...pkg.scripts.test.matchAll(/npm run (check:upstream-builtin-[a-z0-9-]+)/g)].map((m) => m[1]))
+  for (const name of EXPECTED_NAMES) {
+    const script = 'check:upstream-builtin-' + name
+    assert(typeof pkg.scripts[script] === 'string', script + ' is not defined in package.json')
+    assert(inChain.has(script), script + ' is not run by npm test')
+  }
+})
+
+gate('a builtin name with no check script is detected, so the coverage gate can fail', () => {
+  const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
+  mustReject(() => assert(typeof pkg.scripts['check:upstream-builtin-no-such-module'] === 'string', 'check:upstream-builtin-no-such-module is not defined'))
 })
 
 finish()

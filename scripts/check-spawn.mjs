@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { gate, finish } from './lib/gate.mjs'
-import { decodeName, readFrames, sha256Hex, verifyContent, parseHead, parseHeadResponse, parseManifest, normalizeFeedEntry, walkFeed, parseResolve, parseLedgerKey, cdnValue } from '../src/spawn/index.js'
+import { decodeName, encodeName, readFrames, sha256Hex, verifyContent, parseHead, parseHeadResponse, parseManifest, bindFrames, normalizeFeedEntry, walkFeed, parseResolve, classifyResolve, parseLedgerKey, cdnValue } from '../src/spawn/index.js'
 
 const fixtures = join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'spawn')
 const bytesOf = (path) => readFileSync(join(fixtures, path))
@@ -234,6 +234,105 @@ gate('a ledger key without a two-hex bucket is refused', () => {
     rejected = true
   }
   assert(rejected, 'key without a bucket was accepted')
+})
+
+const resolveCases = JSON.parse(textOf('resolve/responses.json'))
+const resolveBody = (file) => readFileSync(join(fixtures, 'resolve', file), 'utf8')
+const exceptionManifest = bytesOf('manifest-d048ad.bin')
+
+gate('encodeName writes the witnessed "/" escape, and decodeName reverses it on the fixture cdn values', () => {
+  for (const row of glbRows) {
+    const sha = row[1]
+    const asset = '/cdn/value.' + sha + '.glb'
+    const encoded = encodeName(asset)
+    assert(encoded === '~2fcdn~2fvalue.' + sha + '.glb', 'encoded ' + encoded)
+    assert(decodeName(encoded) === asset, 'decode of ' + encoded + ' is not ' + asset)
+  }
+})
+
+gate('encodeName refuses ":", "~" and capitals, which have no witnessed escape', () => {
+  for (const name of ['https://spawnfile.io', 'a~b', 'Upper']) {
+    let refused = false
+    try {
+      encodeName(name)
+    } catch {
+      refused = true
+    }
+    assert(refused, 'encodeName accepted ' + JSON.stringify(name))
+  }
+})
+
+gate('a ledger bucket is taken as any two lowercase hex characters, and no bucket rule is applied', () => {
+  const sha = glbRows[0][1]
+  for (const bucket of ['00', '3d', 'ff']) {
+    assert(parseLedgerKey('world.assets/' + bucket + '/~2fcdn~2fvalue.' + sha + '.glb.yaml').bucket === bucket, 'bucket ' + bucket + ' was rewritten')
+  }
+  let refused = false
+  try {
+    parseLedgerKey('world.assets/zz/~2fcdn~2fvalue.' + sha + '.glb.yaml')
+  } catch {
+    refused = true
+  }
+  assert(refused, 'a non-hex bucket was accepted')
+})
+
+gate('the captured resolve redirects classify as redirects with their captured status and location', () => {
+  const redirects = resolveCases.filter((c) => c.status === 307 || c.status === 308)
+  assert(redirects.length === 3, 'expected 3 captured redirects, found ' + redirects.length)
+  for (const c of redirects) {
+    const result = classifyResolve({ status: c.status, location: c.location, text: resolveBody(c.file) })
+    assert(result.type === 'redirect' && result.status === c.status && result.location === c.location, c.file + ' classified as ' + JSON.stringify(result))
+  }
+})
+
+gate('the captured not_found body classifies as not_found, and the captured 400 is refused as an unexpected status', () => {
+  const notFound = resolveCases.find((c) => c.status === 200)
+  assert(classifyResolve({ status: 200, text: resolveBody(notFound.file) }).type === 'not_found', 'not_found body')
+  let refused = false
+  try {
+    classifyResolve({ status: 400, text: resolveBody('bad-request.bin') })
+  } catch {
+    refused = true
+  }
+  assert(refused, 'a 400 was classified')
+})
+
+gate('a 410 gone is refused, since no body has been captured for it', () => {
+  let refused = false
+  try {
+    classifyResolve({ status: 410, text: '' })
+  } catch (error) {
+    refused = error.message.includes('no body has been captured')
+  }
+  assert(refused, 'a 410 was classified')
+})
+
+gate('negative control: a redirect with another body, or with no location, is refused', () => {
+  const body = resolveBody('redirect-apex.bin')
+  for (const attempt of [{ status: 307, location: '/x', text: '{"ok":true}' }, { status: 307, location: null, text: body }]) {
+    let refused = false
+    try {
+      classifyResolve(attempt)
+    } catch {
+      refused = true
+    }
+    assert(refused, 'a malformed redirect was classified: ' + JSON.stringify(attempt))
+  }
+})
+
+gate('the manifest fixture binds each frame after the index to the index hashes in order; the fixture holds 3 of its 80 hashes as frames', () => {
+  const bound = bindFrames(manifestBytes)
+  assert(bound.framesAfterIndex === 3, 'frames after the index: ' + bound.framesAfterIndex)
+  assert(bound.hashCount === 80, 'hashes: ' + bound.hashCount)
+  assert(bound.mismatches.length === 0, 'mismatches: ' + JSON.stringify(bound.mismatches))
+  assert(bound.hashesWithoutFrame.length === 77, 'hashes without a frame: ' + bound.hashesWithoutFrame.length)
+})
+
+gate('the exception manifest binds the sheet and its second frame, and its third frame is non-JSON and matches no index hash', () => {
+  const bound = bindFrames(exceptionManifest)
+  assert(bound.framesAfterIndex === 3, 'frames after the index: ' + bound.framesAfterIndex)
+  assert(JSON.stringify(bound.mismatches) === JSON.stringify([{ position: 2, frame: 3, json: false }]), 'mismatches: ' + JSON.stringify(bound.mismatches))
+  assert(bound.hashesWithoutFrame.length === 1, 'hashes without a frame: ' + bound.hashesWithoutFrame.length)
 })
 
 finish()
