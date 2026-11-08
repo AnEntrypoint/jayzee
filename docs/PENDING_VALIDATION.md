@@ -89,3 +89,17 @@ The dispatcher owns docs/ENGINE.md, so these are recorded here and not edited.
   - Inside a rock box the contact axis falls back to +Y.
   - The one-body-per-tree arm exists only for the cost comparison. It raises Init's body capacity by 1024, so the phase 2 world witness must be run again.
 - Jolt calls to check in a build: the (User2, Sphere) registration order, and CapsuleShape's half height, which is the half length of the cylinder part.
+
+## Phase 7: bit-compatible wire codecs (coded, not built or run)
+- Files: `engine/src/codec.h` and `engine/src/codec.cpp` (29-byte entity and 22-byte player records, the smallest-three quaternion word, and the input packet, version 1 with a 2-byte header and 12-byte records), exports in `engine/src/engine_core.cpp` through shared scratch buffers (4096 bytes and 2048 doubles), sources and exports in `engine/CMakeLists.txt`, `scripts/gen-engine-codec-fixtures.mjs` (writes `scripts/fixtures/engine/codec-cases.json` from `src/wire/binSnapshot.js` and `src/protocol/input.js`, not run), `scripts/check-engine-codecs.mjs` (bit-compatibility gate, not run), and package scripts `check:engine-codecs` and `gen:engine-codec-fixtures`. The check is not in `npm test`.
+- Witness gates, not run: entity and player encode bytes equal the JS codec's bytes; entity, player and smallest-three decodes equal the JS decoder value for value and bit for bit; smallest-three encode words equal the JS words; input packets encode and decode byte for byte; every case the JS codec refuses, the C++ codec refuses; a truncated record is refused.
+- Decisions and deviations for the dispatcher to decide:
+  - Only the input packet in `src/protocol/input.js` is ported. The schema-driven `src/protocol/inputCodec.js` (328 lines) is not ported, and no gate covers it.
+  - Rounding: JS `Math.round` rounds a half toward +Infinity. `jsRound` takes the floor and adds one when the fraction is at least 0.5, which matches that rule for the magnitudes the wire carries. It is not proven for values near 2^53.
+  - A refusal returns `kRange` (-2) from the export, where JS throws a RangeError. The gate checks only that the code is negative. The refusal reasons are not carried across.
+  - The smallest-three arithmetic runs in double, as the JS does, and packs into a uint64 before storing the word. The word is at most 2^32, so it is exact in a double.
+  - Decodes of random uint32 words check refusals as well as values, since the JS decoder refuses words whose stored squares exceed 1.
+  - The scratch buffers are module-wide and not reentrant. The engine is single-threaded, so this is not a concurrency fault, but a caller must copy results out before the next codec call.
+- Checked by reading the JS source, not by running it: the field offsets, the scale and velocity ranges, the quaternion levels, steps, span and shifts, the input packet layout, and the yaw step count. Those values were transcribed from `src/wire/binSnapshot.js`, `src/wire/quantize.js` and `src/protocol/input.js`, and the gate is what proves them equal.
+- To check in a build: the Emscripten exports for the byte and double scratch pointers, and the pointer-to-index conversion in the gate (byte offset for `HEAPU8`, byte offset divided by 8 for `HEAPF64`); `-ffp-contract=off` keeps the decode arithmetic unfused.
+- The fixture file does not exist until `gen:engine-codec-fixtures` is run in Phase B. The gate fails on a missing fixture, not on a mismatch.

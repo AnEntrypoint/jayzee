@@ -4,6 +4,7 @@
 #include <emscripten/emscripten.h>
 
 #include "bridge.h"
+#include "codec.h"
 #include "planet_frame.h"
 #include "vegetation.h"
 #include "world.h"
@@ -23,6 +24,8 @@ void leakBlock() {
 alignas(8) float stageRows[engine::kMaxBodies * engine::kBatchFloats];
 std::uint32_t stageHandles[engine::kMaxBodies];
 std::int32_t planetScratch[4];
+alignas(8) std::uint8_t codecBytes[engine::codec::kScratchBytes];
+alignas(8) double codecValues[engine::codec::kScratchValues];
 
 }
 
@@ -242,6 +245,56 @@ EMSCRIPTEN_KEEPALIVE int engine_veg_attach() {
 
 EMSCRIPTEN_KEEPALIVE std::uint64_t engine_veg_placed() {
   return engine::vegetation::state().placed;
+}
+
+EMSCRIPTEN_KEEPALIVE std::uint8_t* engine_codec_bytes() {
+  return codecBytes;
+}
+
+EMSCRIPTEN_KEEPALIVE double* engine_codec_values() {
+  return codecValues;
+}
+
+EMSCRIPTEN_KEEPALIVE int engine_codec_encode_entity() {
+  const bool ok = engine::codec::encodeEntity(codecValues, codecValues + 3, codecValues[6], codecValues + 7, codecValues[10], codecBytes);
+  return ok ? engine::kOk : engine::kRange;
+}
+
+EMSCRIPTEN_KEEPALIVE int engine_codec_decode_entity(int length) {
+  if (length < 0) return engine::kRange;
+  const bool ok = engine::codec::decodeEntity(codecBytes, static_cast<std::size_t>(length), codecValues, codecValues + 3, codecValues[6],
+                                              codecValues + 7, codecValues[10]);
+  return ok ? engine::kOk : engine::kRange;
+}
+
+EMSCRIPTEN_KEEPALIVE int engine_codec_encode_player() {
+  const bool ok = engine::codec::encodePlayer(codecValues, codecValues + 3, codecValues[6], codecBytes);
+  return ok ? engine::kOk : engine::kRange;
+}
+
+EMSCRIPTEN_KEEPALIVE int engine_codec_decode_player(int length) {
+  if (length < 0) return engine::kRange;
+  const bool ok = engine::codec::decodePlayer(codecBytes, static_cast<std::size_t>(length), codecValues, codecValues + 3, codecValues[6]);
+  return ok ? engine::kOk : engine::kRange;
+}
+
+EMSCRIPTEN_KEEPALIVE int engine_codec_encode_quat() {
+  return engine::codec::encodeSmallestThree(codecValues, codecValues[4]) ? engine::kOk : engine::kRange;
+}
+
+EMSCRIPTEN_KEEPALIVE int engine_codec_decode_quat() {
+  return engine::codec::decodeSmallestThree(codecValues[0], codecValues + 1) ? engine::kOk : engine::kRange;
+}
+
+EMSCRIPTEN_KEEPALIVE int engine_codec_encode_inputs(int count) {
+  const int length = engine::codec::encodeInputs(codecValues, count, codecBytes);
+  return length < 0 ? engine::kRange : length;
+}
+
+EMSCRIPTEN_KEEPALIVE int engine_codec_decode_inputs(int length) {
+  if (length < 0) return engine::kRange;
+  const int count = engine::codec::decodeInputs(codecBytes, static_cast<std::size_t>(length), codecValues);
+  return count < 0 ? engine::kRange : count;
 }
 
 }

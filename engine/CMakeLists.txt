@@ -51,7 +51,8 @@ add_executable(engine_core
   src/planet_frame.cpp
   src/page_cache.cpp
   src/planet_shape.cpp
-  src/vegetation.cpp)
+  src/vegetation.cpp
+  src/codec.cpp)
 target_link_libraries(engine_core PRIVATE Jolt)
 target_compile_definitions(engine_core PRIVATE JPH_CROSS_PLATFORM_DETERMINISTIC)
 
@@ -98,7 +99,17 @@ set(ENGINE_EXPORTS
   _engine_veg_configure
   _engine_veg_place
   _engine_veg_attach
-  _engine_veg_placed)
+  _engine_veg_placed
+  _engine_codec_bytes
+  _engine_codec_values
+  _engine_codec_encode_entity
+  _engine_codec_decode_entity
+  _engine_codec_encode_player
+  _engine_codec_decode_player
+  _engine_codec_encode_quat
+  _engine_codec_decode_quat
+  _engine_codec_encode_inputs
+  _engine_codec_decode_inputs)
 string(JOIN "," ENGINE_EXPORT_LIST ${ENGINE_EXPORTS})
 
 target_link_options(engine_core PRIVATE
