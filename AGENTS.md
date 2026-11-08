@@ -144,7 +144,8 @@ Non-obvious facts for automated edits. Architecture and measured costs live in d
 - The first `getRenderState` after a correction shows the whole offset, because `ReconciliationEngine#decay` treats its first call as zero elapsed time.
 - `SnapshotProcessor` refuses a player record that is not 22 bytes and an entity record that is not 29 bytes with a RangeError, where spoint reads a truncated record silently.
 - `SnapshotProcessor` reads its injected `now` only when a snapshot timestamp is missing or 0, as spoint does, and throws a TypeError when no clock was given.
-- `createTerrainReanchor` in `src/terrain-pure/chartReanchorTerrain.js` throws a TypeError without a `now()` clock. spoint `createFieldLattice` is not ported, so a migrate needs a lattice passed in.
+- `createTerrainReanchor` in `src/terrain-pure/chartReanchorTerrain.js` throws a TypeError without a `now()` clock. `createFieldLattice` is ported in `src/terrain-pure/fieldLattice.js`; a migrate still takes a lattice passed in.
+- `createColliderStreamer` in `src/terrain-pure/colliderStreamer.js` takes `now`, `setTimer`, `clearTimer` and `yieldToLoop` in its spec, and `cpuUsage` optionally. The pure directory has no host timers, so a missing function throws at construction.
 - `createChartReanchorService` runs every terrain migrator before any state migrator. The first terrain gate that refuses leaves the frame unchanged and is tallied under its reason.
 - `scripts/fixtures/spoint/cluster-handoff.json` is written by `node scripts/gen-cluster-handoff-fixture.mjs [spointRoot]`. spoint `ClusterHandoff` cannot be imported in Node as it is, because `RegionRouter.js` pulls in the HTTP server and three.js, so the generator loads only a slice of it.
 - The atmosphere modules in `src/packages/mapspinner` work in kilometres (`ATM_BOTTOM` 6360, `ATM_TOP` 6500), not the metres of `PLANET_RADIUS_M`.
