@@ -16,6 +16,7 @@
 
 #include <algorithm>
 #include <cstdlib>
+#include <cstring>
 
 #include "planet_frame.h"
 #include "planet_shape.h"
@@ -40,26 +41,71 @@ std::uint64_t warmupBase = 0;
 
 void silentTrace(const char*, ...) {}
 
+constexpr std::size_t kBlockHeader = 16;
+constexpr std::uint32_t kMinBlockClass = 5;
+constexpr std::uint32_t kMaxBlockClass = 16;
+constexpr std::uint32_t kUnpooledClass = 0;
+void* blockFreeLists[kMaxBlockClass + 1];
+
+std::uint32_t blockClassOf(std::size_t bytes) {
+  std::uint32_t c = kMinBlockClass;
+  while (c <= kMaxBlockClass && (std::size_t(1) << c) < bytes) c += 1;
+  return c > kMaxBlockClass ? kUnpooledClass : c;
+}
+
+char* takeBlock(std::size_t bytes) {
+  const std::uint32_t c = blockClassOf(bytes + kBlockHeader);
+  char* raw = nullptr;
+  if (c != kUnpooledClass && blockFreeLists[c] != nullptr) {
+    raw = static_cast<char*>(blockFreeLists[c]);
+    blockFreeLists[c] = *reinterpret_cast<void**>(raw + kBlockHeader);
+  } else {
+    const std::size_t total = c == kUnpooledClass ? bytes + kBlockHeader : std::size_t(1) << c;
+    raw = static_cast<char*>(std::malloc(total));
+    if (raw == nullptr) return nullptr;
+    allocations += 1;
+  }
+  *reinterpret_cast<std::uint32_t*>(raw) = c;
+  *reinterpret_cast<std::uint64_t*>(raw + 8) = bytes;
+  return raw;
+}
+
+void releaseBlock(char* raw) {
+  const std::uint32_t c = *reinterpret_cast<std::uint32_t*>(raw);
+  if (c == kUnpooledClass) {
+    std::free(raw);
+    return;
+  }
+  *reinterpret_cast<void**>(raw + kBlockHeader) = blockFreeLists[c];
+  blockFreeLists[c] = raw;
+}
+
 void* countedAllocate(std::size_t size) {
-  allocations += 1;
-  return std::malloc(size);
+  char* raw = takeBlock(size);
+  return raw == nullptr ? nullptr : raw + kBlockHeader;
 }
 
 void* countedReallocate(void* block, std::size_t, std::size_t newSize) {
-  allocations += 1;
-  return std::realloc(block, newSize);
+  if (block == nullptr) return countedAllocate(newSize);
+  char* raw = static_cast<char*>(block) - kBlockHeader;
+  const std::size_t previous = *reinterpret_cast<std::uint64_t*>(raw + 8);
+  void* next = countedAllocate(newSize);
+  if (next == nullptr) return nullptr;
+  std::memcpy(next, block, std::min(previous, newSize));
+  releaseBlock(raw);
+  return next;
 }
 
 void countedFree(void* block) {
-  std::free(block);
+  if (block == nullptr) return;
+  releaseBlock(static_cast<char*>(block) - kBlockHeader);
 }
 
 void* countedAlignedAllocate(std::size_t size, std::size_t alignment) {
-  allocations += 1;
-  const std::size_t header = sizeof(void*);
-  void* raw = std::malloc(size + alignment + header);
+  constexpr std::size_t pointer = sizeof(void*);
+  char* raw = takeBlock(size + alignment + pointer);
   if (raw == nullptr) return nullptr;
-  const std::uintptr_t start = reinterpret_cast<std::uintptr_t>(raw) + header;
+  const std::uintptr_t start = reinterpret_cast<std::uintptr_t>(raw) + kBlockHeader + pointer;
   const std::uintptr_t aligned = (start + alignment - 1) & ~(static_cast<std::uintptr_t>(alignment) - 1);
   reinterpret_cast<void**>(aligned)[-1] = raw;
   return reinterpret_cast<void*>(aligned);
@@ -67,7 +113,7 @@ void* countedAlignedAllocate(std::size_t size, std::size_t alignment) {
 
 void countedAlignedFree(void* block) {
   if (block == nullptr) return;
-  std::free(reinterpret_cast<void**>(block)[-1]);
+  releaseBlock(static_cast<char*>(reinterpret_cast<void**>(block)[-1]));
 }
 
 class BroadPhaseLayers final : public JPH::BroadPhaseLayerInterface {
@@ -211,6 +257,17 @@ Status World::configure(const Config& config) {
                                            JPH::EMotionType::Static, kLayerNonMoving);
   const JPH::BodyID groundId = runtime_->physics.GetBodyInterface().CreateAndAddBody(groundSettings, JPH::EActivation::DontActivate);
   groundBody_ = groundId.GetIndexAndSequenceNumber();
+
+  for (std::uint32_t slot = 0; slot < capacity_; ++slot) {
+    JPH::BodyCreationSettings bodySettings(runtime_->sphere.GetPtr(), JPH::RVec3::sZero(), JPH::Quat::sIdentity(),
+                                           JPH::EMotionType::Dynamic, kLayerMoving);
+    bodySettings.mRestitution = restitution_;
+    bodySettings.mLinearDamping = drag_;
+    bodySettings.mAllowSleeping = false;
+    JPH::Body* body = runtime_->physics.GetBodyInterface().CreateBody(bodySettings);
+    if (body == nullptr) return kFull;
+    bodyIds_[slot] = body->GetID().GetIndexAndSequenceNumber();
+  }
   return kOk;
 }
 
@@ -303,15 +360,9 @@ int World::spawnBatch(const float* rows, std::uint32_t count, std::uint32_t* han
     const float* row = rows + i * kBatchFloats;
     const int slot = allocateSlot();
     if (slot < 0) return kFull;
-    JPH::BodyCreationSettings settings(runtime_->sphere.GetPtr(), JPH::RVec3(row[0], row[1], row[2]), JPH::Quat::sIdentity(),
-                                       JPH::EMotionType::Dynamic, kLayerMoving);
-    settings.mRestitution = restitution_;
-    settings.mLinearDamping = drag_;
-    settings.mAllowSleeping = false;
-    JPH::Body* body = bodies.CreateBody(settings);
-    if (body == nullptr) return kFull;
-    runtime_->batch[i] = body->GetID();
-    bodyIds_[slot] = body->GetID().GetIndexAndSequenceNumber();
+    const JPH::BodyID id(bodyIds_[slot]);
+    bodies.SetPositionAndRotation(id, JPH::RVec3(row[0], row[1], row[2]), JPH::Quat::sIdentity(), JPH::EActivation::DontActivate);
+    runtime_->batch[i] = id;
     alive_[slot] = 1;
     live_ += 1;
     handles[i] = (static_cast<std::uint32_t>(generations_[slot]) << 16) | static_cast<std::uint32_t>(slot);
@@ -336,7 +387,6 @@ Status World::despawn(std::uint32_t handle) {
   JPH::BodyInterface& bodies = runtime_->physics.GetBodyInterface();
   const JPH::BodyID id(bodyIds_[slot]);
   bodies.RemoveBody(id);
-  bodies.DestroyBody(id);
   alive_[slot] = 0;
   live_ -= 1;
   if (generations_[slot] == kLastGeneration) {
@@ -402,7 +452,7 @@ void World::setTick(std::uint64_t tick) {
 }
 
 std::uint32_t World::physicsBodies() const {
-  return runtime_ == nullptr ? 0 : runtime_->physics.GetNumBodies();
+  return runtime_ == nullptr ? 0 : runtime_->physics.GetNumBodies() - (capacity_ - live_);
 }
 
 int World::resolve(std::uint32_t handle) const {
