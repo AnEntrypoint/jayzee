@@ -1,0 +1,743 @@
+{
+  "source": "spoint src/netcode/NetworkState.js and src/shared/vecGuard.js, driven by scripts/lib/network-state-trace.mjs with Date.now set to the trace clock",
+  "steps": [
+    [
+      "addPlayer with no state stamps lastUpdate and applies the defaults",
+      {
+        "id": 1,
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "velocity": [
+          0,
+          0,
+          0
+        ],
+        "onGround": false,
+        "health": 100,
+        "inputSequence": 0,
+        "crouch": 0,
+        "lookPitch": 0,
+        "lookYaw": 0,
+        "expr": 0,
+        "weapon": 0,
+        "inputBuffer": 0,
+        "groundNormal": null,
+        "wallNormals": null,
+        "lastUpdate": 1000
+      }
+    ],
+    [
+      "addPlayer keeps an explicit health of zero and the given pose",
+      {
+        "id": 2,
+        "position": [
+          1,
+          2,
+          3
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "velocity": [
+          0.5,
+          0,
+          0
+        ],
+        "onGround": true,
+        "health": 0,
+        "inputSequence": 0,
+        "crouch": 1,
+        "lookPitch": 0.25,
+        "lookYaw": -1,
+        "expr": 3,
+        "weapon": 2,
+        "inputBuffer": 0,
+        "groundNormal": null,
+        "wallNormals": null,
+        "lastUpdate": 1000
+      }
+    ],
+    [
+      "addPlayer keeps a falsy onGround and treats a null health as absent",
+      {
+        "id": 3,
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "velocity": [
+          0,
+          0,
+          0
+        ],
+        "onGround": 0,
+        "health": 100,
+        "inputSequence": 0,
+        "crouch": 0,
+        "lookPitch": 0,
+        "lookYaw": 0,
+        "expr": 0,
+        "weapon": 0,
+        "inputBuffer": 0,
+        "groundNormal": null,
+        "wallNormals": null,
+        "lastUpdate": 1000
+      }
+    ],
+    [
+      "setTick without a timestamp takes the clock",
+      {
+        "tick": 5,
+        "timestamp": 1100
+      }
+    ],
+    [
+      "updatePlayer with valid vectors and no expr or weapon zeroes both",
+      {
+        "id": 1,
+        "position": [
+          1,
+          2,
+          3
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "velocity": [
+          0,
+          0,
+          0
+        ],
+        "onGround": true,
+        "health": 90,
+        "inputSequence": 7,
+        "crouch": 1,
+        "lookPitch": 0.1,
+        "lookYaw": 0.2,
+        "expr": 0,
+        "weapon": 0,
+        "inputBuffer": 0,
+        "groundNormal": null,
+        "wallNormals": null,
+        "lastUpdate": 1000
+      }
+    ],
+    [
+      "updatePlayer keeps the previous position and velocity when they are invalid",
+      {
+        "id": 2,
+        "position": [
+          1,
+          2,
+          3
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "velocity": [
+          0.5,
+          0,
+          0
+        ],
+        "onGround": false,
+        "health": 80,
+        "inputSequence": 8,
+        "crouch": 0,
+        "lookPitch": 0,
+        "lookYaw": 0,
+        "expr": 2,
+        "weapon": 1,
+        "inputBuffer": [
+          0,
+          1,
+          0
+        ],
+        "groundNormal": [
+          [
+            0,
+            0,
+            1
+          ]
+        ],
+        "wallNormals": null,
+        "lastUpdate": 1000
+      }
+    ],
+    [
+      "updatePlayer refuses a non-finite position and a five-element rotation",
+      {
+        "id": 2,
+        "position": [
+          1,
+          2,
+          3
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "velocity": [
+          0,
+          0,
+          0
+        ],
+        "onGround": true,
+        "health": 70,
+        "inputSequence": 9,
+        "crouch": 0,
+        "lookPitch": 0,
+        "lookYaw": 0,
+        "expr": 0,
+        "weapon": 0,
+        "inputBuffer": 0,
+        "groundNormal": null,
+        "wallNormals": null,
+        "lastUpdate": 1000
+      }
+    ],
+    [
+      "updatePlayer on an unknown id changes nothing",
+      [
+        1,
+        2,
+        3
+      ]
+    ],
+    [
+      "getSnapshot copies every player with the tick and timestamp",
+      {
+        "tick": 5,
+        "timestamp": 1100,
+        "players": [
+          {
+            "id": 1,
+            "position": [
+              1,
+              2,
+              3
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "velocity": [
+              0,
+              0,
+              0
+            ],
+            "onGround": true,
+            "health": 90,
+            "inputSequence": 7,
+            "crouch": 1,
+            "lookPitch": 0.1,
+            "lookYaw": 0.2,
+            "expr": 0,
+            "weapon": 0,
+            "inputBuffer": 0,
+            "groundNormal": null,
+            "wallNormals": null
+          },
+          {
+            "id": 2,
+            "position": [
+              1,
+              2,
+              3
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "velocity": [
+              0,
+              0,
+              0
+            ],
+            "onGround": true,
+            "health": 70,
+            "inputSequence": 9,
+            "crouch": 0,
+            "lookPitch": 0,
+            "lookYaw": 0,
+            "expr": 0,
+            "weapon": 0,
+            "inputBuffer": 0,
+            "groundNormal": null,
+            "wallNormals": null
+          },
+          {
+            "id": 3,
+            "position": [
+              0,
+              0,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "velocity": [
+              0,
+              0,
+              0
+            ],
+            "onGround": 0,
+            "health": 100,
+            "inputSequence": 0,
+            "crouch": 0,
+            "lookPitch": 0,
+            "lookYaw": 0,
+            "expr": 0,
+            "weapon": 0,
+            "inputBuffer": 0,
+            "groundNormal": null,
+            "wallNormals": null
+          }
+        ]
+      }
+    ],
+    [
+      "getSnapshot returns one reused output object",
+      true
+    ],
+    [
+      "addPlayer after a clock move stamps the new time, and setTick takes an explicit timestamp",
+      {
+        "p4": {
+          "id": 4,
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "velocity": [
+            0,
+            0,
+            0
+          ],
+          "onGround": false,
+          "health": 100,
+          "inputSequence": 0,
+          "crouch": 0,
+          "lookPitch": 0,
+          "lookYaw": 0,
+          "expr": 0,
+          "weapon": 0,
+          "inputBuffer": 0,
+          "groundNormal": null,
+          "wallNormals": null,
+          "lastUpdate": 2000
+        },
+        "tick": 6,
+        "timestamp": 2500
+      }
+    ],
+    [
+      "getSnapshot prunes a removed player from the pooled list",
+      {
+        "tick": 6,
+        "timestamp": 2500,
+        "players": [
+          {
+            "id": 1,
+            "position": [
+              1,
+              2,
+              3
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "velocity": [
+              0,
+              0,
+              0
+            ],
+            "onGround": true,
+            "health": 90,
+            "inputSequence": 7,
+            "crouch": 1,
+            "lookPitch": 0.1,
+            "lookYaw": 0.2,
+            "expr": 0,
+            "weapon": 0,
+            "inputBuffer": 0,
+            "groundNormal": null,
+            "wallNormals": null
+          },
+          {
+            "id": 2,
+            "position": [
+              1,
+              2,
+              3
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "velocity": [
+              0,
+              0,
+              0
+            ],
+            "onGround": true,
+            "health": 70,
+            "inputSequence": 9,
+            "crouch": 0,
+            "lookPitch": 0,
+            "lookYaw": 0,
+            "expr": 0,
+            "weapon": 0,
+            "inputBuffer": 0,
+            "groundNormal": null,
+            "wallNormals": null
+          },
+          {
+            "id": 4,
+            "position": [
+              0,
+              0,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "velocity": [
+              0,
+              0,
+              0
+            ],
+            "onGround": false,
+            "health": 100,
+            "inputSequence": 0,
+            "crouch": 0,
+            "lookPitch": 0,
+            "lookYaw": 0,
+            "expr": 0,
+            "weapon": 0,
+            "inputBuffer": 0,
+            "groundNormal": null,
+            "wallNormals": null
+          }
+        ]
+      }
+    ],
+    [
+      "snapshotState holds a copy of each player",
+      {
+        "tick": 6,
+        "timestamp": 2500,
+        "players": [
+          [
+            1,
+            {
+              "id": 1,
+              "position": [
+                1,
+                2,
+                3
+              ],
+              "rotation": [
+                0,
+                0,
+                0,
+                1
+              ],
+              "velocity": [
+                0,
+                0,
+                0
+              ],
+              "onGround": true,
+              "health": 90,
+              "inputSequence": 7,
+              "crouch": 1,
+              "lookPitch": 0.1,
+              "lookYaw": 0.2,
+              "expr": 0,
+              "weapon": 0,
+              "inputBuffer": 0,
+              "groundNormal": null,
+              "wallNormals": null,
+              "lastUpdate": 1000
+            }
+          ],
+          [
+            2,
+            {
+              "id": 2,
+              "position": [
+                1,
+                2,
+                3
+              ],
+              "rotation": [
+                0,
+                0,
+                0,
+                1
+              ],
+              "velocity": [
+                0,
+                0,
+                0
+              ],
+              "onGround": true,
+              "health": 70,
+              "inputSequence": 9,
+              "crouch": 0,
+              "lookPitch": 0,
+              "lookYaw": 0,
+              "expr": 0,
+              "weapon": 0,
+              "inputBuffer": 0,
+              "groundNormal": null,
+              "wallNormals": null,
+              "lastUpdate": 1000
+            }
+          ],
+          [
+            4,
+            {
+              "id": 4,
+              "position": [
+                0,
+                0,
+                0
+              ],
+              "rotation": [
+                0,
+                0,
+                0,
+                1
+              ],
+              "velocity": [
+                0,
+                0,
+                0
+              ],
+              "onGround": false,
+              "health": 100,
+              "inputSequence": 0,
+              "crouch": 0,
+              "lookPitch": 0,
+              "lookYaw": 0,
+              "expr": 0,
+              "weapon": 0,
+              "inputBuffer": 0,
+              "groundNormal": null,
+              "wallNormals": null,
+              "lastUpdate": 2000
+            }
+          ]
+        ]
+      }
+    ],
+    [
+      "restoreState puts back the saved tick, timestamp and players",
+      {
+        "tick": 6,
+        "timestamp": 2500,
+        "p1": {
+          "id": 1,
+          "position": [
+            1,
+            2,
+            3
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "velocity": [
+            0,
+            0,
+            0
+          ],
+          "onGround": true,
+          "health": 90,
+          "inputSequence": 7,
+          "crouch": 1,
+          "lookPitch": 0.1,
+          "lookYaw": 0.2,
+          "expr": 0,
+          "weapon": 0,
+          "inputBuffer": 0,
+          "groundNormal": null,
+          "wallNormals": null,
+          "lastUpdate": 1000
+        }
+      }
+    ],
+    [
+      "restoreState from a plain object restores known ids only",
+      {
+        "tick": 9,
+        "p2": {
+          "id": 2,
+          "health": 33
+        }
+      }
+    ],
+    [
+      "restoreState from a Map restores its ids",
+      {
+        "tick": 10,
+        "p4": {
+          "id": 4,
+          "health": 5
+        }
+      }
+    ],
+    [
+      "getAllPlayers lists the live players in insertion order",
+      [
+        1,
+        2,
+        4
+      ]
+    ],
+    [
+      "clear removes every player and keeps the tick",
+      {
+        "players": [],
+        "tick": 10
+      }
+    ],
+    [
+      "getSnapshot after clear has no players",
+      {
+        "tick": 10,
+        "timestamp": 10000,
+        "players": []
+      }
+    ],
+    [
+      "vecOK on valid, short, non-number, non-finite, long and non-array inputs",
+      [
+        true,
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    ],
+    [
+      "vec3 returns a valid vector and throws the spoint message otherwise",
+      [
+        [
+          1,
+          2,
+          3
+        ],
+        {
+          "error": "TypeError",
+          "message": "entity.position must be a length-3 array of finite numbers"
+        },
+        {
+          "error": "TypeError",
+          "message": "entity.position must be a length-3 array of finite numbers"
+        },
+        {
+          "error": "TypeError",
+          "message": "entity.position must be a length-3 array of finite numbers"
+        },
+        {
+          "error": "TypeError",
+          "message": "entity.position must be a length-3 array of finite numbers"
+        },
+        {
+          "error": "TypeError",
+          "message": "entity.position must be a length-3 array of finite numbers"
+        }
+      ]
+    ],
+    [
+      "vec4 refuses a three-element vector",
+      {
+        "error": "TypeError",
+        "message": "entity.rotation must be a length-4 array of finite numbers"
+      }
+    ],
+    [
+      "num accepts a finite number and refuses NaN, Infinity and a string",
+      [
+        5,
+        {
+          "error": "TypeError",
+          "message": "health must be a finite number"
+        },
+        {
+          "error": "TypeError",
+          "message": "health must be a finite number"
+        },
+        {
+          "error": "TypeError",
+          "message": "health must be a finite number"
+        }
+      ]
+    ],
+    [
+      "nonNeg accepts zero and refuses a negative number",
+      [
+        0,
+        {
+          "error": "TypeError",
+          "message": "speed must be a non-negative finite number"
+        },
+        2
+      ]
+    ]
+  ]
+}
