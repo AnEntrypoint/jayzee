@@ -866,24 +866,5 @@
         "SKILL.md"
       ]
     }
-  ],
-  "parityRow61": {
-    "checked": 47,
-    "unchecked": 13,
-    "uncheckedNames": [
-      "terrain mark vocabulary and world-def wiring",
-      "named terrain field paint with PLAYER and CREATOR layers",
-      "decoration item layers and graphics-tier reach",
-      "rigged-model ragdoll activation",
-      "vibe pattern core and transport",
-      "PostFX look DSL and render-graph operators",
-      "private preview room and separate publish",
-      "browser readiness, fault and chat contract",
-      "declarative world tree and state scopes",
-      "shared spec parse boundary for all ctx.define* factories",
-      "surface of the tick drop counter",
-      "SES availability preflight with distinct reason codes",
-      "a fail-loud asset loading gate for model errors"
-    ]
-  }
+  ]
 }

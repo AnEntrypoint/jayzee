@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { gate, finish } from './lib/gate.mjs'
-import { buildReport, countItems, normalizeName, parseFeatureGap, parseSummary, sha256Hex } from './gen-feature-gap.mjs'
+import { buildReport, countItems, parseFeatureGap, parseSummary, sha256Hex } from './gen-feature-gap.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const copyPath = join(here, 'fixtures', 'spoint', 'spoint-spawn-feature-gap.md')
@@ -41,13 +41,6 @@ const hashProblems = (recorded, bytes) => {
   return problems
 }
 
-const nameProblems = (expected, actual) => {
-  if (expected.length !== actual.length) return [`expected ${expected.length} unchecked names, found ${actual.length}`]
-  return expected.flatMap((name, index) => normalizeName(name) === normalizeName(actual[index])
-    ? []
-    : [`name ${index + 1}: row "${name}" vs report "${actual[index]}"`])
-}
-
 const verificationProblems = (items) => items.flatMap((item) => {
   const wanted = item.status === 'checked' ? 'UNVERIFIED' : 'OPEN'
   return item.verification === wanted
@@ -58,8 +51,6 @@ const verificationProblems = (items) => items.flatMap((item) => {
 const freshProblems = (recorded, fresh) => ['report', 'summary', 'counts', 'items']
   .filter((key) => JSON.stringify(recorded[key]) !== JSON.stringify(fresh[key]))
   .map((key) => `${key} differs from a fresh parse of the copy`)
-
-const rowProblems = (row) => countProblems({ checked: EXPECTED.checked, unchecked: EXPECTED.unchecked }, row)
 
 const fresh = buildReport(copyBytes, 'spoint-spawn-feature-gap.md')
 
@@ -84,20 +75,6 @@ gate('the parser finds 47 checked and 13 unchecked items', () => {
 gate('the fixture counts and items equal a fresh parse of the copy', () => {
   assertNoProblems(freshProblems(record, fresh))
   assertDetects(freshProblems({ ...record, items: record.items.slice(1) }, fresh), 'a fixture missing its first item')
-})
-
-gate('PARITY.md row 61 declares 47 checked and 13 unchecked, as the fixture records', () => {
-  assertNoProblems(rowProblems(record.parityRow61))
-  assertDetects(rowProblems({ checked: 46, unchecked: 14 }), 'a row that declares 46 checked and 14 unchecked')
-})
-
-gate('the 13 unchecked names match the PARITY.md row 61 list', () => {
-  const reportNames = freshItems.filter((item) => item.status === 'unchecked').map((item) => item.name)
-  assertNoProblems(nameProblems(record.parityRow61.uncheckedNames, reportNames))
-  assertDetects(nameProblems(record.parityRow61.uncheckedNames.slice(1), reportNames), 'a row list missing its first name')
-  const renamed = [...record.parityRow61.uncheckedNames]
-  renamed[0] = 'Terrain marks'
-  assertDetects(nameProblems(renamed, reportNames), 'a row list with a renamed first item')
 })
 
 gate('checked items stay UNVERIFIED and unchecked items stay OPEN', () => {

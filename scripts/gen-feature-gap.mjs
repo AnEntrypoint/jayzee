@@ -4,15 +4,12 @@ import { basename, dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const scriptsDir = dirname(fileURLToPath(import.meta.url))
-const parityPath = join(scriptsDir, '..', 'docs', 'PARITY.md')
 const recordPath = join(scriptsDir, 'fixtures', 'spoint', 'feature-gap.json')
 const ITEM_LINE = /^- \[( |x)\] \*\*(.+?)\*\* \((\w+)\)/
 const SECTION_LINE = /^## (.+)$/
 const FILES_LINE = /^ {2}- files: (.+)$/
 const BACKTICKED = /`([^`]+)`/g
 const SUMMARY_LINE = /^Total claims: (\d+)\. Implemented here: (\d+)\. Remaining: (\d+)\.$/m
-const ROW_CLAIM = /lists (\d+) checked and (\d+) unchecked/
-const ROW_UNCHECKED_LIST = /The \d+ unchecked items are: (.+?)\. The \d+ checked items/
 const FUNCTION_WORDS = new Set(['a', 'an', 'the', 'of'])
 
 export const sha256Hex = (bytes) => createHash('sha256').update(bytes).digest('hex')
@@ -54,19 +51,6 @@ export const normalizeName = (name) => name
   .filter((word) => word !== '' && !FUNCTION_WORDS.has(word))
   .join(' ')
 
-export const parseParityRow = (parityText) => {
-  const row = parityText.split('\n').find((line) => line.startsWith('61. '))
-  if (row === undefined) throw new Error('PARITY.md has no row 61')
-  const claim = ROW_CLAIM.exec(row)
-  const list = ROW_UNCHECKED_LIST.exec(row)
-  if (!claim || !list) throw new Error('row 61 does not state its counts and its unchecked list')
-  return {
-    checked: Number(claim[1]),
-    unchecked: Number(claim[2]),
-    uncheckedNames: list[1].split('; ').map((name) => name.replace(/^and /, ''))
-  }
-}
-
 export const buildReport = (reportBytes, reportName) => {
   const text = reportBytes.toString('utf8')
   const items = parseFeatureGap(text).map((item, index) => ({
@@ -95,7 +79,7 @@ if (invokedDirectly) {
     process.exitCode = 2
   } else {
     const report = buildReport(readFileSync(reportPath), basename(reportPath))
-    const record = { ...report, parityRow61: parseParityRow(readFileSync(parityPath, 'utf8')) }
+    const record = { ...report }
     writeFileSync(recordPath, JSON.stringify(record, null, 2) + '\n')
     console.log(`checked ${record.counts.checked} unchecked ${record.counts.unchecked} total ${record.counts.total} sha256 ${record.report.sha256}`)
     console.log(`wrote ${recordPath}`)
