@@ -1,5 +1,10 @@
 {
   "emsdk": "4.0.10",
   "emsdkCommit": "62a853cd3b3134398ce85cde8bb5cbb2ef0194cb",
-  "artifacts": {}
+  "artifacts": {
+    "engine-core-64mib": {
+      "wasm": "engine/out/engine-core-64mib.wasm",
+      "sha256": "fbfcc4ade72fc422a1ae62f4320c91badc7349f24a7422a979809c90019e5777"
+    }
+  }
 }
