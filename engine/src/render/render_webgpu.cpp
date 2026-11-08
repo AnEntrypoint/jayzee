@@ -303,7 +303,7 @@ wgpu::TextureView makeArrayView(wgpu::Texture texture, std::uint32_t layers) {
 }
 
 wgpu::ShaderModule makeModule(const char* code) {
-  wgpu::ShaderSourceWGSL source{};
+  wgpu::ShaderModuleWGSLDescriptor source{};
   source.code = code;
   wgpu::ShaderModuleDescriptor desc{};
   desc.nextInChain = &source;
@@ -370,10 +370,10 @@ void writeBuffer(wgpu::Buffer buffer, std::uint64_t offset, const void* data, st
 }
 
 void writeLayer(wgpu::Texture texture, std::uint32_t layer, const void* pixels, std::uint32_t side, std::uint32_t bytesPerTexel) {
-  wgpu::TexelCopyTextureInfo destination{};
+  wgpu::ImageCopyTexture destination{};
   destination.texture = texture;
   destination.origin = wgpu::Origin3D{0, 0, layer};
-  wgpu::TexelCopyBufferLayout layout{};
+  wgpu::TextureDataLayout layout{};
   layout.bytesPerRow = side * bytesPerTexel;
   layout.rowsPerImage = side;
   const wgpu::Extent3D size{side, side, 1};
@@ -566,7 +566,7 @@ int frame(const SceneView& scene, const FramePlan& plan, const Camera& camera) {
   writeBuffer(pageBuf, 0, plan.pageRecords, kPageBytes);
 
   for (std::uint32_t u = 0; u < plan.uploadCount; ++u) {
-    writeLayer(heightTex, plan.uploadLayer[u], scene.pages->samplesAt(static_cast<int>(plan.uploadSlot[u])), kPageSide, 4);
+    writeLayer(heightTex, plan.uploadLayer[u], scene.pages->pageSamples(static_cast<int>(plan.uploadSlot[u])), kPageSide, 4);
   }
   for (std::uint32_t layer = 0; layer < kAlbedoLayers; ++layer) {
     if (plan.albedoPending[layer] == 0) continue;

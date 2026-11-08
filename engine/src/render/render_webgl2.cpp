@@ -347,7 +347,7 @@ int frame(const SceneView& scene, const FramePlan& plan, const Camera& camera) {
   ENGINE_RENDER_CALL(glBindTexture(GL_TEXTURE_2D_ARRAY, heightTex));
   for (std::uint32_t u = 0; u < plan.uploadCount; ++u) {
     ENGINE_RENDER_CALL(glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, static_cast<GLint>(plan.uploadLayer[u]), kPageSide, kPageSide, 1, GL_RED, GL_FLOAT,
-                                       scene.pages->samplesAt(static_cast<int>(plan.uploadSlot[u]))));
+                                       scene.pages->pageSamples(static_cast<int>(plan.uploadSlot[u]))));
   }
   ENGINE_RENDER_CALL(glActiveTexture(GL_TEXTURE0));
   ENGINE_RENDER_CALL(glBindTexture(GL_TEXTURE_2D_ARRAY, albedoTex));
