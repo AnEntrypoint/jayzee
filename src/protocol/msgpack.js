@@ -60,9 +60,63 @@ const assertEncodable = (value) => {
   }
 }
 
+const FLOAT64_MARKER = 0xcb
+const NEG_ZERO_FLOAT64_TAIL = Uint8Array.of(0x80, 0, 0, 0, 0, 0, 0, 0)
+const NEG_ZERO_SENTINELS = [0.8374615592187193, 0.1937725216839527, 0.5772156649015329, 0.2360679774997897]
+
+const isPlainContainer = (value) => {
+  const prototype = Object.getPrototypeOf(value)
+  return prototype === Object.prototype || prototype === null
+}
+
+const countNegativeZero = (value) => {
+  if (Object.is(value, -0)) return 1
+  if (value === null || typeof value !== 'object' || ArrayBuffer.isView(value)) return 0
+  if (Array.isArray(value)) return value.reduce((count, item) => count + countNegativeZero(item), 0)
+  if (value instanceof Map) return [...value.values()].reduce((count, item) => count + countNegativeZero(item), 0)
+  if (!isPlainContainer(value)) return 0
+  return Object.values(value).reduce((count, item) => count + countNegativeZero(item), 0)
+}
+
+const replaceNegativeZero = (value, sentinel) => {
+  if (Object.is(value, -0)) return sentinel
+  if (value === null || typeof value !== 'object' || ArrayBuffer.isView(value)) return value
+  if (Array.isArray(value)) return value.map((item) => replaceNegativeZero(item, sentinel))
+  if (value instanceof Map) return new Map([...value].map(([key, item]) => [key, replaceNegativeZero(item, sentinel)]))
+  if (!isPlainContainer(value)) return value
+  return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, replaceNegativeZero(item, sentinel)]))
+}
+
+const float64Bytes = (number) => {
+  const view = new DataView(new ArrayBuffer(8))
+  view.setFloat64(0, number)
+  return new Uint8Array(view.buffer)
+}
+
+const overwriteNegativeZero = (bytes, sentinel, expected) => {
+  const pattern = float64Bytes(sentinel)
+  if (pattern.includes(FLOAT64_MARKER)) return false
+  const starts = []
+  for (let start = 0; start + 9 <= bytes.length; start++) {
+    if (bytes[start] !== FLOAT64_MARKER) continue
+    let matches = true
+    for (let offset = 0; offset < 8 && matches; offset++) matches = bytes[start + 1 + offset] === pattern[offset]
+    if (matches) starts.push(start)
+  }
+  if (starts.length !== expected) return false
+  for (const start of starts) bytes.set(NEG_ZERO_FLOAT64_TAIL, start + 1)
+  return true
+}
+
 export function pack(value) {
   assertEncodable(value)
-  return new Uint8Array(packer.pack(value))
+  const negativeZeros = countNegativeZero(value)
+  if (negativeZeros === 0) return new Uint8Array(packer.pack(value))
+  for (const sentinel of NEG_ZERO_SENTINELS) {
+    const bytes = new Uint8Array(packer.pack(replaceNegativeZero(value, sentinel)))
+    if (overwriteNegativeZero(bytes, sentinel, negativeZeros)) return bytes
+  }
+  throw new RangeError('[msgpack] every negative-zero sentinel collides with the value')
 }
 
 const RESERVED_MARKER_PROTOTYPE = Object.getPrototypeOf(unpacker.unpack(Uint8Array.of(0xc1)))

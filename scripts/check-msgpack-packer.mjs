@@ -53,11 +53,11 @@ gate('packing the cases in reverse order gives the same bytes (no state carried 
   assert(JSON.stringify(forward) === JSON.stringify(backward), 'order changed the bytes')
 })
 
-gate('OPEN, known difference: negative zero packs as integer 0 under the released msgpackr 2.0.4, where spoint packs float64 -0', () => {
+gate('packs the spoint negative zero in an array to the float64 -0 bytes', () => {
   const negative = byName('negative zero in array')
   assert(negative.negativeZero === true, 'the -0 case is not marked')
   assert(negative.hex === '92cb800000000000000001', 'spoint bytes ' + negative.hex)
-  assert(hex(pack(revive(negative.value))) === '920001', 'jayzee bytes ' + hex(pack(revive(negative.value))))
+  assert(hex(pack(revive(negative.value))) === negative.hex, 'jayzee bytes ' + hex(pack(revive(negative.value))))
 })
 
 gate('the packer returns a Uint8Array that a later pack does not overwrite', () => {

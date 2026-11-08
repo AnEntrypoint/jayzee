@@ -87,10 +87,11 @@ gate('negative control: a changed input changes the written bytes and the read v
   assert(decodeReplay(written).inputs[0].buttons === 4, 'the changed input did not read back')
 })
 
-gate('OPEN, known difference: a negative zero in a replay writes as integer 0 under the released msgpackr 2.0.4', () => {
+gate('a negative zero in a replay is written as the float64 -0 bytes and reads back as -0', () => {
   const written = encodeReplay({ header: { x: -0 }, inputs: [] })
+  assert(Buffer.from(written).includes(Buffer.from('cb8000000000000000', 'hex')), 'no float64 -0 in the replay bytes')
   const read = decodeReplay(written)
-  assert(Object.is(read.header.x, 0), 'the -0 read back as ' + read.header.x)
+  assert(Object.is(read.header.x, -0), 'the -0 read back as ' + read.header.x)
 })
 
 finish()
