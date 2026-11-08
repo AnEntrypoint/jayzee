@@ -177,12 +177,12 @@ rejects('crowd fixture: reduced tuple yaw', reducedTupleOf(crowdTick4.players), 
 claim('crowd fixture: far dots at tick 3 and 4', [crowdTick3.dots, crowdTick4.dots], [[[3, 2, 1], [-4, -4, 1]], [[3, 2, 1], [-4, -4, 1]]])
 rejects('crowd fixture: far dots at tick 3 and 4', [crowdTick3.dots, crowdTick4.dots], [[[3, 2, 1]], [[3, 2, 1], [-4, -4, 1]]])
 
-claim('buildCrowdDots bins 25 m cells and counts members', buildCrowdDots([{ position: [1, 0, 1] }, { position: [-3, 0, -30] }, { position: [30, 0, -30] }, { position: [30, 0, 30] }], ORIGIN, 25), [[0, 0, 1], [-1, -2, 1], [0, 1000001, 1], [1, 1, 1]])
-rejects('buildCrowdDots bins 25 m cells and counts members', buildCrowdDots([{ position: [1, 0, 1] }, { position: [-3, 0, -30] }, { position: [30, 0, -30] }, { position: [30, 0, 30] }], ORIGIN, 25), [[0, 0, 1], [-1, -2, 1], [1, -2, 1], [1, 1, 1]])
-claim('buildCrowdDots decodes cell (1, -2) as (0, 1000001), the spoint key defect', buildCrowdDots([{ position: [30, 0, -30] }], ORIGIN, 25), [[0, 1000001, 1]])
-rejects('buildCrowdDots decodes cell (1, -2) as (0, 1000001)', buildCrowdDots([{ position: [30, 0, -30] }], ORIGIN, 25), [[1, -2, 1]])
-claim('buildCrowdDots with a 10 m cell repeats the same defect at (3, -3)', buildCrowdDots([{ position: [30, 0, -30] }], ORIGIN, 10), [[2, 1000000, 1]])
-rejects('buildCrowdDots with a 10 m cell', buildCrowdDots([{ position: [30, 0, -30] }], ORIGIN, 10), [[3, -3, 1]])
+claim('buildCrowdDots bins 25 m cells and counts members', buildCrowdDots([{ position: [1, 0, 1] }, { position: [-3, 0, -30] }, { position: [30, 0, -30] }, { position: [30, 0, 30] }], ORIGIN, 25), [[0, 0, 1], [-1, -2, 1], [1, -2, 1], [1, 1, 1]])
+rejects('control rejects buildCrowdDots bins 25 m cells and counts members', buildCrowdDots([{ position: [1, 0, 1] }, { position: [-3, 0, -30] }, { position: [30, 0, -30] }, { position: [30, 0, 30] }], ORIGIN, 25), [[0, 0, 1], [-1, -2, 1], [0, 1000001, 1], [1, 1, 1]])
+claim('buildCrowdDots decodes cell (1, -2) as (1, -2), spoint 0769dae', buildCrowdDots([{ position: [30, 0, -30] }], ORIGIN, 25), [[1, -2, 1]])
+rejects('control rejects buildCrowdDots decodes cell (1, -2) as (0, 1000001)', buildCrowdDots([{ position: [30, 0, -30] }], ORIGIN, 25), [[0, 1000001, 1]])
+claim('buildCrowdDots with a 10 m cell places (30, -30) in cell (3, -3)', buildCrowdDots([{ position: [30, 0, -30] }], ORIGIN, 10), [[3, -3, 1]])
+rejects('control rejects buildCrowdDots with a 10 m cell', buildCrowdDots([{ position: [30, 0, -30] }], ORIGIN, 10), [[2, 1000000, 1]])
 claim('buildCrowdDots of no players is empty', buildCrowdDots([], ORIGIN, 25), [])
 rejects('buildCrowdDots of no players is empty', buildCrowdDots([], ORIGIN, 25), [[0, 0, 0]])
 

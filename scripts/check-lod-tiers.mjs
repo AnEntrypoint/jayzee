@@ -32,7 +32,7 @@ gate('jayzee filters every scenario to the same records and dots as spoint, at t
   assert.ok(same(got, want), 'filtered records or dots differ from spoint')
 })
 
-gate('jayzee crowd dots over every scenario match spoint, including the cell-key quirk for negative cells', () => {
+gate('jayzee crowd dots over every scenario match spoint, including mixed-sign cells', () => {
   assert.ok(same(ran.map((s) => s.dotsAll), fixture.scenarios.map((s) => s.dotsAll)), 'crowd dots differ from spoint')
 })
 

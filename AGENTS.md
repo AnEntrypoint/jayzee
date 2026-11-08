@@ -157,7 +157,7 @@ Non-obvious facts for automated edits. Architecture and measured costs live in d
 - `scripts/check-animation-rig.mjs` needs the `/workspace/spoint` checkout and is not part of `npm test`.
 - `createAnimationController` in `src/animation/animationController.js` needs a `{ now }` clock as its third argument. Its land timer fires on the first update at or after 500 ms on that clock.
 - `AnimationSystem` throws at construction when grounding finds a hips bone and `host.moveHips` is missing, because spoint always moves the hips.
-- `src/client/crowdDots.js` reproduces the cell-key quirk for both signs: cell (-1, 5) decodes to (0, -999998), so cx below 0 with cz above 0 also wraps, not only cx above 0 with cz below 0.
+- `buildCrowdDots` in `src/snapshot-lod-pure/playerLod.js` keys buckets by the `[cx, cz]` pair, as spoint does at 0769dae. The old packed key `cx * 1000003 + cz` wrapped mixed-sign cells.
 - The pose and cadence values in `scripts/fixtures/spoint/crowd-dots.json` are transcriptions of spoint arithmetic, not spoint module output, because PlayerLOD needs three.js and TickHandler does not export its modulus.
 - `scripts/check-marching-drift.mjs` imports spoint terrain modules from `/workspace/spoint`, so it is a script and not part of `npm test`.
 - `scripts/fixtures/spoint/spline-erosion.json` is written by `scripts/gen-spline-erosion-fixture.mjs`, the only script that reads `/workspace/spoint`. The gate reads the fixture and runs in `npm test`.

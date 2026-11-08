@@ -6,7 +6,6 @@ export const PLAYER_LOD_FULL_COUNT = 30
 export const PLAYER_LOD_REDUCED2 = 120 * 120
 export const PLAYER_LOD_REDUCED_HZ = 5
 export const CROWD_DOT_CELL_M = 25
-export const CROWD_KEY_STRIDE = 1000003
 export const PROP_MAX_HZ = 15
 export const PROP_SLEEP_TICKMOD = 60
 export const NEAR2 = 20 * 20

@@ -1,7 +1,6 @@
 import { encodePlayerRecord, PLAYER_RECORD_BYTES } from '../wire/index.js'
 import {
   CROWD_DOT_CELL_M,
-  CROWD_KEY_STRIDE,
   HALF_PI,
   PLAYER_LOD_FULL_COUNT,
   PLAYER_LOD_REDUCED2,
@@ -114,16 +113,12 @@ export const buildCrowdDots = (players, viewerPos, dotCellM) => {
     const pos = p.position
     if (!pos) continue
     const cx = Math.floor(pos[0] / cell), cz = Math.floor(pos[2] / cell)
-    const key = cx * CROWD_KEY_STRIDE + cz
-    buckets.set(key, (buckets.get(key) || 0) + 1)
+    const key = `${cx},${cz}`
+    const bucket = buckets.get(key)
+    if (bucket) bucket[2]++
+    else buckets.set(key, [cx, cz, 1])
   }
-  const out = []
-  for (const [key, count] of buckets) {
-    const cz = key % CROWD_KEY_STRIDE
-    const cx = (key - cz) / CROWD_KEY_STRIDE
-    out.push([cx, cz, count])
-  }
-  return out
+  return [...buckets.values()]
 }
 
 const tierIds = []

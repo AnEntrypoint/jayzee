@@ -25,18 +25,18 @@ gate('buildCrowdDots reproduces spoint dots for every crowd position', () => {
   assert.deepEqual(buildCrowdDots(crowdPlayers, origin, CROWD_DOT_CELL_M), fixture.crowd.dots)
 })
 
-gate('quirk pinned: world (30, -30) is cell (1, -2) and comes back as (0, 1000001)', () => {
-  assert.deepEqual(buildCrowdDots([{ position: [30, 0, -30] }], origin, CROWD_DOT_CELL_M), [[0, 1000001, 1]])
-  assert.deepEqual(fixture.crowd.dots[2], [0, 1000001, 1])
+gate('spoint fixture: world (30, -30) is cell (1, -2) and is reported at (1, -2)', () => {
+  assert.deepEqual(buildCrowdDots([{ position: [30, 0, -30] }], origin, CROWD_DOT_CELL_M), [[1, -2, 1]])
+  assert.deepEqual(fixture.crowd.dots[2], [1, -2, 1])
 })
 
-gate('quirk pinned: cell (2, -3) comes back as (1, 1000000) from spoint', () => {
-  assert.deepEqual(buildCrowdDots([{ position: [60, 0, -60] }], origin, CROWD_DOT_CELL_M), [[1, 1000000, 1]])
-  assert.deepEqual(fixture.crowd.dots[4], [1, 1000000, 1])
+gate('spoint fixture: cell (2, -3) is reported at (2, -3)', () => {
+  assert.deepEqual(buildCrowdDots([{ position: [60, 0, -60] }], origin, CROWD_DOT_CELL_M), [[2, -3, 1]])
+  assert.deepEqual(fixture.crowd.dots[4], [2, -3, 1])
 })
 
-gate('negative control: the true cell (1, -2) is not what the decoder returns', () => {
-  assert.notDeepEqual(buildCrowdDots([{ position: [30, 0, -30] }], origin, CROWD_DOT_CELL_M), [[1, -2, 1]])
+gate('negative control: no crowd dot carries a packed key, so every reported cz is within the grid', () => {
+  for (const [, cz] of buildCrowdDots(crowdPlayers, origin, CROWD_DOT_CELL_M)) assert.ok(Math.abs(cz) < 1000, 'cz ' + cz)
 })
 
 gate('cells with cx below 0 and cz below 0 round-trip through the bucket key', () => {
@@ -44,13 +44,9 @@ gate('cells with cx below 0 and cz below 0 round-trip through the bucket key', (
   assert.deepEqual(buildCrowdDots([{ position: [-3, 0, -30] }], origin, CROWD_DOT_CELL_M), [[-1, -2, 1]])
 })
 
-gate('cell (-1, 5) with cx below 0 and cz above 0 wraps: spoint reports it as (0, -999998)', () => {
-  assert.deepEqual(fixture.wrap.dots, [[0, -999998, 1]])
+gate('cell (-1, 5) with cx below 0 and cz above 0 is reported at (-1, 5), as the spoint fixture has it', () => {
+  assert.deepEqual(fixture.wrap.dots, [[-1, 5, 1]])
   assert.deepEqual(buildCrowdDots([{ position: [-3, 0, 125] }], origin, CROWD_DOT_CELL_M), fixture.wrap.dots)
-})
-
-gate('negative control: the true cell (-1, 5) is not what the decoder returns', () => {
-  assert.notDeepEqual(buildCrowdDots([{ position: [-3, 0, 125] }], origin, CROWD_DOT_CELL_M), [[-1, 5, 1]])
 })
 
 gate('a count of 100 in one cell is one bucket that spoint also reports', () => {
@@ -62,11 +58,11 @@ gate('client pose of spoint bucket dots matches spoint PlayerLOD arithmetic', ()
   assert.deepEqual(decodeCrowdDots(fixture.crowd.dots, { dotCellM: CROWD_DOT_CELL_M, dotSize: fixture.dotSize, viewerY: fixture.viewerY }), fixture.crowd.poses)
 })
 
-gate('client pose of the quirk dot is placed at z 25000037.5, not at the true cell', () => {
-  const pose = decodeCrowdDots([[0, 1000001, 1]], { dotCellM: CROWD_DOT_CELL_M, viewerY: 2 })[0]
-  assert.equal(pose.z, 25000037.5)
+gate('client pose of cell (0, 1) is placed at z 37.5, not at a packed key', () => {
+  const pose = decodeCrowdDots([[0, 1, 1]], { dotCellM: CROWD_DOT_CELL_M, viewerY: 2 })[0]
+  assert.equal(pose.z, 37.5)
   assert.equal(pose.x, 12.5)
-  assert.notEqual(pose.z, -37.5)
+  assert.notEqual(pose.z, 25000037.5)
 })
 
 gate('scale caps at three times the dot size for dense cells', () => {

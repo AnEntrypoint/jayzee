@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { execFileSync } from 'node:child_process'
 
 const spointRoot = resolve(process.argv[2] ?? '/workspace/spoint')
 const outDir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'spoint')
@@ -17,7 +18,8 @@ const ORIGIN = [0, 0, 0]
 
 const crowdPositions = [
   [1, 0, 1], [-3, 0, -30], [30, 0, -30], [30, 0, 30], [60, 0, -60],
-  [-30, 0, 30], [-30, 0, -30], [26, 0, -1], [0, 0, -0.5], [1, 0, 1]
+  [-30, 0, 30], [-30, 0, -30], [26, 0, -1], [0, 0, -0.5], [1, 0, 1],
+  [-24, 0, 26], [51, 0, -124], [-99, 0, 176]
 ]
 const crowdPlayers = crowdPositions.map((position, i) => ({ id: i + 1, position }))
 const crowdDots = encoder.buildCrowdDots(crowdPlayers, ORIGIN, CELL_M)
@@ -27,6 +29,9 @@ const crowdPoses = crowdDots.map(([cx, cz, count]) => ({
   z: (cz + 0.5) * CELL_M,
   scale: DOT_SIZE * Math.min(3, 0.6 + Math.sqrt(count) * 0.35)
 }))
+
+const mixedPositions = [[51, 0, -124], [-99, 0, 176], [-99, 0, 177], [-99, 0, 178], [26, 0, -1], [-24, 0, 26]]
+const mixedDots = encoder.buildCrowdDots(mixedPositions.map((position, i) => ({ id: i + 1, position })), ORIGIN, CELL_M)
 
 const capDots = encoder.buildCrowdDots(Array.from({ length: 100 }, (_, i) => ({ id: 1000 + i, position: [55, 0, 55] })), ORIGIN, CELL_M)
 const capPose = { x: (capDots[0][0] + 0.5) * CELL_M, y: VIEWER_Y + LIFT, z: (capDots[0][1] + 0.5) * CELL_M, scale: DOT_SIZE * Math.min(3, 0.6 + Math.sqrt(capDots[0][2]) * 0.35) }
@@ -67,10 +72,12 @@ const recordSamples = [
 
 const payload = {
   generatedFrom: 'spoint src/netcode/SnapshotEncoder.js buildCrowdDots and filterEncodedPlayersTiered, PLAYER_LOD_REDUCED_HZ, src/netcode/SnapshotBinFormat.js packBinRecord and unpackBinRecord, client/core/PlayerLOD.js update pose arithmetic',
+  spointCommit: execFileSync('git', ['-C', spointRoot, 'rev-parse', '--short', 'HEAD'], { encoding: 'utf8' }).trim(),
   cellM: CELL_M,
   dotSize: DOT_SIZE,
   viewerY: VIEWER_Y,
   crowd: { positions: crowdPositions, dots: crowdDots, poses: crowdPoses },
+  mixed: { positions: mixedPositions, dots: mixedDots },
   cap: { count: 100, dots: capDots, pose: capPose },
   wrap: { positions: wrapPositions, dots: wrapDots },
   flat: { sample: flatSample, pose: flatPose },
