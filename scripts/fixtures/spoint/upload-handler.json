@@ -1,0 +1,415 @@
+{
+  "source": "spoint src/sdk/UploadHandler.js createUploadHandler, driven through a fake request with ProgressiveBake.js stubbed",
+  "cases": [
+    {
+      "label": "a GLB with the GLB magic is stored at one byte per chunk",
+      "contentType": "multipart/form-data; boundary=BND",
+      "chunkSize": 1,
+      "parts": [
+        {
+          "name": "model",
+          "filename": "a.glb",
+          "head": "glTF\u0002\u0000\u0000\u0000",
+          "length": 40
+        }
+      ],
+      "expect": {
+        "status": 200,
+        "ext": ".glb",
+        "sha256": "6389d1aeb191e8194778d538efe9cf5eed245d4c366785068b745f6942163b43",
+        "length": 40
+      }
+    },
+    {
+      "label": "a quoted boundary is read",
+      "contentType": "multipart/form-data; boundary=\"BND\"",
+      "chunkSize": 7,
+      "parts": [
+        {
+          "name": "model",
+          "filename": "a.glb",
+          "head": "glTF\u0002\u0000\u0000\u0000",
+          "length": 40
+        }
+      ],
+      "expect": {
+        "status": 200,
+        "ext": ".glb",
+        "sha256": "6389d1aeb191e8194778d538efe9cf5eed245d4c366785068b745f6942163b43",
+        "length": 40
+      }
+    },
+    {
+      "label": "an upper case GLB extension is stored under its lower case extension",
+      "contentType": "multipart/form-data; boundary=BND",
+      "chunkSize": 65536,
+      "parts": [
+        {
+          "name": "model",
+          "filename": "Model.GLB",
+          "head": "glTF\u0002\u0000\u0000\u0000",
+          "length": 40
+        }
+      ],
+      "expect": {
+        "status": 200,
+        "ext": ".glb",
+        "sha256": "6389d1aeb191e8194778d538efe9cf5eed245d4c366785068b745f6942163b43",
+        "length": 40
+      }
+    },
+    {
+      "label": "a GLTF that opens with the GLB magic is refused as invalid content",
+      "contentType": "multipart/form-data; boundary=BND",
+      "chunkSize": 7,
+      "parts": [
+        {
+          "name": "model",
+          "filename": "scene.gltf",
+          "head": "glTF\u0002\u0000\u0000\u0000",
+          "length": 40
+        }
+      ],
+      "expect": {
+        "status": 400,
+        "body": "invalid file content"
+      }
+    },
+    {
+      "label": "a GLTF that opens with a JSON brace after whitespace is stored",
+      "contentType": "multipart/form-data; boundary=BND",
+      "chunkSize": 1,
+      "parts": [
+        {
+          "name": "model",
+          "filename": "scene.gltf",
+          "head": "  \n{\"asset\":{}}",
+          "length": 40
+        }
+      ],
+      "expect": {
+        "status": 200,
+        "ext": ".gltf",
+        "sha256": "e79a72f76dbe61dfaaf2f0065ff3db1fc23d33490f26572f2fc9e8273c75b14d",
+        "length": 40
+      }
+    },
+    {
+      "label": "a VRM that opens with a JSON brace is stored",
+      "contentType": "multipart/form-data; boundary=BND",
+      "chunkSize": 65536,
+      "parts": [
+        {
+          "name": "model",
+          "filename": "avatar.vrm",
+          "head": "{\"asset\":{}}",
+          "length": 40
+        }
+      ],
+      "expect": {
+        "status": 200,
+        "ext": ".vrm",
+        "sha256": "9f86ea610ae90f2cd94f54c7dd0c473d3e1a95e5a00ceaa1273cc42709076a18",
+        "length": 40
+      }
+    },
+    {
+      "label": "an executable is refused by its extension",
+      "contentType": "multipart/form-data; boundary=BND",
+      "chunkSize": 7,
+      "parts": [
+        {
+          "name": "model",
+          "filename": "tool.exe",
+          "head": "MZ\u0000",
+          "length": 40
+        }
+      ],
+      "expect": {
+        "status": 400,
+        "body": "invalid type"
+      }
+    },
+    {
+      "label": "a file with no extension is refused by its extension",
+      "contentType": "multipart/form-data; boundary=BND",
+      "chunkSize": 7,
+      "parts": [
+        {
+          "name": "model",
+          "filename": "model",
+          "head": "glTF\u0002\u0000\u0000\u0000",
+          "length": 40
+        }
+      ],
+      "expect": {
+        "status": 400,
+        "body": "invalid type"
+      }
+    },
+    {
+      "label": "a GLB whose bytes are JSON is refused as invalid content",
+      "contentType": "multipart/form-data; boundary=BND",
+      "chunkSize": 7,
+      "parts": [
+        {
+          "name": "model",
+          "filename": "a.glb",
+          "head": "{\"asset\":{}}",
+          "length": 40
+        }
+      ],
+      "expect": {
+        "status": 400,
+        "body": "invalid file content"
+      }
+    },
+    {
+      "label": "a GLB shorter than four bytes is refused as invalid content",
+      "contentType": "multipart/form-data; boundary=BND",
+      "chunkSize": 1,
+      "parts": [
+        {
+          "name": "model",
+          "filename": "a.glb",
+          "head": "glT",
+          "length": 3
+        }
+      ],
+      "expect": {
+        "status": 400,
+        "body": "invalid file content"
+      }
+    },
+    {
+      "label": "an empty GLB is refused as invalid content",
+      "contentType": "multipart/form-data; boundary=BND",
+      "chunkSize": 1,
+      "parts": [
+        {
+          "name": "model",
+          "filename": "a.glb",
+          "head": "",
+          "length": 0
+        }
+      ],
+      "expect": {
+        "status": 400,
+        "body": "invalid file content"
+      }
+    },
+    {
+      "label": "a body with no file part is refused as no file",
+      "contentType": "multipart/form-data; boundary=BND",
+      "chunkSize": 7,
+      "parts": [
+        {
+          "name": "note",
+          "head": "value"
+        }
+      ],
+      "expect": {
+        "status": 400,
+        "body": "no file"
+      }
+    },
+    {
+      "label": "a body whose content type has no boundary is refused before parsing",
+      "contentType": "multipart/form-data",
+      "chunkSize": 7,
+      "parts": [
+        {
+          "name": "model",
+          "filename": "a.glb",
+          "head": "glTF\u0002\u0000\u0000\u0000",
+          "length": 40
+        }
+      ],
+      "expect": {
+        "status": 400,
+        "body": "no boundary"
+      }
+    },
+    {
+      "label": "a file part with no header terminator starts no file and is refused as no file",
+      "contentType": "multipart/form-data; boundary=BND",
+      "chunkSize": 7,
+      "raw": "--BND\r\nContent-Disposition: form-data; name=\"model\"; filename=\"a.glb\"\r\n",
+      "expect": {
+        "status": 400,
+        "body": "no file"
+      }
+    },
+    {
+      "label": "a body cut off before its closing boundary keeps all but its last bytes",
+      "contentType": "multipart/form-data; boundary=BND",
+      "chunkSize": 1,
+      "raw": "--BND\r\nContent-Disposition: form-data; name=\"model\"; filename=\"a.glb\"\r\nContent-Type: model/gltf-binary\r\n\r\nglTF\u0002\u0000\u0000\u0000AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "expect": {
+        "status": 200,
+        "ext": ".glb",
+        "sha256": "64f57244af94b4d81308e19309eb4a3c6dc59ce7c4d229ec8c298499a1dbbb82",
+        "length": 39
+      }
+    },
+    {
+      "label": "the first file part is stored and a second is ignored, at one byte per chunk",
+      "contentType": "multipart/form-data; boundary=BND",
+      "chunkSize": 1,
+      "parts": [
+        {
+          "name": "model",
+          "filename": "a.glb",
+          "head": "glTF\u0002\u0000\u0000\u0000",
+          "length": 40
+        },
+        {
+          "name": "other",
+          "filename": "b.glb",
+          "head": "glTF\u0002\u0000\u0000\u0000",
+          "length": 40
+        }
+      ],
+      "expect": {
+        "status": 200,
+        "ext": ".glb",
+        "sha256": "6389d1aeb191e8194778d538efe9cf5eed245d4c366785068b745f6942163b43",
+        "length": 40
+      }
+    },
+    {
+      "label": "the first file part is stored and a second is ignored, at seven bytes per chunk",
+      "contentType": "multipart/form-data; boundary=BND",
+      "chunkSize": 7,
+      "parts": [
+        {
+          "name": "model",
+          "filename": "a.glb",
+          "head": "glTF\u0002\u0000\u0000\u0000",
+          "length": 40
+        },
+        {
+          "name": "other",
+          "filename": "b.glb",
+          "head": "glTF\u0002\u0000\u0000\u0000",
+          "length": 40
+        }
+      ],
+      "expect": {
+        "status": 200,
+        "ext": ".glb",
+        "sha256": "6389d1aeb191e8194778d538efe9cf5eed245d4c366785068b745f6942163b43",
+        "length": 40
+      }
+    },
+    {
+      "label": "the first file part is stored and a second is ignored, in one write",
+      "contentType": "multipart/form-data; boundary=BND",
+      "chunkSize": 0,
+      "parts": [
+        {
+          "name": "model",
+          "filename": "a.glb",
+          "head": "glTF\u0002\u0000\u0000\u0000",
+          "length": 40
+        },
+        {
+          "name": "other",
+          "filename": "b.glb",
+          "head": "glTF\u0002\u0000\u0000\u0000",
+          "length": 40
+        }
+      ],
+      "expect": {
+        "status": 200,
+        "ext": ".glb",
+        "sha256": "6389d1aeb191e8194778d538efe9cf5eed245d4c366785068b745f6942163b43",
+        "length": 40
+      }
+    },
+    {
+      "label": "a 50 MiB GLB is stored, so the cap is inclusive",
+      "contentType": "multipart/form-data; boundary=BND",
+      "chunkSize": 65536,
+      "parts": [
+        {
+          "name": "model",
+          "filename": "a.glb",
+          "head": "glTF\u0002\u0000\u0000\u0000",
+          "length": 52428800
+        }
+      ],
+      "expect": {
+        "status": 200,
+        "ext": ".glb",
+        "sha256": "6b9bdd7baecbb6d25dc5c1a0054402bc2ae982af651bdb2901e3bdf9cd07b09a",
+        "length": 52428800
+      }
+    },
+    {
+      "label": "a GLB one byte over 50 MiB is refused as too large",
+      "contentType": "multipart/form-data; boundary=BND",
+      "chunkSize": 65536,
+      "parts": [
+        {
+          "name": "model",
+          "filename": "a.glb",
+          "head": "glTF\u0002\u0000\u0000\u0000",
+          "length": 52428801
+        }
+      ],
+      "expect": {
+        "status": 413,
+        "body": "too large"
+      }
+    },
+    {
+      "label": "the cap counts file bytes only, so a 50 MiB GLB followed by a field is stored",
+      "contentType": "multipart/form-data; boundary=BND",
+      "chunkSize": 65536,
+      "parts": [
+        {
+          "name": "model",
+          "filename": "a.glb",
+          "head": "glTF\u0002\u0000\u0000\u0000",
+          "length": 52428800
+        },
+        {
+          "name": "note",
+          "head": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        }
+      ],
+      "expect": {
+        "status": 200,
+        "ext": ".glb",
+        "sha256": "6b9bdd7baecbb6d25dc5c1a0054402bc2ae982af651bdb2901e3bdf9cd07b09a",
+        "length": 52428800
+      }
+    },
+    {
+      "label": "the cap applies to the first file part only, so a second file over 50 MiB is ignored",
+      "contentType": "multipart/form-data; boundary=BND",
+      "chunkSize": 65536,
+      "parts": [
+        {
+          "name": "model",
+          "filename": "a.glb",
+          "head": "glTF\u0002\u0000\u0000\u0000",
+          "length": 1048576
+        },
+        {
+          "name": "other",
+          "filename": "b.glb",
+          "head": "glTF\u0002\u0000\u0000\u0000",
+          "length": 52428801
+        }
+      ],
+      "expect": {
+        "status": 200,
+        "ext": ".glb",
+        "sha256": "abe15b7ce70d789ce16a7f9a54ff9b1f4971ca8f64c5b8219f7f096f3dd8e1c2",
+        "length": 1048576
+      }
+    }
+  ]
+}
