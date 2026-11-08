@@ -3,6 +3,8 @@ import { createBridge } from './bridge.js'
 
 const MAX_STEPS_PER_ADVANCE = 8
 const BOX_WORDS = 6
+const BATCH_WORDS = 6
+const SLOT_MASK = 0xffff
 const FNV_OFFSET = 0x811c9dc5
 const FNV_PRIME = 0x01000193
 const ENGINE_MAX_BODIES = 4096
@@ -20,6 +22,8 @@ const fnvWords = (hash, words) => {
 
 const engineError = (status, message) => new RangeError(message + ' (engine status ' + status + ')')
 
+const bySlot = (a, b) => (a & SLOT_MASK) - (b & SLOT_MASK)
+
 export const loadEngineModule = async (glue = DEFAULT_GLUE) => {
   const factory = (await import(glue)).default
   const module = await factory()
@@ -32,7 +36,7 @@ export class EngineWorld {
   #bridge
   #capacity
   #tickRate
-  #count = 0
+  #alive = new Set()
   #accumulator = 0
 
   constructor(module, settings) {
@@ -43,7 +47,7 @@ export class EngineWorld {
   }
 
   get count() {
-    return this.#count
+    return this.#alive.size
   }
 
   get tick() {
@@ -57,27 +61,65 @@ export class EngineWorld {
   spawn(position, velocity = [0, 0, 0]) {
     checkVector(position, 'position')
     checkVector(velocity, 'velocity')
-    if (this.#count === this.#capacity) throw new RangeError('world is full: capacity ' + this.#capacity)
-    const id = this.#module._engine_spawn(position[0], position[1], position[2], velocity[0], velocity[1], velocity[2])
-    if (id < 0) throw engineError(id, 'engine refused the spawn')
-    this.#count += 1
-    return id
+    if (this.#alive.size === this.#capacity) throw new RangeError('world is full: capacity ' + this.#capacity)
+    const handle = this.#module._engine_spawn(position[0], position[1], position[2], velocity[0], velocity[1], velocity[2])
+    if (handle < 0) throw engineError(handle, 'engine refused the spawn')
+    this.#alive.add(handle)
+    return handle
   }
 
-  position(id) {
-    this.#checkId(id)
-    return Array.from(this.#floats(this.#module._engine_positions(), id * 3, 3))
+  spawnMany(rows) {
+    if (!Array.isArray(rows)) throw new TypeError('spawnMany takes an array of { position, velocity } rows')
+    if (rows.length > this.#capacity - this.#alive.size) {
+      throw new RangeError('world has room for ' + (this.#capacity - this.#alive.size) + ' more bodies')
+    }
+    const staged = rows.map((row) => {
+      checkVector(row.position, 'position')
+      checkVector(row.velocity ?? [0, 0, 0], 'velocity')
+      return [...row.position, ...(row.velocity ?? [0, 0, 0])]
+    })
+    const stage = this.#module._engine_stage() / 4
+    staged.forEach((values, row) => {
+      for (let k = 0; k < BATCH_WORDS; k++) this.#module.HEAPF32[stage + row * BATCH_WORDS + k] = values[k]
+    })
+    const status = this.#module._engine_spawn_batch(rows.length)
+    if (status < 0) throw engineError(status, 'engine refused the batch')
+    const handles = this.#module._engine_stage_handles() / 4
+    const spawned = []
+    for (let row = 0; row < rows.length; row++) {
+      const handle = this.#module.HEAPU32[handles + row]
+      this.#alive.add(handle)
+      spawned.push(handle)
+    }
+    return spawned
   }
 
-  velocity(id) {
-    this.#checkId(id)
-    return Array.from(this.#floats(this.#module._engine_velocities(), id * 3, 3))
+  despawn(handle) {
+    this.#checkHandle(handle)
+    this.#write(this.#module._engine_despawn(handle), 'despawn')
+    this.#alive.delete(handle)
   }
 
-  setVelocity(id, velocity) {
-    this.#checkId(id)
+  position(handle) {
+    this.#checkHandle(handle)
+    return Array.from(this.#floats(this.#module._engine_positions(), (handle & SLOT_MASK) * 3, 3))
+  }
+
+  velocity(handle) {
+    this.#checkHandle(handle)
+    return Array.from(this.#floats(this.#module._engine_velocities(), (handle & SLOT_MASK) * 3, 3))
+  }
+
+  setVelocity(handle, velocity) {
+    this.#checkHandle(handle)
     checkVector(velocity, 'velocity')
-    this.#write(this.#module._engine_set_velocity(id, velocity[0], velocity[1], velocity[2]), 'velocity')
+    this.#write(this.#module._engine_set_velocity(handle, velocity[0], velocity[1], velocity[2]), 'velocity')
+  }
+
+  setPosition(handle, position) {
+    this.#checkHandle(handle)
+    checkVector(position, 'position')
+    this.#write(this.#module._engine_set_position(handle, position[0], position[1], position[2]), 'position')
   }
 
   step() {
@@ -98,8 +140,8 @@ export class EngineWorld {
   }
 
   hash() {
-    const positions = this.#floats(this.#module._engine_positions(), 0, this.#count * 3)
-    const velocities = this.#floats(this.#module._engine_velocities(), 0, this.#count * 3)
+    const positions = this.#gather(this.#module._engine_positions())
+    const velocities = this.#gather(this.#module._engine_velocities())
     const words = (view) => new Uint32Array(view.buffer, view.byteOffset, view.length * 2)
     return fnvWords(fnvWords(FNV_OFFSET, words(positions)), words(velocities)) >>> 0
   }
@@ -107,40 +149,53 @@ export class EngineWorld {
   snapshot() {
     return {
       tick: this.tick,
-      count: this.#count,
-      positions: this.#floats(this.#module._engine_positions(), 0, this.#count * 3).slice(),
+      count: this.#alive.size,
+      positions: this.#gather(this.#module._engine_positions()),
     }
-  }
-
-  setPosition(id, position) {
-    this.#checkId(id)
-    checkVector(position, 'position')
-    this.#write(this.#module._engine_set_position(id, position[0], position[1], position[2]), 'position')
   }
 
   exportState() {
     return {
       tick: this.tick,
-      count: this.#count,
-      positions: this.#floats(this.#module._engine_positions(), 0, this.#count * 3).slice(),
-      velocities: this.#floats(this.#module._engine_velocities(), 0, this.#count * 3).slice(),
+      count: this.#alive.size,
+      positions: this.#gather(this.#module._engine_positions()),
+      velocities: this.#gather(this.#module._engine_velocities()),
     }
   }
 
   importState(state) {
-    const words = this.#count * 3
-    if (state.count !== this.#count) throw new RangeError('state holds ' + state.count + ' bodies, world has ' + this.#count)
+    const words = this.#alive.size * 3
+    if (state.count !== this.#alive.size) throw new RangeError('state holds ' + state.count + ' bodies, world has ' + this.#alive.size)
     if (state.positions.length !== words || state.velocities.length !== words) {
       throw new RangeError('state arrays do not match the body count')
     }
-    for (let id = 0; id < this.#count; id++) {
-      const p = state.positions.slice(id * 3, id * 3 + 3)
-      const v = state.velocities.slice(id * 3, id * 3 + 3)
-      this.#write(this.#module._engine_set_position(id, p[0], p[1], p[2]), 'position')
-      this.#write(this.#module._engine_set_velocity(id, v[0], v[1], v[2]), 'velocity')
-    }
+    this.#handles().forEach((handle, index) => {
+      const p = state.positions.slice(index * 3, index * 3 + 3)
+      const v = state.velocities.slice(index * 3, index * 3 + 3)
+      this.#write(this.#module._engine_set_position(handle, p[0], p[1], p[2]), 'position')
+      this.#write(this.#module._engine_set_velocity(handle, v[0], v[1], v[2]), 'velocity')
+    })
     this.#module._engine_set_tick(BigInt(state.tick))
     this.#accumulator = 0
+  }
+
+  markWarmup() {
+    this.#module._engine_mark_warmup()
+  }
+
+  allocationsSinceWarmup() {
+    return Number(this.#module._engine_allocations_since_warmup())
+  }
+
+  #handles() {
+    return [...this.#alive].sort(bySlot)
+  }
+
+  #gather(pointer) {
+    const handles = this.#handles()
+    const out = new Float64Array(handles.length * 3)
+    handles.forEach((handle, index) => out.set(this.#floats(pointer, (handle & SLOT_MASK) * 3, 3), index * 3))
+    return out
   }
 
   #floats(pointer, offset, length) {
@@ -152,8 +207,8 @@ export class EngineWorld {
     if (status !== ENGINE_OK) throw engineError(status, 'engine refused the ' + name)
   }
 
-  #checkId(id) {
-    if (!Number.isInteger(id) || id < 0 || id >= this.#count) throw new RangeError('no body with id ' + id)
+  #checkHandle(handle) {
+    if (!this.#alive.has(handle)) throw new RangeError('no body with id ' + handle)
   }
 }
 

@@ -33,6 +33,7 @@
     "check:engine-core": "node scripts/check-engine-core.mjs",
     "check:engine-world": "node scripts/check-engine-world.mjs",
     "check:engine-bridge": "node scripts/check-engine-bridge.mjs",
+    "check:engine-pools": "node scripts/check-engine-pools.mjs",
     "check:types": "tsc -p tsconfig.json",
     "bench": "node scripts/bench.mjs",
     "prepare": "npm run build:kernel",

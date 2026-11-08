@@ -65,7 +65,14 @@ set(ENGINE_EXPORTS
   _engine_transforms
   _engine_control
   _engine_inputs
-  _engine_events)
+  _engine_events
+  _engine_stage
+  _engine_stage_handles
+  _engine_spawn_batch
+  _engine_despawn
+  _engine_mark_warmup
+  _engine_allocations_since_warmup
+  _engine_allocations_total)
 string(JOIN "," ENGINE_EXPORT_LIST ${ENGINE_EXPORTS})
 
 target_link_options(engine_core PRIVATE
