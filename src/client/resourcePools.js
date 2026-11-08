@@ -7,7 +7,7 @@ const LIGHT_FIELDS = LIGHT_KEYS.length
 
 const whole = (value, name, min, max) => {
   if (!Number.isInteger(value) || value < min || value > max) {
-    throw new RangeError(name + ' must be a whole number from ' + min + ' to ' + max + ', got ' + String(value))
+    throw new RangeError(name + ' must be a whole number between ' + min + ' and ' + max + ', got ' + String(value))
   }
   return value
 }
