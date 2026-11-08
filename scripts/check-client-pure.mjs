@@ -1094,13 +1094,28 @@ gate('the pure source has no comments, only relative imports, and no browser or 
   assert(globals.test(stripStrings('const x = window.foo')) && !globals.test(stripStrings("const s = 'window'")), 'negative control: the scan must flag code and ignore string data')
 })
 
-gate('every module in src/client-pure is covered by this gate', () => {
+gate('every module in src/client-pure is covered by this gate or by the gate named for it', () => {
   const covered = new Set(['qualityGovernor', 'qualityTierChoice', 'qualityPresets', 'postFxSelection', 'frameMetrics', 'budgetControllers', 'cascadeShadow', 'shadowCostStats', 'lodBandPolicy', 'impostorTier', 'streamingScheduler', 'cullingHub', 'drawBands', 'touchSurfaceSpec', 'touchDraft', 'replayBuffer', 'groundNodeGrid', 'programReadiness', 'placementTickGate', 'editHistory', 'layerRegistry', 'hudStats'])
+  const coveredElsewhere = {
+    cacheRevalidationSweep: 'check-client-pure-rows.mjs',
+    clientMachine: 'check-client-machines.mjs',
+    exactPatchFrame: 'check-client-pure-rows.mjs',
+    inputActionCompile: 'check-client-machines.mjs',
+    inputStepper: 'check-client-machines.mjs',
+    keyBindings: 'check-client-pure-rows.mjs',
+    keybindingDefaults: 'check-client-pure-rows.mjs',
+    loadingMachine: 'check-client-machines.mjs',
+    stateValue: 'check-client-machines.mjs',
+    tileExtent: 'check-client-pure-rows.mjs',
+    transformLerp: 'check-client-pure-rows.mjs',
+  }
   const present = readdirSync(pureDir).filter(name => name.endsWith('.js')).map(name => name.slice(0, -3))
-  const missing = present.filter(name => !covered.has(name))
+  const missing = present.filter(name => !covered.has(name) && !(name in coveredElsewhere))
   const absent = [...covered].filter(name => !present.includes(name))
-  assert(missing.length === 0 && absent.length === 0, `uncovered ${missing.join(',')} absent ${absent.join(',')}`)
-  assert(covered.size === present.length && present.length === 22, 'negative control: the module count must be exactly the 22 ported files')
+  const unlinked = Object.entries(coveredElsewhere).filter(([name, gateFile]) => !readFileSync(join(here, gateFile), 'utf8').includes(name)).map(([name]) => name)
+  assert(missing.length === 0 && absent.length === 0 && unlinked.length === 0, `uncovered ${missing.join(',')} absent ${absent.join(',')} unlinked ${unlinked.join(',')}`)
+  const total = covered.size + Object.keys(coveredElsewhere).length
+  assert(total === present.length && present.length === 33, 'negative control: the module count must be exactly the 33 ported files')
 })
 
 finish()
