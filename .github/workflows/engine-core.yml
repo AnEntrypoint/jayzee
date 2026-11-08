@@ -34,7 +34,18 @@ jobs:
         run: bash engine/build.sh
       - name: Check the artifact hash and the memory witness
         run: node scripts/check-engine-core.mjs
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - name: Build the leak variant and check that its memory witness fails
+        run: |
+          set -euo pipefail
+          ENGINE_VARIANT=leak bash engine/build.sh
+          if node scripts/check-engine-core.mjs engine/out/engine-core-64mib-leak.mjs > leak-witness.log 2>&1; then
+            echo "the leak variant passed its memory witness"
+            exit 1
+          fi
+          grep -q 'FAIL memory.buffer.byteLength is unchanged' leak-witness.log
+          cat leak-witness.log
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: engine-core-64mib
           path: engine/out/engine-core-64mib.*
