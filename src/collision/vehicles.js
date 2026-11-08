@@ -157,9 +157,13 @@ export function createVehicleBackend(host) {
 
   function removeVehicle(vehicleId) {
     const v = vehicles.get(vehicleId); if (!v) return false
-    host.physicsSystem.RemoveStepListener(v.stepListener)
-    J.destroy(v.stepListener)
-    host.physicsSystem.RemoveConstraint(v.constraint)
+    try {
+      host.physicsSystem.RemoveStepListener(v.stepListener)
+      J.destroy(v.stepListener)
+      host.physicsSystem.RemoveConstraint(v.constraint)
+    } catch (error) {
+      console.error('[physics] removeVehicle cleanup error:', error?.message || error)
+    }
     vehicles.delete(vehicleId)
     return true
   }
