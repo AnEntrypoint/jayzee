@@ -1,0 +1,27 @@
+{
+  "source": {
+    "commit": "1fafe75",
+    "files": [
+      "client/core/Bloom.js"
+    ],
+    "sha256": {
+      "client/core/Bloom.js": "49421ba0d716c0f19e49a28b253a2744e6e42dacffab81b17a0ef3f47bfc7c7a"
+    }
+  },
+  "controls": {
+    "bloom": false,
+    "bloomThreshold": 1,
+    "bloomIntensity": 1.2,
+    "bloomResolutionScale": 0.5,
+    "bloomBlurPasses": 1
+  },
+  "rows": [
+    "{\"label\":s:\"the threshold, blur and composite materials start with the spoint uniforms\",\"value\":{\"blur\":{\"tSource\":null,\"uDirection\":[n:0,n:0]},\"composite\":{\"tBloom\":null,\"uIntensity\":n:1.2},\"threshold\":{\"tScene\":null,\"uKnee\":n:0.15,\"uThreshold\":n:1}}}",
+    "{\"label\":s:\"compute copies the frame, thresholds it into a half-size target and blurs it in each pass\",\"value\":[[s:\"copy\",n:640,n:360],[s:\"setRenderTarget\",[n:320,n:180]],[s:\"render\",[n:320,n:180],{\"tScene\":{\"texture\":[n:640,n:360]},\"uKnee\":n:0.15,\"uThreshold\":n:1},b:true],[s:\"setRenderTarget\",[n:320,n:180]],[s:\"render\",[n:320,n:180],{\"tSource\":{\"texture\":[n:320,n:180]},\"uDirection\":[n:0.003125,n:0]},b:true],[s:\"setRenderTarget\",[n:320,n:180]],[s:\"render\",[n:320,n:180],{\"tSource\":{\"texture\":[n:320,n:180]},\"uDirection\":[n:0,n:0.005555555555555556]},b:true],[s:\"setRenderTarget\",null]]}",
+    "{\"label\":s:\"composite adds the bloom texture with its intensity and does not clear the canvas\",\"value\":[[s:\"render\",s:\"canvas\",{\"tBloom\":{\"texture\":[n:320,n:180]},\"uIntensity\":n:1.2},b:false]]}",
+    "{\"label\":s:\"a resize rebuilds the half-size targets and runs the same passes\",\"value\":[[s:\"copy\",n:320,n:180],[s:\"setRenderTarget\",[n:160,n:90]],[s:\"render\",[n:160,n:90],{\"tScene\":{\"texture\":[n:320,n:180]},\"uKnee\":n:0.15,\"uThreshold\":n:1},b:true],[s:\"setRenderTarget\",[n:160,n:90]],[s:\"render\",[n:160,n:90],{\"tSource\":{\"texture\":[n:160,n:90]},\"uDirection\":[n:0.00625,n:0]},b:true],[s:\"setRenderTarget\",[n:160,n:90]],[s:\"render\",[n:160,n:90],{\"tSource\":{\"texture\":[n:160,n:90]},\"uDirection\":[n:0,n:0.011111111111111112]},b:true],[s:\"setRenderTarget\",null]]}",
+    "{\"label\":s:\"dispose leaves the bloom size at the last target\",\"value\":{\"h\":n:90,\"logged\":n:0,\"w\":n:160}}",
+    "{\"label\":s:\"the bloom graph nodes are named, ordered and read from their inputs\",\"value\":[{\"id\":s:\"bloom-compute\",\"idleShouldRun\":b:false,\"reads\":[s:\"sceneColor\"],\"targets\":null,\"writes\":[s:\"bloomComputed\"]},{\"id\":s:\"bloom-composite\",\"idleShouldRun\":b:false,\"reads\":[s:\"bloomComputed\",s:\"ssaoComposited\"],\"targets\":{\"bloomComposited\":s:\"canvas\"},\"writes\":[s:\"bloomComposited\"]}]}",
+    "{\"label\":s:\"the composite node waits for the bloom compute of the same frame\",\"value\":[{\"computedShouldRun\":b:false,\"id\":s:\"bloom-compute\"},{\"computedShouldRun\":b:false,\"id\":s:\"bloom-composite\"}]}"
+  ]
+}
