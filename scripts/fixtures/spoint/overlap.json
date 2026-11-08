@@ -1,0 +1,36 @@
+{
+  "source": {
+    "file": "src/physics/World.js",
+    "sha256": "2c978302c0fa894b8168e0e1ad8242a5bd5e70c0ee571274b22e4815197e1d3e",
+    "joltPhysics": "1.1.0",
+    "api": "NarrowPhaseQuery.CollideShape on the spoint PhysicsWorld Jolt system, as spoint has no overlap query"
+  },
+  "labels": [
+    "sphere at the origin reaches the sphere and the floor",
+    "sphere above box A overlaps its top only",
+    "sphere touching the top of box A from above",
+    "sphere far from the scene hits nothing",
+    "sphere with the floor excluded keeps only the sphere",
+    "sphere with an unknown id excluded changes nothing",
+    "box around box B hits box B only",
+    "box spanning the floor top hits the floor and the sphere",
+    "box touching the x face of box A",
+    "box over box A with box A excluded hits nothing",
+    "box far from the scene hits nothing",
+    "box lying on the floor hits the floor"
+  ],
+  "rows": [
+    "{\"label\":s:\"sphere at the origin reaches the sphere and the floor\",\"value\":[n:8388608,n:8388611]}",
+    "{\"label\":s:\"sphere above box A overlaps its top only\",\"value\":[n:8388609]}",
+    "{\"label\":s:\"sphere touching the top of box A from above\",\"value\":[n:8388609]}",
+    "{\"label\":s:\"sphere far from the scene hits nothing\",\"value\":[]}",
+    "{\"label\":s:\"sphere with the floor excluded keeps only the sphere\",\"value\":[n:8388611]}",
+    "{\"label\":s:\"sphere with an unknown id excluded changes nothing\",\"value\":[n:8388608,n:8388611]}",
+    "{\"label\":s:\"box around box B hits box B only\",\"value\":[n:8388608,n:8388610]}",
+    "{\"label\":s:\"box spanning the floor top hits the floor and the sphere\",\"value\":[n:8388608,n:8388611]}",
+    "{\"label\":s:\"box touching the x face of box A\",\"value\":[n:8388608]}",
+    "{\"label\":s:\"box over box A with box A excluded hits nothing\",\"value\":[]}",
+    "{\"label\":s:\"box far from the scene hits nothing\",\"value\":[]}",
+    "{\"label\":s:\"box lying on the floor hits the floor\",\"value\":[n:8388608]}"
+  ]
+}

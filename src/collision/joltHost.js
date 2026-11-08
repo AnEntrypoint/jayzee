@@ -74,6 +74,8 @@ export async function createJoltHost({ gravity = [0, -9.81, 0], joltLimits = nul
     forgetStaticTile,
     repositionBody,
     castRay,
+    overlapSphere,
+    overlapBox,
     boundsOf,
     get dormantStatics() {
       if (!dormant) dormant = createDormantStatics(host)
@@ -193,6 +195,49 @@ export async function createJoltHost({ gravity = [0, -9.81, 0], joltLimits = nul
       if (reach < (result.hit ? result.distance : maxDistance)) return { hit: false, distance: maxDistance, bodyId: null, normal: null, position: null, unavailable: 'static-colliders-migrating' }
     }
     return result
+  }
+
+  function refuseWhileMigrating() {
+    if (dormant && dormant.pendingCount > 0) {
+      const error = new Error('static colliders are migrating, so an overlap answer would miss them')
+      error.code = 'static-colliders-migrating'
+      throw error
+    }
+  }
+
+  function collideShape(shape, centre, excludeBodyId) {
+    const hits = []
+    const collector = new J.CollideShapeCollectorJS()
+    collector.OnBody = () => {}
+    collector.AddHit = (ptr) => { hits.push(J.wrapPointer(ptr, J.CollideShapeResult).get_mBodyID2().GetIndexAndSequenceNumber()) }
+    const settings = new J.CollideShapeSettings()
+    const scale = new J.Vec3(1, 1, 1)
+    const base = new J.RVec3(0, 0, 0)
+    const xf = J.RMat44.prototype.sTranslation(new J.Vec3(centre[0], centre[1], centre[2]))
+    const filter = ignoreFilter(excludeBodyId)
+    physicsSystem.GetNarrowPhaseQuery().CollideShape(shape, scale, xf, settings, base, collector, broadPhaseFilter, objectLayerFilter, filter, shapeFilter)
+    if (filter !== bodyFilter) J.destroy(filter)
+    for (const v of [settings, scale, base, xf, collector, shape]) J.destroy(v)
+    return hits.sort((a, b) => a - b)
+  }
+
+  function overlapSphere(centre, radius, excludeBodyId = null) {
+    if (!(Number.isFinite(radius) && radius > 0)) throw new TypeError('overlapSphere needs a positive finite radius, got ' + radius)
+    refuseWhileMigrating()
+    return collideShape(new J.SphereShape(radius), centre, excludeBodyId)
+  }
+
+  function overlapBox(min, max, excludeBodyId = null) {
+    for (let k = 0; k < 3; k++) {
+      if (!(Number.isFinite(min[k]) && Number.isFinite(max[k]) && max[k] > min[k])) throw new TypeError('overlapBox needs finite min and max with max above min on every axis')
+    }
+    refuseWhileMigrating()
+    const half = [0, 1, 2].map((k) => (max[k] - min[k]) / 2)
+    const centre = [0, 1, 2].map((k) => (min[k] + max[k]) / 2)
+    const hv = new J.Vec3(half[0], half[1], half[2])
+    const shape = new J.BoxShape(hv, Math.min(0.05, Math.min(...half) * 0.1), null)
+    J.destroy(hv)
+    return collideShape(shape, centre, excludeBodyId)
   }
 
   function forgetStaticTile(id) {
