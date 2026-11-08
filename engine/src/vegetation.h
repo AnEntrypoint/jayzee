@@ -1,15 +1,14 @@
 #ifndef ENGINE_VEGETATION_H
 #define ENGINE_VEGETATION_H
 
+#include <cstddef>
 #include <cstdint>
 
 #include "surface_shape.h"
 
 namespace engine::vegetation {
 
-constexpr int kCellsPerSide = 32;
-constexpr int kCells = kCellsPerSide * kCellsPerSide;
-constexpr int kInstancesPerCell = 32;
+constexpr std::uint32_t kMaxInstances = 1u << 22;
 constexpr std::uint32_t kClassTrunk = 0;
 constexpr std::uint32_t kClassRock = 1;
 constexpr std::uint32_t kClassPass = 2;
@@ -26,19 +25,19 @@ struct Instance {
   std::uint32_t cls;
 };
 
-struct Cell {
-  std::uint32_t count;
-  Instance instances[kInstancesPerCell];
-};
-
 struct Field {
   float origin = 0.0f;
   float cellSize = 0.0f;
   bool configured = false;
   std::uint64_t placed = 0;
-  Cell cells[kCells];
+  std::uint32_t cellsPerSide = 0;
+  std::uint32_t instancesPerCell = 0;
+  std::uint32_t* counts = nullptr;
+  Instance* instances = nullptr;
 };
 
+std::size_t bytesFor(std::uint32_t cellsPerSide, std::uint32_t instancesPerCell);
+Field* bind(void* base, std::uint32_t cellsPerSide, std::uint32_t instancesPerCell);
 Field& state();
 bool configure(Field& field, float origin, float cellSize);
 int place(Field& field, float x, float y, float z, float yaw, float scale, std::uint32_t cls);
@@ -48,8 +47,14 @@ void registerCollisions();
 class VegetationShape final : public SurfaceShape {
  public:
   VegetationShape();
+  explicit VegetationShape(Field& field);
 
   JPH::AABox GetLocalBounds() const override;
+
+  const Field& field() const { return field_; }
+
+ private:
+  Field& field_;
 };
 
 }

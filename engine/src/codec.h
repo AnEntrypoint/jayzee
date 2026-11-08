@@ -10,12 +10,14 @@ constexpr std::size_t kEntityBytes = 29;
 constexpr std::size_t kPlayerBytes = 22;
 constexpr std::size_t kScratchBytes = 4096;
 constexpr std::size_t kScratchValues = 8192;
+constexpr std::size_t kScratchCounts = 4;
 constexpr int kInputVersion = 1;
 constexpr int kMaxInputRecords = 255;
 constexpr std::size_t kInputHeaderBytes = 2;
 constexpr std::size_t kInputRecordBytes = 12;
 constexpr std::size_t kInputRecordValues = 5;
 
+bool encodeEntityInto(const double* position, const double* velocity, double rotationWord, const double* scale, double flags, std::uint8_t* out);
 bool encodeEntity(const double* position, const double* velocity, double rotationWord, const double* scale, double flags, std::uint8_t* out);
 bool decodeEntity(const std::uint8_t* in, std::size_t length, double* position, double* velocity, double& rotationWord, double* scale,
                   double& flags);
@@ -65,6 +67,16 @@ struct PacketSchema {
 int encodePacket(const PacketSchema& schema, const double* entries, int count, double chartEpoch, std::uint8_t* out, std::int32_t* counts);
 int decodePacket(const PacketSchema& schema, const std::uint8_t* in, std::size_t length, bool dropping, std::uint32_t dropAtOrBelow,
                  double* entries, std::uint32_t& chartEpoch);
+
+struct Scratch {
+  std::uint8_t* bytes;
+  double* values;
+  std::int32_t* counts;
+  std::uint32_t packetEpoch;
+
+  static std::size_t bytesFor();
+  static Scratch* bind(void* base);
+};
 
 }
 

@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <new>
 
 namespace engine::codec {
 
@@ -110,16 +111,39 @@ bool yawSteps(double yaw, std::uint32_t& out) {
 
 }
 
-bool encodeEntity(const double* position, const double* velocity, double rotationWord, const double* scale, double flags, std::uint8_t* out) {
-  if (!writeKinematics(out, position, velocity, rotationWord)) return false;
+namespace {
+
+bool entityFieldsValid(const double* position, const double* velocity, double rotationWord, const double* scale, double flags) {
+  std::int64_t units = 0;
+  for (int axis = 0; axis < 3; ++axis) {
+    if (!quantize(position[axis], -kPositionLimit, kPositionLimit, units)) return false;
+  }
+  for (int axis = 0; axis < 3; ++axis) {
+    if (!quantize(velocity[axis], -kVelocityLimit, kVelocityLimit, units)) return false;
+  }
+  if (!isUnsigned32(rotationWord)) return false;
+  for (int axis = 0; axis < 3; ++axis) {
+    if (!quantize(scale[axis], 0.0, kScaleLimit, units)) return false;
+  }
+  return flags >= 0.0 && flags <= 255.0 && std::floor(flags) == flags;
+}
+
+}
+
+bool encodeEntityInto(const double* position, const double* velocity, double rotationWord, const double* scale, double flags, std::uint8_t* out) {
+  if (!entityFieldsValid(position, velocity, rotationWord, scale, flags)) return false;
+  writeKinematics(out, position, velocity, rotationWord);
   for (int axis = 0; axis < 3; ++axis) {
     std::int64_t units = 0;
-    if (!quantize(scale[axis], 0.0, kScaleLimit, units)) return false;
+    quantize(scale[axis], 0.0, kScaleLimit, units);
     writeU16(out, kScaleAt[axis], static_cast<std::uint32_t>(units));
   }
-  if (!(flags >= 0.0 && flags <= 255.0) || std::floor(flags) != flags) return false;
   out[kFlagsAt] = static_cast<std::uint8_t>(flags);
   return true;
+}
+
+bool encodeEntity(const double* position, const double* velocity, double rotationWord, const double* scale, double flags, std::uint8_t* out) {
+  return encodeEntityInto(position, velocity, rotationWord, scale, flags, out);
 }
 
 bool decodeEntity(const std::uint8_t* in, std::size_t length, double* position, double* velocity, double& rotationWord, double* scale,
@@ -420,6 +444,46 @@ int decodePacket(const PacketSchema& schema, const std::uint8_t* in, std::size_t
   }
   if (off != length) return reject(InputCase::Trailing);
   return kept;
+}
+
+
+namespace {
+
+constexpr std::size_t kScratchAlign = 16;
+constexpr std::size_t kScratchWordAlign = 8;
+
+std::size_t alignScratch(std::size_t value, std::size_t align) {
+  return (value + align - 1) / align * align;
+}
+
+std::size_t scratchBytesAt() {
+  return alignScratch(sizeof(Scratch), kScratchWordAlign);
+}
+
+std::size_t scratchValuesAt() {
+  return alignScratch(scratchBytesAt() + kScratchBytes, kScratchWordAlign);
+}
+
+std::size_t scratchCountsAt() {
+  return scratchValuesAt() + kScratchValues * sizeof(double);
+}
+
+}
+
+std::size_t Scratch::bytesFor() {
+  return alignScratch(scratchCountsAt() + kScratchCounts * sizeof(std::int32_t), kScratchAlign);
+}
+
+Scratch* Scratch::bind(void* base) {
+  if (base == nullptr) return nullptr;
+  std::memset(base, 0, bytesFor());
+  std::uint8_t* raw = static_cast<std::uint8_t*>(base);
+  Scratch* scratch = new (base) Scratch();
+  scratch->bytes = raw + scratchBytesAt();
+  scratch->values = reinterpret_cast<double*>(raw + scratchValuesAt());
+  scratch->counts = reinterpret_cast<std::int32_t*>(raw + scratchCountsAt());
+  scratch->packetEpoch = 0;
+  return scratch;
 }
 
 }

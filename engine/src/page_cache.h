@@ -1,33 +1,38 @@
 #ifndef ENGINE_PAGE_CACHE_H
 #define ENGINE_PAGE_CACHE_H
 
+#include <cstddef>
 #include <cstdint>
 
 namespace engine::planet {
 
-constexpr int kPageSlots = 64;
 constexpr int kPageSide = 16;
 constexpr int kPageSamples = kPageSide * kPageSide;
+constexpr std::uint32_t kMaxPageSlots = 1u << 16;
 
 enum class PageState : std::uint8_t { kFree, kStaged, kPendingCommit, kResident, kPendingRelease };
 
 class PageCache {
  public:
+  static std::size_t bytesFor(std::uint32_t pageSlots);
+  bool bind(void* base, std::uint32_t pageSlots);
   void clear();
   int stage(std::int64_t key);
   float* samples(int slot);
-  const float* samplesAt(int slot) const;
+  const float* pageSamples(int slot) const;
   bool commit(int slot);
   bool releaseKey(std::int64_t key);
   void applyPending();
   int lookup(std::int64_t key) const;
   int residentCount() const;
+  int pageSlotCount() const;
   PageState state(int slot) const;
 
  private:
-  alignas(16) float samples_[kPageSlots][kPageSamples];
-  std::int64_t keys_[kPageSlots];
-  PageState states_[kPageSlots];
+  float* samples_ = nullptr;
+  std::int64_t* keys_ = nullptr;
+  PageState* states_ = nullptr;
+  int slots_ = 0;
 };
 
 }

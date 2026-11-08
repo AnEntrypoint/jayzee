@@ -1,24 +1,58 @@
 #include "page_cache.h"
 
+#include <cstring>
+
 namespace engine::planet {
 
 namespace {
 
-bool inRange(int slot) {
-  return slot >= 0 && slot < kPageSlots;
+constexpr std::size_t kAlign = 16;
+
+std::size_t alignUp(std::size_t value) {
+  return (value + kAlign - 1) / kAlign * kAlign;
+}
+
+}
+
+std::size_t PageCache::bytesFor(std::uint32_t pageSlots) {
+  if (pageSlots == 0 || pageSlots > kMaxPageSlots) return 0;
+  const std::size_t count = pageSlots;
+  const std::size_t keysAt = count * kPageSamples * sizeof(float);
+  const std::size_t statesAt = keysAt + count * sizeof(std::int64_t);
+  return alignUp(statesAt + count * sizeof(PageState));
+}
+
+bool PageCache::bind(void* base, std::uint32_t pageSlots) {
+  const std::size_t total = bytesFor(pageSlots);
+  if (base == nullptr || total == 0) return false;
+  std::memset(base, 0, total);
+  std::uint8_t* raw = static_cast<std::uint8_t*>(base);
+  const std::size_t count = pageSlots;
+  samples_ = reinterpret_cast<float*>(raw);
+  keys_ = reinterpret_cast<std::int64_t*>(raw + count * kPageSamples * sizeof(float));
+  states_ = reinterpret_cast<PageState*>(raw + count * kPageSamples * sizeof(float) + count * sizeof(std::int64_t));
+  slots_ = static_cast<int>(pageSlots);
+  clear();
+  return true;
+}
+
+namespace {
+
+bool inRange(int slot, int slots) {
+  return slot >= 0 && slot < slots;
 }
 
 }
 
 void PageCache::clear() {
-  for (int slot = 0; slot < kPageSlots; ++slot) {
+  for (int slot = 0; slot < slots_; ++slot) {
     states_[slot] = PageState::kFree;
     keys_[slot] = 0;
   }
 }
 
 int PageCache::stage(std::int64_t key) {
-  for (int slot = 0; slot < kPageSlots; ++slot) {
+  for (int slot = 0; slot < slots_; ++slot) {
     if (states_[slot] == PageState::kFree) {
       states_[slot] = PageState::kStaged;
       keys_[slot] = key;
@@ -29,15 +63,15 @@ int PageCache::stage(std::int64_t key) {
 }
 
 float* PageCache::samples(int slot) {
-  return inRange(slot) ? samples_[slot] : nullptr;
+  return inRange(slot, slots_) ? samples_ + static_cast<std::size_t>(slot) * kPageSamples : nullptr;
 }
 
-const float* PageCache::samplesAt(int slot) const {
-  return samples_[slot];
+const float* PageCache::pageSamples(int slot) const {
+  return inRange(slot, slots_) ? samples_ + static_cast<std::size_t>(slot) * kPageSamples : nullptr;
 }
 
 bool PageCache::commit(int slot) {
-  if (!inRange(slot) || states_[slot] != PageState::kStaged) return false;
+  if (!inRange(slot, slots_) || states_[slot] != PageState::kStaged) return false;
   states_[slot] = PageState::kPendingCommit;
   return true;
 }
@@ -50,12 +84,12 @@ bool PageCache::releaseKey(std::int64_t key) {
 }
 
 void PageCache::applyPending() {
-  for (int slot = 0; slot < kPageSlots; ++slot) {
+  for (int slot = 0; slot < slots_; ++slot) {
     if (states_[slot] == PageState::kPendingRelease) states_[slot] = PageState::kFree;
   }
-  for (int slot = 0; slot < kPageSlots; ++slot) {
+  for (int slot = 0; slot < slots_; ++slot) {
     if (states_[slot] != PageState::kPendingCommit) continue;
-    for (int other = 0; other < kPageSlots; ++other) {
+    for (int other = 0; other < slots_; ++other) {
       if (other != slot && states_[other] == PageState::kResident && keys_[other] == keys_[slot]) {
         states_[other] = PageState::kFree;
       }
@@ -65,7 +99,7 @@ void PageCache::applyPending() {
 }
 
 int PageCache::lookup(std::int64_t key) const {
-  for (int slot = 0; slot < kPageSlots; ++slot) {
+  for (int slot = 0; slot < slots_; ++slot) {
     const PageState state = states_[slot];
     if ((state == PageState::kResident || state == PageState::kPendingRelease) && keys_[slot] == key) return slot;
   }
@@ -74,14 +108,18 @@ int PageCache::lookup(std::int64_t key) const {
 
 int PageCache::residentCount() const {
   int count = 0;
-  for (int slot = 0; slot < kPageSlots; ++slot) {
+  for (int slot = 0; slot < slots_; ++slot) {
     if (states_[slot] == PageState::kResident || states_[slot] == PageState::kPendingRelease) count += 1;
   }
   return count;
 }
 
+int PageCache::pageSlotCount() const {
+  return slots_;
+}
+
 PageState PageCache::state(int slot) const {
-  return inRange(slot) ? states_[slot] : PageState::kFree;
+  return inRange(slot, slots_) ? states_[slot] : PageState::kFree;
 }
 
 }

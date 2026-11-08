@@ -2,7 +2,9 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 #include <limits>
+#include <new>
 
 namespace engine::planet {
 
@@ -76,11 +78,35 @@ double clampUnit(double value) {
   return std::clamp(value, 0.0, 1.0);
 }
 
+constexpr std::size_t kAlign = 16;
+
+std::size_t alignUp(std::size_t value) {
+  return (value + kAlign - 1) / kAlign * kAlign;
+}
+
+Planet* bound = nullptr;
+
+}
+
+std::size_t bytesFor(std::uint32_t pageSlots) {
+  const std::size_t pages = PageCache::bytesFor(pageSlots);
+  if (pages == 0) return 0;
+  return alignUp(sizeof(Planet)) + pages;
+}
+
+Planet* bind(void* base, std::uint32_t pageSlots) {
+  if (bound != nullptr) return nullptr;
+  const std::size_t total = bytesFor(pageSlots);
+  if (base == nullptr || total == 0) return nullptr;
+  std::memset(base, 0, total);
+  Planet* terrain = new (base) Planet();
+  if (!terrain->pages.bind(static_cast<std::uint8_t*>(base) + alignUp(sizeof(Planet)), pageSlots)) return nullptr;
+  bound = terrain;
+  return terrain;
 }
 
 Planet& state() {
-  static Planet instance;
-  return instance;
+  return *bound;
 }
 
 bool configure(Planet& terrain, double radius, double cellSize, double maxHeight) {
@@ -182,7 +208,7 @@ double heightAt(Planet& terrain, double x, double y, double z) {
   const int j0 = std::min(static_cast<int>(gy), kPageSide - 2);
   const double tx = gx - i0;
   const double ty = gy - j0;
-  const float* s = terrain.pages.samplesAt(slot);
+  const float* s = terrain.pages.pageSamples(slot);
   const double s00 = s[j0 * kPageSide + i0];
   const double s10 = s[j0 * kPageSide + i0 + 1];
   const double s01 = s[(j0 + 1) * kPageSide + i0];

@@ -3,12 +3,11 @@
 
 #include <cstdint>
 
+#include "budget.h"
 #include "world.h"
 
 namespace engine::bridge {
 
-constexpr std::uint32_t kInputSlots = 256;
-constexpr std::uint32_t kEventSlots = 256;
 constexpr std::uint32_t kControlWords = 16;
 
 enum ControlWord : std::uint32_t {
@@ -48,9 +47,12 @@ static_assert(sizeof(InputSlot) == 20);
 static_assert(sizeof(EventSlot) == 16);
 static_assert(sizeof(Transform) == 28);
 
+Status bind(const budget::Capacity& capacity);
 std::uint32_t* controlWords();
 InputSlot* inputSlots();
 EventSlot* eventSlots();
+std::uint32_t inputSlotCount();
+std::uint32_t eventSlotCount();
 void tickBatch(std::uint32_t steps);
 
 }

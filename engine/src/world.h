@@ -3,17 +3,29 @@
 
 #include <cstdint>
 
+#include "budget.h"
+
 namespace engine {
 
-constexpr std::uint32_t kMaxBodies = 4096;
-constexpr std::uint32_t kMaxStatics = 64;
-constexpr std::uint32_t kMaxLegacyTrunks = 1024;
 constexpr std::uint32_t kMaxIterations = 32;
 constexpr std::uint32_t kSlotMask = 0xffffu;
 constexpr std::uint32_t kBatchFloats = 6;
 constexpr std::uint32_t kNoBody = 0xffffffffu;
 constexpr std::uint16_t kLastGeneration = 0xfffeu;
 constexpr std::uint16_t kRetiredGeneration = 0xffffu;
+constexpr std::uint32_t kFixedJoltBodies = 3;
+
+constexpr std::uint32_t joltBodyCapacity(const budget::Capacity& c) {
+  return c.bodies + c.statics + c.trunks + kFixedJoltBodies;
+}
+
+constexpr std::uint32_t joltPairCapacity(const budget::Capacity& c) {
+  return c.bodies * 4;
+}
+
+constexpr std::uint32_t joltContactCapacity(const budget::Capacity& c) {
+  return c.bodies * 5 / 2;
+}
 
 enum Status : int {
   kOk = 0,
@@ -23,6 +35,7 @@ enum Status : int {
   kBadId = -4,
   kTooManyStatics = -5,
   kZeroThickness = -6,
+  kAlreadyInitialized = -7,
 };
 
 struct Config {
@@ -60,6 +73,7 @@ class World {
 
   static Status initialize();
 
+  Status bind(const budget::Capacity& capacity);
   Status configure(const Config& config);
   Status addBox(const float* box);
   Status configurePlanet(double radius, double cellSize, double gravity, double maxHeight);
@@ -75,9 +89,11 @@ class World {
   void applyRadialGravity(float dt);
 
   std::uint32_t count() const { return live_; }
+  std::uint32_t slotExtent() const { return fresh_; }
   std::uint32_t retiredSlots() const { return retired_; }
   std::uint32_t physicsBodies() const;
   std::uint64_t tick() const { return tick_; }
+  std::uint32_t bodyCapacity() const { return limits_.bodies; }
   const double* positions() const { return positions_; }
   const double* velocities() const { return velocities_; }
   const Transform* transforms() const { return transforms_; }
@@ -89,8 +105,10 @@ class World {
   int allocateSlot();
   void sync(std::uint32_t slot);
   void removeBody(std::uint32_t index);
+  void releaseRuntime();
 
   Runtime* runtime_ = nullptr;
+  budget::Capacity limits_{};
   std::uint32_t capacity_ = 0;
   std::uint32_t statics_ = 0;
   std::uint32_t live_ = 0;
@@ -106,13 +124,14 @@ class World {
   std::uint32_t vegetationBody_ = kNoBody;
   std::uint32_t trunkBodies_ = 0;
   std::uint64_t tick_ = 0;
-  std::uint32_t bodyIds_[kMaxBodies];
-  std::uint32_t freeSlots_[kMaxBodies];
-  std::uint16_t generations_[kMaxBodies];
-  std::uint8_t alive_[kMaxBodies];
-  alignas(8) double positions_[kMaxBodies * 3];
-  alignas(8) double velocities_[kMaxBodies * 3];
-  Transform transforms_[kMaxBodies];
+  std::uint32_t* bodyIds_ = nullptr;
+  std::uint32_t* batch_ = nullptr;
+  std::uint32_t* freeSlots_ = nullptr;
+  std::uint16_t* generations_ = nullptr;
+  std::uint8_t* alive_ = nullptr;
+  double* positions_ = nullptr;
+  double* velocities_ = nullptr;
+  Transform* transforms_ = nullptr;
 };
 
 World& world();

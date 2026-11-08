@@ -2,6 +2,9 @@
 
 #include <Jolt/Core/Factory.h>
 #include <Jolt/Core/JobSystemSingleThreaded.h>
+#if defined(ENGINE_THREADS)
+#include <Jolt/Core/JobSystemThreadPool.h>
+#endif
 #include <Jolt/Core/TempAllocator.h>
 #include <Jolt/Physics/Body/BodyCreationSettings.h>
 #include <Jolt/Physics/Body/BodyInterface.h>
@@ -15,11 +18,12 @@
 #include <Jolt/RegisterTypes.h>
 
 #include <algorithm>
-#include <cstdlib>
-#include <cstring>
+#include <new>
 
+#include "arena.h"
 #include "planet_frame.h"
 #include "planet_shape.h"
+#include "pool_alloc.h"
 #include "vegetation.h"
 #include "world.h"
 
@@ -29,104 +33,23 @@ namespace {
 
 constexpr JPH::ObjectLayer kLayerNonMoving = 0;
 constexpr JPH::ObjectLayer kLayerMoving = 1;
-constexpr JPH::uint kTempBytes = 16 * 1024 * 1024;
-constexpr JPH::uint kMaxBodyPairs = 16384;
-constexpr JPH::uint kMaxContactConstraints = 10240;
 constexpr float kGroundHalfExtent = 4096.0f;
 constexpr float kConvexRadius = 0.05f;
 
 bool joltReady = false;
-std::uint64_t allocations = 0;
 std::uint64_t warmupBase = 0;
 
 void silentTrace(const char*, ...) {}
 
-constexpr std::size_t kBlockHeader = 16;
-constexpr std::uint32_t kMinBlockClass = 5;
-constexpr std::uint32_t kMaxBlockClass = 16;
-constexpr std::uint32_t kUnpooledClass = 0;
-void* blockFreeLists[kMaxBlockClass + 1];
+static_assert(sizeof(JPH::BodyID) == sizeof(std::uint32_t));
 
-std::uint32_t blockClassOf(std::size_t bytes) {
-  std::uint32_t c = kMinBlockClass;
-  while (c <= kMaxBlockClass && (std::size_t(1) << c) < bytes) c += 1;
-  return c > kMaxBlockClass ? kUnpooledClass : c;
+JPH::BodyID* asBodyIds(std::uint32_t* raw) {
+  return reinterpret_cast<JPH::BodyID*>(raw);
 }
 
-char* takeBlock(std::size_t bytes) {
-  const std::uint32_t c = blockClassOf(bytes + kBlockHeader);
-  char* raw = nullptr;
-  if (c != kUnpooledClass && blockFreeLists[c] != nullptr) {
-    raw = static_cast<char*>(blockFreeLists[c]);
-    blockFreeLists[c] = *reinterpret_cast<void**>(raw + kBlockHeader);
-  } else {
-    const std::size_t total = c == kUnpooledClass ? bytes + kBlockHeader : std::size_t(1) << c;
-    raw = static_cast<char*>(std::malloc(total));
-    if (raw == nullptr) return nullptr;
-    allocations += 1;
-  }
-  *reinterpret_cast<std::uint32_t*>(raw) = c;
-  *reinterpret_cast<std::uint64_t*>(raw + 8) = bytes;
-  return raw;
-}
-
-void releaseBlock(char* raw) {
-  const std::uint32_t c = *reinterpret_cast<std::uint32_t*>(raw);
-  if (c == kUnpooledClass) {
-    std::free(raw);
-    return;
-  }
-  *reinterpret_cast<void**>(raw + kBlockHeader) = blockFreeLists[c];
-  blockFreeLists[c] = raw;
-}
-
-void primeBlockPools() {
-  constexpr std::uint32_t kPrimedBlocksPerClass = 8;
-  for (std::uint32_t c = kMinBlockClass; c <= kMaxBlockClass; ++c) {
-    for (std::uint32_t i = 0; i < kPrimedBlocksPerClass; ++i) {
-      char* raw = static_cast<char*>(std::malloc(std::size_t(1) << c));
-      if (raw == nullptr) return;
-      allocations += 1;
-      *reinterpret_cast<std::uint32_t*>(raw) = c;
-      releaseBlock(raw);
-    }
-  }
-}
-
-void* countedAllocate(std::size_t size) {
-  char* raw = takeBlock(size);
-  return raw == nullptr ? nullptr : raw + kBlockHeader;
-}
-
-void* countedReallocate(void* block, std::size_t, std::size_t newSize) {
-  if (block == nullptr) return countedAllocate(newSize);
-  char* raw = static_cast<char*>(block) - kBlockHeader;
-  const std::size_t previous = *reinterpret_cast<std::uint64_t*>(raw + 8);
-  void* next = countedAllocate(newSize);
-  if (next == nullptr) return nullptr;
-  std::memcpy(next, block, std::min(previous, newSize));
-  releaseBlock(raw);
-  return next;
-}
-
-void countedFree(void* block) {
-  if (block == nullptr) return;
-  releaseBlock(static_cast<char*>(block) - kBlockHeader);
-}
-
-void* countedAlignedAllocate(std::size_t size, std::size_t alignment) {
-  constexpr std::size_t pointer = sizeof(void*);
-  char* raw = takeBlock(size + alignment + pointer);
-  if (raw == nullptr) return nullptr;
-  const std::uintptr_t start = reinterpret_cast<std::uintptr_t>(raw) + kBlockHeader + pointer;
-  const std::uintptr_t aligned = (start + alignment - 1) & ~(static_cast<std::uintptr_t>(alignment) - 1);
-  reinterpret_cast<void**>(aligned)[-1] = raw;
-  return reinterpret_cast<void*>(aligned);
-}
-
-void countedAlignedFree(void* block) {
-  if (block == nullptr) return;
-  releaseBlock(static_cast<char*>(reinterpret_cast<void**>(block)[-1]));
+template <typename T>
+T* carveArray(std::size_t count) {
+  return static_cast<T*>(arena::carve(sizeof(T) * count, alignof(T)));
 }
 
 class BroadPhaseLayers final : public JPH::BroadPhaseLayerInterface {
@@ -181,45 +104,58 @@ class RadialGravity final : public JPH::PhysicsStepListener {
 }
 
 struct World::Runtime {
-  explicit Runtime(World& owner) : gravity(owner) {}
+  Runtime(World& owner, std::uint64_t tempBytes, std::uint32_t workers)
+      : temp(static_cast<std::size_t>(tempBytes)),
+#if defined(ENGINE_THREADS)
+        jobs(JPH::cMaxPhysicsJobs, JPH::cMaxPhysicsBarriers, static_cast<int>(workers) - 1),
+#else
+        jobs(JPH::cMaxPhysicsJobs),
+#endif
+        gravity(owner) {}
 
   BroadPhaseLayers broadPhase;
   ObjectVsBroadPhase objectVsBroadPhase;
   ObjectPairs objectPairs;
-  JPH::TempAllocatorImpl temp{kTempBytes};
-  JPH::JobSystemSingleThreaded jobs{JPH::cMaxPhysicsJobs};
+  JPH::TempAllocatorImpl temp;
+#if defined(ENGINE_THREADS)
+  JPH::JobSystemThreadPool jobs;
+#else
+  JPH::JobSystemSingleThreaded jobs;
+#endif
   JPH::PhysicsSystem physics;
   JPH::ShapeRefC sphere;
   JPH::ShapeRefC planetShape;
   JPH::ShapeRefC vegetationShape;
   RadialGravity gravity;
-  JPH::BodyID batch[kMaxBodies];
 };
 
 std::uint64_t allocationsTotal() {
-  return allocations;
+  return arena::carves();
 }
 
 void markWarmup() {
-  warmupBase = allocations;
+  warmupBase = arena::carves();
 }
 
 std::uint64_t allocationsSinceWarmup() {
-  return allocations - warmupBase;
+  return arena::carves() - warmupBase;
 }
 
 World::~World() {
-  delete runtime_;
+  releaseRuntime();
+}
+
+void World::releaseRuntime() {
+  if (runtime_ == nullptr) return;
+  runtime_->~Runtime();
+  pool::releaseAligned(runtime_);
+  runtime_ = nullptr;
 }
 
 Status World::initialize() {
   if (joltReady) return kOk;
   JPH::RegisterDefaultAllocator();
-  JPH::Allocate = countedAllocate;
-  JPH::Reallocate = countedReallocate;
-  JPH::Free = countedFree;
-  JPH::AlignedAllocate = countedAlignedAllocate;
-  JPH::AlignedFree = countedAlignedFree;
+  pool::installJoltHooks();
   JPH::Trace = silentTrace;
   JPH::Factory::sInstance = new JPH::Factory();
   JPH::RegisterTypes();
@@ -229,15 +165,37 @@ Status World::initialize() {
   return kOk;
 }
 
+Status World::bind(const budget::Capacity& capacity) {
+  if (bodyIds_ != nullptr) return kAlreadyInitialized;
+  const std::size_t n = capacity.bodies;
+  bodyIds_ = carveArray<std::uint32_t>(n);
+  batch_ = carveArray<std::uint32_t>(n);
+  freeSlots_ = carveArray<std::uint32_t>(n);
+  generations_ = carveArray<std::uint16_t>(n);
+  alive_ = carveArray<std::uint8_t>(n);
+  positions_ = carveArray<double>(n * 3);
+  velocities_ = carveArray<double>(n * 3);
+  transforms_ = carveArray<Transform>(n);
+  if (bodyIds_ == nullptr || batch_ == nullptr || freeSlots_ == nullptr || generations_ == nullptr || alive_ == nullptr ||
+      positions_ == nullptr || velocities_ == nullptr || transforms_ == nullptr) {
+    return kFull;
+  }
+  limits_ = capacity;
+  return kOk;
+}
+
 Status World::configure(const Config& config) {
-  if (config.capacity == 0 || config.capacity > kMaxBodies) return kRange;
+  if (config.capacity == 0 || config.capacity > limits_.bodies) return kRange;
   if (config.tickRate == 0) return kRange;
   if (config.iterations == 0 || config.iterations > kMaxIterations) return kRange;
   if (!(config.radius > 0.0f)) return kRange;
   if (!joltReady) return kNotConfigured;
+  if (bodyIds_ == nullptr) return kNotConfigured;
 
-  delete runtime_;
-  runtime_ = new Runtime(*this);
+  releaseRuntime();
+  void* raw = pool::allocateAligned(sizeof(Runtime), alignof(Runtime));
+  if (raw == nullptr) return kFull;
+  runtime_ = new (raw) Runtime(*this, limits_.tempBytes, limits_.workers);
   capacity_ = config.capacity;
   statics_ = 0;
   live_ = 0;
@@ -249,16 +207,15 @@ Status World::configure(const Config& config) {
   drag_ = config.drag;
   restitution_ = config.restitution;
   planetGravity_ = 0.0f;
-  primeBlockPools();
   groundBody_ = kNoBody;
   planetBody_ = kNoBody;
   vegetationBody_ = kNoBody;
   trunkBodies_ = 0;
-  std::fill(generations_, generations_ + kMaxBodies, static_cast<std::uint16_t>(0));
-  std::fill(alive_, alive_ + kMaxBodies, static_cast<std::uint8_t>(0));
+  std::fill(generations_, generations_ + limits_.bodies, static_cast<std::uint16_t>(0));
+  std::fill(alive_, alive_ + limits_.bodies, static_cast<std::uint8_t>(0));
 
-  runtime_->physics.Init(kMaxBodies + kMaxStatics + kMaxLegacyTrunks + 1, 0, kMaxBodyPairs, kMaxContactConstraints,
-                         runtime_->broadPhase, runtime_->objectVsBroadPhase, runtime_->objectPairs);
+  runtime_->physics.Init(joltBodyCapacity(limits_), 0, joltPairCapacity(limits_), joltContactCapacity(limits_), runtime_->broadPhase,
+                         runtime_->objectVsBroadPhase, runtime_->objectPairs);
   runtime_->physics.SetGravity(JPH::Vec3(0.0f, config.gravity, 0.0f));
   JPH::PhysicsSettings settings = runtime_->physics.GetPhysicsSettings();
   settings.mNumVelocitySteps = config.iterations;
@@ -294,7 +251,7 @@ void World::removeBody(std::uint32_t index) {
 
 Status World::addBox(const float* box) {
   if (runtime_ == nullptr) return kNotConfigured;
-  if (statics_ == kMaxStatics) return kTooManyStatics;
+  if (statics_ == limits_.statics) return kTooManyStatics;
   const float halfX = (box[3] - box[0]) * 0.5f;
   const float halfY = (box[4] - box[1]) * 0.5f;
   const float halfZ = (box[5] - box[2]) * 0.5f;
@@ -347,7 +304,7 @@ Status World::attachVegetation() {
 
 Status World::addTrunk(const float* trunk) {
   if (runtime_ == nullptr) return kNotConfigured;
-  if (trunkBodies_ == kMaxLegacyTrunks) return kFull;
+  if (trunkBodies_ == limits_.trunks) return kFull;
   if (!(trunk[3] > 0.0f) || !(trunk[4] >= 0.0f)) return kRange;
   JPH::ShapeRefC shape = new JPH::CapsuleShape(trunk[4], trunk[3]);
   JPH::BodyCreationSettings settings(shape.GetPtr(), JPH::RVec3(trunk[0], trunk[1], trunk[2]), JPH::Quat::sIdentity(),
@@ -370,20 +327,21 @@ int World::spawnBatch(const float* rows, std::uint32_t count, std::uint32_t* han
   if (runtime_ == nullptr) return kNotConfigured;
   if (count > capacity_ - live_ - retired_) return kFull;
   JPH::BodyInterface& bodies = runtime_->physics.GetBodyInterface();
+  JPH::BodyID* batch = asBodyIds(batch_);
   for (std::uint32_t i = 0; i < count; ++i) {
     const float* row = rows + i * kBatchFloats;
     const int slot = allocateSlot();
     if (slot < 0) return kFull;
     const JPH::BodyID id(bodyIds_[slot]);
     bodies.SetPositionAndRotation(id, JPH::RVec3(row[0], row[1], row[2]), JPH::Quat::sIdentity(), JPH::EActivation::DontActivate);
-    runtime_->batch[i] = id;
+    batch[i] = id;
     alive_[slot] = 1;
     live_ += 1;
     handles[i] = (static_cast<std::uint32_t>(generations_[slot]) << 16) | static_cast<std::uint32_t>(slot);
   }
   if (count > 0) {
-    const JPH::BodyInterface::AddState state = bodies.AddBodiesPrepare(runtime_->batch, static_cast<int>(count));
-    bodies.AddBodiesFinalize(runtime_->batch, static_cast<int>(count), state, JPH::EActivation::Activate);
+    const JPH::BodyInterface::AddState state = bodies.AddBodiesPrepare(batch, static_cast<int>(count));
+    bodies.AddBodiesFinalize(batch, static_cast<int>(count), state, JPH::EActivation::Activate);
   }
   for (std::uint32_t i = 0; i < count; ++i) {
     const float* row = rows + i * kBatchFloats;
