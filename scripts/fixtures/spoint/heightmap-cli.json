@@ -1,0 +1,100 @@
+{
+ "generator": "scripts/gen-heightmap-cli-fixture.mjs",
+ "source": "spoint packages/mapspinner/src/height-cpu.js and scripts/lab-png.mjs; sampleField and toGray are transcribed from spoint scripts/lab.mjs heightmap (the lab module runs its CLI on import, so it is not imported)",
+ "cases": [
+  {
+   "name": "global-res-24",
+   "argv": [
+    "--res",
+    "24"
+   ],
+   "stats": {
+    "ok": true,
+    "w": 48,
+    "h": 24,
+    "radiusM": 6360000,
+    "minM": -35000,
+    "maxM": 26511.2,
+    "meanM": -7358.4,
+    "reliefM": 61511.2,
+    "landFrac": 0.345
+   },
+   "png": "iVBORw0KGgoAAAANSUhEUgAAADAAAAAYCAAAAACZliEAAAAETUlEQVR42pXB/VOSBxwA8G/b2rx2e8nlba50ZaW1KZrl2DJbGb6EiVmKipCmoAiGL4BgCogICILIgzy8yYvyIAoaaL5gaWn0QmWX25VX3WXebdftOm+/7cfddrf/oM8HfnxPIBSLeYYXf7y+q+zvkFClWufwiFHi9ZmV8m7nvL6nhcHC7/pkb2EuUT3+5NcxoxAQg3PB//fm8uZoYTzAssJj0fESL2deoHLIeacvMy52jo7NGNh2g12jdBkkegSi9jLl5hr1WIKLtgSxBCnWLfwl7ScTMb+iTAlFtWtTniPk45dmHF6xlgoHIAom0ccLOp5E+tFSGB/ntqw23HkgAnDhDjYAAOx2cCHp9/WQW6MIoazCHOkkeBdVanbW1Cwi/C4dzxFN+dBKePa6K/eQ6yUF7C9oMbexI2kJNa1koa+o16LxQnL/CaAEVrMpI4rrtOOnB+1ZX5mtX+gbSAM1ASefrcDKz9a71/cMewPL7s56eTJs99GATfim5si5vbTa3NXdHX4Q3EwZfl5hSWnqIYmIs0j381eOIkwr4vs3nsJ2iG750wRQeXJf7kMEusziqIuf6o6Wd1xHQFXPOPRtuW9a9O9oNpCOSdx5/g1SNKisITuH29VGSefFoVckzTOUNf22pM7AwrRuAGV/niryrJxiBqYTy/QF1Y19mArg3EhVbZ95/9z2/Y+3zNCYYOwp6SJKQhHcvbWoYKjUtVKnDavEyqvzmsG/wr0AU8wLssNSRgWk0NTF0JQ1uWAfDrZ+75zqGS2rIQVF4+0XoVvYJ1tDMIeOyJ6C+9TuabG/1QAC+1UuXDaQFIsdyTxC/2aoc0hdLJ/QCa9kytUPJP22R17GGd59wIGzt9ruzZdu24OdaWQ5OmonhIwdZ9aN/nWbQAJdA/Xi2dRFgfESxompXmDiIIEThTtvtQXnPZ3GdqGs+FKuTfZzwX6NQGPRoXg63rhjPDaWkCoKN+u5pYqWBKBfczbrfeIBqz8yQVZC6UAaLhLiIEWH626lA70v+CwjztQuXpudM1wzBx8dpwMlw8DyePx1y6BDy2AWSvlz7zTeH4orHzp2CZo/ZEMjpms1//MW/e0zujtniALaSll5plQ8ceKAKOcURfGxOeBIqf4AjyEprUoqi1mHP5g9pDJWrz+RxaRk2/RauGEabAIGvUUg5er4gwBpOyeoJWJ8oHFWnxC/LV2Skaa/Fhq+LTrPs7T1clw3AL2JCTtj74WDmKdK1Rw3+O6VWyJiyhgF+/L4XEb7rfSvHc0IIh0YtzGtrJNCFBYbshPdL4l8ONQ60uYTVyC2u2+tSqzf5CWTQnYPI3UIOZ+pPSYhyx386sY3ixAP/1NGuEOjG5HJsa03suijEevMwsS4Q6FXce3yElxSeW5OPupjfXmWEA+FvSbEgXpWtlYnq4q8d8IbSyv3ryMiKplhMcuxJc/keNUFQg6NbnCtPHmKVhVCyXv6D00gA6sgC6DIAAAAAElFTkSuQmCC"
+  },
+  {
+   "name": "global-hillshade-res-16",
+   "argv": [
+    "--res",
+    "16",
+    "--hillshade"
+   ],
+   "stats": {
+    "ok": true,
+    "w": 32,
+    "h": 16,
+    "radiusM": 6360000,
+    "minM": -35000,
+    "maxM": 26806.4,
+    "meanM": -8769.3,
+    "reliefM": 61806.4,
+    "landFrac": 0.299
+   },
+   "png": "iVBORw0KGgoAAAANSUhEUgAAACAAAAAQCAAAAABSayKFAAACEklEQVR42mPIzMhIT8/IyMjIzMzIzMzPWZSTWymck1uSm5OZCRJiMJm9f0t/YE23reGUrmgDGauaqlDxvImR5dMmLypqTHEyYWAJiTXVU+4xZEidZKQok97v3WUgvNVR12XaCntjNS4WFobu5daWlhoOunNmL3Zmbug2NTFjKDJiDcqs1lXPXp6RbMCga82gJCeuOVm+w1imrpfFRHByqa7QAq3ObXqnjIyTc1QZqrhdS1sb5utWb5H17/GRDJu1XkXUYmLrXmsGbVn2chcGhoK+7ZGWYTYpvdqqq42Nfaet9zNmaZplL6NnLTUzJN1vAoOrXoCVLkN4m5pKzbxpG+VnGNu5z+gwlypXid+TNrN5yXYGN1trgf6Kbi39voU2E2zUbUUSrZQMpMtdE7dYW0X65roxMIjJtXdWufKWWYnrmBoqqAkVGcnX+EnZbte11zIUcWVgaGwv2GAqLzdfVYInZZ63qWLjGtm8ClOGVUa2Vovscox9GWz0JugaadcbyzBYFh7SNJldaKHhoMzXPUmjpN6EwbBlAUPWFlt9fW3jeUb85Q1JInOVK5REJnnyT8vK6dA3t7RYZMago8+3SljR2021Nnu7u+bCBTl6bWutnFoMlCQVNP0nGOswMCh1a/Vqaojk+1x20rYy1jTTybY0CFIUEeySCfVXZWBgKC5tl5WVla2URQWV5bUL62Vli4sBWfmjMGKASPsAAAAASUVORK5CYII="
+  },
+  {
+   "name": "center-seed-7",
+   "argv": [
+    "--res",
+    "16",
+    "--center",
+    "46.5,8.2",
+    "--span",
+    "2",
+    "--seed",
+    "7"
+   ],
+   "stats": {
+    "ok": true,
+    "w": 16,
+    "h": 16,
+    "radiusM": 6360000,
+    "minM": -21637.6,
+    "maxM": 3091.6,
+    "meanM": -5699,
+    "reliefM": 24729.2,
+    "landFrac": 0.125
+   },
+   "png": "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAAAAAA6mKC9AAABG0lEQVR42gEQAe/+AJ+aprO/vM/R19nd5vH2/+UAnZaln6Wvv8rT29LL1eXz9gCip6GhqLO2tLOvs8HV0uDoAJWyqaClqKqzssHE0szB0NcApcGtoaGfqMHCx8zNvrvK0QC/39q4raieoavP0b22usvOAMbM3+G8p52Yk6TDubm3wd4Aoq3LyM7Us6eMjJyxubzW6QBQlZK5s7XJ0cjEzMjGw93wACpBg4+1ury9wdnu+/ju5OoAKTJzgo+bkZGbtNDh8PXw8ABFPD5QWGx8d4KLpcnS0uHzAE1PQ0NHSFKCh4qTmq3C0vgAPUJCOjM7QEpcipGPo7PV9AAnPTcuMDEuLER7gI6fpcv3AAAcNSwwMzQuOGN7jJGswfRqSaRkYOY2bgAAAABJRU5ErkJggg=="
+  },
+  {
+   "name": "hash-version-2-res-12",
+   "argv": [
+    "--res",
+    "12",
+    "--hash-version",
+    "2"
+   ],
+   "stats": {
+    "ok": true,
+    "w": 24,
+    "h": 12,
+    "radiusM": 6360000,
+    "minM": -35000,
+    "maxM": 22711.9,
+    "meanM": -9373.6,
+    "reliefM": 57711.9,
+    "landFrac": 0.253
+   },
+   "png": "iVBORw0KGgoAAAANSUhEUgAAABgAAAAMCAAAAABdWyKpAAABFUlEQVR42mNQwQEYJs+KYbRbU9qx+EZKXWUhA6Pb7I1ZK5amTmaI6fRzT5ucs9IivtAtJq/6RIBGadXZeZUxDFN6WXu67bdEre1k2MAoz3Bu4boJol4Oi6Yw8M1OZfDOL1bbfnRyjX7CjsLSbM/p3eu28jHo1s3zDEssZHBJORM4q23aynkK/6sYGEp1GURPhS+tZXDa2fLl3toT0/tNGi/HLj2xrF2UIbj+856zHX2OS24faOiI5DHmZJmRGmPTE8yQs3BvlFJydezuLetmLtZJSfQr7V0Udpwhh2HxhinTa++dqL95tOnQ0VORxw1nLr6+xthvMUNLs1tGSKJ/rc69/xd35u7q67JoTze1ndnCUIQDAAB1Rn9jhaWWwwAAAABJRU5ErkJggg=="
+  }
+ ],
+ "synthetic": {
+  "w": 17,
+  "h": 9,
+  "png": "iVBORw0KGgoAAAANSUhEUgAAABEAAAAJCAAAAADxg5jQAAAAq0lEQVR42mNgYOcTlVHWMrSwd/MNiU7KLGDgFZFW0jQwt3P1CY5KzMgvq2WQUtTQN7N18Q6KTEjPK61p7mJQ1zO1cfYKjIhPyy2pbuqcMJ3BxNrJMyA8LjWnuKqxo3/a3CUMjh7+YbEp2UWVDe19U+csXrWRwS80JjmrsKK+rXfK7EUrN2zfxwCysLyutWfyrIUr1m/be+Q0A8jClu5JMxcsX7d1z+FTF28AAGUeQI0tVIEdAAAAAElFTkSuQmCC"
+ },
+ "crc32": {
+  "input": "123456789",
+  "value": 3421780262
+ }
+}

@@ -109,7 +109,7 @@ gate('FACE_FRAME and the five bands keep the spoint names, levels, fractals and 
   differs(jzBands.BANDS[2].params(0.5, 0.2), jzBands.BANDS[2].params(0.5, 1.2), 'a different latitude')
 })
 
-const SEEDS = [undefined, 0, 1, 42, -7, 2 ** 32 + 5]
+const SEEDS = [undefined, 0, 1, 42, -7, 2147483647]
 
 gate('sampleUV, sampleTile and sampleDir match spoint for seeds, band caps and band scales', () => {
   const rnd = seeded(21)
@@ -134,11 +134,12 @@ gate('sampleUV, sampleTile and sampleDir match spoint for seeds, band caps and b
   }
 })
 
-gate('seed quirks: 0 and a missing seed both mean 1337, and a seed is taken as int32', () => {
+gate('seed: a missing seed means 1337, seed 0 is seed 0 as spoint has it, and a seed outside int32 is refused', () => {
   const sample = (seed) => snap(jzField.createAnchorField({ seed }).sampleUV(2, 0.4, 0.55))
-  same(sample(0), sample(1337), 'seed 0')
   same(sample(undefined), sample(1337), 'no seed')
-  same(sample(2 ** 32 + 5), sample(5), 'seed 2^32 + 5')
+  differs(sample(0), sample(1337), 'seed 0 is not the default')
+  same(sample(0), snap(spField.createAnchorField({ seed: 0 }).sampleUV(2, 0.4, 0.55)), 'seed 0 as spoint')
+  throwsLike(() => jzField.createAnchorField({ seed: 2 ** 32 + 5 }), /int32 range/, 'seed 2^32 + 5 refused')
   differs(sample(1), sample(2), 'a different seed')
 })
 

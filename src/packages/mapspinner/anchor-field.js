@@ -31,8 +31,23 @@ export function dirToFaceUV(d) {
   return { face, fu: u * 0.5 + 0.5, fv: v * 0.5 + 0.5 }
 }
 
+const INT32_MIN = -2147483648
+const INT32_MAX = 2147483647
+
+export class AnchorFieldError extends Error {
+  constructor(code, message) { super(message); this.name = 'AnchorFieldError'; this.code = code; }
+}
+
+function resolveSeed(s) {
+  if (s == null) return DEFAULT_SEED
+  if (!Number.isInteger(s) || s < INT32_MIN || s > INT32_MAX) {
+    throw new AnchorFieldError('anchor-field-bad-seed', 'createAnchorField: seed must be an integer in the int32 range, got ' + String(s))
+  }
+  return s
+}
+
 export function createAnchorField(opts = {}) {
-  const seed = (opts.seed | 0) || DEFAULT_SEED
+  const seed = resolveSeed(opts.seed)
 
   const bands = BANDS.map((B) => ({
     baseLevel: B.level, bn: 1 << B.level,
