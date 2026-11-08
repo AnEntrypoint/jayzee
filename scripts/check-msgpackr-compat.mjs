@@ -6,9 +6,11 @@ import { fileURLToPath } from 'node:url'
 import { Packr, Unpackr, NEVER, DECIMAL_ROUND } from 'msgpackr'
 import { encodeReplay } from '../src/replay/file.js'
 
-const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'spoint')
+const root = join(dirname(fileURLToPath(import.meta.url)), '..')
+const fixtureDir = join(root, 'scripts', 'fixtures', 'spoint')
 const bytes = readFileSync(join(fixtureDir, 'replay-sample.bin'))
 const meta = JSON.parse(readFileSync(join(fixtureDir, 'replay-sample.json'), 'utf8'))
+const packageJson = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
 
 const WIRE_STRUCTURES = [
   ['type', 'payload'],
@@ -37,6 +39,10 @@ const envelopeOf = ({ header, inputs, ticks, events }) => ({
 
 const sameBytes = (a, b) => Buffer.from(a).equals(Buffer.from(b))
 
+gate('msgpackr is an exact runtime pin at 2.0.4, the version spoint pins', () => {
+  if (packageJson.dependencies?.msgpackr !== '2.0.4') throw new Error('dependencies.msgpackr is ' + packageJson.dependencies?.msgpackr)
+})
+
 gate('the fixture bytes match the sha256 recorded when spoint wrote them', () => {
   const digest = createHash('sha256').update(bytes).digest('hex')
   if (digest !== meta.sha256) throw new Error(`fixture sha256 ${digest} differs from recorded ${meta.sha256}`)
@@ -59,8 +65,8 @@ gate('a packer without the record dialect does not reproduce the fixture (contro
   if (sameBytes(plain.pack(envelopeOf(meta.sample)), bytes)) throw new Error('plain packer matched the record dialect bytes')
 })
 
-gate('OPEN, known difference: the shipped encodeReplay bytes differ from spoint, so the replay file is not byte-compatible yet', () => {
-  if (sameBytes(encodeReplay(meta.sample), bytes)) throw new Error('shipped encodeReplay now matches spoint: update row 42 and this claim')
+gate('encodeReplay writes the spoint fixture byte for byte', () => {
+  if (!sameBytes(encodeReplay(meta.sample), bytes)) throw new Error('shipped encodeReplay differs from spoint')
 })
 
 finish()

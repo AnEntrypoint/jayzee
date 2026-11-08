@@ -13,6 +13,7 @@ import {
   msgpackArrayHeader,
   frameRecordArray
 } from '../src/wire/index.js'
+import { pack } from '../src/protocol/msgpack.js'
 
 const random = (seed) => {
   let state = seed >>> 0
@@ -187,6 +188,14 @@ gate('a framed record array is the header followed by each record in order', () 
   assert.deepEqual(framed.subarray(30), second)
   assert.notDeepEqual(frameRecordArray([second, first]), framed)
   assert.throws(() => frameRecordArray([[1, 2, 3]]), RangeError)
+})
+
+gate('the array header matches the header the shipped msgpack packer writes for the same length', () => {
+  for (const length of [0, 1, 15, 16, 255, 0xffff, 0x10000]) {
+    const header = [...msgpackArrayHeader(length)]
+    const packed = [...pack(new Array(length).fill(0))]
+    assert.deepEqual(packed.slice(0, header.length), header, 'length ' + length)
+  }
 })
 
 finish()

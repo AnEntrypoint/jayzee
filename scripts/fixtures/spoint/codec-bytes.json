@@ -1,0 +1,190 @@
+{
+  "generatedFrom": "spoint src/protocol/InputCodec.js tryEncodeInputPacket and decodeInputPacket; spoint src/protocol/ComponentSchema.js encodeCustomFields and decodeCustomFields",
+  "componentSchema": {
+    "hp": "u16",
+    "kind": "enum idle run dead",
+    "alive": "bool",
+    "label": "string",
+    "speed": "f32"
+  },
+  "inputPackets": [
+    {
+      "name": "two records with analog and an axis, epoch 5",
+      "schema": "axes",
+      "epoch": 5,
+      "entries": [
+        {
+          "sequence": 41,
+          "data": {
+            "forward": true,
+            "sprint": true,
+            "shoot": true,
+            "yaw": 1.25,
+            "pitch": -0.5,
+            "expr": 9,
+            "analogForward": 0.5,
+            "analogRight": -1,
+            "throttle": 0.25
+          }
+        },
+        {
+          "sequence": 42,
+          "data": {
+            "backward": false,
+            "yaw": 0,
+            "pitch": 0,
+            "expr": 0,
+            "throttle": -1
+          }
+        }
+      ],
+      "hex": "820500000029000000a1000000ee3242d7090140810000803e2a00000000000000000000000000000080bf",
+      "decoded": "[{\"sequence\":41,\"data\":{\"forward\":true,\"backward\":false,\"left\":false,\"right\":false,\"jump\":false,\"sprint\":true,\"crouch\":false,\"shoot\":true,\"aim\":false,\"reload\":false,\"interact\":false,\"use\":false,\"weapon\":false,\"ability1\":false,\"ability2\":false,\"ability3\":false,\"yaw\":1.2500025945283118,\"pitch\":-0.49999712175270156,\"expr\":9,\"analogForward\":0.5039370078740157,\"analogRight\":-1,\"throttle\":0.25}},{\"sequence\":42,\"data\":{\"forward\":false,\"backward\":false,\"left\":false,\"right\":false,\"jump\":false,\"sprint\":false,\"crouch\":false,\"shoot\":false,\"aim\":false,\"reload\":false,\"interact\":false,\"use\":false,\"weapon\":false,\"ability1\":false,\"ability2\":false,\"ability3\":false,\"yaw\":0,\"pitch\":0,\"expr\":0,\"throttle\":-1}}]",
+      "chartEpoch": 5
+    },
+    {
+      "name": "one record, epoch 0 (untagged)",
+      "schema": "plain",
+      "epoch": 0,
+      "entries": [
+        {
+          "sequence": 1,
+          "data": {
+            "forward": true
+          }
+        }
+      ],
+      "hex": "010100000001000000000000000000",
+      "decoded": "[{\"sequence\":1,\"data\":{\"forward\":true,\"backward\":false,\"left\":false,\"right\":false,\"jump\":false,\"sprint\":false,\"crouch\":false,\"shoot\":false,\"aim\":false,\"reload\":false,\"interact\":false,\"use\":false,\"weapon\":false,\"ability1\":false,\"ability2\":false,\"ability3\":false,\"yaw\":0,\"pitch\":0,\"expr\":0}}]",
+      "chartEpoch": 0
+    },
+    {
+      "name": "nine records: the oldest is dropped",
+      "schema": "axes",
+      "epoch": 7,
+      "entries": [
+        {
+          "sequence": 100,
+          "data": {
+            "jump": true,
+            "yaw": 0,
+            "pitch": 0,
+            "expr": 0,
+            "throttle": -0.4
+          }
+        },
+        {
+          "sequence": 101,
+          "data": {
+            "jump": false,
+            "yaw": 0.5,
+            "pitch": 0.1,
+            "expr": 1,
+            "throttle": -0.30000000000000004
+          }
+        },
+        {
+          "sequence": 102,
+          "data": {
+            "jump": true,
+            "yaw": 1,
+            "pitch": 0.2,
+            "expr": 2,
+            "throttle": -0.2
+          }
+        },
+        {
+          "sequence": 103,
+          "data": {
+            "jump": false,
+            "yaw": 1.5,
+            "pitch": 0.30000000000000004,
+            "expr": 3,
+            "throttle": -0.10000000000000003
+          }
+        },
+        {
+          "sequence": 104,
+          "data": {
+            "jump": true,
+            "yaw": 2,
+            "pitch": 0.4,
+            "expr": 4,
+            "throttle": 0
+          }
+        },
+        {
+          "sequence": 105,
+          "data": {
+            "jump": false,
+            "yaw": 2.5,
+            "pitch": 0.5,
+            "expr": 5,
+            "throttle": 0.09999999999999998
+          }
+        },
+        {
+          "sequence": 106,
+          "data": {
+            "jump": true,
+            "yaw": 3,
+            "pitch": 0.6000000000000001,
+            "expr": 6,
+            "throttle": 0.19999999999999996
+          }
+        },
+        {
+          "sequence": 107,
+          "data": {
+            "jump": false,
+            "yaw": 3.5,
+            "pitch": 0.7000000000000001,
+            "expr": 7,
+            "throttle": 0.29999999999999993
+          }
+        },
+        {
+          "sequence": 108,
+          "data": {
+            "jump": true,
+            "yaw": 4,
+            "pitch": 0.8,
+            "expr": 8,
+            "throttle": 0.4
+          }
+        }
+      ],
+      "hex": "880700000065000000000000005f14260801009a9999be6600000010000000be284c100200cdcc4cbe67000000000000001e3d72180300cdccccbd68000000100000007d5198200400000000006900000000000000dc65be280500cdcccc3d6a000000100000003b7ae4300600cdcc4c3e6b000000000000009a8e0a3907009a99993e6c00000010000000faa230410800cdcccc3e",
+      "decoded": "[{\"sequence\":101,\"data\":{\"forward\":false,\"backward\":false,\"left\":false,\"right\":false,\"jump\":false,\"sprint\":false,\"crouch\":false,\"shoot\":false,\"aim\":false,\"reload\":false,\"interact\":false,\"use\":false,\"weapon\":false,\"ability1\":false,\"ability2\":false,\"ability3\":false,\"yaw\":0.4999818630514762,\"pitch\":0.09999942435054031,\"expr\":1,\"throttle\":-0.30000001192092896}},{\"sequence\":102,\"data\":{\"forward\":false,\"backward\":false,\"left\":false,\"right\":false,\"jump\":true,\"sprint\":false,\"crouch\":false,\"shoot\":false,\"aim\":false,\"reload\":false,\"interact\":false,\"use\":false,\"weapon\":false,\"ability1\":false,\"ability2\":false,\"ability3\":false,\"yaw\":0.9999637261029524,\"pitch\":0.19999884870108062,\"expr\":2,\"throttle\":-0.20000000298023224}},{\"sequence\":103,\"data\":{\"forward\":false,\"backward\":false,\"left\":false,\"right\":false,\"jump\":false,\"sprint\":false,\"crouch\":false,\"shoot\":false,\"aim\":false,\"reload\":false,\"interact\":false,\"use\":false,\"weapon\":false,\"ability1\":false,\"ability2\":false,\"ability3\":false,\"yaw\":1.5000414629536714,\"pitch\":0.2999982730516209,\"expr\":3,\"throttle\":-0.10000000149011612}},{\"sequence\":104,\"data\":{\"forward\":false,\"backward\":false,\"left\":false,\"right\":false,\"jump\":true,\"sprint\":false,\"crouch\":false,\"shoot\":false,\"aim\":false,\"reload\":false,\"interact\":false,\"use\":false,\"weapon\":false,\"ability1\":false,\"ability2\":false,\"ability3\":false,\"yaw\":2.0000233260051474,\"pitch\":0.39999769740216123,\"expr\":4,\"throttle\":0}},{\"sequence\":105,\"data\":{\"forward\":false,\"backward\":false,\"left\":false,\"right\":false,\"jump\":false,\"sprint\":false,\"crouch\":false,\"shoot\":false,\"aim\":false,\"reload\":false,\"interact\":false,\"use\":false,\"weapon\":false,\"ability1\":false,\"ability2\":false,\"ability3\":false,\"yaw\":2.5000051890566235,\"pitch\":0.49999712175270156,\"expr\":5,\"throttle\":0.10000000149011612}},{\"sequence\":106,\"data\":{\"forward\":false,\"backward\":false,\"left\":false,\"right\":false,\"jump\":true,\"sprint\":false,\"crouch\":false,\"shoot\":false,\"aim\":false,\"reload\":false,\"interact\":false,\"use\":false,\"weapon\":false,\"ability1\":false,\"ability2\":false,\"ability3\":false,\"yaw\":2.9999870521081,\"pitch\":0.5999965461032418,\"expr\":6,\"throttle\":0.20000000298023224}},{\"sequence\":107,\"data\":{\"forward\":false,\"backward\":false,\"left\":false,\"right\":false,\"jump\":false,\"sprint\":false,\"crouch\":false,\"shoot\":false,\"aim\":false,\"reload\":false,\"interact\":false,\"use\":false,\"weapon\":false,\"ability1\":false,\"ability2\":false,\"ability3\":false,\"yaw\":3.499968915159576,\"pitch\":0.6999959704537821,\"expr\":7,\"throttle\":0.30000001192092896}},{\"sequence\":108,\"data\":{\"forward\":false,\"backward\":false,\"left\":false,\"right\":false,\"jump\":true,\"sprint\":false,\"crouch\":false,\"shoot\":false,\"aim\":false,\"reload\":false,\"interact\":false,\"use\":false,\"weapon\":false,\"ability1\":false,\"ability2\":false,\"ability3\":false,\"yaw\":4.000046652010295,\"pitch\":0.7999953948043225,\"expr\":8,\"throttle\":0.4000000059604645}}]",
+      "chartEpoch": 7
+    }
+  ],
+  "componentFields": [
+    {
+      "name": "every field set",
+      "value": {
+        "hp": 120,
+        "kind": "run",
+        "alive": true,
+        "label": "scout",
+        "speed": 2.5
+      },
+      "hex": "0178000101010101050073636f75740100002040",
+      "decoded": "{\"hp\":120,\"kind\":\"run\",\"alive\":true,\"label\":\"scout\",\"speed\":2.5}"
+    },
+    {
+      "name": "one field set",
+      "value": {
+        "hp": 3
+      },
+      "hex": "01030000000000000000000000",
+      "decoded": "{\"hp\":3}"
+    },
+    {
+      "name": "empty object",
+      "value": {},
+      "hex": "00000000000000000000000000",
+      "decoded": "{}"
+    }
+  ]
+}

@@ -1,0 +1,559 @@
+{
+  "generatedFrom": "spoint src/protocol/msgpack.js pack, with the spoint Packr settings",
+  "sha256": "7c43cd53e3489eb51198d63a5201aeb3a027e87ae3adbc114c5c6e2b00776559",
+  "cases": [
+    {
+      "name": "int 0",
+      "value": 0,
+      "hex": "00",
+      "negativeZero": false
+    },
+    {
+      "name": "int 127",
+      "value": 127,
+      "hex": "cc7f",
+      "negativeZero": false
+    },
+    {
+      "name": "int 128",
+      "value": 128,
+      "hex": "cc80",
+      "negativeZero": false
+    },
+    {
+      "name": "int 255",
+      "value": 255,
+      "hex": "ccff",
+      "negativeZero": false
+    },
+    {
+      "name": "int 256",
+      "value": 256,
+      "hex": "cd0100",
+      "negativeZero": false
+    },
+    {
+      "name": "int 65535",
+      "value": 65535,
+      "hex": "cdffff",
+      "negativeZero": false
+    },
+    {
+      "name": "int 65536",
+      "value": 65536,
+      "hex": "ce00010000",
+      "negativeZero": false
+    },
+    {
+      "name": "int 2^32-1",
+      "value": 4294967295,
+      "hex": "ceffffffff",
+      "negativeZero": false
+    },
+    {
+      "name": "int 2^32",
+      "value": 4294967296,
+      "hex": "cb41f0000000000000",
+      "negativeZero": false
+    },
+    {
+      "name": "int 2^53-1",
+      "value": 9007199254740991,
+      "hex": "cb433fffffffffffff",
+      "negativeZero": false
+    },
+    {
+      "name": "int -1",
+      "value": -1,
+      "hex": "ff",
+      "negativeZero": false
+    },
+    {
+      "name": "int -32",
+      "value": -32,
+      "hex": "e0",
+      "negativeZero": false
+    },
+    {
+      "name": "int -33",
+      "value": -33,
+      "hex": "d0df",
+      "negativeZero": false
+    },
+    {
+      "name": "int -128",
+      "value": -128,
+      "hex": "d080",
+      "negativeZero": false
+    },
+    {
+      "name": "int -129",
+      "value": -129,
+      "hex": "d1ff7f",
+      "negativeZero": false
+    },
+    {
+      "name": "int -32768",
+      "value": -32768,
+      "hex": "d18000",
+      "negativeZero": false
+    },
+    {
+      "name": "int -32769",
+      "value": -32769,
+      "hex": "d2ffff7fff",
+      "negativeZero": false
+    },
+    {
+      "name": "int -2^31",
+      "value": -2147483648,
+      "hex": "d280000000",
+      "negativeZero": false
+    },
+    {
+      "name": "int -2^31-1",
+      "value": -2147483649,
+      "hex": "cbc1e0000000200000",
+      "negativeZero": false
+    },
+    {
+      "name": "int -(2^53-1)",
+      "value": -9007199254740991,
+      "hex": "cbc33fffffffffffff",
+      "negativeZero": false
+    },
+    {
+      "name": "int 2^60",
+      "value": 1152921504606847000,
+      "hex": "cb43b0000000000000",
+      "negativeZero": false
+    },
+    {
+      "name": "float 0.5",
+      "value": 0.5,
+      "hex": "cb3fe0000000000000",
+      "negativeZero": false
+    },
+    {
+      "name": "float -1.25",
+      "value": -1.25,
+      "hex": "cbbff4000000000000",
+      "negativeZero": false
+    },
+    {
+      "name": "float 1e-300",
+      "value": 1e-300,
+      "hex": "cb01a56e1fc2f8f359",
+      "negativeZero": false
+    },
+    {
+      "name": "float 1e300",
+      "value": 1e+300,
+      "hex": "cb7e37e43c8800759c",
+      "negativeZero": false
+    },
+    {
+      "name": "float Infinity",
+      "value": {
+        "$num": "Infinity"
+      },
+      "hex": "cb7ff0000000000000",
+      "negativeZero": false
+    },
+    {
+      "name": "float -Infinity",
+      "value": {
+        "$num": "-Infinity"
+      },
+      "hex": "cbfff0000000000000",
+      "negativeZero": false
+    },
+    {
+      "name": "float NaN",
+      "value": {
+        "$num": "NaN"
+      },
+      "hex": "cb7ff8000000000000",
+      "negativeZero": false
+    },
+    {
+      "name": "string empty",
+      "value": "",
+      "hex": "a0",
+      "negativeZero": false
+    },
+    {
+      "name": "string a",
+      "value": "a",
+      "hex": "a161",
+      "negativeZero": false
+    },
+    {
+      "name": "string 31 bytes",
+      "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "hex": "bf78787878787878787878787878787878787878787878787878787878787878",
+      "negativeZero": false
+    },
+    {
+      "name": "string 32 bytes",
+      "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "hex": "d9207878787878787878787878787878787878787878787878787878787878787878",
+      "negativeZero": false
+    },
+    {
+      "name": "string 256 bytes",
+      "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "hex": "da010078787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878",
+      "negativeZero": false
+    },
+    {
+      "name": "string utf8",
+      "value": "héllo ✓",
+      "hex": "aa68c3a96c6c6f20e29c93",
+      "negativeZero": false
+    },
+    {
+      "name": "string 300 bytes",
+      "value": "yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
+      "hex": "da012c797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979797979",
+      "negativeZero": false
+    },
+    {
+      "name": "binary empty",
+      "value": {
+        "$bin": ""
+      },
+      "hex": "c400",
+      "negativeZero": false
+    },
+    {
+      "name": "binary 3",
+      "value": {
+        "$bin": "010203"
+      },
+      "hex": "c403010203",
+      "negativeZero": false
+    },
+    {
+      "name": "binary 256",
+      "value": {
+        "$bin": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff"
+      },
+      "hex": "c50100000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff",
+      "negativeZero": false
+    },
+    {
+      "name": "array empty",
+      "value": [],
+      "hex": "90",
+      "negativeZero": false
+    },
+    {
+      "name": "array mixed",
+      "value": [
+        1,
+        "a",
+        null
+      ],
+      "hex": "9301a161c0",
+      "negativeZero": false
+    },
+    {
+      "name": "array 16",
+      "value": [
+        -8,
+        -7,
+        -6,
+        -5,
+        -4,
+        -3,
+        -2,
+        -1,
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "hex": "dc0010f8f9fafbfcfdfeff0001020304050607",
+      "negativeZero": false
+    },
+    {
+      "name": "array nested",
+      "value": [
+        [
+          1,
+          [
+            2,
+            [
+              3
+            ]
+          ]
+        ],
+        {
+          "a": [
+            true,
+            false
+          ]
+        }
+      ],
+      "hex": "92920192029103d4724291a16192c3c2",
+      "negativeZero": false
+    },
+    {
+      "name": "object empty",
+      "value": {},
+      "hex": "d4724290",
+      "negativeZero": false
+    },
+    {
+      "name": "object a",
+      "value": {
+        "a": 1
+      },
+      "hex": "d4724291a16101",
+      "negativeZero": false
+    },
+    {
+      "name": "object 16 keys",
+      "value": {
+        "k0": 0,
+        "k1": 1,
+        "k2": 2,
+        "k3": 3,
+        "k4": 4,
+        "k5": 5,
+        "k6": 6,
+        "k7": 7,
+        "k8": 8,
+        "k9": 9,
+        "k10": 10,
+        "k11": 11,
+        "k12": 12,
+        "k13": 13,
+        "k14": 14,
+        "k15": 15
+      },
+      "hex": "d47242dc0010a26b30a26b31a26b32a26b33a26b34a26b35a26b36a26b37a26b38a26b39a36b3130a36b3131a36b3132a36b3133a36b3134a36b3135000102030405060708090a0b0c0d0e0f",
+      "negativeZero": false
+    },
+    {
+      "name": "object nested",
+      "value": {
+        "id": 7,
+        "name": "héllo",
+        "pos": {
+          "x": 1.5,
+          "y": -2,
+          "z": 0
+        },
+        "blob": {
+          "$bin": "090807"
+        },
+        "flags": [
+          true,
+          false,
+          null
+        ],
+        "big": 4294967296,
+        "neg": -129
+      },
+      "hex": "d4724297a26964d66200000043c104a3706f73c104c105a3626967a36e656707c1fbd4724393a178a179a17acb3ff8000000000000fe00c40309080793c3c2c0cb41f0000000000000d1ff7fa668c3a96c6c6fad6e616d65626c6f62666c616773",
+      "negativeZero": false
+    },
+    {
+      "name": "object undefined field",
+      "value": {
+        "a": {
+          "$undef": true
+        },
+        "b": 1
+      },
+      "hex": "d4724292a161a162d4000001",
+      "negativeZero": false
+    },
+    {
+      "name": "undefined top level",
+      "value": {
+        "$undef": true
+      },
+      "hex": "d40000",
+      "negativeZero": false
+    },
+    {
+      "name": "map a",
+      "value": {
+        "$map": [
+          [
+            "a",
+            1
+          ]
+        ]
+      },
+      "hex": "81a16101",
+      "negativeZero": false
+    },
+    {
+      "name": "map a b",
+      "value": {
+        "$map": [
+          [
+            "a",
+            1
+          ],
+          [
+            "b",
+            "x"
+          ]
+        ]
+      },
+      "hex": "82a16101a162a178",
+      "negativeZero": false
+    },
+    {
+      "name": "map numeric key",
+      "value": {
+        "$map": [
+          [
+            1,
+            "x"
+          ]
+        ]
+      },
+      "hex": "8101a178",
+      "negativeZero": false
+    },
+    {
+      "name": "negative zero in array",
+      "value": [
+        {
+          "$num": "-0"
+        },
+        1
+      ],
+      "hex": "92cb800000000000000001",
+      "negativeZero": true
+    },
+    {
+      "name": "wire snapshot",
+      "value": {
+        "type": "snapshot",
+        "payload": {
+          "seq": 1,
+          "tick": 2,
+          "serverTime": 3,
+          "players": [
+            [
+              1,
+              2,
+              3,
+              4,
+              0
+            ]
+          ],
+          "entities": [],
+          "removed": {
+            "$undef": true
+          },
+          "delta": 1,
+          "dots": {
+            "$undef": true
+          },
+          "me": {
+            "$undef": true
+          },
+          "chartEpoch": 0
+        }
+      },
+      "hex": "40d6620000001dc108410102039195010203040090d4000001d40000d4000000a0a8736e617073686f74",
+      "negativeZero": false
+    },
+    {
+      "name": "wire snapshot with removed",
+      "value": {
+        "type": "snapshot",
+        "payload": {
+          "seq": 1,
+          "tick": 2,
+          "serverTime": 3,
+          "players": [
+            [
+              1,
+              2,
+              3,
+              4,
+              0
+            ]
+          ],
+          "entities": [],
+          "removed": [
+            4,
+            5
+          ],
+          "delta": 1,
+          "dots": [
+            1.5
+          ],
+          "me": {
+            "id": 2
+          },
+          "chartEpoch": 9
+        }
+      },
+      "hex": "40d66200000029c1084101020391950102030400909204050191cb3ff8000000000000d4724291a269640209a0a8736e617073686f74",
+      "negativeZero": false
+    },
+    {
+      "name": "wire snapshot with binary player",
+      "value": {
+        "type": "snapshot",
+        "payload": {
+          "seq": 1,
+          "tick": 2,
+          "serverTime": 3,
+          "players": [
+            [
+              9,
+              {
+                "$bin": "010203"
+              },
+              1
+            ],
+            [
+              5,
+              -6,
+              7,
+              8,
+              1
+            ]
+          ],
+          "entities": [],
+          "removed": {
+            "$undef": true
+          },
+          "delta": 1,
+          "dots": {
+            "$undef": true
+          },
+          "me": {
+            "$undef": true
+          },
+          "chartEpoch": 0
+        }
+      },
+      "hex": "40d66200000025c10841010203929309c403010203019505fa07080190d4000001d40000d4000000a0a8736e617073686f74",
+      "negativeZero": false
+    },
+    {
+      "name": "wire type only",
+      "value": {
+        "type": "ping"
+      },
+      "hex": "d4724291d66200000008c104c104a0a87479706570696e67",
+      "negativeZero": false
+    }
+  ]
+}

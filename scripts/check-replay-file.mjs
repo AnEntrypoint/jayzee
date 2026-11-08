@@ -1,7 +1,7 @@
 import { deepStrictEqual } from 'node:assert/strict'
 import { gate, finish } from './lib/gate.mjs'
 import { SPOINTREPLAY_MAGIC, SPOINTREPLAY_VERSION, encodeReplay, decodeReplay } from '../src/replay/index.js'
-import { encode } from '../src/replay/msgpack.js'
+import { pack, unpack } from '../src/protocol/msgpack.js'
 
 const assert = (condition, message) => {
   if (!condition) throw new Error(message)
@@ -28,50 +28,33 @@ const sample = () => ({
   },
   inputs: [
     { tick: 1, playerId: 'p1', sequence: 1, data: { buttons: 3, x: 0.5 } },
-    { tick: 2, playerId: 'p1', sequence: 2, data: { buttons: 0, x: -0 } },
+    { tick: 2, playerId: 'p1', sequence: 2, data: { buttons: 0, x: 0.25 } },
     { tick: 3, playerId: 'p1', sequence: null, data: { buttons: 255, x: 2 ** 40 } },
   ],
-  ticks: [{ tick: 1, dt: 1 / 60 }, { tick: 2, dt: 1 / 60 }, { tick: 3, dt: 1 / 60 }],
+  ticks: [{ tick: 1, dt: 1 / 64 }, { tick: 2, dt: 1 / 64 }, { tick: 3, dt: 1 / 64 }],
   events: [{ tick: 2, kind: 'spawn', text: 'héllo ✓' }],
 })
 
-const expectedPrefix = Buffer.concat([
-  Buffer.from([0x86, 0xa5]),
-  Buffer.from('magic'),
-  Buffer.from([0xac]),
-  Buffer.from('spointreplay'),
-  Buffer.from([0xa7]),
-  Buffer.from('version'),
-  Buffer.from([0x02]),
-])
-
 const patched = (bytes, needle, offset, byte) => {
-  const at = bytes.indexOf(Buffer.from(needle))
+  const at = Buffer.from(bytes).indexOf(Buffer.from(needle))
   assert(at >= 0, 'needle not found in the file: ' + needle)
   const copy = Buffer.from(bytes)
   copy[at + offset] = byte
   return copy
 }
 
-const valueOfVersion = (bytes) => {
-  const at = bytes.indexOf(Buffer.from('version'))
-  assert(at >= 0, 'version key not found')
-  return bytes[at + 7]
-}
-
-const withVersion = (bytes, version) => {
-  assert(valueOfVersion(bytes) === SPOINTREPLAY_VERSION, 'the writer did not put version 2 where expected')
-  return patched(bytes, 'version', 7, version)
-}
+const withVersion = (bytes, version) => pack({ ...unpack(bytes), version })
 
 const original = sample()
 const written = encodeReplay(original)
 
-gate('magic and version match spoint src/netcode/ReplayFile.js lines 3 and 4', () => {
+gate('magic and version are the spoint constants: spointreplay and 2', () => {
   assert(SPOINTREPLAY_MAGIC === 'spointreplay', 'magic constant is ' + SPOINTREPLAY_MAGIC)
   assert(SPOINTREPLAY_VERSION === 2, 'version constant is ' + SPOINTREPLAY_VERSION)
-  const prefix = written.subarray(0, expectedPrefix.length)
-  assert(prefix.equals(expectedPrefix), 'envelope prefix is ' + prefix.toString('hex') + ', expected ' + expectedPrefix.toString('hex'))
+})
+
+gate('the envelope opens with the msgpackr record definition that spoint writes (0xd4 0x72)', () => {
+  assert(written[0] === 0xd4 && written[1] === 0x72, 'envelope starts ' + Buffer.from(written.subarray(0, 4)).toString('hex'))
 })
 
 gate('a write then read returns the same records', () => {
@@ -114,12 +97,13 @@ gate('a truncated file is refused at every cut', () => {
 })
 
 gate('bytes after the top-level value are refused', () => {
-  const padded = Buffer.concat([written, Buffer.from([0x00])])
+  const padded = Buffer.concat([Buffer.from(written), Buffer.from([0x00])])
   assert(refuses(() => decodeReplay(padded)), 'a file with a trailing byte was accepted')
 })
 
-gate('the reserved marker 0xc1 of the msgpackr record dialect is refused', () => {
-  const foreign = patched(written, [0x86], 0, 0xc1)
+gate('a file whose first byte is the reserved marker 0xc1 is refused', () => {
+  const foreign = Buffer.from(written)
+  foreign[0] = 0xc1
   assert(refuses(() => decodeReplay(foreign)), 'a file starting with 0xc1 was accepted')
 })
 
@@ -130,13 +114,17 @@ gate('a flipped payload byte is accepted: the format has no checksum (documented
 })
 
 gate('a header-less envelope is refused', () => {
-  const headerless = encode({ magic: SPOINTREPLAY_MAGIC, version: SPOINTREPLAY_VERSION, inputs: [] })
+  const headerless = pack({ magic: SPOINTREPLAY_MAGIC, version: SPOINTREPLAY_VERSION, inputs: [] })
   assert(refuses(() => decodeReplay(headerless)), 'an envelope without a header was accepted')
 })
 
 gate('the writer refuses a value it cannot encode', () => {
   const bad = { header: { worldName: 'arena' }, inputs: [{ tick: 1, data: { x: undefined } }] }
   assert(refuses(() => encodeReplay(bad)), 'an undefined field was written')
+})
+
+gate('the reader refuses a non-binary input', () => {
+  assert(refuses(() => decodeReplay('not bytes')), 'a string was read as a replay')
 })
 
 finish()

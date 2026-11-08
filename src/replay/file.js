@@ -1,27 +1,38 @@
-import { encode, decode } from './msgpack.js'
+import { pack, unpack } from '../protocol/msgpack.js'
 
 export const SPOINTREPLAY_MAGIC = 'spointreplay'
 export const SPOINTREPLAY_VERSION = 2
 
 const READABLE_VERSIONS = [1, SPOINTREPLAY_VERSION]
 
+const refuseUndefined = (value, path) => {
+  if (value === undefined) throw new TypeError('encodeReplay cannot write an undefined value at ' + path)
+  if (Array.isArray(value)) {
+    value.forEach((item, index) => refuseUndefined(item, path + '[' + index + ']'))
+  } else if (value !== null && typeof value === 'object' && !(value instanceof Uint8Array)) {
+    for (const [key, item] of Object.entries(value)) refuseUndefined(item, path + '.' + key)
+  }
+}
+
 export const encodeReplay = ({ header, inputs, ticks, events }) => {
   if (!header || typeof header !== 'object') throw new TypeError('encodeReplay requires a header object')
   if (!Array.isArray(inputs)) throw new TypeError('encodeReplay requires an inputs array')
-  return encode({
+  const envelope = {
     magic: SPOINTREPLAY_MAGIC,
     version: SPOINTREPLAY_VERSION,
     header,
     inputs,
     ticks: Array.isArray(ticks) ? ticks : [],
     events: Array.isArray(events) ? events : [],
-  })
+  }
+  refuseUndefined(envelope, 'envelope')
+  return pack(envelope)
 }
 
 export const decodeReplay = (bytes) => {
   let envelope
   try {
-    envelope = decode(bytes)
+    envelope = unpack(bytes)
   } catch (error) {
     throw new RangeError('decodeReplay: not a valid .spointreplay file (' + error.message + ')')
   }

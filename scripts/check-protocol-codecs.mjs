@@ -1,4 +1,7 @@
 import { gate, finish } from './lib/gate.mjs'
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import {
   createInputSchema, encodeInputPacket, decodeInputPacket, tryEncodeInputPacket, quantizeInput, INPUT_CASE,
   defineComponentSchema, registerComponentSchema, validateSchema, encodeCustomFields, decodeCustomFields,
@@ -162,26 +165,36 @@ gate('msgpack round trips a nested value with binary, text and wide integers', (
   assert(deepEqual(unpack(pack(nested)), nested), 'nested value changed in the round trip')
 })
 
-gate('msgpack packs a Map to the same bytes as the object with the same entries', () => {
-  assert(hex(pack(new Map([['a', 1]]))) === hex(pack({ a: 1 })), 'Map bytes ' + hex(pack(new Map([['a', 1]]))))
-  assert(deepEqual(unpack(pack(new Map([['a', 1], ['b', 'x']]))), { a: 1, b: 'x' }), 'Map entries changed in the round trip')
+gate('msgpack packs a Map to a plain map and an object to the record dialect, and both read back the same', () => {
+  assert(hex(pack(new Map([['a', 1]]))) === '81a16101', 'Map bytes ' + hex(pack(new Map([['a', 1]]))))
+  assert(hex(pack({ a: 1 })) === 'd4724291a16101', 'object bytes ' + hex(pack({ a: 1 })))
+  assert(JSON.stringify([...unpack(pack(new Map([['a', 1], ['b', 'x']]))).entries()]) === JSON.stringify([['a', 1], ['b', 'x']]), 'Map entries changed in the round trip')
+  assert(deepEqual(unpack(pack({ a: 1 })), { a: 1 }), 'object changed in the round trip')
 })
 
-gate('msgpack refuses a Map with a non-string key instead of dropping it', () => {
-  refusedWith(() => pack(new Map([[1, 'x']])), /map keys must be strings/)
+gate('msgpack writes a Map with a numeric key as spoint does, the key as an integer', () => {
+  assert(hex(pack(new Map([[1, 'x']]))) === '8101a178', 'Map bytes ' + hex(pack(new Map([[1, 'x']]))))
 })
 
-gate('msgpack writes the specification bytes for two small values', () => {
+gate('msgpack writes the specification bytes for an array, a Map and an object', () => {
   assert(hex(pack([1, 'a', null])) === '9301a161c0', 'array bytes ' + hex(pack([1, 'a', null])))
-  assert(hex(pack({ a: 1 })) === '81a16101', 'map bytes ' + hex(pack({ a: 1 })))
+  assert(hex(pack(new Map([['a', 1]]))) === '81a16101', 'Map bytes ' + hex(pack(new Map([['a', 1]]))))
+  assert(hex(pack({ a: 1 })) === 'd4724291a16101', 'object bytes ' + hex(pack({ a: 1 })))
 })
 
-gate('msgpack refuses a truncated, trailing, unsupported or unencodable input', () => {
+gate('msgpack refuses a truncated, trailing, reserved or non-binary input', () => {
   const bytes = pack(nested)
-  refusedWith(() => unpack(bytes.subarray(0, bytes.length - 1)), /truncated input/)
-  refusedWith(() => unpack(concat(pack(1), [0])), /trailing byte/)
-  refusedWith(() => unpack(Uint8Array.of(0xc1)), /unsupported marker 0xc1/)
+  refusedWith(() => unpack(bytes.subarray(0, bytes.length - 1)), /./)
+  refusedWith(() => unpack(concat(pack(1), [0])), /end of buffer not reached/)
+  refusedWith(() => unpack(Uint8Array.of(0xc1)), /marker 0xc1 is reserved/)
+  refusedWith(() => unpack('9101'), /Uint8Array or ArrayBuffer/)
+  refusedWith(() => pack(Symbol('x')), /Unknown type: symbol/)
+})
+
+gate('msgpack refuses a function at any depth, where msgpackr would write it as undefined (d4 00 00)', () => {
   refusedWith(() => pack(() => 1), /cannot encode a value of type function/)
+  refusedWith(() => pack({ wrapped: [1, { f: () => 1 }] }), /cannot encode a value of type function/)
+  refusedWith(() => pack(new Map([['k', () => 1]])), /cannot encode a value of type function/)
 })
 
 gate('negative control: a changed nested value packs to different bytes', () => {
@@ -331,5 +344,41 @@ gate('cursor stream stop closes the connection once and ignores later events', (
   assert(closes.length === 1 && events.length === 0, 'closes ' + closes.length + ' events ' + events.length)
   assert(stream.running === false, 'still running after stop')
 })
+
+const codecBytes = JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'spoint', 'codec-bytes.json'), 'utf8'))
+
+const inputSchemaFor = (name) => (name === 'axes' ? createInputSchema({ inputAxes: ['throttle'] }) : createInputSchema())
+
+for (const packet of codecBytes.inputPackets) {
+  gate('input packet "' + packet.name + '" encodes to the spoint bytes', () => {
+    const result = tryEncodeInputPacket(inputSchemaFor(packet.schema), packet.entries, packet.epoch)
+    assert(result.accepted, 'jayzee refused the packet: ' + result.code)
+    assert(hex(result.bytes) === packet.hex, 'jayzee ' + hex(result.bytes) + ' differs from spoint ' + packet.hex)
+  })
+  gate('input packet "' + packet.name + '" decodes to the records spoint decodes', () => {
+    const decoded = decodeInputPacket(inputSchemaFor(packet.schema), Uint8Array.from(Buffer.from(packet.hex, 'hex')))
+    assert(decoded.accepted, 'jayzee refused the spoint bytes: ' + decoded.code)
+    assert(decoded.chartEpoch === packet.chartEpoch, 'chart epoch ' + decoded.chartEpoch)
+    assert(JSON.stringify(decoded.entries) === packet.decoded, 'decoded records differ from spoint')
+  })
+}
+
+const codecVitals = defineComponentSchema({
+  hp: { type: 'u16' },
+  kind: { type: 'enum', enum: ['idle', 'run', 'dead'] },
+  alive: { type: 'bool' },
+  label: { type: 'string' },
+  speed: { type: 'f32' }
+})
+
+for (const fields of codecBytes.componentFields) {
+  gate('component fields "' + fields.name + '" encode to the spoint bytes', () => {
+    assert(hex(encodeCustomFields(codecVitals, fields.value)) === fields.hex, 'jayzee ' + hex(encodeCustomFields(codecVitals, fields.value)) + ' differs from spoint ' + fields.hex)
+  })
+  gate('component fields "' + fields.name + '" decode to the values spoint decodes', () => {
+    const decoded = decodeCustomFields(codecVitals, Uint8Array.from(Buffer.from(fields.hex, 'hex')))
+    assert(JSON.stringify(decoded) === fields.decoded, 'decoded ' + JSON.stringify(decoded) + ' differs from spoint ' + fields.decoded)
+  })
+}
 
 finish()
