@@ -109,7 +109,7 @@ The dispatcher owns docs/ENGINE.md, so these are recorded here and not edited.
 - Witness, not run: adding and removing lights, textures and meshes during play leaves frame-time p99 unchanged, and no pipeline compiles after seal. The page measures JavaScript-side frame time only, with a registry stand-in for compiled pipelines. The WebGPU render cost is phase 10's witness.
 - Decisions and deviations for the dispatcher to decide:
   - This phase is JavaScript. ENGINE.md's slot rules belong to the wasm renderer (phase 10), so the module does not reach the GPU yet. Its pools are the slot layer phase 10 reads.
-  - The materials table in ENGINE.md is not coded.
+  - The materials table is coded in Gap closure 3.
   - A handle is generation times 65536 plus slot. Generations 1 to 65534 are issued, and a slot retires at its last generation instead of wrapping (see Gap closure 1).
   - Mutators throw a RangeError on a stale or unknown handle. `add` checks its input before it takes a slot, so a refused input leaves the pool unchanged, and returns -1 when the pool is full.
   - Mesh indices are the mesh's own vertex indices. The renderer adds the vertex offset that `rangeInto` returns. Each slot has a fixed vertex and index capacity, so a mesh cannot grow into its neighbour.
@@ -123,6 +123,15 @@ The dispatcher owns docs/ENGINE.md, so these are recorded here and not edited.
 - Witness, not run: phase 4, 65,535 spawn and despawn cycles on one slot of a capacity-2 world. Every issued handle is refused by despawn, the next spawn lands in slot 1, `retiredSlots` is 1, and a further spawn is refused. Phase 8, 65,534 acquire and release cycles on a one-slot pool. Every issued handle resolves to -1, `retired()` is 1, `count()` is 0, and a release of the last handle returns false.
 - Decisions: the C++ and JS pools start at different generations (0 and 1), so they issue 65,535 and 65,534 handles per slot. The JS start at 1 keeps handle 0 free as the "none" sentinel for the material table.
 - Cost: each slot is lost after its last generation, which is one slot per 65,535 uses (C++) or 65,534 (JS). The loss is not measured. A long-running host should watch `retiredSlots` against its budget.
+
+## Gap closure 3: material table as slots, phase 8 (coded, not built or run)
+- Change: `createMaterialPool({ capacity, textures })` in `src/client/resourcePools.js` holds materials as slots. Nine floats per slot are in one `Float32Array` (r, g, b, a, roughness, metallic, emissive r, g, b), and the albedo texture handle is in one `Uint32Array`, where 0 means no albedo. Material objects are never stored. The pool exposes `add`, `set`, `read` (which writes into a caller array and returns the albedo handle), `albedoOffset`, `isLive` and `remove`.
+- Refusals: colour and roughness and metallic must be finite and in 0 to 1. The emissive values must be finite and zero or more. A non-object is a TypeError. An albedo must be 0 or a live handle of the texture pool, which is checked on add and on set. Every check runs before a slot is taken, so a refused material leaves the table unchanged.
+- Dangling albedo: when the texture under a material is removed, `albedoOffset` returns -1, so the renderer can fall back. The old handle stays stale when the layer is reused, because texture handles are generation-checked.
+- `createTexturePool` gains `isLive`, which the material pool uses to check albedo.
+- Files: `src/client/resourcePools.js`, `scripts/check-client-resource-pools.mjs` (three gates: slot round trip and refusals, full table and removal, albedo validation and dangling textures, and a churn gate with the same backing buffers).
+- Witness, not run, phase 8: the material gates in `scripts/check-client-resource-pools.mjs`. The browser page does not yet draw from the table, so the frame-time witness has not been extended to materials.
+- Deviation: the material table is JavaScript, as the rest of phase 8 is. Its slots are the layer the phase 10 renderer will read, which ENGINE.md places in the wasm module.
 
 ## Gap closure 2: schema-driven input codec, phase 7 (coded, not built or run)
 - Port: `src/protocol/inputCodec.js` (`tryEncodeInputPacket` and `decodeInputPacket`) is ported in `engine/src/codec.h` and `engine/src/codec.cpp` as `encodePacket` and `decodePacket`. `InputCase` has the same order as `INPUT_CASE_CODES`, and a refusal returns `-1 - code`, so the code is `-1 - result`.

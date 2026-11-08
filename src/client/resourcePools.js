@@ -135,6 +135,7 @@ export const createTexturePool = ({ layers, width, height }) => {
     data,
     count: slots.count,
     layerOffset: (handle) => requireSlot(handle) * layerBytes,
+    isLive: (handle) => slots.resolve(handle) >= 0,
     add(pixels) {
       check(pixels)
       const handle = slots.acquire()
@@ -214,6 +215,77 @@ export const createMeshPool = ({ slots: capacity, vertexCapacity, indexCapacity,
       indices.fill(0, slot * indexCapacity, (slot + 1) * indexCapacity)
       vertexCounts[slot] = 0
       indexCounts[slot] = 0
+      return slots.release(handle)
+    }
+  }
+}
+
+const MATERIAL_KEYS = ['r', 'g', 'b', 'a', 'roughness', 'metallic', 'emissiveR', 'emissiveG', 'emissiveB']
+const MATERIAL_FIELDS = MATERIAL_KEYS.length
+const MATERIAL_UNIT_FIELDS = 6
+
+export const createMaterialPool = ({ capacity, textures = null }) => {
+  const slots = createSlotPool(capacity, 'materials')
+  const data = new Float32Array(capacity * MATERIAL_FIELDS)
+  const albedo = new Uint32Array(capacity)
+
+  const check = (material) => {
+    if (material === null || typeof material !== 'object') throw new TypeError('material must be an object')
+    for (let k = 0; k < MATERIAL_UNIT_FIELDS; k++) {
+      const value = finite(material[MATERIAL_KEYS[k]], 'material.' + MATERIAL_KEYS[k])
+      if (value < 0 || value > 1) throw new RangeError('material.' + MATERIAL_KEYS[k] + ' must lie from 0 to 1, got ' + value)
+    }
+    for (let k = MATERIAL_UNIT_FIELDS; k < MATERIAL_FIELDS; k++) {
+      const value = finite(material[MATERIAL_KEYS[k]], 'material.' + MATERIAL_KEYS[k])
+      if (value < 0) throw new RangeError('material.' + MATERIAL_KEYS[k] + ' must be zero or more, got ' + value)
+    }
+    const texture = material.albedo ?? 0
+    if (!Number.isInteger(texture) || texture < 0 || texture > 0xffffffff) throw new RangeError('material.albedo must be a texture handle or 0 for none, got ' + String(texture))
+    if (texture !== 0 && (textures === null || !textures.isLive(texture))) throw new RangeError('material.albedo is a stale or unknown texture handle ' + String(texture))
+  }
+  const store = (slot, material) => {
+    for (let k = 0; k < MATERIAL_FIELDS; k++) data[slot * MATERIAL_FIELDS + k] = material[MATERIAL_KEYS[k]]
+    albedo[slot] = material.albedo ?? 0
+  }
+  const requireSlot = (handle) => {
+    const slot = slots.resolve(handle)
+    if (slot < 0) throw new RangeError('stale or unknown material handle ' + String(handle))
+    return slot
+  }
+
+  return {
+    capacity,
+    data,
+    albedo,
+    count: slots.count,
+    add(material) {
+      check(material)
+      const handle = slots.acquire()
+      if (handle < 0) return -1
+      store(handle % SLOT_SPAN, material)
+      return handle
+    },
+    set(handle, material) {
+      check(material)
+      store(requireSlot(handle), material)
+    },
+    read(handle, out) {
+      const slot = requireSlot(handle)
+      if (out.length < MATERIAL_FIELDS) throw new RangeError('read needs an output of ' + MATERIAL_FIELDS + ' values')
+      for (let k = 0; k < MATERIAL_FIELDS; k++) out[k] = data[slot * MATERIAL_FIELDS + k]
+      return albedo[slot]
+    },
+    albedoOffset(handle) {
+      const texture = albedo[requireSlot(handle)]
+      if (texture === 0 || textures === null || !textures.isLive(texture)) return -1
+      return textures.layerOffset(texture)
+    },
+    isLive: (handle) => slots.resolve(handle) >= 0,
+    remove(handle) {
+      const slot = slots.resolve(handle)
+      if (slot < 0) return false
+      data.fill(0, slot * MATERIAL_FIELDS, (slot + 1) * MATERIAL_FIELDS)
+      albedo[slot] = 0
       return slots.release(handle)
     }
   }
