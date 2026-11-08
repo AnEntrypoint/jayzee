@@ -154,3 +154,5 @@ Non-obvious facts for automated edits. Architecture and measured costs live in d
 - `scripts/check-animation-rig.mjs` needs the `/workspace/spoint` checkout and is not part of `npm test`.
 - `createAnimationController` in `src/animation/animationController.js` needs a `{ now }` clock as its third argument. Its land timer fires on the first update at or after 500 ms on that clock.
 - `AnimationSystem` throws at construction when grounding finds a hips bone and `host.moveHips` is missing, because spoint always moves the hips.
+- `src/client/crowdDots.js` reproduces the cell-key quirk for both signs: cell (-1, 5) decodes to (0, -999998), so cx below 0 with cz above 0 also wraps, not only cx above 0 with cz below 0.
+- The pose and cadence values in `scripts/fixtures/spoint/crowd-dots.json` are transcriptions of spoint arithmetic, not spoint module output, because PlayerLOD needs three.js and TickHandler does not export its modulus.
