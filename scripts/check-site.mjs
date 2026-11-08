@@ -16,6 +16,11 @@ gate('the browser closure of the physics page is planned and carries no Node imp
   }
 })
 
+gate('the service worker re-serves every response with both cross-origin isolation headers', () => {
+  const text = planned.get('coi-sw.js').toString('utf8')
+  assert(text.includes("'Cross-Origin-Embedder-Policy'") && text.includes("'Cross-Origin-Opener-Policy'"), 'coi-sw.js does not set both isolation headers')
+})
+
 gate('negative control: the planner refuses a module that imports a Node built-in', () => {
   const read = (abs) => (abs.endsWith('World.js') ? "import { readFileSync } from 'node:fs'\n" : '')
   let refused = false

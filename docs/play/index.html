@@ -5,6 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>jayzee playable</title>
 <script type="importmap">{"imports":{"jz/interop":"./vendor/jz/instantiate.js"}}</script>
+<script>
+if (!self.crossOriginIsolated && 'serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./coi-sw.js')
+  navigator.serviceWorker.addEventListener('controllerchange', () => location.reload())
+}
+</script>
 <style>
 body { margin: 0; background: #101418; color: #d8dee9; font: 14px/1.4 monospace; }
 canvas { display: block; background: #1b2330; cursor: crosshair; }
