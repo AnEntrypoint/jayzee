@@ -143,3 +143,5 @@ Non-obvious facts for automated edits. Architecture and measured costs live in d
 - The first `getRenderState` after a correction shows the whole offset, because `ReconciliationEngine#decay` treats its first call as zero elapsed time.
 - `SnapshotProcessor` refuses a player record that is not 22 bytes and an entity record that is not 29 bytes with a RangeError, where spoint reads a truncated record silently.
 - `SnapshotProcessor` reads its injected `now` only when a snapshot timestamp is missing or 0, as spoint does, and throws a TypeError when no clock was given.
+- `createTerrainReanchor` in `src/terrain-pure/chartReanchorTerrain.js` throws a TypeError without a `now()` clock. spoint `createFieldLattice` is not ported, so a migrate needs a lattice passed in.
+- `createChartReanchorService` runs every terrain migrator before any state migrator. The first terrain gate that refuses leaves the frame unchanged and is tallied under its reason.
