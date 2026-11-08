@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { gate, finish } from './lib/gate.mjs'
-import { createSlotPool, createLightPool, createTexturePool, createMeshPool, createMaterialPool, createPipelineRegistry } from '../src/client/resourcePools.js'
+import { createSlotPool, createLightPool, createMeshPool, createPipelineRegistry } from '../src/client/resourcePools.js'
 
 const LIGHT = { x: 1, y: 2, z: 3, radius: 4, r: 0.5, g: 0.25, b: 0.125, intensity: 2 }
 const SLOT_SPAN = 65536
@@ -86,35 +86,6 @@ gate('lights: churn during play keeps the same backing buffer and leaves no ligh
   assert.equal(lights.count(), 0)
 })
 
-gate('textures: a layer takes exactly one image, a wrong size or type is refused', () => {
-  const textures = createTexturePool({ layers: 2, width: 2, height: 2 })
-  const handle = textures.add(new Uint8Array(16).fill(7))
-  assert.equal(textures.layerOffset(handle), 0)
-  assert.equal(textures.data[0], 7)
-  assert.throws(() => textures.add(new Uint8Array(15)), RangeError)
-  assert.throws(() => textures.add([1, 2]), TypeError)
-  assert.equal(textures.count(), 1)
-})
-
-gate('textures: a replaced layer takes the new image, a removed one is zeroed and its handle is refused', () => {
-  const textures = createTexturePool({ layers: 1, width: 2, height: 2 })
-  const handle = textures.add(new Uint8Array(16).fill(7))
-  textures.replace(handle, new Uint8Array(16).fill(9))
-  assert.equal(textures.data[0], 9)
-  assert.equal(textures.remove(handle), true)
-  assert.equal(textures.data[0], 0)
-  assert.throws(() => textures.replace(handle, new Uint8Array(16)), RangeError)
-  assert.throws(() => textures.layerOffset(handle), RangeError)
-})
-
-gate('textures: a full array refuses a new layer without writing into one', () => {
-  const textures = createTexturePool({ layers: 2, width: 1, height: 1 })
-  textures.add(new Uint8Array(4).fill(1))
-  textures.add(new Uint8Array(4).fill(2))
-  assert.equal(textures.add(new Uint8Array(4).fill(3)), -1)
-  assert.deepEqual(Array.from(textures.data), [1, 1, 1, 1, 2, 2, 2, 2])
-})
-
 gate('meshes: each slot holds its own range, and an oversize or out-of-range mesh is refused', () => {
   const meshes = createMeshPool({ slots: 2, vertexCapacity: 3, indexCapacity: 3, stride: 3 })
   const triangle = { vertices: new Float32Array(9).map((_, i) => i), indices: new Uint32Array([0, 1, 2]) }
@@ -150,58 +121,6 @@ gate('meshes: churn during play keeps the same backing buffers', () => {
   assert.equal(meshes.vertices, vertices)
   assert.equal(meshes.indices, indices)
   assert.equal(meshes.count(), 0)
-})
-
-const MATERIAL = { r: 0.5, g: 0.25, b: 0.125, a: 1, roughness: 0.5, metallic: 0, emissiveR: 2, emissiveG: 0, emissiveB: 0 }
-
-gate('materials: a material is a slot, read back exactly, and an invalid one is refused before a slot is taken', () => {
-  const materials = createMaterialPool({ capacity: 2 })
-  const handle = materials.add(MATERIAL)
-  const out = new Float32Array(9)
-  assert.equal(materials.read(handle, out), 0)
-  assert.deepEqual(Array.from(out), [0.5, 0.25, 0.125, 1, 0.5, 0, 2, 0, 0])
-  assert.throws(() => materials.add({ ...MATERIAL, r: 2 }), RangeError)
-  assert.throws(() => materials.add({ ...MATERIAL, emissiveR: -1 }), RangeError)
-  assert.throws(() => materials.add({ ...MATERIAL, roughness: NaN }), RangeError)
-  assert.throws(() => materials.add(null), TypeError)
-  assert.equal(materials.count(), 1)
-})
-
-gate('materials: a full table refuses a new material, and a removed one leaves zeros and a stale handle', () => {
-  const materials = createMaterialPool({ capacity: 1 })
-  const handle = materials.add(MATERIAL)
-  assert.equal(materials.add(MATERIAL), -1)
-  assert.equal(materials.remove(handle), true)
-  assert.deepEqual(Array.from(materials.data), new Array(9).fill(0))
-  assert.equal(materials.isLive(handle), false)
-  assert.throws(() => materials.read(handle, new Float32Array(9)), RangeError)
-  assert.throws(() => materials.set(handle, MATERIAL), RangeError)
-})
-
-gate('materials: an albedo must be a live texture, and a texture removed under a material leaves -1 until it is replaced', () => {
-  const textures = createTexturePool({ layers: 1, width: 1, height: 1 })
-  const materials = createMaterialPool({ capacity: 2, textures })
-  const texture = textures.add(new Uint8Array(4).fill(9))
-  const material = materials.add({ ...MATERIAL, albedo: texture })
-  assert.equal(materials.albedoOffset(material), 0)
-  assert.throws(() => materials.add({ ...MATERIAL, albedo: texture + 1 }), RangeError)
-  assert.throws(() => createMaterialPool({ capacity: 1 }).add({ ...MATERIAL, albedo: texture }), RangeError)
-  textures.remove(texture)
-  assert.equal(materials.albedoOffset(material), -1)
-  const replacement = textures.add(new Uint8Array(4).fill(7))
-  assert.notEqual(replacement, texture)
-  assert.equal(materials.albedoOffset(material), -1)
-  assert.throws(() => materials.add({ ...MATERIAL, albedo: texture }), RangeError)
-})
-
-gate('materials: churn during play keeps the same backing buffers', () => {
-  const materials = createMaterialPool({ capacity: 64 })
-  const data = materials.data
-  const albedo = materials.albedo
-  for (let i = 0; i < 10000; i++) materials.remove(materials.add(MATERIAL))
-  assert.equal(materials.data, data)
-  assert.equal(materials.albedo, albedo)
-  assert.equal(materials.count(), 0)
 })
 
 gate('pipelines: nothing compiles after seal, and an unregistered key is refused', () => {

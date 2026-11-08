@@ -1,3 +1,5 @@
+import { MATERIAL_ALBEDO_WORD, MATERIAL_FIELD_WORDS, MATERIAL_WORDS, TABLE_STATUS, TEXTURE_FORMAT } from '../engine/materials.js'
+
 const MAX_SLOTS = 65535
 const SLOT_SPAN = 65536
 const LAST_GENERATION = 65534
@@ -113,45 +115,49 @@ export const createLightPool = (capacity) => {
   }
 }
 
-export const createTexturePool = ({ layers, width, height }) => {
-  whole(width, 'texture width', 1, 65536)
-  whole(height, 'texture height', 1, 65536)
-  const slots = createSlotPool(layers, 'textures')
+export const createTexturePool = ({ layers, width, height, host = null, pixels = null }) => {
+  whole(width, 'texture width', 1, 16384)
+  whole(height, 'texture height', 1, 16384)
+  whole(layers, 'texture layers', 1, MAX_SLOTS)
+  if (host === null || typeof host !== 'object') throw new TypeError('createTexturePool needs a host, the wasm texture table from createTextures')
+  if (!(pixels instanceof Uint8Array)) throw new TypeError('createTexturePool needs pixels, a Uint8Array over the texture layers')
+  if (host.capacity !== layers) throw new RangeError('texture layers ' + layers + ' must match the wasm table capacity ' + host.capacity)
   const layerBytes = width * height * 4
-  const data = new Uint8Array(layers * layerBytes)
+  if (pixels.length !== layers * layerBytes) throw new RangeError('texture pixels hold ' + pixels.length + ' bytes, ' + layers + ' layers hold ' + layers * layerBytes)
 
-  const check = (pixels) => {
-    if (!(pixels instanceof Uint8Array)) throw new TypeError('pixels must be a Uint8Array')
-    if (pixels.length !== layerBytes) throw new RangeError('pixels hold ' + pixels.length + ' bytes, a layer holds ' + layerBytes)
+  const check = (bytes) => {
+    if (!(bytes instanceof Uint8Array)) throw new TypeError('pixels must be a Uint8Array')
+    if (bytes.length !== layerBytes) throw new RangeError('pixels hold ' + bytes.length + ' bytes, a layer holds ' + layerBytes)
   }
-  const requireSlot = (handle) => {
-    const slot = slots.resolve(handle)
-    if (slot < 0) throw new RangeError('stale or unknown texture handle ' + String(handle))
-    return slot
+  const layerStart = (handle) => {
+    const layer = host.layer(handle)
+    if (layer < 0) throw new RangeError('stale or unknown texture handle ' + String(handle))
+    return layer * layerBytes
   }
 
   return {
     layers,
-    data,
-    count: slots.count,
-    layerOffset: (handle) => requireSlot(handle) * layerBytes,
-    isLive: (handle) => slots.resolve(handle) >= 0,
-    add(pixels) {
-      check(pixels)
-      const handle = slots.acquire()
-      if (handle < 0) return -1
-      data.set(pixels, (handle % SLOT_SPAN) * layerBytes)
+    data: pixels,
+    count: () => host.liveCount(),
+    layerOffset: layerStart,
+    isLive: (handle) => host.isLive(handle),
+    add(bytes) {
+      check(bytes)
+      const handle = host.add(width, height, TEXTURE_FORMAT.RGBA8_UNORM)
+      if (handle === TABLE_STATUS.FULL) return -1
+      if (handle < 0) throw new RangeError('texture add was refused by the wasm table with status ' + String(handle))
+      pixels.set(bytes, layerStart(handle))
       return handle
     },
-    replace(handle, pixels) {
-      check(pixels)
-      data.set(pixels, requireSlot(handle) * layerBytes)
+    replace(handle, bytes) {
+      check(bytes)
+      pixels.set(bytes, layerStart(handle))
     },
     remove(handle) {
-      const slot = slots.resolve(handle)
-      if (slot < 0) return false
-      data.fill(0, slot * layerBytes, (slot + 1) * layerBytes)
-      return slots.release(handle)
+      const layer = host.layer(handle)
+      if (layer < 0) return false
+      pixels.fill(0, layer * layerBytes, (layer + 1) * layerBytes)
+      return host.remove(handle) === TABLE_STATUS.OK
     }
   }
 }
@@ -220,35 +226,20 @@ export const createMeshPool = ({ slots: capacity, vertexCapacity, indexCapacity,
   }
 }
 
-const MATERIAL_KEYS = ['r', 'g', 'b', 'a', 'roughness', 'metallic', 'emissiveR', 'emissiveG', 'emissiveB']
-const MATERIAL_FIELDS = MATERIAL_KEYS.length
-const MATERIAL_UNIT_FIELDS = 6
+export const createMaterialPool = ({ capacity, host = null, textures = null }) => {
+  if (host === null || typeof host !== 'object') throw new TypeError('createMaterialPool needs a host, the wasm material table from createMaterials')
+  if (host.capacity !== capacity) throw new RangeError('material capacity ' + capacity + ' must match the wasm table capacity ' + host.capacity)
+  const { data, words } = host
 
-export const createMaterialPool = ({ capacity, textures = null }) => {
-  const slots = createSlotPool(capacity, 'materials')
-  const data = new Float32Array(capacity * MATERIAL_FIELDS)
-  const albedo = new Uint32Array(capacity)
-
-  const check = (material) => {
+  const refuse = (status, what) => {
+    if (status === TABLE_STATUS.FULL) return -1
+    throw new RangeError(what + ' was refused by the wasm material table with status ' + String(status))
+  }
+  const requireObject = (material) => {
     if (material === null || typeof material !== 'object') throw new TypeError('material must be an object')
-    for (let k = 0; k < MATERIAL_UNIT_FIELDS; k++) {
-      const value = finite(material[MATERIAL_KEYS[k]], 'material.' + MATERIAL_KEYS[k])
-      if (value < 0 || value > 1) throw new RangeError('material.' + MATERIAL_KEYS[k] + ' must lie from 0 to 1, got ' + value)
-    }
-    for (let k = MATERIAL_UNIT_FIELDS; k < MATERIAL_FIELDS; k++) {
-      const value = finite(material[MATERIAL_KEYS[k]], 'material.' + MATERIAL_KEYS[k])
-      if (value < 0) throw new RangeError('material.' + MATERIAL_KEYS[k] + ' must be zero or more, got ' + value)
-    }
-    const texture = material.albedo ?? 0
-    if (!Number.isInteger(texture) || texture < 0 || texture > 0xffffffff) throw new RangeError('material.albedo must be a texture handle or 0 for none, got ' + String(texture))
-    if (texture !== 0 && (textures === null || !textures.isLive(texture))) throw new RangeError('material.albedo is a stale or unknown texture handle ' + String(texture))
   }
-  const store = (slot, material) => {
-    for (let k = 0; k < MATERIAL_FIELDS; k++) data[slot * MATERIAL_FIELDS + k] = material[MATERIAL_KEYS[k]]
-    albedo[slot] = material.albedo ?? 0
-  }
-  const requireSlot = (handle) => {
-    const slot = slots.resolve(handle)
+  const slotOf = (handle) => {
+    const slot = host.slot(handle)
     if (slot < 0) throw new RangeError('stale or unknown material handle ' + String(handle))
     return slot
   }
@@ -256,37 +247,32 @@ export const createMaterialPool = ({ capacity, textures = null }) => {
   return {
     capacity,
     data,
-    albedo,
-    count: slots.count,
+    words,
+    count: () => host.liveCount(),
     add(material) {
-      check(material)
-      const handle = slots.acquire()
-      if (handle < 0) return -1
-      store(handle % SLOT_SPAN, material)
-      return handle
+      requireObject(material)
+      const handle = host.add(material.r, material.g, material.b, material.a, material.roughness, material.metallic, material.emissiveR, material.emissiveG, material.emissiveB, material.albedo ?? 0)
+      return handle >= 0 ? handle : refuse(handle, 'material add')
     },
     set(handle, material) {
-      check(material)
-      store(requireSlot(handle), material)
+      requireObject(material)
+      const status = host.set(handle, material.r, material.g, material.b, material.a, material.roughness, material.metallic, material.emissiveR, material.emissiveG, material.emissiveB, material.albedo ?? 0)
+      if (status !== TABLE_STATUS.OK) refuse(status, 'material set')
     },
     read(handle, out) {
-      const slot = requireSlot(handle)
-      if (out.length < MATERIAL_FIELDS) throw new RangeError('read needs an output of ' + MATERIAL_FIELDS + ' values')
-      for (let k = 0; k < MATERIAL_FIELDS; k++) out[k] = data[slot * MATERIAL_FIELDS + k]
-      return albedo[slot]
+      const base = slotOf(handle) * MATERIAL_WORDS
+      if (out.length < MATERIAL_FIELD_WORDS) throw new RangeError('read needs an output of ' + MATERIAL_FIELD_WORDS + ' values')
+      for (let k = 0; k < MATERIAL_FIELD_WORDS; k++) out[k] = data[base + k]
+      return words[base + MATERIAL_ALBEDO_WORD]
     },
     albedoOffset(handle) {
-      const texture = albedo[requireSlot(handle)]
+      const texture = words[slotOf(handle) * MATERIAL_WORDS + MATERIAL_ALBEDO_WORD]
       if (texture === 0 || textures === null || !textures.isLive(texture)) return -1
       return textures.layerOffset(texture)
     },
-    isLive: (handle) => slots.resolve(handle) >= 0,
+    isLive: (handle) => host.isLive(handle),
     remove(handle) {
-      const slot = slots.resolve(handle)
-      if (slot < 0) return false
-      data.fill(0, slot * MATERIAL_FIELDS, (slot + 1) * MATERIAL_FIELDS)
-      albedo[slot] = 0
-      return slots.release(handle)
+      return host.remove(handle) === TABLE_STATUS.OK
     }
   }
 }
