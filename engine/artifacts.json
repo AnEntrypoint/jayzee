@@ -4,7 +4,7 @@
   "artifacts": {
     "engine-core-64mib": {
       "wasm": "engine/out/engine-core-64mib.wasm",
-      "sha256": "fbfcc4ade72fc422a1ae62f4320c91badc7349f24a7422a979809c90019e5777"
+      "sha256": "147e48a44fa4167a9d3daed9ad0a0407a58667910ec23a9b4e3f862e4247ab0c"
     }
   }
 }
