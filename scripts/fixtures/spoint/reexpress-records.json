@@ -1,0 +1,627 @@
+{
+  "source": "spoint src/client/reexpressRecords.js",
+  "cases": [
+    {
+      "label": "a full player record reexpresses every field and clears the wall planes",
+      "kind": "player",
+      "input": {
+        "position": [
+          1,
+          2,
+          3
+        ],
+        "velocity": [
+          0,
+          -1,
+          0
+        ],
+        "rotation": 0.5,
+        "lookYaw": 0.1,
+        "lookPitch": -0.2,
+        "groundNormal": [
+          0,
+          1,
+          0
+        ],
+        "wallPlanes": [
+          {
+            "n": [
+              1,
+              0,
+              0
+            ]
+          },
+          {
+            "n": [
+              0,
+              0,
+              1
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "trace": [
+          [
+            "point",
+            [
+              1,
+              2,
+              3
+            ]
+          ],
+          [
+            "vector",
+            [
+              0,
+              -1,
+              0
+            ]
+          ],
+          [
+            "yawRotation",
+            0.5
+          ],
+          [
+            "look",
+            "<subject>",
+            "lookYaw",
+            "lookPitch"
+          ],
+          [
+            "vector",
+            [
+              0,
+              1,
+              0
+            ]
+          ]
+        ],
+        "hasWallPlanes": true,
+        "wallPlanes": []
+      }
+    },
+    {
+      "label": "a player without a wall plane field gains none",
+      "kind": "player",
+      "input": {
+        "position": [
+          1,
+          2,
+          3
+        ],
+        "velocity": [
+          0,
+          -1,
+          0
+        ],
+        "rotation": 0.5,
+        "lookYaw": 0.1,
+        "lookPitch": -0.2,
+        "groundNormal": [
+          0,
+          1,
+          0
+        ]
+      },
+      "expect": {
+        "trace": [
+          [
+            "point",
+            [
+              1,
+              2,
+              3
+            ]
+          ],
+          [
+            "vector",
+            [
+              0,
+              -1,
+              0
+            ]
+          ],
+          [
+            "yawRotation",
+            0.5
+          ],
+          [
+            "look",
+            "<subject>",
+            "lookYaw",
+            "lookPitch"
+          ],
+          [
+            "vector",
+            [
+              0,
+              1,
+              0
+            ]
+          ]
+        ],
+        "hasWallPlanes": false,
+        "wallPlanes": {
+          "$undef": true
+        }
+      }
+    },
+    {
+      "label": "an empty wall plane list stays empty",
+      "kind": "player",
+      "input": {
+        "position": [
+          1,
+          2,
+          3
+        ],
+        "velocity": [
+          0,
+          -1,
+          0
+        ],
+        "rotation": 0.5,
+        "lookYaw": 0.1,
+        "lookPitch": -0.2,
+        "groundNormal": [
+          0,
+          1,
+          0
+        ],
+        "wallPlanes": []
+      },
+      "expect": {
+        "trace": [
+          [
+            "point",
+            [
+              1,
+              2,
+              3
+            ]
+          ],
+          [
+            "vector",
+            [
+              0,
+              -1,
+              0
+            ]
+          ],
+          [
+            "yawRotation",
+            0.5
+          ],
+          [
+            "look",
+            "<subject>",
+            "lookYaw",
+            "lookPitch"
+          ],
+          [
+            "vector",
+            [
+              0,
+              1,
+              0
+            ]
+          ]
+        ],
+        "hasWallPlanes": true,
+        "wallPlanes": []
+      }
+    },
+    {
+      "label": "a null wall plane list is left as it is",
+      "kind": "player",
+      "input": {
+        "position": [
+          1,
+          2,
+          3
+        ],
+        "velocity": [
+          0,
+          -1,
+          0
+        ],
+        "rotation": 0.5,
+        "lookYaw": 0.1,
+        "lookPitch": -0.2,
+        "groundNormal": [
+          0,
+          1,
+          0
+        ],
+        "wallPlanes": null
+      },
+      "expect": {
+        "trace": [
+          [
+            "point",
+            [
+              1,
+              2,
+              3
+            ]
+          ],
+          [
+            "vector",
+            [
+              0,
+              -1,
+              0
+            ]
+          ],
+          [
+            "yawRotation",
+            0.5
+          ],
+          [
+            "look",
+            "<subject>",
+            "lookYaw",
+            "lookPitch"
+          ],
+          [
+            "vector",
+            [
+              0,
+              1,
+              0
+            ]
+          ]
+        ],
+        "hasWallPlanes": true,
+        "wallPlanes": null
+      }
+    },
+    {
+      "label": "a non-finite position component is passed through unchanged",
+      "kind": "player",
+      "input": {
+        "position": [
+          {
+            "$num": "NaN"
+          },
+          0,
+          {
+            "$num": "Infinity"
+          }
+        ],
+        "velocity": [
+          0,
+          -1,
+          0
+        ],
+        "rotation": 0.5,
+        "lookYaw": 0.1,
+        "lookPitch": -0.2,
+        "groundNormal": [
+          0,
+          1,
+          0
+        ],
+        "wallPlanes": [
+          {
+            "n": [
+              0,
+              1,
+              0
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "trace": [
+          [
+            "point",
+            [
+              {
+                "$num": "NaN"
+              },
+              0,
+              {
+                "$num": "Infinity"
+              }
+            ]
+          ],
+          [
+            "vector",
+            [
+              0,
+              -1,
+              0
+            ]
+          ],
+          [
+            "yawRotation",
+            0.5
+          ],
+          [
+            "look",
+            "<subject>",
+            "lookYaw",
+            "lookPitch"
+          ],
+          [
+            "vector",
+            [
+              0,
+              1,
+              0
+            ]
+          ]
+        ],
+        "hasWallPlanes": true,
+        "wallPlanes": []
+      }
+    },
+    {
+      "label": "a player with no ground normal passes undefined to the pass",
+      "kind": "player",
+      "input": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "velocity": [
+          0,
+          0,
+          0
+        ],
+        "rotation": 0,
+        "lookYaw": 0,
+        "lookPitch": 0,
+        "wallPlanes": [
+          {
+            "n": [
+              1,
+              0,
+              0
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "trace": [
+          [
+            "point",
+            [
+              0,
+              0,
+              0
+            ]
+          ],
+          [
+            "vector",
+            [
+              0,
+              0,
+              0
+            ]
+          ],
+          [
+            "yawRotation",
+            0
+          ],
+          [
+            "look",
+            "<subject>",
+            "lookYaw",
+            "lookPitch"
+          ],
+          [
+            "vector",
+            {
+              "$undef": true
+            }
+          ]
+        ],
+        "hasWallPlanes": true,
+        "wallPlanes": []
+      }
+    },
+    {
+      "label": "an entity record reexpresses position, velocity and rotation",
+      "kind": "entity",
+      "input": {
+        "position": [
+          4,
+          5,
+          6
+        ],
+        "velocity": [
+          1,
+          0,
+          0
+        ],
+        "rotation": 1.5
+      },
+      "expect": {
+        "trace": [
+          [
+            "point",
+            [
+              4,
+              5,
+              6
+            ]
+          ],
+          [
+            "vector",
+            [
+              1,
+              0,
+              0
+            ]
+          ],
+          [
+            "rotation",
+            1.5
+          ]
+        ],
+        "hasWallPlanes": false,
+        "wallPlanes": {
+          "$undef": true
+        }
+      }
+    },
+    {
+      "label": "an entity with zero state reexpresses zeros",
+      "kind": "entity",
+      "input": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "velocity": [
+          0,
+          0,
+          0
+        ],
+        "rotation": 0
+      },
+      "expect": {
+        "trace": [
+          [
+            "point",
+            [
+              0,
+              0,
+              0
+            ]
+          ],
+          [
+            "vector",
+            [
+              0,
+              0,
+              0
+            ]
+          ],
+          [
+            "rotation",
+            0
+          ]
+        ],
+        "hasWallPlanes": false,
+        "wallPlanes": {
+          "$undef": true
+        }
+      }
+    },
+    {
+      "label": "an entity with a non-finite rotation passes it through unchanged",
+      "kind": "entity",
+      "input": {
+        "position": [
+          4,
+          5,
+          6
+        ],
+        "velocity": [
+          1,
+          0,
+          0
+        ],
+        "rotation": {
+          "$num": "Infinity"
+        }
+      },
+      "expect": {
+        "trace": [
+          [
+            "point",
+            [
+              4,
+              5,
+              6
+            ]
+          ],
+          [
+            "vector",
+            [
+              1,
+              0,
+              0
+            ]
+          ],
+          [
+            "rotation",
+            {
+              "$num": "Infinity"
+            }
+          ]
+        ],
+        "hasWallPlanes": false,
+        "wallPlanes": {
+          "$undef": true
+        }
+      }
+    },
+    {
+      "label": "an entity that carries wall planes keeps them",
+      "kind": "entity",
+      "input": {
+        "position": [
+          4,
+          5,
+          6
+        ],
+        "velocity": [
+          1,
+          0,
+          0
+        ],
+        "rotation": 1.5,
+        "wallPlanes": [
+          {
+            "n": [
+              1,
+              0,
+              0
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "trace": [
+          [
+            "point",
+            [
+              4,
+              5,
+              6
+            ]
+          ],
+          [
+            "vector",
+            [
+              1,
+              0,
+              0
+            ]
+          ],
+          [
+            "rotation",
+            1.5
+          ]
+        ],
+        "hasWallPlanes": true,
+        "wallPlanes": [
+          {
+            "n": [
+              1,
+              0,
+              0
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}
