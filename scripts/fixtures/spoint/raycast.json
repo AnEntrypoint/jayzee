@@ -1,0 +1,27 @@
+{
+  "source": {
+    "file": "src/physics/World.js",
+    "sha256": "2c978302c0fa894b8168e0e1ad8242a5bd5e70c0ee571274b22e4815197e1d3e",
+    "dormantFile": "src/physics/DormantStatics.js",
+    "dormantSha256": "933bb30f065e13cc6e3375fa64bae1cccafe937ac5033059f345ab222ffa957b",
+    "joltPhysics": "1.1.0"
+  },
+  "rows": [
+    "{\"label\":s:\"floor from 10 m, no exclude\",\"result\":{\"bodyId\":n:8388608,\"distance\":n:10.000000149011612,\"hit\":b:true,\"normal\":[n:0,n:1,n:0],\"position\":[n:0,n:-1.4901161193847656e-7,n:0],\"unavailable\":null}}",
+    "{\"label\":s:\"box top from above, no exclude\",\"result\":{\"bodyId\":n:8388609,\"distance\":n:3.0000001192092896,\"hit\":b:true,\"normal\":[n:0,n:1,n:0],\"position\":[n:5,n:1.9999998807907104,n:5],\"unavailable\":null}}",
+    "{\"label\":s:\"box top, excluded by a single id\",\"result\":{\"bodyId\":n:8388608,\"distance\":n:5,\"hit\":b:true,\"normal\":[n:0,n:1,n:0],\"position\":[n:5,n:0,n:5],\"unavailable\":null}}",
+    "{\"label\":s:\"box top, excluded by an array of one id\",\"result\":{\"bodyId\":n:8388608,\"distance\":n:5,\"hit\":b:true,\"normal\":[n:0,n:1,n:0],\"position\":[n:5,n:0,n:5],\"unavailable\":null}}",
+    "{\"label\":s:\"floor and box excluded by an array\",\"result\":{\"bodyId\":null,\"distance\":n:20,\"hit\":b:false,\"normal\":null,\"position\":null,\"unavailable\":null}}",
+    "{\"label\":s:\"exclude an id that is not in the world\",\"result\":{\"bodyId\":n:8388609,\"distance\":n:3.0000001192092896,\"hit\":b:true,\"normal\":[n:0,n:1,n:0],\"position\":[n:5,n:1.9999998807907104,n:5],\"unavailable\":null}}",
+    "{\"label\":s:\"exclude an unknown id beside the box id\",\"result\":{\"bodyId\":n:8388608,\"distance\":n:5,\"hit\":b:true,\"normal\":[n:0,n:1,n:0],\"position\":[n:5,n:0,n:5],\"unavailable\":null}}",
+    "{\"label\":s:\"parallel ray misses the floor\",\"result\":{\"bodyId\":null,\"distance\":n:100,\"hit\":b:false,\"normal\":null,\"position\":null,\"unavailable\":null}}",
+    "{\"label\":s:\"unnormalised direction hits the second box top\",\"result\":{\"bodyId\":n:8388610,\"distance\":n:6.000000238418579,\"hit\":b:true,\"normal\":[n:0,n:1,n:0],\"position\":[n:-20,n:3.999999761581421,n:-3],\"unavailable\":null}}",
+    "{\"label\":s:\"ray that stops short of the floor\",\"result\":{\"bodyId\":null,\"distance\":n:5,\"hit\":b:false,\"normal\":null,\"position\":null,\"unavailable\":null}}",
+    "{\"label\":s:\"park box A as a dormant static\",\"result\":{\"parked\":n:1}}",
+    "{\"label\":s:\"parked box blocks a ray that reaches it\",\"result\":{\"bodyId\":null,\"distance\":n:20,\"hit\":b:false,\"normal\":null,\"position\":null,\"unavailable\":s:\"static-colliders-migrating\"}}",
+    "{\"label\":s:\"parked box is clear of a ray that misses it\",\"result\":{\"bodyId\":n:8388608,\"distance\":n:10.000000149011612,\"hit\":b:true,\"normal\":[n:0,n:1,n:0],\"position\":[n:0,n:-1.4901161193847656e-7,n:0],\"unavailable\":null}}",
+    "{\"label\":s:\"parked box, box excluded, floor beyond its reach\",\"result\":{\"bodyId\":null,\"distance\":n:20,\"hit\":b:false,\"normal\":null,\"position\":null,\"unavailable\":s:\"static-colliders-migrating\"}}",
+    "{\"label\":s:\"drain every parked static\",\"result\":{\"drained\":n:1}}",
+    "{\"label\":s:\"after the drain the box blocks the ray again\",\"result\":{\"bodyId\":n:8388609,\"distance\":n:3.0000001192092896,\"hit\":b:true,\"normal\":[n:0,n:1,n:0],\"position\":[n:5,n:1.9999998807907104,n:5],\"unavailable\":null}}"
+  ]
+}

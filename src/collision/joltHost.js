@@ -1,5 +1,6 @@
 import { JoltLimitsError, joltReservationBytes, resolveJoltLimits } from '../motion-pure/joltLimits.js'
 import { createStaticTileIndex, STATIC_TILE_M } from './staticTileIndex.js'
+import { createDormantStatics } from './dormantStatics.js'
 
 const LAYER_STATIC = 0
 const LAYER_DYNAMIC = 1
@@ -54,6 +55,7 @@ export async function createJoltHost({ gravity = [0, -9.81, 0], joltLimits = nul
   const bodyIds = new Map()
   const shapeKeys = new Map()
   let staticTiles = null
+  let dormant = null
 
   const host = {
     Jolt: J,
@@ -67,8 +69,14 @@ export async function createJoltHost({ gravity = [0, -9.81, 0], joltLimits = nul
     addBody,
     addStaticTriangles,
     enableStaticTiles,
+    forgetStaticTile,
+    repositionBody,
     castRay,
     boundsOf,
+    get dormantStatics() {
+      if (!dormant) dormant = createDormantStatics(host)
+      return dormant
+    },
     bodyCount: () => physicsSystem.GetNumBodies(),
     destroy,
   }
@@ -136,7 +144,19 @@ export async function createJoltHost({ gravity = [0, -9.81, 0], joltLimits = nul
     return staticTiles
   }
 
-  function castRay(from, direction, maxDistance = 1000) {
+  function ignoreFilter(excludeBodyId) {
+    if (excludeBodyId == null) return bodyFilter
+    const ids = Array.isArray(excludeBodyId) ? excludeBodyId : [excludeBodyId]
+    const jids = []
+    for (const id of ids) { const b = bodies.get(id); if (b) jids.push(b.GetID()) }
+    if (jids.length === 0) return bodyFilter
+    if (jids.length === 1) return new J.IgnoreSingleBodyFilter(jids[0])
+    const filter = new J.IgnoreMultipleBodiesFilter()
+    for (const jid of jids) filter.IgnoreBody(jid)
+    return filter
+  }
+
+  function castRay(from, direction, maxDistance = 1000, excludeBodyId = null) {
     const len = Math.hypot(direction[0], direction[1], direction[2])
     const dx = len > 0 ? direction[0] / len : direction[0]
     const dy = len > 0 ? direction[1] / len : direction[1]
@@ -146,17 +166,45 @@ export async function createJoltHost({ gravity = [0, -9.81, 0], joltLimits = nul
     ray.set_mOrigin(origin)
     ray.set_mDirection(dir)
     collector.Reset()
-    physicsSystem.GetNarrowPhaseQuery().CastRay(ray, raySettings, collector, broadPhaseFilter, objectLayerFilter, bodyFilter, shapeFilter)
-    if (!collector.HadHit()) return { hit: false, distance: maxDistance, bodyId: null, normal: null, position: null }
-    const hit = collector.get_mHit()
-    const distance = hit.mFraction * maxDistance
-    const position = [from[0] + dx * distance, from[1] + dy * distance, from[2] + dz * distance]
-    const bodyId = hit.mBodyID.GetIndexAndSequenceNumber()
-    normalPoint.Set(position[0], position[1], position[2])
-    const n = bodies.get(bodyId).GetWorldSpaceSurfaceNormal(hit.mSubShapeID2, normalPoint)
-    const normal = [n.GetX(), n.GetY(), n.GetZ()]
-    J.destroy(n)
-    return { hit: true, distance, bodyId, normal, position }
+    const filter = ignoreFilter(excludeBodyId)
+    physicsSystem.GetNarrowPhaseQuery().CastRay(ray, raySettings, collector, broadPhaseFilter, objectLayerFilter, filter, shapeFilter)
+    let result = { hit: false, distance: maxDistance, bodyId: null, normal: null, position: null }
+    if (collector.HadHit()) {
+      const hit = collector.get_mHit()
+      const distance = hit.mFraction * maxDistance
+      const position = [from[0] + dx * distance, from[1] + dy * distance, from[2] + dz * distance]
+      const bodyId = hit.mBodyID.GetIndexAndSequenceNumber()
+      normalPoint.Set(position[0], position[1], position[2])
+      const n = bodies.get(bodyId).GetWorldSpaceSurfaceNormal(hit.mSubShapeID2, normalPoint)
+      const normal = [n.GetX(), n.GetY(), n.GetZ()]
+      J.destroy(n)
+      result = { hit: true, distance, bodyId, normal, position }
+    }
+    if (filter !== bodyFilter) J.destroy(filter)
+    if (dormant && dormant.pendingCount > 0) {
+      const reach = dormant.firstReach(from, [dx, dy, dz], maxDistance)
+      if (reach < (result.hit ? result.distance : maxDistance)) return { hit: false, distance: maxDistance, bodyId: null, normal: null, position: null, unavailable: 'static-colliders-migrating' }
+    }
+    return result
+  }
+
+  function forgetStaticTile(id) {
+    if (staticTiles) staticTiles.forget(id)
+  }
+
+  function repositionBody(id, position, rotation = null) {
+    const body = bodies.get(id)
+    if (!body) return
+    const p = new J.RVec3(position[0], position[1], position[2])
+    if (rotation) {
+      const q = new J.Quat(rotation[0], rotation[1], rotation[2], rotation[3])
+      bodyInterface.SetPositionAndRotation(body.GetID(), p, q, J.EActivation_DontActivate)
+      J.destroy(q)
+    } else {
+      bodyInterface.SetPosition(body.GetID(), p, J.EActivation_DontActivate)
+    }
+    J.destroy(p)
+    if (staticTiles) staticTiles.update(id)
   }
 
   function boundsOf(id) {
@@ -168,6 +216,8 @@ export async function createJoltHost({ gravity = [0, -9.81, 0], joltLimits = nul
   }
 
   function destroy() {
+    if (dormant) dormant.destroy()
+    dormant = null
     if (staticTiles) staticTiles.destroy()
     staticTiles = null
     for (const v of [origin, dir, normalPoint]) J.destroy(v)
