@@ -91,4 +91,16 @@ gate('a body whose digest is not pinned, a wrong pin, a duplicate module and inv
   mustReject(() => bindBuiltinBodies([bad], () => 'x', { 'sections/builtin-bad.md': 'x' }))
 })
 
+gate('every one of the 21 builtin bodies is served by name as strict UTF-8 text, with its heading, its file and the Tome byte count', () => {
+  for (const module of modules) {
+    const served = builtinBody(modules, module.name)
+    assert(served !== null, 'not served by name: ' + module.name)
+    same(served.file, 'sections/builtin-' + module.name + '.md', module.name + ' file')
+    same(served.text.split('\n')[0], '## builtin/' + module.name, module.name + ' heading')
+    same(served.bytes, rows.find((row) => row.file === served.file).bytes, module.name + ' bytes')
+    same(served.text, new TextDecoder('utf-8', { fatal: true }).decode(sections.find((section) => section.file === served.file).bytes), module.name + ' text')
+    same(builtinBody(modules, module.name + '-x'), null, module.name + '-x is not served')
+  }
+})
+
 finish()
