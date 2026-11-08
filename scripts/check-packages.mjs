@@ -710,11 +710,20 @@ gate('buildClusterLodExtra adds materialBucket only when one is given', () => {
   assert(tagged.materialBucket === 'stone', 'control: a given materialBucket must be written')
 })
 
-gate('parseClusterLod returns null without a valid EP_cluster_lod payload', () => {
+gate('parseClusterLod returns null for an absent or empty payload and refuses a malformed one, as spoint does', () => {
+  const refusesMalformed = (fn) => {
+    try {
+      fn()
+    } catch (error) {
+      return error.name === 'ClusterLodRecordError' && error.code === 'cluster-lod-malformed'
+    }
+    return false
+  }
   assert(streamingGltf.parseClusterLod(undefined) === null, 'undefined extras parsed')
   assert(streamingGltf.parseClusterLod({ EP_cluster_lod: { clusters: [] } }) === null, 'an empty cluster list parsed')
-  assert(streamingGltf.parseClusterLod({ EP_cluster_lod: { clusters: [{ aabb: [0, 0, 0, 1, 1, 1], sphere: [0, 0], lods: [[0, 3]] }] } }) === null, 'a two-element sphere parsed')
-  assert(streamingGltf.parseClusterLod({ EP_cluster_lod: { clusters: [{ aabb: [0, 0, 0, Number.NaN, 1, 1], sphere: [0, 0, 0, 1], lods: [[0, 3]] }] } }) === null, 'a NaN aabb parsed')
+  assert(refusesMalformed(() => streamingGltf.parseClusterLod({ EP_cluster_lod: { clusters: 'nope' } })), 'a non-array cluster list was not refused')
+  assert(refusesMalformed(() => streamingGltf.parseClusterLod({ EP_cluster_lod: { clusters: [{ aabb: [0, 0, 0, 1, 1, 1], sphere: [0, 0], lods: [[0, 3]] }] } })), 'a two-element sphere was not refused')
+  assert(refusesMalformed(() => streamingGltf.parseClusterLod({ EP_cluster_lod: { clusters: [{ aabb: [0, 0, 0, Number.NaN, 1, 1], sphere: [0, 0, 0, 1], lods: [[0, 3]] }] } })), 'a NaN aabb was not refused')
   const valid = { EP_cluster_lod: { clusters: [{ aabb: [0, 0, 0, 1, 1, 1], sphere: [0, 0, 0, 1], lods: [[0, 3]] }] } }
   assert(streamingGltf.parseClusterLod(valid) !== null, 'control: a valid payload must parse')
 })

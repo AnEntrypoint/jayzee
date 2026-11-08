@@ -178,3 +178,9 @@ Non-obvious facts for automated edits. Architecture and measured costs live in d
 - The snapshot splice is inert under msgpackr 2.0.4: `packSnapshotBytes` returns null for every shape, as in spoint.
 - The site resolver is `src/site/worldName.js`. `SITE_WORLD_FILES` is empty, so every named world is refused. Rebuild `docs/play` after any change to `site/play.js` or `src/site`.
 - Spoint `client/app.js` logs a failed world import and continues, but spoint README says boot stops. Jayzee follows the README.
+- `parseClusterLod` refuses a malformed `EP_cluster_lod` record with `ClusterLodRecordError` (code `cluster-lod-malformed`), as spoint does. It returns null only when the payload is absent or its cluster list is empty.
+
+## Dependencies and licences
+
+- `meshoptimizer` 1.2.0, MIT (`node_modules/meshoptimizer/LICENSE.md`). Pinned exactly to the version spoint locks. `src/packages/streaming-gltf/meshlet-codec.js` loads it with a dynamic import, and `scripts/fixtures/spoint/cluster-lod.json` records the version it was generated with.
+- `recast-navigation` 0.43.1, MIT, with `@recast-navigation/core`, `@recast-navigation/generators` and `@recast-navigation/wasm`, all 0.43.1 and MIT. Pinned exactly to the version spoint locks. Its WASM binary ships in `@recast-navigation/wasm`, and `src/pathfinding/recastBake.js` is the only importer.
