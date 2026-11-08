@@ -89,6 +89,7 @@
     "check:clusters": "node scripts/check-clusters.mjs",
     "check:tick-authority": "node scripts/check-tick-authority.mjs",
     "check:tick-order": "node scripts/check-tick-order.mjs",
+    "check:animation-rig": "node scripts/check-animation-rig.mjs",
     "check:streaming-gltf-queues": "node scripts/check-streaming-gltf-queues.mjs",
     "check:streaming-gltf-mesh": "node scripts/check-streaming-gltf-mesh.mjs",
     "check:mapspinner-fields": "node scripts/check-mapspinner-fields.mjs",

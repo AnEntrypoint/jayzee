@@ -150,3 +150,5 @@ Non-obvious facts for automated edits. Architecture and measured costs live in d
 - `scripts/check-mapspinner-fields.mjs` imports spoint from `/workspace/spoint`, so it is a script rather than part of `npm test`.
 - `gridDecimate` in `src/packages/streaming-gltf/grid-decimate.js` returns resolution 2 even when it is over the cap, and returns null only when no triangle survives or the mesh was already under the cap.
 - `DeferredLoadQueue` takes its clock, timers and warn sink as a fourth `host` argument and throws a TypeError when now, setTimer or clearTimer is missing.
+- `src/animation/rigMath.js` copies three 0.185.1 formulas in the same operation order. A simplified formula breaks the 1e-12 cross-check with spoint, so do not simplify it.
+- `scripts/check-animation-rig.mjs` needs the `/workspace/spoint` checkout and is not part of `npm test`.
