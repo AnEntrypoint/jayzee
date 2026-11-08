@@ -53,6 +53,10 @@ export class EngineWorld {
     return this.#alive.size
   }
 
+  get retiredSlots() {
+    return this.#module._engine_retired_slots()
+  }
+
   get tick() {
     return Number(this.#module._engine_ticks())
   }
@@ -64,7 +68,7 @@ export class EngineWorld {
   spawn(position, velocity = [0, 0, 0]) {
     checkVector(position, 'position')
     checkVector(velocity, 'velocity')
-    if (this.#alive.size === this.#capacity) throw new RangeError('world is full: capacity ' + this.#capacity)
+    if (this.#alive.size + this.retiredSlots >= this.#capacity) throw new RangeError('world is full: capacity ' + this.#capacity + ' less ' + this.retiredSlots + ' retired')
     const handle = this.#module._engine_spawn(position[0], position[1], position[2], velocity[0], velocity[1], velocity[2])
     if (handle < 0) throw engineError(handle, 'engine refused the spawn')
     this.#alive.add(handle)

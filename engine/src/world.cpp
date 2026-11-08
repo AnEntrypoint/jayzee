@@ -176,6 +176,7 @@ Status World::configure(const Config& config) {
   capacity_ = config.capacity;
   statics_ = 0;
   live_ = 0;
+  retired_ = 0;
   fresh_ = 0;
   freeCount_ = 0;
   tick_ = 0;
@@ -290,7 +291,7 @@ int World::spawn(const float* position, const float* velocity) {
 
 int World::spawnBatch(const float* rows, std::uint32_t count, std::uint32_t* handles) {
   if (runtime_ == nullptr) return kNotConfigured;
-  if (count > capacity_ - live_) return kFull;
+  if (count > capacity_ - live_ - retired_) return kFull;
   JPH::BodyInterface& bodies = runtime_->physics.GetBodyInterface();
   for (std::uint32_t i = 0; i < count; ++i) {
     const float* row = rows + i * kBatchFloats;
@@ -331,10 +332,15 @@ Status World::despawn(std::uint32_t handle) {
   bodies.RemoveBody(id);
   bodies.DestroyBody(id);
   alive_[slot] = 0;
+  live_ -= 1;
+  if (generations_[slot] == kLastGeneration) {
+    generations_[slot] = kRetiredGeneration;
+    retired_ += 1;
+    return kOk;
+  }
   generations_[slot] = static_cast<std::uint16_t>(generations_[slot] + 1);
   freeSlots_[freeCount_] = static_cast<std::uint32_t>(slot);
   freeCount_ += 1;
-  live_ -= 1;
   return kOk;
 }
 

@@ -12,6 +12,8 @@ constexpr std::uint32_t kMaxIterations = 32;
 constexpr std::uint32_t kSlotMask = 0xffffu;
 constexpr std::uint32_t kBatchFloats = 6;
 constexpr std::uint32_t kNoBody = 0xffffffffu;
+constexpr std::uint16_t kLastGeneration = 0xfffeu;
+constexpr std::uint16_t kRetiredGeneration = 0xffffu;
 
 enum Status : int {
   kOk = 0,
@@ -73,6 +75,7 @@ class World {
   void applyRadialGravity(float dt);
 
   std::uint32_t count() const { return live_; }
+  std::uint32_t retiredSlots() const { return retired_; }
   std::uint32_t physicsBodies() const;
   std::uint64_t tick() const { return tick_; }
   const double* positions() const { return positions_; }
@@ -91,6 +94,7 @@ class World {
   std::uint32_t capacity_ = 0;
   std::uint32_t statics_ = 0;
   std::uint32_t live_ = 0;
+  std::uint32_t retired_ = 0;
   std::uint32_t fresh_ = 0;
   std::uint32_t freeCount_ = 0;
   std::uint32_t tickRate_ = 1;

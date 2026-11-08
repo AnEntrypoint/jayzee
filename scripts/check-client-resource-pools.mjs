@@ -26,6 +26,23 @@ gate('a released handle goes stale and its slot comes back under a new generatio
   assert.equal(pool.resolve(first), -1)
 })
 
+gate('a slot retires at its last generation: no handle it issued resolves again, and the slot is never reused', () => {
+  const pool = createSlotPool(1)
+  const issued = []
+  let handle = pool.acquire()
+  while (handle >= 0) {
+    issued.push(handle)
+    assert.equal(pool.release(handle), true)
+    handle = pool.acquire()
+  }
+  assert.equal(issued.length, 65534)
+  assert.equal(new Set(issued).size, 65534)
+  assert.equal(pool.retired(), 1)
+  assert.equal(pool.count(), 0)
+  for (const old of issued) assert.equal(pool.resolve(old), -1)
+  assert.equal(pool.release(issued[issued.length - 1]), false)
+})
+
 gate('a slot pool refuses a capacity that is not a whole number from 1 to 65535', () => {
   for (const value of [0, 65536, 1.5, NaN, -1, '3', null]) {
     assert.throws(() => createSlotPool(value), RangeError, String(value))

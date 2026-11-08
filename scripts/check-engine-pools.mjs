@@ -24,6 +24,26 @@ gate('a despawned slot is reused under a new generation, and the old handle is r
   assert.deepEqual(world.position(reused), [0, 4, 0])
 })
 
+gate('a slot retires at its last generation: its handles stay refused, and the slot is never reused', async () => {
+  const world = await createEngineWorld({ capacity: 2 }, glue)
+  let handle = world.spawn([0, 3, 0])
+  const issued = []
+  for (;;) {
+    issued.push(handle)
+    world.despawn(handle)
+    if (world.retiredSlots > 0) break
+    handle = world.spawn([0, 3, 0])
+  }
+  assert.equal(issued.length, 65535)
+  assert.equal(new Set(issued).size, 65535)
+  for (const old of issued) assert.throws(() => world.despawn(old), RangeError)
+  const next = world.spawn([0, 3, 0])
+  assert.equal(next & 0xffff, 1)
+  assert.equal(world.retiredSlots, 1)
+  assert.equal(world.count, 1)
+  assert.throws(() => world.spawn([0, 3, 0]), RangeError)
+})
+
 gate('despawn removes the body from the physics world, so the count and the snapshot drop with it', async () => {
   const world = await createEngineWorld({ capacity: 8 }, glue)
   world.spawn([0, 3, 0])

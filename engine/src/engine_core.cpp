@@ -123,6 +123,10 @@ EMSCRIPTEN_KEEPALIVE std::uint32_t engine_body_count() {
   return engine::world().count();
 }
 
+EMSCRIPTEN_KEEPALIVE std::uint32_t engine_retired_slots() {
+  return engine::world().retiredSlots();
+}
+
 EMSCRIPTEN_KEEPALIVE std::uint32_t engine_physics_bodies() {
   return engine::world().physicsBodies();
 }

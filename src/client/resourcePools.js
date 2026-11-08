@@ -1,6 +1,7 @@
 const MAX_SLOTS = 65535
 const SLOT_SPAN = 65536
-const MAX_GENERATION = 65535
+const LAST_GENERATION = 65534
+const RETIRED_GENERATION = 65535
 const LIGHT_KEYS = ['x', 'y', 'z', 'radius', 'r', 'g', 'b', 'intensity']
 const LIGHT_FIELDS = LIGHT_KEYS.length
 
@@ -23,6 +24,7 @@ export const createSlotPool = (capacity, name = 'pool') => {
   const live = new Uint8Array(capacity)
   for (let i = 0; i < capacity; i++) freeStack[i] = capacity - 1 - i
   let freeCount = capacity
+  let retired = 0
 
   const resolve = (handle) => {
     if (!Number.isInteger(handle) || handle < 0) return -1
@@ -35,7 +37,8 @@ export const createSlotPool = (capacity, name = 'pool') => {
   return {
     capacity,
     name,
-    count: () => capacity - freeCount,
+    count: () => capacity - freeCount - retired,
+    retired: () => retired,
     acquire() {
       if (freeCount === 0) return -1
       freeCount -= 1
@@ -48,7 +51,12 @@ export const createSlotPool = (capacity, name = 'pool') => {
       const slot = resolve(handle)
       if (slot < 0) return false
       live[slot] = 0
-      generations[slot] = generations[slot] === MAX_GENERATION ? 1 : generations[slot] + 1
+      if (generations[slot] === LAST_GENERATION) {
+        generations[slot] = RETIRED_GENERATION
+        retired += 1
+        return true
+      }
+      generations[slot] += 1
       freeStack[freeCount] = slot
       freeCount += 1
       return true

@@ -69,6 +69,7 @@ set(ENGINE_EXPORTS
   _engine_ticks
   _engine_memory_bytes
   _engine_body_count
+  _engine_retired_slots
   _engine_physics_bodies
   _engine_positions
   _engine_velocities
