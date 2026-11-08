@@ -1,0 +1,1020 @@
+{
+ "generatedFrom": "spoint src/shared/clusterAssignment.js, src/shared/chartReanchorPolicy.js, src/sharding/ClusterHandoff.js through scripts/lib/clusterHandoffScenarios.mjs",
+ "result": {
+  "assign": [
+   {
+    "clusters": [
+     {
+      "id": 1,
+      "memberIds": [
+       1,
+       2,
+       3
+      ],
+      "centroidDir": [
+       0.00010987286114607611,
+       0.9999999939639772,
+       0
+      ],
+      "radiusM": 799.999996360604,
+      "anchorDir": [
+       0.024533841613307267,
+       0.9993979093591233,
+       -0.024533841613307267
+      ],
+      "created": true
+     },
+     {
+      "id": 2,
+      "memberIds": [
+       4
+      ],
+      "centroidDir": [
+       0.033900323772888874,
+       0.9980297011207944,
+       0.05279662611219934
+      ],
+      "radiusM": 0,
+      "anchorDir": [
+       0.024474772886930698,
+       0.9969917162084659,
+       0.07354252717870854
+      ],
+      "created": true
+     }
+    ],
+    "clusterOf": [
+     [
+      1,
+      1
+     ],
+     [
+      2,
+      1
+     ],
+     [
+      3,
+      1
+     ],
+     [
+      4,
+      2
+     ]
+    ],
+    "rejected": [
+     {
+      "id": 5,
+      "reason": "direction-is-not-a-finite-nonzero-3-vector"
+     },
+     {
+      "id": 2,
+      "reason": "duplicate-player-id"
+     },
+     {
+      "id": 6,
+      "reason": "direction-is-not-a-finite-nonzero-3-vector"
+     },
+     {
+      "id": 7,
+      "reason": "direction-is-not-a-finite-nonzero-3-vector"
+     }
+    ],
+    "events": []
+   },
+   {
+    "clusters": [
+     {
+      "id": 1,
+      "memberIds": [
+       1,
+       2
+      ],
+      "centroidDir": [
+       0.0000470883691554127,
+       0.9999999988913428,
+       0
+      ],
+      "radiusM": 299.99998790407756,
+      "anchorDir": [
+       0.024533841613307267,
+       0.9993979093591233,
+       -0.024533841613307267
+      ],
+      "created": false
+     },
+     {
+      "id": 2,
+      "memberIds": [
+       4
+      ],
+      "centroidDir": [
+       0.0339426433787614,
+       0.9980247739182357,
+       0.05286253499328957
+      ],
+      "radiusM": 0,
+      "anchorDir": [
+       0.024474772886930698,
+       0.9969917162084659,
+       0.07354252717870854
+      ],
+      "created": false
+     },
+     {
+      "id": 3,
+      "memberIds": [
+       3
+      ],
+      "centroidDir": [
+       0.00470881951568001,
+       0.9999889134479285,
+       0
+      ],
+      "radiusM": 0.09493529796600342,
+      "anchorDir": [
+       0.024533841613307267,
+       0.9993979093591233,
+       -0.024533841613307267
+      ],
+      "created": true
+     }
+    ],
+    "clusterOf": [
+     [
+      1,
+      1
+     ],
+     [
+      2,
+      1
+     ],
+     [
+      4,
+      2
+     ],
+     [
+      3,
+      3
+     ]
+    ],
+    "rejected": [],
+    "events": [
+     {
+      "type": "handoff",
+      "playerId": 3,
+      "from": 1,
+      "to": 3
+     }
+    ]
+   },
+   {
+    "clusters": [
+     {
+      "id": 1,
+      "memberIds": [
+       1,
+       2,
+       3
+      ],
+      "centroidDir": [
+       0.00006783356432479853,
+       0.9999999976926195,
+       0.0000036563277138510145
+      ],
+      "radiusM": 432.79497811760234,
+      "anchorDir": [
+       0.024533841613307267,
+       0.9993979093591233,
+       -0.024533841613307267
+      ],
+      "created": false
+     }
+    ],
+    "clusterOf": [
+     [
+      1,
+      1
+     ],
+     [
+      2,
+      1
+     ],
+     [
+      3,
+      1
+     ]
+    ],
+    "rejected": [],
+    "events": [
+     {
+      "type": "merge",
+      "into": 1,
+      "from": 3
+     },
+     {
+      "type": "handoff",
+      "playerId": 3,
+      "from": 3,
+      "to": 1
+     },
+     {
+      "type": "drop",
+      "cluster": 2
+     }
+    ]
+   },
+   {
+    "clusters": [
+     {
+      "id": 1,
+      "memberIds": [
+       1
+      ],
+      "centroidDir": [
+       0,
+       1,
+       0
+      ],
+      "radiusM": 0,
+      "anchorDir": [
+       0.024533841613307267,
+       0.9993979093591233,
+       -0.024533841613307267
+      ],
+      "created": false
+     }
+    ],
+    "clusterOf": [
+     [
+      1,
+      1
+     ]
+    ],
+    "rejected": [],
+    "events": []
+   },
+   {
+    "clusters": [],
+    "clusterOf": [],
+    "rejected": [],
+    "events": [
+     {
+      "type": "drop",
+      "cluster": 1
+     }
+    ]
+   }
+  ],
+  "assignNoLattice": [
+   {
+    "clusters": [
+     {
+      "id": 1,
+      "memberIds": [
+       1,
+       2,
+       3
+      ],
+      "centroidDir": [
+       0.00010987286114607611,
+       0.9999999939639772,
+       0
+      ],
+      "radiusM": 799.999996360604,
+      "anchorDir": null,
+      "created": true
+     },
+     {
+      "id": 2,
+      "memberIds": [
+       4
+      ],
+      "centroidDir": [
+       0.033900323772888874,
+       0.9980297011207944,
+       0.05279662611219934
+      ],
+      "radiusM": 0,
+      "anchorDir": null,
+      "created": true
+     }
+    ],
+    "clusterOf": [
+     [
+      1,
+      1
+     ],
+     [
+      2,
+      1
+     ],
+     [
+      3,
+      1
+     ],
+     [
+      4,
+      2
+     ]
+    ],
+    "rejected": [
+     {
+      "id": 5,
+      "reason": "direction-is-not-a-finite-nonzero-3-vector"
+     },
+     {
+      "id": 2,
+      "reason": "duplicate-player-id"
+     },
+     {
+      "id": 6,
+      "reason": "direction-is-not-a-finite-nonzero-3-vector"
+     },
+     {
+      "id": 7,
+      "reason": "direction-is-not-a-finite-nonzero-3-vector"
+     }
+    ],
+    "events": []
+   },
+   {
+    "clusters": [
+     {
+      "id": 1,
+      "memberIds": [
+       1,
+       2
+      ],
+      "centroidDir": [
+       0.0000470883691554127,
+       0.9999999988913428,
+       0
+      ],
+      "radiusM": 299.99998790407756,
+      "anchorDir": null,
+      "created": false
+     },
+     {
+      "id": 2,
+      "memberIds": [
+       4
+      ],
+      "centroidDir": [
+       0.0339426433787614,
+       0.9980247739182357,
+       0.05286253499328957
+      ],
+      "radiusM": 0,
+      "anchorDir": null,
+      "created": false
+     },
+     {
+      "id": 3,
+      "memberIds": [
+       3
+      ],
+      "centroidDir": [
+       0.00470881951568001,
+       0.9999889134479285,
+       0
+      ],
+      "radiusM": 0.09493529796600342,
+      "anchorDir": null,
+      "created": true
+     }
+    ],
+    "clusterOf": [
+     [
+      1,
+      1
+     ],
+     [
+      2,
+      1
+     ],
+     [
+      4,
+      2
+     ],
+     [
+      3,
+      3
+     ]
+    ],
+    "rejected": [],
+    "events": [
+     {
+      "type": "handoff",
+      "playerId": 3,
+      "from": 1,
+      "to": 3
+     }
+    ]
+   },
+   {
+    "clusters": [
+     {
+      "id": 1,
+      "memberIds": [
+       1,
+       2,
+       3
+      ],
+      "centroidDir": [
+       0.00006783356432479853,
+       0.9999999976926195,
+       0.0000036563277138510145
+      ],
+      "radiusM": 432.79497811760234,
+      "anchorDir": null,
+      "created": false
+     }
+    ],
+    "clusterOf": [
+     [
+      1,
+      1
+     ],
+     [
+      2,
+      1
+     ],
+     [
+      3,
+      1
+     ]
+    ],
+    "rejected": [],
+    "events": [
+     {
+      "type": "merge",
+      "into": 1,
+      "from": 3
+     },
+     {
+      "type": "handoff",
+      "playerId": 3,
+      "from": 3,
+      "to": 1
+     },
+     {
+      "type": "drop",
+      "cluster": 2
+     }
+    ]
+   },
+   {
+    "clusters": [
+     {
+      "id": 1,
+      "memberIds": [
+       1
+      ],
+      "centroidDir": [
+       0,
+       1,
+       0
+      ],
+      "radiusM": 0,
+      "anchorDir": null,
+      "created": false
+     }
+    ],
+    "clusterOf": [
+     [
+      1,
+      1
+     ]
+    ],
+    "rejected": [],
+    "events": []
+   },
+   {
+    "clusters": [],
+    "clusterOf": [],
+    "rejected": [],
+    "events": [
+     {
+      "type": "drop",
+      "cluster": 1
+     }
+    ]
+   }
+  ],
+  "assignerConfig": [
+   {
+    "threw": "ClusterAssignerConfigError",
+    "code": "assigner-radius-not-positive-finite",
+    "reason": null
+   },
+   {
+    "threw": "ClusterAssignerConfigError",
+    "code": "assigner-radius-not-positive-finite",
+    "reason": null
+   },
+   {
+    "threw": "ClusterAssignerConfigError",
+    "code": "assigner-link-m-not-positive",
+    "reason": null
+   },
+   {
+    "threw": "ClusterAssignerConfigError",
+    "code": "assigner-member-radius-m-not-positive",
+    "reason": null
+   },
+   {
+    "threw": "ClusterAssignerConfigError",
+    "code": "assigner-factors-not-bracketing-one",
+    "reason": null
+   },
+   {
+    "threw": "ClusterAssignerConfigError",
+    "code": "assigner-factors-not-bracketing-one",
+    "reason": null
+   },
+   {
+    "value": "made"
+   }
+  ],
+  "factors": {
+   "stay": 1.25,
+   "join": 0.8
+  },
+  "decisions": [
+   {
+    "value": {
+     "kind": "stay",
+     "reason": "no-players"
+    }
+   },
+   {
+    "value": {
+     "kind": "stay",
+     "reason": "gain-below-hysteresis",
+     "gainDeg": -1.9883386806128078
+    }
+   },
+   {
+    "value": {
+     "kind": "stay",
+     "reason": "anchor-unchanged",
+     "gainDeg": 0
+    }
+   },
+   {
+    "value": {
+     "kind": "reanchor",
+     "anchorDir": [
+      0.31359655752876314,
+      0.9492703283648903,
+      0.02330327857024529
+     ],
+     "centroidDir": [
+      0.3089124288541007,
+      0.9510436386962029,
+      0.009439734898095948
+     ],
+     "gainDeg": 15.856269959941061,
+     "worstPlayerAngleDeg": 2.0701005301382027
+    }
+   },
+   {
+    "value": {
+     "kind": "stay",
+     "reason": "gain-below-hysteresis",
+     "gainDeg": 0.07300011859338995
+    }
+   },
+   {
+    "value": {
+     "kind": "refusal",
+     "reason": "players-straddle-the-planet"
+    }
+   },
+   {
+    "value": {
+     "kind": "refusal",
+     "reason": "player-direction-has-no-length"
+    }
+   },
+   {
+    "value": {
+     "kind": "refusal",
+     "reason": "party-spread-exceeds-walkable-chart",
+     "worstPlayerAngleDeg": 46.414869049928555,
+     "walkableLimitDeg": 45.00010522957485
+    }
+   },
+   {
+    "threw": "ChartAnchorDecisionError",
+    "code": null,
+    "reason": "decision-needs-a-lattice"
+   },
+   {
+    "threw": "ChartAnchorDecisionError",
+    "code": null,
+    "reason": "decision-needs-a-frame-up"
+   },
+   {
+    "threw": "ChartAnchorDecisionError",
+    "code": null,
+    "reason": "player-directions-not-a-list"
+   },
+   {
+    "threw": "ChartAnchorDecisionError",
+    "code": null,
+    "reason": "player-direction-not-a-vector"
+   }
+  ],
+  "policyConstants": {
+   "hysteresisDeg": 0.75,
+   "walkableLimitDeg": 45.00010522957485
+  },
+  "centroids": [
+   {
+    "value": [
+     0.27059805007309845,
+     0.9238795325112866,
+     0.27059805007309845
+    ]
+   },
+   {
+    "value": [
+     0.27059805007309845,
+     0.9238795325112866,
+     0.27059805007309845
+    ]
+   },
+   {
+    "value": null
+   }
+  ],
+  "handoff": {
+   "exported": {
+    "chart": {
+     "radius": 6371000,
+     "offsetY": 0,
+     "anchorHeight": 0,
+     "chartEpoch": 0,
+     "east": [
+      0,
+      0,
+      1
+     ],
+     "up": [
+      0,
+      1,
+      0
+     ],
+     "north": [
+      -1,
+      0,
+      0
+     ]
+    },
+    "name": "ann",
+    "tick": 120,
+    "state": {
+     "position": [
+      10,
+      2,
+      -5
+     ],
+     "velocity": [
+      3,
+      0.05,
+      1
+     ],
+     "rotation": [
+      0,
+      0.29552020666133955,
+      0,
+      0.955336489125606
+     ],
+     "lookYaw": 0.6,
+     "lookPitch": -0.2,
+     "onGround": true,
+     "groundNormal": [
+      0,
+      1,
+      0
+     ],
+     "health": 80
+    },
+    "lastInput": {
+     "yaw": 0.6,
+     "pitch": -0.2,
+     "buttons": 3
+    }
+   },
+   "exportIsCopy": true,
+   "handoffUntouched": true,
+   "admitted": {
+    "token": "0123456789abcdef0123456789abcdef",
+    "state": {
+     "position": [
+      -156342.2190137444,
+      -3833.5526695828885,
+      156253.0853219024
+     ],
+     "velocity": [
+      2.997869394662467,
+      0,
+      1.0027315944720252
+     ],
+     "rotation": [
+      0,
+      0.2954284702451531,
+      0,
+      0.955364861698717
+     ],
+     "lookYaw": 0.6067298105944922,
+     "lookPitch": -0.20627779011750585,
+     "onGround": true,
+     "groundNormal": [
+      -0.024541228522912312,
+      0.9993979093591233,
+      0.02452645247890305
+     ],
+     "health": 80
+    },
+    "lastInput": {
+     "yaw": 0.6067298105944922,
+     "pitch": -0.20627779011750585,
+     "buttons": 3
+    },
+    "tiltRad": 0.03470305662145344,
+    "m": [
+     0.9996988186962041,
+     -0.024541228522912312,
+     0,
+     0.024533841613307267,
+     0.9993979093591233,
+     -0.024533841613307267,
+     0.0006020906135771094,
+     0.02452645247890305,
+     0.9996990000073488
+    ]
+   },
+   "destLog": {
+    "created": [
+     {
+      "owner": null,
+      "state": {
+       "position": [
+        -156342.2190137444,
+        -3833.5526695828885,
+        156253.0853219024
+       ],
+       "velocity": [
+        2.997869394662467,
+        0,
+        1.0027315944720252
+       ],
+       "rotation": [
+        0,
+        0.2954284702451531,
+        0,
+        0.955364861698717
+       ],
+       "lookYaw": 0.6067298105944922,
+       "lookPitch": -0.20627779011750585,
+       "onGround": true,
+       "groundNormal": [
+        -0.024541228522912312,
+        0.9993979093591233,
+        0.02452645247890305
+       ],
+       "health": 80,
+       "name": "ann"
+      }
+     }
+    ],
+    "destroyed": [],
+    "sent": [],
+    "closed": [],
+    "covered": [
+     [
+      [
+       -156342.2190137444,
+       156253.0853219024
+      ]
+     ]
+    ]
+   },
+   "admittedId": 9,
+   "appliedInput": {
+    "yaw": 0.6067298105944922,
+    "pitch": -0.20627779011750585,
+    "buttons": 3
+   },
+   "airborne": {
+    "state": {
+     "position": [
+      -156342.2190137444,
+      -3833.5526695828885,
+      156253.0853219024
+     ],
+     "velocity": [
+      2.997869394662467,
+      0.0990375786945707,
+      1.0027315944720252
+     ],
+     "rotation": [
+      0,
+      0.2954284702451531,
+      0,
+      0.955364861698717
+     ],
+     "lookYaw": 0.6067298105944922,
+     "lookPitch": -0.20627779011750585,
+     "onGround": false,
+     "groundNormal": null,
+     "health": 80
+    },
+    "lastInput": {
+     "yaw": 0.6067298105944922,
+     "pitch": -0.20627779011750585,
+     "buttons": 3
+    }
+   },
+   "noStreamerLog": {
+    "created": [
+     {
+      "owner": null,
+      "state": {
+       "position": [
+        -156342.2190137444,
+        -3833.5526695828885,
+        156253.0853219024
+       ],
+       "velocity": [
+        2.997869394662467,
+        0,
+        1.0027315944720252
+       ],
+       "rotation": [
+        0,
+        0.2954284702451531,
+        0,
+        0.955364861698717
+       ],
+       "lookYaw": 0.6067298105944922,
+       "lookPitch": -0.20627779011750585,
+       "onGround": true,
+       "groundNormal": [
+        -0.024541228522912312,
+        0.9993979093591233,
+        0.02452645247890305
+       ],
+       "health": 80,
+       "name": "ann"
+      }
+     }
+    ],
+    "destroyed": [],
+    "sent": [],
+    "closed": [],
+    "covered": []
+   },
+   "releases": {
+    "toDestination": {
+     "ret": "undefined",
+     "log": {
+      "created": [],
+      "destroyed": [
+       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      ],
+      "sent": [
+       {
+        "id": 3,
+        "type": 199,
+        "payload": {
+         "url": "wss://b.example/ws",
+         "sessionToken": "fedcba9876543210fedcba9876543210",
+         "clusterId": 7
+        }
+       }
+      ],
+      "closed": [],
+      "covered": []
+     }
+    },
+    "toDestinationNoCluster": {
+     "ret": "undefined",
+     "log": {
+      "created": [],
+      "destroyed": [
+       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      ],
+      "sent": [
+       {
+        "id": 3,
+        "type": 199,
+        "payload": {
+         "url": "wss://b.example/ws",
+         "sessionToken": "fedcba9876543210fedcba9876543210",
+         "clusterId": null
+        }
+       }
+      ],
+      "closed": [],
+      "covered": []
+     }
+    },
+    "destinationWithoutToken": {
+     "ret": "undefined",
+     "log": {
+      "created": [],
+      "destroyed": [
+       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      ],
+      "sent": [],
+      "closed": [
+       3
+      ],
+      "covered": []
+     }
+    },
+    "noDestination": {
+     "ret": "undefined",
+     "log": {
+      "created": [],
+      "destroyed": [
+       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      ],
+      "sent": [],
+      "closed": [
+       3
+      ],
+      "covered": []
+     }
+    },
+    "noClient": {
+     "ret": "undefined",
+     "log": {
+      "created": [],
+      "destroyed": [],
+      "sent": [],
+      "closed": [],
+      "covered": []
+     }
+    },
+    "clientWithoutToken": {
+     "ret": "undefined",
+     "log": {
+      "created": [],
+      "destroyed": [],
+      "sent": [],
+      "closed": [
+       3
+      ],
+      "covered": []
+     }
+    }
+   },
+   "errors": {
+    "exportNegative": {
+     "name": "ClusterHandoffError",
+     "code": "cluster-local-player-id-malformed"
+    },
+    "exportFraction": {
+     "name": "ClusterHandoffError",
+     "code": "cluster-local-player-id-malformed"
+    },
+    "exportString": {
+     "name": "ClusterHandoffError",
+     "code": "cluster-local-player-id-malformed"
+    },
+    "exportUnknown": {
+     "name": "ClusterHandoffError",
+     "code": "handoff-unknown-cluster-local-player"
+    },
+    "exportNoFrame": {
+     "name": "ClusterHandoffError",
+     "code": "handoff-needs-planet-frame"
+    },
+    "admitNoFrame": {
+     "name": "ClusterHandoffError",
+     "code": "handoff-needs-planet-frame"
+    },
+    "applyMalformed": {
+     "name": "ClusterHandoffError",
+     "code": "session-token-malformed"
+    },
+    "applyNull": {
+     "name": "ClusterHandoffError",
+     "code": "session-token-malformed"
+    },
+    "applyUnjoined": {
+     "name": "ClusterHandoffError",
+     "code": "handoff-session-not-joined"
+    },
+    "releaseNegative": {
+     "name": "ClusterHandoffError",
+     "code": "cluster-local-player-id-malformed"
+    }
+   }
+  }
+ }
+}

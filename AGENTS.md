@@ -145,3 +145,4 @@ Non-obvious facts for automated edits. Architecture and measured costs live in d
 - `SnapshotProcessor` reads its injected `now` only when a snapshot timestamp is missing or 0, as spoint does, and throws a TypeError when no clock was given.
 - `createTerrainReanchor` in `src/terrain-pure/chartReanchorTerrain.js` throws a TypeError without a `now()` clock. spoint `createFieldLattice` is not ported, so a migrate needs a lattice passed in.
 - `createChartReanchorService` runs every terrain migrator before any state migrator. The first terrain gate that refuses leaves the frame unchanged and is tallied under its reason.
+- `scripts/fixtures/spoint/cluster-handoff.json` is written by `node scripts/gen-cluster-handoff-fixture.mjs [spointRoot]`. spoint `ClusterHandoff` cannot be imported in Node as it is, because `RegionRouter.js` pulls in the HTTP server and three.js, so the generator loads only a slice of it.

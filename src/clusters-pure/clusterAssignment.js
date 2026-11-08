@@ -1,0 +1,263 @@
+import { chartAnchorForDir } from '../chart-pure/chartAnchor.js'
+import { chartAnchorDecision, CHART_REANCHOR_HYSTERESIS_DEG } from '../chart-pure/chartReanchorPolicy.js'
+
+export const CLUSTER_STAY_FACTOR = 1.25
+export const CLUSTER_JOIN_FACTOR = 0.8
+
+export const ASSIGNER_RADIUS_NOT_POSITIVE_FINITE = 'assigner-radius-not-positive-finite'
+export const ASSIGNER_LINK_M_NOT_POSITIVE = 'assigner-link-m-not-positive'
+export const ASSIGNER_MEMBER_RADIUS_M_NOT_POSITIVE = 'assigner-member-radius-m-not-positive'
+export const ASSIGNER_FACTORS_NOT_BRACKETING_ONE = 'assigner-factors-not-bracketing-one'
+
+export class ClusterAssignerConfigError extends Error {
+  constructor(code, message) {
+    super(`${code}: ${message}`)
+    this.name = 'ClusterAssignerConfigError'
+    this.code = code
+  }
+}
+
+const byId = (a, b) => {
+  if (typeof a === 'number' && typeof b === 'number') return a - b
+  const sa = String(a)
+  const sb = String(b)
+  if (sa < sb) return -1
+  return sa > sb ? 1 : 0
+}
+
+function unitDir(d) {
+  if (!Array.isArray(d) || d.length !== 3) return null
+  const l = Math.hypot(d[0], d[1], d[2])
+  return Number.isFinite(l) && l > 0 ? [d[0] / l, d[1] / l, d[2] / l] : null
+}
+
+const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+
+function centroidOf(members) {
+  let x = 0
+  let y = 0
+  let z = 0
+  for (const m of members) {
+    x += m.dir[0]
+    y += m.dir[1]
+    z += m.dir[2]
+  }
+  const l = Math.hypot(x, y, z)
+  return l > 0 ? [x / l, y / l, z / l] : members[0].dir
+}
+
+function farthestFrom(members, centre) {
+  let worst = members[0]
+  let worstDot = dot(worst.dir, centre)
+  for (let i = 1; i < members.length; i++) {
+    const d = dot(members[i].dir, centre)
+    if (d < worstDot) {
+      worst = members[i]
+      worstDot = d
+    }
+  }
+  return { member: worst, dot: worstDot }
+}
+
+const pushInto = (map, key, value) => {
+  if (!map.has(key)) map.set(key, [])
+  map.get(key).push(value)
+}
+
+export function createClusterAssigner({ radius, linkM, memberRadiusM, lattice = null, hysteresisDeg = CHART_REANCHOR_HYSTERESIS_DEG, stayFactor = CLUSTER_STAY_FACTOR, joinFactor = CLUSTER_JOIN_FACTOR }) {
+  if (!(radius > 0) || !Number.isFinite(radius)) throw new ClusterAssignerConfigError(ASSIGNER_RADIUS_NOT_POSITIVE_FINITE, `cluster assigner needs a positive finite planet radius, got ${radius}`)
+  if (!(linkM > 0)) throw new ClusterAssignerConfigError(ASSIGNER_LINK_M_NOT_POSITIVE, `cluster assigner linkM must be a positive number of metres, got ${linkM}`)
+  if (!(memberRadiusM > 0)) throw new ClusterAssignerConfigError(ASSIGNER_MEMBER_RADIUS_M_NOT_POSITIVE, `cluster assigner memberRadiusM must be a positive number of metres, got ${memberRadiusM}`)
+  if (!(joinFactor < 1 && stayFactor > 1)) throw new ClusterAssignerConfigError(ASSIGNER_FACTORS_NOT_BRACKETING_ONE, `cluster hysteresis needs joinFactor < 1 < stayFactor, got ${joinFactor} and ${stayFactor}`)
+  const cosOf = (m) => Math.cos(Math.min(Math.PI, m / radius))
+  const cosLink = cosOf(linkM)
+  const cosJoin = cosOf(memberRadiusM * joinFactor)
+  const cosStay = cosOf(memberRadiusM * stayFactor)
+  const state = { nextClusterId: 1, clusterOf: new Map(), anchors: new Map() }
+
+  function admit(players) {
+    const accepted = []
+    const rejected = []
+    const seen = new Set()
+    for (const p of players) {
+      const dir = unitDir(p.dir)
+      if (!dir) {
+        rejected.push({ id: p.id, reason: 'direction-is-not-a-finite-nonzero-3-vector' })
+        continue
+      }
+      if (seen.has(p.id)) {
+        rejected.push({ id: p.id, reason: 'duplicate-player-id' })
+        continue
+      }
+      seen.add(p.id)
+      accepted.push({ id: p.id, dir })
+    }
+    accepted.sort((a, b) => byId(a.id, b.id))
+    return { accepted, rejected }
+  }
+
+  function retainPreviousClusters(accepted) {
+    const groups = new Map()
+    const pool = []
+    for (const m of accepted) {
+      const k = state.clusterOf.get(m.id)
+      if (k === undefined) pool.push(m)
+      else pushInto(groups, k, m)
+    }
+    const clusters = new Map()
+    for (const k of [...groups.keys()].sort((a, b) => a - b)) {
+      const members = groups.get(k)
+      let centre = centroidOf(members)
+      while (members.length > 1) {
+        const far = farthestFrom(members, centre)
+        if (far.dot >= cosStay) break
+        members.splice(members.indexOf(far.member), 1)
+        pool.push(far.member)
+        centre = centroidOf(members)
+      }
+      clusters.set(k, { id: k, members, centre })
+    }
+    pool.sort((a, b) => byId(a.id, b.id))
+    return { clusters, pool }
+  }
+
+  function attachToExisting(clusters, pool) {
+    const left = []
+    const joins = new Map()
+    for (const m of pool) {
+      let best = null
+      let bestDot = -2
+      for (const c of clusters.values()) {
+        const d = dot(m.dir, c.centre)
+        if (d >= cosJoin && (d > bestDot || (d === bestDot && c.id < best.id))) {
+          best = c
+          bestDot = d
+        }
+      }
+      if (best) pushInto(joins, best.id, m)
+      else left.push(m)
+    }
+    for (const [k, added] of joins) {
+      const c = clusters.get(k)
+      c.members.push(...added)
+      c.members.sort((a, b) => byId(a.id, b.id))
+      c.centre = centroidOf(c.members)
+    }
+    return left
+  }
+
+  function linkedComponents(left) {
+    const parent = left.map((_, i) => i)
+    const find = (start) => {
+      let i = start
+      while (parent[i] !== i) {
+        parent[i] = parent[parent[i]]
+        i = parent[i]
+      }
+      return i
+    }
+    for (let i = 0; i < left.length; i++) {
+      for (let j = i + 1; j < left.length; j++) {
+        const sameBefore = state.clusterOf.has(left[i].id) && state.clusterOf.get(left[i].id) === state.clusterOf.get(left[j].id)
+        const need = sameBefore ? cosOf(linkM * stayFactor) : cosLink
+        if (dot(left[i].dir, left[j].dir) < need) continue
+        const a = find(i)
+        const b = find(j)
+        if (a !== b) parent[Math.max(a, b)] = Math.min(a, b)
+      }
+    }
+    const comps = new Map()
+    left.forEach((m, i) => pushInto(comps, find(i), m))
+    return [...comps.values()].sort((a, b) => byId(a[0].id, b[0].id))
+  }
+
+  function packComponent(component, clusters) {
+    let remaining = component
+    while (remaining.length) {
+      const centre = centroidOf(remaining)
+      let inside = remaining.filter((m) => dot(m.dir, centre) >= cosJoin)
+      if (!inside.length) {
+        let nearest = remaining[0]
+        for (const m of remaining) if (dot(m.dir, centre) > dot(nearest.dir, centre)) nearest = m
+        inside = [nearest]
+      }
+      const id = state.nextClusterId++
+      clusters.set(id, { id, members: inside, centre: centroidOf(inside), created: true })
+      const taken = new Set(inside)
+      remaining = remaining.filter((m) => !taken.has(m))
+    }
+  }
+
+  function membersLinked(a, b) {
+    for (const ma of a.members) {
+      for (const mb of b.members) if (dot(ma.dir, mb.dir) >= cosLink) return true
+    }
+    return false
+  }
+
+  function mergeOnce(clusters, events) {
+    const ids = [...clusters.keys()].sort((a, b) => a - b)
+    for (let i = 0; i < ids.length; i++) {
+      for (let j = i + 1; j < ids.length; j++) {
+        const a = clusters.get(ids[i])
+        const b = clusters.get(ids[j])
+        if (dot(a.centre, b.centre) < cosOf(2 * memberRadiusM * stayFactor + linkM)) continue
+        if (!membersLinked(a, b)) continue
+        const all = a.members.concat(b.members)
+        const centre = centroidOf(all)
+        if (farthestFrom(all, centre).dot < cosJoin) continue
+        const survivor = (a.members.length > b.members.length || (a.members.length === b.members.length && a.id < b.id)) ? a : b
+        const gone = survivor === a ? b : a
+        survivor.members = all.sort((x, y) => byId(x.id, y.id))
+        survivor.centre = centre
+        clusters.delete(gone.id)
+        events.push({ type: 'merge', into: survivor.id, from: gone.id })
+        return true
+      }
+    }
+    return false
+  }
+
+  function mergeConverged(clusters, events) {
+    while (mergeOnce(clusters, events));
+  }
+
+  function anchorFor(cluster) {
+    if (!lattice) return null
+    const prev = state.anchors.get(cluster.id)
+    if (!prev) return chartAnchorForDir(lattice, cluster.centre)
+    const decision = chartAnchorDecision({ lattice, frame: { up: prev }, dirs: cluster.members.map((m) => m.dir), hysteresisDeg })
+    return decision.kind === 'reanchor' ? decision.anchorDir : prev
+  }
+
+  function assign(players) {
+    const { accepted, rejected } = admit(players)
+    const events = []
+    const { clusters, pool } = retainPreviousClusters(accepted)
+    const left = attachToExisting(clusters, pool)
+    for (const component of linkedComponents(left)) packComponent(component, clusters)
+    mergeConverged(clusters, events)
+
+    const clusterOf = new Map()
+    const anchors = new Map()
+    const out = []
+    for (const id of [...clusters.keys()].sort((a, b) => a - b)) {
+      const c = clusters.get(id)
+      for (const m of c.members) {
+        clusterOf.set(m.id, id)
+        const before = state.clusterOf.get(m.id)
+        if (before !== undefined && before !== id) events.push({ type: 'handoff', playerId: m.id, from: before, to: id })
+      }
+      const anchorDir = anchorFor(c)
+      if (anchorDir) anchors.set(id, anchorDir)
+      out.push({ id, memberIds: c.members.map((m) => m.id), centroidDir: c.centre, radiusM: radius * Math.acos(Math.max(-1, Math.min(1, farthestFrom(c.members, c.centre).dot))), anchorDir, created: c.created === true })
+    }
+    const mergedAway = new Set(events.filter((e) => e.type === 'merge').map((e) => e.from))
+    for (const k of new Set(state.clusterOf.values())) if (!clusters.has(k) && !mergedAway.has(k)) events.push({ type: 'drop', cluster: k })
+    state.clusterOf = clusterOf
+    state.anchors = anchors
+    return { clusters: out, clusterOf, rejected, events }
+  }
+
+  return { assign, state }
+}
