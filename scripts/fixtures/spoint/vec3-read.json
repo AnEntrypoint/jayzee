@@ -1,0 +1,218 @@
+{
+  "source": "spoint src/shared/vec3.js readVec3",
+  "cases": [
+    {
+      "label": "a valid vector is returned as the same array",
+      "args": [
+        [
+          1,
+          2,
+          3
+        ]
+      ],
+      "expect": {
+        "returns": true,
+        "same": true
+      }
+    },
+    {
+      "label": "a valid vector with signed zero and a large component",
+      "args": [
+        [
+          0,
+          0,
+          1e+308
+        ]
+      ],
+      "expect": {
+        "returns": true,
+        "same": true
+      }
+    },
+    {
+      "label": "a valid vector takes the name it is given",
+      "args": [
+        [
+          0,
+          0,
+          0
+        ],
+        "position"
+      ],
+      "expect": {
+        "returns": true,
+        "same": true
+      }
+    },
+    {
+      "label": "a two element array is refused under the default name",
+      "args": [
+        [
+          1,
+          2
+        ]
+      ],
+      "expect": {
+        "returns": false,
+        "type": "TypeError",
+        "message": "[vec3] vec3-invalid: value must be an array of three finite numbers",
+        "reasonCode": "vec3-invalid"
+      }
+    },
+    {
+      "label": "a four element array is refused",
+      "args": [
+        [
+          1,
+          2,
+          3,
+          4
+        ]
+      ],
+      "expect": {
+        "returns": false,
+        "type": "TypeError",
+        "message": "[vec3] vec3-invalid: value must be an array of three finite numbers",
+        "reasonCode": "vec3-invalid"
+      }
+    },
+    {
+      "label": "a string is refused",
+      "args": [
+        "123"
+      ],
+      "expect": {
+        "returns": false,
+        "type": "TypeError",
+        "message": "[vec3] vec3-invalid: value must be an array of three finite numbers",
+        "reasonCode": "vec3-invalid"
+      }
+    },
+    {
+      "label": "null is refused",
+      "args": [
+        null
+      ],
+      "expect": {
+        "returns": false,
+        "type": "TypeError",
+        "message": "[vec3] vec3-invalid: value must be an array of three finite numbers",
+        "reasonCode": "vec3-invalid"
+      }
+    },
+    {
+      "label": "undefined is refused",
+      "args": [
+        {
+          "$undef": true
+        }
+      ],
+      "expect": {
+        "returns": false,
+        "type": "TypeError",
+        "message": "[vec3] vec3-invalid: value must be an array of three finite numbers",
+        "reasonCode": "vec3-invalid"
+      }
+    },
+    {
+      "label": "a plain object with index keys is refused",
+      "args": [
+        {
+          "0": 1,
+          "1": 2,
+          "2": 3
+        }
+      ],
+      "expect": {
+        "returns": false,
+        "type": "TypeError",
+        "message": "[vec3] vec3-invalid: value must be an array of three finite numbers",
+        "reasonCode": "vec3-invalid"
+      }
+    },
+    {
+      "label": "a NaN component is refused",
+      "args": [
+        [
+          1,
+          {
+            "$num": "NaN"
+          },
+          3
+        ]
+      ],
+      "expect": {
+        "returns": false,
+        "type": "TypeError",
+        "message": "[vec3] vec3-invalid: value must be an array of three finite numbers",
+        "reasonCode": "vec3-invalid"
+      }
+    },
+    {
+      "label": "an infinite component is refused",
+      "args": [
+        [
+          {
+            "$num": "Infinity"
+          },
+          0,
+          0
+        ]
+      ],
+      "expect": {
+        "returns": false,
+        "type": "TypeError",
+        "message": "[vec3] vec3-invalid: value must be an array of three finite numbers",
+        "reasonCode": "vec3-invalid"
+      }
+    },
+    {
+      "label": "a string component is refused",
+      "args": [
+        [
+          1,
+          "2",
+          3
+        ]
+      ],
+      "expect": {
+        "returns": false,
+        "type": "TypeError",
+        "message": "[vec3] vec3-invalid: value must be an array of three finite numbers",
+        "reasonCode": "vec3-invalid"
+      }
+    },
+    {
+      "label": "a null component is refused",
+      "args": [
+        [
+          1,
+          null,
+          3
+        ]
+      ],
+      "expect": {
+        "returns": false,
+        "type": "TypeError",
+        "message": "[vec3] vec3-invalid: value must be an array of three finite numbers",
+        "reasonCode": "vec3-invalid"
+      }
+    },
+    {
+      "label": "the refusal names the argument",
+      "args": [
+        [
+          1,
+          2
+        ],
+        "velocity"
+      ],
+      "expect": {
+        "returns": false,
+        "type": "TypeError",
+        "message": "[vec3] vec3-invalid: velocity must be an array of three finite numbers",
+        "reasonCode": "vec3-invalid"
+      }
+    }
+  ]
+}
