@@ -1,4 +1,13 @@
-const isPlainObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v)
+const isPlainObject = (v) => {
+  if (v === null || typeof v !== 'object' || Array.isArray(v)) return false
+  const proto = Object.getPrototypeOf(v)
+  return proto === Object.prototype || proto === null
+}
+
+function setOwn(target, key, value) {
+  Object.defineProperty(target, key, { value, enumerable: true, writable: true, configurable: true })
+  return target
+}
 
 function cloneData(v) {
   if (Array.isArray(v)) return v.map(cloneData)
@@ -9,7 +18,7 @@ function cloneData(v) {
 function mergeSlice(base, over) {
   if (!isPlainObject(base) || !isPlainObject(over)) return over === undefined ? cloneData(base) : over
   const out = cloneData(base)
-  for (const [k, v] of Object.entries(over)) out[k] = mergeSlice(base[k], v)
+  for (const [k, v] of Object.entries(over)) setOwn(out, k, mergeSlice(Object.hasOwn(base, k) ? base[k] : undefined, v))
   return out
 }
 

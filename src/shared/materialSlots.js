@@ -35,12 +35,12 @@ export function parseMaterialSlots(raw) {
   if (typeof raw !== 'object' || Array.isArray(raw)) return refuse('not-object')
   const names = Object.keys(raw)
   if (names.length > MAX_SLOTS) return refuse('too-many-slots', String(names.length))
-  const value = {}
+  const entries = []
   for (const name of names) {
     if (name.length === 0 || name.length > MAX_SLOT_NAME) return refuse('slot-bad-name', name.slice(0, 32))
     const parsed = parseSlot(name, raw[name])
     if (!parsed.ok) return parsed
-    value[name] = parsed.value
+    entries.push([name, parsed.value])
   }
-  return { ok: true, value }
+  return { ok: true, value: Object.fromEntries(entries) }
 }

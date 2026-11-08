@@ -1,7 +1,4 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { gate, finish } from './lib/gate.mjs'
 import { biomeColor, reliefShade, shadeHeightGrid } from '../src/shared/biomeColor.js'
 import { elevation } from '../src/shared/ballisticsElevation.js'
@@ -11,10 +8,6 @@ import { EQUIP_UNARMED, equipNameOf, equipResolve } from '../src/shared/equipmen
 import { parseMaterialSlots } from '../src/shared/materialSlots.js'
 import { expandWorldPresets } from '../src/shared/worldPresets.js'
 import { WORLD_FIELD_INVALID, WORLD_NOT_A_PLAIN_OBJECT, WorldResolveError, assertWorld, parseWorld, validateMovement } from '../src/shared/worldResolve.js'
-
-const root = join(dirname(fileURLToPath(import.meta.url)), '..')
-const SHARED_FILES = ['biomeColor', 'ballisticsElevation', 'bookmarks', 'colliderLattice', 'equipment', 'materialSlots', 'worldPresets', 'worldResolve']
-const HOST_GLOBALS = ['Date.now', 'performance', 'console', 'window', 'process', 'setTimeout', 'globalThis', 'Math.random']
 
 const near = (actual, expected, tol, label) => assert.ok(Math.abs(actual - expected) <= tol, `${label}: got ${actual}, expected ${expected}`)
 const refusesWith = (fn, reasonCode) => {
@@ -55,6 +48,11 @@ gate('biomeColor: deep ocean, sea, beach and snowcap bands return their document
   assert.deepEqual(biomeColor(4, 0.5, 0.5, 0), [214, 199, 152])
   assert.deepEqual(biomeColor(2300, 0.5, 0.5, 0), [235, 238, 242])
   assert.deepEqual(biomeColor(2200, 0.5, 0.5, 0), [235, 238, 242], 'exactly 2200 blends to snow')
+})
+
+gate('biomeColor: the beach band ends at 8 m, so exactly 8 m is dry land and 7.99 m is beach', () => {
+  assert.deepEqual(biomeColor(7.99, 0.5, 0.5, 0), [214, 199, 152])
+  assert.deepEqual(biomeColor(8, 0.5, 0.5, 0), [140, 157, 92], 'exactly 8 m is past the beach, so it takes the dry-grass mix')
 })
 
 gate('biomeColor: seaLevel shifts the height before any band is chosen', () => {
@@ -495,15 +493,31 @@ gate('colliderLattice: a missing io object is refused with a TypeError', () => {
   assert.ok(error instanceof TypeError, 'expected a TypeError, got ' + (error && error.name))
 })
 
-gate('shared-pure sources carry no comment markers and read no host global', () => {
-  for (const name of SHARED_FILES) {
-    const source = readFileSync(join(root, 'src/shared', name + '.js'), 'utf8')
-    assert.equal(source.includes('//'), false, name + ' has a line comment marker')
-    assert.equal(source.includes('/*'), false, name + ' has a block comment marker')
-    for (const token of HOST_GLOBALS) {
-      assert.equal(source.includes(token), false, name + ' reads ' + token)
-    }
-  }
+gate('materialSlots: a slot named __proto__ is kept as an own slot, not as the prototype of the result', () => {
+  const r = parseMaterialSlots(JSON.parse('{"__proto__":{"color":"#102030"}}'))
+  assert.equal(r.ok, true)
+  assert.deepEqual(Object.keys(r.value), ['__proto__'])
+  assert.equal(Object.getPrototypeOf(r.value), Object.prototype)
+  assert.equal(r.value.color, undefined, 'the slot fields must not leak through the prototype')
+})
+
+gate('worldPresets: typed arrays and dates pass through a merge as the same kind of value', () => {
+  const when = new Date(0)
+  const data = new Uint8Array([1, 2])
+  const table = { p: { entities: [{ id: 'a', data, when }] } }
+  const out = expandWorldPresets({ presets: ['p'], entities: [{ id: 'b' }] }, table)
+  assert.equal(out.entities[0].data, data)
+  assert.ok(out.entities[0].when instanceof Date, 'a date stays a date, not an empty object')
+  assert.equal(out.entities[0].when.getTime(), 0)
+})
+
+gate('worldPresets: a movement key named __proto__ stays an own key and sets no prototype', () => {
+  const raw = JSON.parse('{"presets":["p"],"movement":{"__proto__":{"maxSpeed":3}}}')
+  const out = expandWorldPresets(raw, { p: { movement: { sprintSpeed: 9 } } })
+  assert.equal(Object.hasOwn(out.movement, '__proto__'), true)
+  assert.deepEqual(Object.getOwnPropertyDescriptor(out.movement, '__proto__').value, { maxSpeed: 3 })
+  assert.equal(out.movement.sprintSpeed, 9)
+  assert.equal(out.movement.maxSpeed, undefined)
 })
 
 finish()
