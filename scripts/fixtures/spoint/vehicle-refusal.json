@@ -1,0 +1,22 @@
+{
+  "source": {
+    "files": [
+      "src/physics/World.js",
+      "src/physics/VehiclePhysics.js"
+    ],
+    "sha256": {
+      "src/physics/World.js": "2c978302c0fa894b8168e0e1ad8242a5bd5e70c0ee571274b22e4815197e1d3e",
+      "src/physics/VehiclePhysics.js": "23d006415e7912ad9eee9e1217467ad7bb64759c3c9ce03c1c7d4cbc949d43c2"
+    },
+    "joltPhysics": "1.1.0"
+  },
+  "rows": [
+    "{\"label\":s:\"wheeled build with a missing chassis\",\"logged\":[],\"value\":null}",
+    "{\"label\":s:\"wheeled build with no wheels\",\"logged\":[],\"value\":null}",
+    "{\"label\":s:\"wheeled build with a one-point tyre curve\",\"logged\":[[s:\"[physics] createWheeledVehicle failed:\",s:\"[vehicle-tyre] longitudinal needs at least 2 points\"]],\"value\":null}",
+    "{\"label\":s:\"wheeled build with a zero-frequency spring\",\"logged\":[[s:\"[physics] createWheeledVehicle failed:\",s:\"[vehicle-suspension] frequency must be > 0 and damping within [0, 1]\"]],\"value\":null}",
+    "{\"label\":s:\"tracked build with a missing chassis\",\"logged\":[],\"value\":null}",
+    "{\"label\":s:\"tracked build with no wheels\",\"logged\":[],\"value\":null}",
+    "{\"label\":s:\"tracked build with null options\",\"logged\":[[s:\"[physics] createTrackedVehicle failed:\",s:\"Cannot read properties of null (reading 'up')\"]],\"value\":null}"
+  ]
+}

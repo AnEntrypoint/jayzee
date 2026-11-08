@@ -115,7 +115,8 @@ export function createVehicleBackend(host) {
       vehicles.set(vid, { constraint, controller, tester, stepListener, chassisBodyId, wheelCount: wheelDefs.length })
       return vid
     } catch (error) {
-      lastError = error.message
+      lastError = error?.message || error
+      console.error('[physics] createWheeledVehicle failed:', lastError)
       return null
     } finally {
       if (vcs) J.destroy(vcs)
@@ -230,7 +231,8 @@ export function createVehicleBackend(host) {
       vehicles.set(vid, { constraint, controller, tester, stepListener, chassisBodyId, wheelCount: wheelDefs.length, tracked: true })
       return vid
     } catch (error) {
-      lastError = error.message
+      lastError = error?.message || error
+      console.error('[physics] createTrackedVehicle failed:', lastError)
       return null
     } finally {
       if (vcs) J.destroy(vcs)
