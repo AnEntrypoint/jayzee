@@ -1,0 +1,560 @@
+{
+  "source": "spoint src/sdk/EditorHandlersSerialize.js (d5e3860 content)",
+  "worldConfig": {
+    "port": 3000,
+    "tickRate": 20,
+    "gravity": [
+      0,
+      -9.8,
+      0
+    ],
+    "scene": {
+      "sky": "day"
+    },
+    "spawnPoints": [
+      [
+        1,
+        2,
+        3
+      ]
+    ],
+    "terrain": {
+      "seed": 7
+    },
+    "unknownKey": "dropped"
+  },
+  "entities": [
+    {
+      "id": "a",
+      "model": "crate",
+      "position": [
+        1,
+        2,
+        3
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "_appName": "crate",
+      "bodyType": "dynamic",
+      "_config": {
+        "hp": 3
+      },
+      "custom": {
+        "tag": "x"
+      }
+    },
+    {
+      "id": "b",
+      "parent": "a",
+      "model": "bolt",
+      "position": [
+        0,
+        1,
+        0
+      ],
+      "rotation": [
+        0,
+        0.7071067811865476,
+        0,
+        0.7071067811865476
+      ],
+      "scale": [
+        2,
+        2,
+        2
+      ]
+    },
+    {
+      "id": "c",
+      "position": [
+        5,
+        0,
+        5
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "id": "d",
+      "position": [
+        -4,
+        0.5,
+        2
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "bodyType": "static",
+      "custom": {}
+    },
+    {
+      "id": "e",
+      "model": "ramp",
+      "position": [
+        3,
+        0,
+        -3
+      ],
+      "rotation": [
+        0,
+        0.5,
+        0,
+        0.8660254037844386
+      ],
+      "scale": [
+        1,
+        3,
+        1
+      ],
+      "bodyType": "kinematic"
+    }
+  ],
+  "transfer": {
+    "offset": [
+      -10,
+      1,
+      0
+    ],
+    "mul": [
+      1,
+      1,
+      2
+    ],
+    "negateY": true
+  },
+  "worldConfigKeys": [
+    "port",
+    "tickRate",
+    "entityTickRate",
+    "gravity",
+    "relevanceRadius",
+    "physicsRadius",
+    "physicsBodyBudget",
+    "movement",
+    "player",
+    "scene",
+    "camera",
+    "animation",
+    "input",
+    "spawnPoint",
+    "spawnPoints",
+    "playerModel",
+    "trustedApps",
+    "placeableApps",
+    "terrain",
+    "netcode"
+  ],
+  "entityPlain": [
+    {
+      "id": "a",
+      "model": "crate",
+      "position": [
+        1,
+        2,
+        3
+      ],
+      "app": "crate",
+      "bodyType": "dynamic",
+      "config": {
+        "hp": 3
+      },
+      "custom": {
+        "tag": "x"
+      }
+    },
+    {
+      "id": "b",
+      "model": "bolt",
+      "position": [
+        0,
+        1,
+        0
+      ],
+      "rotation": [
+        0,
+        0.7071067811865476,
+        0,
+        0.7071067811865476
+      ],
+      "scale": [
+        2,
+        2,
+        2
+      ],
+      "parent": "a"
+    },
+    {
+      "id": "c",
+      "position": [
+        5,
+        0,
+        5
+      ]
+    },
+    {
+      "id": "d",
+      "position": [
+        -4,
+        0.5,
+        2
+      ],
+      "custom": {}
+    },
+    {
+      "id": "e",
+      "model": "ramp",
+      "position": [
+        3,
+        0,
+        -3
+      ],
+      "rotation": [
+        0,
+        0.5,
+        0,
+        0.8660254037844386
+      ],
+      "scale": [
+        1,
+        3,
+        1
+      ],
+      "bodyType": "kinematic"
+    }
+  ],
+  "entityRebased": [
+    {
+      "id": "a",
+      "model": "crate",
+      "position": [
+        -9,
+        3,
+        6
+      ],
+      "app": "crate",
+      "bodyType": "dynamic",
+      "config": {
+        "hp": 3
+      },
+      "custom": {
+        "tag": "x"
+      }
+    },
+    {
+      "id": "b",
+      "model": "bolt",
+      "position": [
+        0,
+        1,
+        0
+      ],
+      "rotation": [
+        0,
+        0.7071067811865476,
+        0,
+        0.7071067811865476
+      ],
+      "scale": [
+        2,
+        2,
+        2
+      ],
+      "parent": "a"
+    },
+    {
+      "id": "c",
+      "position": [
+        -5,
+        1,
+        10
+      ]
+    },
+    {
+      "id": "d",
+      "position": [
+        -14,
+        1.5,
+        4
+      ],
+      "custom": {}
+    },
+    {
+      "id": "e",
+      "model": "ramp",
+      "position": [
+        -7,
+        1,
+        -6
+      ],
+      "rotation": [
+        0,
+        -0.5,
+        0,
+        0.8660254037844386
+      ],
+      "scale": [
+        1,
+        3,
+        1
+      ],
+      "bodyType": "kinematic"
+    }
+  ],
+  "worldPlain": {
+    "port": 3000,
+    "tickRate": 20,
+    "gravity": [
+      0,
+      -9.8,
+      0
+    ],
+    "scene": {
+      "sky": "day"
+    },
+    "spawnPoints": [
+      [
+        1,
+        2,
+        3
+      ]
+    ],
+    "terrain": {
+      "seed": 7
+    },
+    "entities": [
+      {
+        "id": "a",
+        "model": "crate",
+        "position": [
+          1,
+          2,
+          3
+        ],
+        "app": "crate",
+        "bodyType": "dynamic",
+        "config": {
+          "hp": 3
+        },
+        "custom": {
+          "tag": "x"
+        }
+      },
+      {
+        "id": "b",
+        "model": "bolt",
+        "position": [
+          0,
+          1,
+          0
+        ],
+        "rotation": [
+          0,
+          0.7071067811865476,
+          0,
+          0.7071067811865476
+        ],
+        "scale": [
+          2,
+          2,
+          2
+        ],
+        "parent": "a"
+      },
+      {
+        "id": "d",
+        "position": [
+          -4,
+          0.5,
+          2
+        ],
+        "custom": {}
+      },
+      {
+        "id": "e",
+        "model": "ramp",
+        "position": [
+          3,
+          0,
+          -3
+        ],
+        "rotation": [
+          0,
+          0.5,
+          0,
+          0.8660254037844386
+        ],
+        "scale": [
+          1,
+          3,
+          1
+        ],
+        "bodyType": "kinematic"
+      }
+    ]
+  },
+  "worldRebased": {
+    "port": 3000,
+    "tickRate": 20,
+    "gravity": [
+      0,
+      -9.8,
+      0
+    ],
+    "scene": {
+      "sky": "day"
+    },
+    "spawnPoints": [
+      [
+        1,
+        2,
+        3
+      ]
+    ],
+    "terrain": {
+      "seed": 7
+    },
+    "entities": [
+      {
+        "id": "a",
+        "model": "crate",
+        "position": [
+          -9,
+          3,
+          6
+        ],
+        "app": "crate",
+        "bodyType": "dynamic",
+        "config": {
+          "hp": 3
+        },
+        "custom": {
+          "tag": "x"
+        }
+      },
+      {
+        "id": "b",
+        "model": "bolt",
+        "position": [
+          0,
+          1,
+          0
+        ],
+        "rotation": [
+          0,
+          0.7071067811865476,
+          0,
+          0.7071067811865476
+        ],
+        "scale": [
+          2,
+          2,
+          2
+        ],
+        "parent": "a"
+      },
+      {
+        "id": "d",
+        "position": [
+          -14,
+          1.5,
+          4
+        ],
+        "custom": {}
+      },
+      {
+        "id": "e",
+        "model": "ramp",
+        "position": [
+          -7,
+          1,
+          -6
+        ],
+        "rotation": [
+          0,
+          -0.5,
+          0,
+          0.8660254037844386
+        ],
+        "scale": [
+          1,
+          3,
+          1
+        ],
+        "bodyType": "kinematic"
+      }
+    ]
+  },
+  "worldSource": "{\n  \"port\": 3000,\n  \"tickRate\": 20,\n  \"gravity\": [\n    0,\n    -9.8,\n    0\n  ],\n  \"scene\": {\n    \"sky\": \"day\"\n  },\n  \"spawnPoints\": [\n    [\n      1,\n      2,\n      3\n    ]\n  ],\n  \"terrain\": {\n    \"seed\": 7\n  },\n  \"entities\": [\n    {\n      \"id\": \"a\",\n      \"model\": \"crate\",\n      \"position\": [\n        1,\n        2,\n        3\n      ],\n      \"app\": \"crate\",\n      \"bodyType\": \"dynamic\",\n      \"config\": {\n        \"hp\": 3\n      },\n      \"custom\": {\n        \"tag\": \"x\"\n      }\n    },\n    {\n      \"id\": \"b\",\n      \"model\": \"bolt\",\n      \"position\": [\n        0,\n        1,\n        0\n      ],\n      \"rotation\": [\n        0,\n        0.7071067811865476,\n        0,\n        0.7071067811865476\n      ],\n      \"scale\": [\n        2,\n        2,\n        2\n      ],\n      \"parent\": \"a\"\n    },\n    {\n      \"id\": \"d\",\n      \"position\": [\n        -4,\n        0.5,\n        2\n      ],\n      \"custom\": {}\n    },\n    {\n      \"id\": \"e\",\n      \"model\": \"ramp\",\n      \"position\": [\n        3,\n        0,\n        -3\n      ],\n      \"rotation\": [\n        0,\n        0.5,\n        0,\n        0.8660254037844386\n      ],\n      \"scale\": [\n        1,\n        3,\n        1\n      ],\n      \"bodyType\": \"kinematic\"\n    }\n  ]\n}",
+  "worldModule": "export default {\n  \"port\": 3000,\n  \"tickRate\": 20,\n  \"gravity\": [\n    0,\n    -9.8,\n    0\n  ],\n  \"scene\": {\n    \"sky\": \"day\"\n  },\n  \"spawnPoints\": [\n    [\n      1,\n      2,\n      3\n    ]\n  ],\n  \"terrain\": {\n    \"seed\": 7\n  },\n  \"entities\": [\n    {\n      \"id\": \"a\",\n      \"model\": \"crate\",\n      \"position\": [\n        1,\n        2,\n        3\n      ],\n      \"app\": \"crate\",\n      \"bodyType\": \"dynamic\",\n      \"config\": {\n        \"hp\": 3\n      },\n      \"custom\": {\n        \"tag\": \"x\"\n      }\n    },\n    {\n      \"id\": \"b\",\n      \"model\": \"bolt\",\n      \"position\": [\n        0,\n        1,\n        0\n      ],\n      \"rotation\": [\n        0,\n        0.7071067811865476,\n        0,\n        0.7071067811865476\n      ],\n      \"scale\": [\n        2,\n        2,\n        2\n      ],\n      \"parent\": \"a\"\n    },\n    {\n      \"id\": \"d\",\n      \"position\": [\n        -4,\n        0.5,\n        2\n      ],\n      \"custom\": {}\n    },\n    {\n      \"id\": \"e\",\n      \"model\": \"ramp\",\n      \"position\": [\n        3,\n        0,\n        -3\n      ],\n      \"rotation\": [\n        0,\n        0.5,\n        0,\n        0.8660254037844386\n      ],\n      \"scale\": [\n        1,\n        3,\n        1\n      ],\n      \"bodyType\": \"kinematic\"\n    }\n  ]\n}\n",
+  "textNames": [
+    "a.js",
+    "b.JS",
+    "c.Yaml",
+    "readme",
+    ".js",
+    "dir.v2/file",
+    "x.png",
+    "y.mjs",
+    "z.",
+    "deep/name.svg"
+  ],
+  "textFlags": [
+    true,
+    true,
+    true,
+    false,
+    true,
+    false,
+    false,
+    true,
+    false,
+    true
+  ],
+  "errors": [
+    {
+      "e": {
+        "code": "EACCES"
+      },
+      "path": "app/a.js",
+      "message": "EACCES: operation failed on 'app/a.js'"
+    },
+    {
+      "e": {
+        "name": "TypeError"
+      },
+      "path": "x",
+      "message": "TypeError: operation failed on 'x'"
+    },
+    {
+      "e": {},
+      "path": "y",
+      "message": "ERROR: operation failed on 'y'"
+    },
+    {
+      "e": null,
+      "path": "z",
+      "message": "ERROR: operation failed on 'z'"
+    }
+  ]
+}
