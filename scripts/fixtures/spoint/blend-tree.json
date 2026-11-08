@@ -1,0 +1,58 @@
+{
+ "source": {
+  "file": "src/animation/BlendTree.js",
+  "sha256": "718dd191153b016e2ef52e89c900e1188d0d85c22e1ab1e8683f5dcfa45808b0",
+  "note": "spoint BlendTree1D, BlendTree2D and BlendTreeNode run on scripts/lib/blendTreeScenario.mjs. The file imports three.js at line 1, but no class in it uses that import, so the import is replaced by an empty module through scripts/lib/threeStubHooks.mjs. AnimationBlender is not in this fixture."
+ },
+ "sections": {
+  "BlendTree1D": [
+   "{\"label\":\"1D parameter -1 weights\",\"result\":{\"ok\":[[1,0,0,0],0,0]}}",
+   "{\"label\":\"1D parameter 0 weights\",\"result\":{\"ok\":[[1,0,0,0],0,0]}}",
+   "{\"label\":\"1D parameter 0.5 weights\",\"result\":{\"ok\":[[0.5,0.5,0,0],0.5,0]}}",
+   "{\"label\":\"1D parameter 1 weights\",\"result\":{\"ok\":[[0,1,0,0],1,0]}}",
+   "{\"label\":\"1D parameter 2.5 weights\",\"result\":{\"ok\":[[0,0.5,0.5,0],0.5,0]}}",
+   "{\"label\":\"1D parameter 4 weights\",\"result\":{\"ok\":[[0,0,1,0],0,0]}}",
+   "{\"label\":\"1D parameter 6 weights\",\"result\":{\"ok\":[[0,0,0.5,0.5],0,0]}}",
+   "{\"label\":\"1D parameter 8 weights\",\"result\":{\"ok\":[[0,0,0,1],0,0]}}",
+   "{\"label\":\"1D parameter 9 weights\",\"result\":{\"ok\":[[0,0,0,1],0,0]}}",
+   "{\"label\":\"1D clips after construction\",\"result\":{\"ok\":[{\"clip\":\"idle\",\"threshold\":0},{\"clip\":\"walk\",\"threshold\":1},{\"clip\":\"run\",\"threshold\":4},{\"clip\":\"sprint\",\"threshold\":8}]}}",
+   "{\"label\":\"1D empty tree\",\"result\":{\"ok\":[]}}",
+   "{\"label\":\"1D addClip chains and weights\",\"result\":{\"ok\":[0.5,0.5]}}",
+   "{\"label\":\"1D duplicate thresholds take the high index\",\"result\":{\"ok\":[0,1]}}",
+   "{\"label\":\"1D bare object is a clip with threshold 0\",\"result\":{\"ok\":[{\"clip\":{\"name\":\"bare\"},\"threshold\":0}]}}",
+   "{\"label\":\"1D getWeights returns a copy\",\"result\":{\"ok\":[[99,1],[0,1]]}}",
+   "{\"label\":\"1D null entry is refused\",\"result\":{\"threw\":\"[BlendTree1D] clips[0] is null; pass a clip or build the tree with addClip(clip, threshold)\"}}",
+   "{\"label\":\"1D entry without a clip is refused\",\"result\":{\"ok\":{\"clips\":[{\"clip\":{\"threshold\":1},\"threshold\":0}],\"weights\":[0],\"parameter\":0}}}",
+   "{\"label\":\"1D addClip with null clip is refused\",\"result\":{\"threw\":\"[BlendTree1D] clips[0] names no clip\"}}",
+   "{\"label\":\"1D entry with null clip is refused\",\"result\":{\"threw\":\"[BlendTree1D] clips[1] names no clip\"}}"
+  ],
+  "BlendTree2D": [
+   "{\"label\":\"2D (0, 0) weights\",\"result\":{\"ok\":[[1,0,0,0],1,0]}}",
+   "{\"label\":\"2D (1, 1) weights\",\"result\":{\"ok\":[[0,0,0,1],0,0]}}",
+   "{\"label\":\"2D (0.5, 0.5) weights\",\"result\":{\"ok\":[[0.3333333333333333,0.3333333333333333,0.3333333333333333,0],0.3333333333333333,0]}}",
+   "{\"label\":\"2D (0.25, 0.1) weights\",\"result\":{\"ok\":[[0.6082270110247872,0.17532828652330584,0.21644470245190697,0],0.6082270110247872,0]}}",
+   "{\"label\":\"2D (10, 10) weights\",\"result\":{\"ok\":[[0,0.3271163205268436,0.3271163205268436,0.3457673589463127],0,0]}}",
+   "{\"label\":\"2D (0.001, 0) weights\",\"result\":{\"ok\":[[0.9803825404537897,0.00980382050262887,0.00981363904358148,0],0.9803825404537897,0]}}",
+   "{\"label\":\"2D (0.004, 0.003) weights\",\"result\":{\"ok\":[[0.9803247598757567,0.00983266670115082,0.009842573423092561,0],0.9803247598757567,0]}}",
+   "{\"label\":\"2D (-0.5, 0.5) weights\",\"result\":{\"ok\":[[0.4086280011842216,0.4086280011842216,0.18274399763155683,0],0.4086280011842216,0]}}",
+   "{\"label\":\"2D (0.5, 0) weights\",\"result\":{\"ok\":[[0.4086280011842216,0.1827439976315568,0.4086280011842216,0],0.4086280011842216,0]}}",
+   "{\"label\":\"2D clips after construction\",\"result\":{\"ok\":[{\"clip\":\"idle\",\"x\":0,\"y\":0},{\"clip\":\"north\",\"x\":0,\"y\":1},{\"clip\":\"east\",\"x\":1,\"y\":0},{\"clip\":\"north-east\",\"x\":1,\"y\":1}]}}",
+   "{\"label\":\"2D empty tree\",\"result\":{\"ok\":[]}}",
+   "{\"label\":\"2D addClip defaults to the origin\",\"result\":{\"ok\":[0,1]}}",
+   "{\"label\":\"2D two samples use both\",\"result\":{\"ok\":[0.75,0.25]}}",
+   "{\"label\":\"2D nearest three of five on a line\",\"result\":{\"ok\":[0.14634146341463414,0.5121951219512195,0.34146341463414626,0,0]}}",
+   "{\"label\":\"2D equal distances keep the listed order\",\"result\":{\"ok\":[0.4086280011842216,0.1827439976315568,0.4086280011842216,0]}}",
+   "{\"label\":\"2D null entry is refused\",\"result\":{\"threw\":\"[BlendTree2D] clips[0] is null; pass a clip or build the tree with addClip(clip, x, y)\"}}",
+   "{\"label\":\"2D entry without a clip is refused\",\"result\":{\"ok\":{\"clips\":[{\"clip\":{\"x\":0,\"y\":0},\"x\":0,\"y\":0}],\"weights\":[0],\"posX\":0,\"posY\":0}}}",
+   "{\"label\":\"2D addClip with null clip is refused\",\"result\":{\"threw\":\"[BlendTree2D] clips[0] names no clip\"}}"
+  ],
+  "BlendTreeNode": [
+   "{\"label\":\"node initial state\",\"result\":{\"ok\":{\"name\":\"root\",\"children\":0,\"output\":0}}}",
+   "{\"label\":\"addChild returns the node\",\"result\":{\"ok\":true}}",
+   "{\"label\":\"addChild chains and accepts a child without update\",\"result\":{\"ok\":3}}",
+   "{\"label\":\"update forwards dt to children with update only\",\"result\":{\"ok\":[\"a 0.5\",\"b 0.5\"]}}",
+   "{\"label\":\"default name and children\",\"result\":{\"ok\":[\"\",[],0]}}",
+   "{\"label\":\"children array is shared with the argument\",\"result\":{\"ok\":1}}"
+  ]
+ }
+}
