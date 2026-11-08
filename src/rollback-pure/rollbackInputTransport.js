@@ -90,3 +90,32 @@ export function createRollbackInputTransport({ link, openPeers = [], stallTicks 
 
   return transport
 }
+
+export function createRollbackBridgeTransport({ bridge, stallTicks, onRemoteInput, onRemoteChecksum } = {}) {
+  const data = bridge?.data
+  if (typeof data?.addEventListener !== 'function' || typeof data.removeEventListener !== 'function') throw new Error('RollbackInputTransport: bridge.data must be an event target')
+  if (typeof data.broadcast !== 'function') throw new Error('RollbackInputTransport: bridge.data.broadcast required')
+  if (typeof data.peers?.[Symbol.iterator] !== 'function') throw new Error('RollbackInputTransport: bridge.data.peers required')
+
+  const openPeers = []
+  for (const [pk, peer] of data.peers) if (peer?.dc?.readyState === 'open') openPeers.push(pk)
+
+  const link = { get pubkey() { return bridge.pubkey }, broadcast: (text) => data.broadcast(text) }
+  const transport = createRollbackInputTransport({ link, openPeers, stallTicks, onRemoteInput, onRemoteChecksum })
+
+  const onData = ({ detail }) => transport.handleFrame(detail)
+  const onPeerOpen = ({ detail }) => transport.peerOpened(detail?.peerPubkey)
+  const onPeerClose = ({ detail }) => transport.peerClosed(detail?.peerPubkey)
+  data.addEventListener('data', onData)
+  data.addEventListener('peer-open', onPeerOpen)
+  data.addEventListener('peer-close', onPeerClose)
+  data.addEventListener('peer-closed', onPeerClose)
+
+  transport.destroy = () => {
+    data.removeEventListener('data', onData)
+    data.removeEventListener('peer-open', onPeerOpen)
+    data.removeEventListener('peer-close', onPeerClose)
+    data.removeEventListener('peer-closed', onPeerClose)
+  }
+  return transport
+}
