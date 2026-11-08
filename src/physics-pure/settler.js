@@ -1,5 +1,12 @@
 import { createContactCache, findContacts } from './contacts.js'
 import { createIslands } from './islands.js'
+import { stopAtBox } from './ccd.js'
+
+const isVec3 = (v) => Array.isArray(v) && v.length === 3 && v.every(Number.isFinite)
+
+const checkBox = (box) => {
+  if (!box || !isVec3(box.min) || !isVec3(box.max) || box.min.some((v, i) => v > box.max[i])) throw new RangeError('box needs finite min and max corners, with min at or below max')
+}
 
 const readBodies = (world, count, read) => {
   const out = new Float64Array(count * 3)
@@ -7,9 +14,10 @@ const readBodies = (world, count, read) => {
   return out
 }
 
-export const createSettler = (world, { radius, skin = radius * 0.05, linearThreshold, timeToSleep, warmStart = true } = {}) => {
+export const createSettler = (world, { radius, skin = radius * 0.05, linearThreshold, timeToSleep, warmStart = true, boxes = [] } = {}) => {
   if (!(typeof radius === 'number' && radius > 0)) throw new RangeError('radius must be a positive number, the world radius')
   if (!(skin >= 0)) throw new RangeError('skin must be zero or above')
+  boxes.forEach(checkBox)
   const count = world.count
   const islands = createIslands({ count, linearThreshold, timeToSleep })
   const cache = createContactCache()
@@ -21,6 +29,24 @@ export const createSettler = (world, { radius, skin = radius * 0.05, linearThres
 
   const writeVelocities = (vel) => {
     for (let i = 0; i < count; i++) world.setVelocity(i, [vel[i * 3], vel[i * 3 + 1], vel[i * 3 + 2]])
+  }
+
+  const sweepBodies = (from) => {
+    for (let i = 0; i < count; i++) {
+      const o = i * 3
+      const start = [from[o], from[o + 1], from[o + 2]]
+      const end = world.position(i)
+      const velocity = world.velocity(i)
+      let first = null
+      for (const box of boxes) {
+        const hit = stopAtBox(start, end, radius, box, velocity)
+        if (hit !== null && (first === null || hit.t < first.t)) first = hit
+      }
+      if (first !== null) {
+        world.setPosition(i, first.position)
+        world.setVelocity(i, first.velocity)
+      }
+    }
   }
 
   const freezeAsleep = (frozen) => {
@@ -45,6 +71,7 @@ export const createSettler = (world, { radius, skin = radius * 0.05, linearThres
         writeVelocities(seeded)
       }
       world.step()
+      if (boxes.length > 0) sweepBodies(pos)
       const after = readBodies(world, count, 'velocity')
       cache.record(contacts, before, after)
       freezeAsleep(pos)
