@@ -11,6 +11,7 @@ Non-obvious facts for automated edits. Architecture and measured costs live in d
 - Keep `MODULES` in `src/kernel/build.js` in step with the imports. A missing file fails the build with an unresolved import.
 - Hygiene scans (comment markers, bare imports, host globals) live only in `scripts/check-hygiene.mjs`. A source directory that needs them joins its `SCOPES` table, not a per-file gate.
 - scripts/lib/gate.mjs holds the shared PASS and FAIL reporter. A new gate imports it, runs each claim through gate(label, fn), and ends with finish().
+  A gate body may return a promise. Its PASS or FAIL line prints when the promise settles, and `finish()` prints RESULT after every pending gate. Before this, `gate` ran an async body without awaiting it, so PASS printed before its assertions ran.
 
 ## Facts that bite
 
