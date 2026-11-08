@@ -428,7 +428,7 @@ Read-only slice. No file was edited or committed, and docs/IDEAL.md was not writ
 | Stream 27 — src/apps/AppPhysics.js, AppRuntimePhysics.js | parseInteractable and mixinPhysics | owner-decision | - | Jolt host (PARITY rows 7 and 9). |
 | Stream 27 — src/apps/AppRuntimeState.js, AppRuntimeStaticMotion.js | Tagged app state and transform capture | built | src/apps/persistedStore.js; src/apps/AccountState.js; src/apps/AppSeats.js; src/apps/AppRuntimeState.js; src/apps/AppRuntimeStaticMotion.js; src/apps/AppPhysics.js; src/apps/AppGameplay.js; scripts/check-apps-a.mjs | gate scripts/check-apps-a.mjs PASS 54; missing note: No module. |
 | Stream 27 — src/apps/AppRuntimeTick.js | mixinTick | partial | src/apps/hookOrder.js | Only the hook order is ported. The tick mixin needs a tick-loop host (PARITY row 18). |
-| Stream 27 — src/apps/ComponentPool.js | createComponentPool | partial | src/behaviours/healthPool.js, src/behaviours/destructiblePool.js | Concrete pools exist for health and destructible. The generic factory is not ported. |
+| Stream 27 — src/apps/ComponentPool.js | createComponentPool | built | src/apps/componentPool.js; scripts/check-component-pool.mjs | The generic factory is ported and gated against spoint: one lifecycle, growth and error trace (scripts/fixtures/spoint/component-pool.json). The health and destructible pools are separate consumers. |
 | Stream 27 — src/apps/CustomVersion.js, EcsEntityMap.js | installCustomVersion and createEcsEntityMap | built | src/apps/CustomVersion.js; src/apps/EcsEntityMap.js; src/apps/EventBus.js; src/apps/SurfaceSelector.js; src/apps/SurfaceSelectorRuntime.js; src/apps/appImports.js; scripts/check-apps-b.mjs | gate scripts/check-apps-b.mjs PASS 62; missing note: No module. |
 | Stream 27 — src/apps/EventBus.js | EventBus | built | src/apps/CustomVersion.js; src/apps/EcsEntityMap.js; src/apps/EventBus.js; src/apps/SurfaceSelector.js; src/apps/SurfaceSelectorRuntime.js; src/apps/appImports.js; scripts/check-apps-b.mjs | gate scripts/check-apps-b.mjs PASS 62; missing note: No module. |
 | Stream 27 — src/apps/HotReloadQueue.js | HotReloadQueue | built | src/hot/hotReloadQueue.js; scripts/check-hot-reload.mjs | Coalescing lives in the separate coalescer. |
@@ -540,7 +540,7 @@ Counts: 153 rows. built 59, partial 26, missing 34, owner-decision 34.
 | upstream FEATURESET Stream 27: src/apps modules with no upstream mention | AppRuntimeStaticMotion captureTransform | built | src/apps/appRuntimeTags.js; src/apps/appStaticMotion.js; scripts/check-app-runtime-state.mjs | gate scripts/check-app-runtime-state.mjs PASS 23; missing note: No decision recorded |
 | upstream FEATURESET Stream 27: src/apps modules with no upstream mention | AppRuntimeTick mixin | partial | src/apps/hookOrder.js; scripts/check-hook-order.mjs | Hook order built (PARITY row 31); tick mixin not ported |
 | upstream FEATURESET Stream 27: src/apps modules with no upstream mention | AppSeats | built | src/apps/persistedStore.js; src/apps/AccountState.js; src/apps/AppSeats.js; src/apps/AppRuntimeState.js; src/apps/AppRuntimeStaticMotion.js; src/apps/AppPhysics.js; src/apps/AppGameplay.js; scripts/check-apps-a.mjs | gate scripts/check-apps-a.mjs PASS 54; missing note: No decision recorded |
-| upstream FEATURESET Stream 27: src/apps modules with no upstream mention | ComponentPool | partial | src/behaviours/healthPool.js; src/behaviours/destructiblePool.js; scripts/check-behaviour-health-destructible.mjs | Two pool consumers; the generic factory is not ported |
+| upstream FEATURESET Stream 27: src/apps modules with no upstream mention | ComponentPool | built | src/apps/componentPool.js; scripts/check-component-pool.mjs | Generic factory ported and gated against spoint; health and destructible pools are separate consumers |
 | upstream FEATURESET Stream 27: src/apps modules with no upstream mention | CustomVersion | built | src/apps/CustomVersion.js; src/apps/EcsEntityMap.js; src/apps/EventBus.js; src/apps/SurfaceSelector.js; src/apps/SurfaceSelectorRuntime.js; src/apps/appImports.js; scripts/check-apps-b.mjs | gate scripts/check-apps-b.mjs PASS 62; missing note: No decision recorded |
 | upstream FEATURESET Stream 27: src/apps modules with no upstream mention | EcsEntityMap | built | src/apps/CustomVersion.js; src/apps/EcsEntityMap.js; src/apps/EventBus.js; src/apps/SurfaceSelector.js; src/apps/SurfaceSelectorRuntime.js; src/apps/appImports.js; scripts/check-apps-b.mjs | gate scripts/check-apps-b.mjs PASS 62; missing note: No decision recorded |
 | upstream FEATURESET Stream 27: src/apps modules with no upstream mention | EventBus | built | src/apps/CustomVersion.js; src/apps/EcsEntityMap.js; src/apps/EventBus.js; src/apps/SurfaceSelector.js; src/apps/SurfaceSelectorRuntime.js; src/apps/appImports.js; scripts/check-apps-b.mjs | gate scripts/check-apps-b.mjs PASS 62; missing note: No decision recorded |
@@ -743,8 +743,8 @@ Rows: 58. Built: 7. Partial: 22. Missing: 7. Owner-decision: 22. Slice A is 46 r
 | 2. spoint FEATURES.md rows 1 to 60 | 60 | 46 | 8 | 0 | 6 |
 | 2. spoint FEATURES.md rows 61 to 120 | 60 | 31 | 10 | 0 | 19 |
 | 2. spoint FEATURES.md rows 121 to 176 (mapspinner) | 56 | 7 | 6 | 0 | 43 |
-| 3. upstream FEATURESET streams 11 to 27 (plus stream 17 subsections, spawn learning and migrators) | 153 | 89 | 26 | 0 | 38 |
-| 3. upstream FEATURESET streams 18 to 58 and improvement items | 229 | 107 | 25 | 0 | 97 |
+| 3. upstream FEATURESET streams 11 to 27 (plus stream 17 subsections, spawn learning and migrators) | 153 | 90 | 25 | 0 | 38 |
+| 3. upstream FEATURESET streams 18 to 58 and improvement items | 229 | 108 | 24 | 0 | 97 |
 | 4. spoint README features and jayzee-only directories | 58 | 9 | 21 | 0 | 28 |
 
 ## 6. Reconciliation and open items
