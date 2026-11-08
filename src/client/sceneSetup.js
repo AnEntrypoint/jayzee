@@ -1,4 +1,11 @@
 import * as THREE from 'three'
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js'
+import { KTX2Loader } from 'three/addons/loaders/KTX2Loader.js'
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js'
+import { VRMLoaderPlugin } from '@pixiv/three-vrm'
+import { createModelErrorHandler } from '../shared/modelLoadErrors.js'
+import { renderDeferringUnreadyPrograms } from './programReadiness.js'
 
 const STUCK_PIPELINE_ERROR_THRESHOLD = 3
 const STUCK_PIPELINE_WINDOW_MS = 2000
@@ -158,7 +165,7 @@ function manifestUnresolvedUrls(entityMeshes, manifestUrls) {
   return [...manifestUrls].filter(u => !resident.has(u))
 }
 
-async function awaitManifestResidence(entityMeshes, manifestUrls, waitMs, env) {
+async function awaitManifestResidence(entityMeshes, manifestUrls, waitMs, env, isAborted = () => false) {
   const startedAt = env.now()
   const deadline = startedAt + waitMs
   const maxPolls = Math.max(1, Math.min(MANIFEST_RESIDENCE_MAX_POLLS, Math.ceil(waitMs / MANIFEST_RESIDENCE_POLL_MS)))
@@ -166,6 +173,7 @@ async function awaitManifestResidence(entityMeshes, manifestUrls, waitMs, env) {
     const unresolved = manifestUnresolvedUrls(entityMeshes, manifestUrls)
     const waitedMs = env.now() - startedAt
     if (unresolved.length === 0) return { unresolved, waitedMs, polls: poll, aborted: false }
+    if (isAborted()) return { unresolved, waitedMs, polls: poll, aborted: true }
     if (waitedMs >= waitMs || env.now() >= deadline) return { unresolved, waitedMs, polls: poll, aborted: false }
     await env.sleep(MANIFEST_RESIDENCE_POLL_MS)
   }
@@ -177,4 +185,145 @@ export async function waitForManifestResidence(entityMeshes, manifest, waitMs = 
   if (!manifestUrls) return { unresolved: [], waitedMs: 0, polls: 0, aborted: false }
   if (!env || typeof env.now !== 'function' || typeof env.sleep !== 'function') throw new TypeError('waitForManifestResidence needs env.now and env.sleep when a manifest is given')
   return awaitManifestResidence(entityMeshes, manifestUrls, waitMs, env)
+}
+
+export function describeRenderer(renderer) {
+  if (!renderer.isWebGPURenderer) {
+    const gl = renderer.getContext()
+    return { class: 'WebGLRenderer', backend: 'webgl2-legacy', glRenderer: unmaskedGlRenderer(gl), glVendor: unmaskedGlVendor(gl) }
+  }
+  const backend = renderer.backend
+  if (backend.isWebGLBackend) {
+    return { class: 'WebGPURenderer', backend: 'webgl2', glRenderer: unmaskedGlRenderer(backend.gl), glVendor: unmaskedGlVendor(backend.gl) }
+  }
+  const device = backend.device
+  return { class: 'WebGPURenderer', backend: 'webgpu', glRenderer: webgpuAdapterLabel(device), glVendor: webgpuAdapterVendor(device) }
+}
+
+function unmaskedGlRenderer(gl) {
+  if (!gl) return null
+  const ext = gl.getExtension('WEBGL_debug_renderer_info')
+  return gl.getParameter(ext ? ext.UNMASKED_RENDERER_WEBGL : gl.RENDERER)
+}
+
+function unmaskedGlVendor(gl) {
+  if (!gl) return null
+  const ext = gl.getExtension('WEBGL_debug_renderer_info')
+  return gl.getParameter(ext ? ext.UNMASKED_VENDOR_WEBGL : gl.VENDOR)
+}
+
+function webgpuAdapterLabel(device) {
+  const info = device && device.adapterInfo
+  if (!info) return null
+  return [info.vendor, info.architecture, info.description].filter(Boolean).join(' ') || null
+}
+
+function webgpuAdapterVendor(device) {
+  const info = device && device.adapterInfo
+  return (info && info.vendor) || null
+}
+
+let sharedKtx2Loader = null
+
+function ensureSharedKtx2Loader(renderer, basisPath) {
+  if (sharedKtx2Loader || !renderer) return sharedKtx2Loader
+  sharedKtx2Loader = new KTX2Loader().setTranscoderPath(basisPath).detectSupport(renderer)
+  return sharedKtx2Loader
+}
+
+export function createLoaders(renderer, paths) {
+  if (!paths || typeof paths.dracoDecoderPath !== 'string' || typeof paths.basisPath !== 'string') throw new TypeError('createLoaders needs paths.dracoDecoderPath and paths.basisPath')
+  THREE.Cache.enabled = true
+  const loadingManager = new THREE.LoadingManager()
+  const modelErrors = createModelErrorHandler({ onError: err => console.error('[THREE] Failed to load:', err.url, err.reasonCode) })
+  loadingManager.onError = url => modelErrors.onError(url)
+  loadingManager.modelLoadErrors = modelErrors
+  const gltfLoader = new GLTFLoader(loadingManager)
+  const dracoLoader = new DRACOLoader(loadingManager).setDecoderPath(paths.dracoDecoderPath)
+  gltfLoader.setDRACOLoader(dracoLoader)
+  try { if (typeof MeshoptDecoder.useWorkers === 'function') MeshoptDecoder.useWorkers(2) } catch (e) { console.warn('[loaders] MeshoptDecoder.useWorkers unavailable, decoding on the main thread:', e?.message || e) }
+  gltfLoader.setMeshoptDecoder(MeshoptDecoder)
+  gltfLoader.register((parser) => new VRMLoaderPlugin(parser))
+  const ktx2Loader = ensureSharedKtx2Loader(renderer, paths.basisPath)
+  if (ktx2Loader) gltfLoader.setKTX2Loader(ktx2Loader)
+  return { gltfLoader, dracoLoader, ktx2Loader }
+}
+
+export async function warmupShaders(renderer, scene, camera, entityMeshes, playerMeshes, loadingMgr, abortSignal = null, manifest = null, residence = null, env = null) {
+  if (!env || typeof env.now !== 'function' || typeof env.epochNow !== 'function' || typeof env.sleep !== 'function' || typeof env.raf !== 'function' || !env.storage || typeof env.record !== 'function' || typeof env.log !== 'function') throw new TypeError('warmupShaders needs env.now, env.epochNow, env.sleep, env.raf, env.storage, env.record and env.log')
+  const t0 = env.now()
+  const isAborted = () => !!(abortSignal && abortSignal.aborted)
+  const manifestUrls = manifest && Array.isArray(manifest.modelUrls) && manifest.modelUrls.length ? new Set(manifest.modelUrls) : null
+  let residenceResult = residence || { unresolved: [], waitedMs: 0, polls: 0, aborted: false }
+  const compileFailures = []
+  const record = (extra) => env.record({
+    ts: env.epochNow(),
+    wallMs: env.now() - t0,
+    manifestDriven: !!manifestUrls,
+    manifestUrls: manifestUrls ? [...manifestUrls] : null,
+    manifestResidenceWaitMs: Math.round(residenceResult.waitedMs),
+    manifestUnresolvedUrls: residenceResult.unresolved.length ? residenceResult.unresolved.slice() : null,
+    manifestUnresolvedReason: residenceResult.unresolved.length ? (residenceResult.aborted ? 'residence-wait-aborted' : 'residence-deadline-exceeded') : null,
+    compileFailures,
+    ...extra,
+  })
+  if (manifestUrls && !residence) residenceResult = await awaitManifestResidence(entityMeshes, manifestUrls, MANIFEST_RESIDENCE_WAIT_MS, env, isAborted)
+  const allEntityMeshes = [...entityMeshes.values()]
+  const manifestedMeshes = manifestUrls ? allEntityMeshes.filter(m => m.userData && manifestUrls.has(m.userData.modelUrl)).slice(0, MAX_UNMANIFESTED_WARMUP_MESHES) : []
+  const residentMeshes = manifestUrls ? allEntityMeshes.filter(m => !(m.userData && manifestUrls.has(m.userData.modelUrl))) : allEntityMeshes
+  const cappedResident = residentMeshes.length > MAX_UNMANIFESTED_WARMUP_MESHES ? [] : residentMeshes
+  if (residentMeshes.length > MAX_UNMANIFESTED_WARMUP_MESHES && !manifestUrls) {
+    env.log('[shader] skipping warmup (too many meshes:', residentMeshes.length + ')')
+    record({ skipped: true, reason: 'too-many-meshes', residentCount: residentMeshes.length, total: 0, manifestedCount: 0 })
+    return
+  }
+  const allMeshes = [...manifestedMeshes, ...cappedResident, ...playerMeshes.values()]
+  const total = allMeshes.length
+  if (total === 0) { record({ skipped: true, reason: 'empty', total: 0, manifestedCount: 0 }); return }
+  const ids = [...entityMeshes.keys()].sort().join(',')
+  const sceneKey = 'shader-warmup-v4:' + (manifestUrls ? 'm' + manifestedMeshes.length : '') + ':' + total + ':' + (ids.length > 200 ? ids.slice(0, 200) : ids)
+  if (env.storage.getItem('lastShaderWarmupKey') === sceneKey) {
+    env.log('[shader] skipped warmup (scene unchanged)')
+    record({ skipped: true, reason: 'scene-unchanged', total, manifestedCount: manifestedMeshes.length })
+    return
+  }
+  loadingMgr.setLabel('Compiling shaders...')
+  loadingMgr.reportProcessing(0, total)
+  const culled = []
+  scene.traverse(obj => { if (obj.frustumCulled) { culled.push(obj); obj.frustumCulled = false } })
+  try {
+    let compiledCount = 0
+    const WARMUP_BATCH = 6
+    for (let i = 0; i < allMeshes.length; i += WARMUP_BATCH) {
+      if (isAborted()) { record({ aborted: true, total, manifestedCount: manifestedMeshes.length }); return }
+      await Promise.all(allMeshes.slice(i, i + WARMUP_BATCH).map(async m => {
+        const url = m.userData && m.userData.modelUrl ? m.userData.modelUrl : null
+        try { await renderer.compileAsync(m, camera, scene) } catch (err) {
+          compileFailures.push({ url, message: String(err && err.message ? err.message : err) })
+          try { renderer.compile(m, camera, scene) } catch (err2) { compileFailures.push({ url, message: String(err2 && err2.message ? err2.message : err2) }) }
+        }
+        compiledCount++
+        loadingMgr.reportProcessing(compiledCount, total)
+      }))
+    }
+    if (isAborted()) { record({ aborted: true, total, manifestedCount: manifestedMeshes.length }); return }
+    renderer.shadowMap.needsUpdate = true
+    renderDeferringUnreadyPrograms(renderer, scene, camera)
+    if (isAborted()) { record({ aborted: true, total, manifestedCount: manifestedMeshes.length }); return }
+    await new Promise(resolve => env.raf(resolve))
+    if (isAborted()) { record({ aborted: true, total, manifestedCount: manifestedMeshes.length }); return }
+    renderDeferringUnreadyPrograms(renderer, scene, camera)
+    env.storage.setItem('lastShaderWarmupKey', sceneKey)
+    loadingMgr.reportProcessing(total, total)
+    env.log('[shader] warmup done, meshes:', total, manifestUrls ? '(' + manifestedMeshes.length + ' manifest-driven)' : '')
+    record({
+      total,
+      manifestedCount: manifestedMeshes.length,
+      residentCount: cappedResident.length,
+      manifestedUrls: manifestedMeshes.map(m => m.userData && m.userData.modelUrl).filter(Boolean),
+      residentModelUrls: [...new Set(residentMeshes.map(m => m.userData && m.userData.modelUrl).filter(Boolean))],
+    })
+  } finally {
+    for (const obj of culled) obj.frustumCulled = true
+  }
 }

@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { SSR_FULLSCREEN_VERT, SSR_FRAG, SSR_WETNESS_GBUFFER_VERT, SSR_WETNESS_GBUFFER_FRAG, SSR_COMPOSITE_FRAG } from '../render/postFxShaders.js'
+import { renderDeferringUnreadyPrograms } from './programReadiness.js'
 
 const defaultOnBeforeRender = new THREE.Object3D().onBeforeRender
 const sizeScratch = new THREE.Vector2()
@@ -10,13 +11,6 @@ let weatherWetness = 0
 
 export function setWeatherWetness(w) {
   weatherWetness = THREE.MathUtils.clamp(Number.isFinite(w) ? w : 0, 0, 1)
-}
-
-function renderDeferringUnreadyPrograms(renderer, scene, camera) {
-  const prev = renderer.deferUnreadyPrograms
-  renderer.deferredProgramDraws = renderer.deferredProgramDraws || 0
-  renderer.deferUnreadyPrograms = true
-  try { renderer.render(scene, camera) } finally { renderer.deferUnreadyPrograms = prev }
 }
 
 export class SSR {

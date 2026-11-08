@@ -6,6 +6,7 @@ import { createRequire } from "node:module"
 const ROOT = normalize(new URL("../..", import.meta.url).pathname)
 const PORT = Number(process.env.PLAYER_WEBGPU_PORT || 8802)
 const CHROMIUM = process.env.CHROMIUM || "/usr/lib/chromium/chromium.real"
+const PAGE = process.env.PLAYER_WEBGPU_PAGE || "scripts/browser/player-webgpu.html?r=1"
 const PLAYWRIGHT = process.env.PLAYWRIGHT_CORE
 if (!PLAYWRIGHT) throw new Error("set PLAYWRIGHT_CORE to the path of a playwright-core index.mjs")
 const { chromium } = await import(PLAYWRIGHT)
@@ -27,7 +28,7 @@ try {
   page.on("pageerror", (e) => errors.push("pageerror " + e.message))
   page.on("console", (m) => { if (m.type() === "error") errors.push("console " + m.text().slice(0, 300)) })
   page.on("response", (r) => { if (r.status() >= 400) errors.push(r.status() + " " + r.url()) })
-  await page.goto("http://127.0.0.1:" + PORT + "/scripts/browser/player-webgpu.html?r=1")
+  await page.goto("http://127.0.0.1:" + PORT + "/" + PAGE)
   const gpu = await page.evaluate(async () => { if (!navigator.gpu) return "no navigator.gpu"; const a = await navigator.gpu.requestAdapter(); return a ? "adapter" : "no adapter" })
   await page.waitForFunction(() => window.playerWebgpuResult, null, { timeout: 90000 }).catch((e) => errors.push("wait " + e.message.slice(0, 120)))
   const out = await page.evaluate(() => window.playerWebgpuResult ?? null)
