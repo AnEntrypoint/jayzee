@@ -101,9 +101,7 @@ std::uint64_t totalBytes(const Capacity& c) {
 
 }
 
-bool plan(std::uint64_t budgetBytes, std::uint32_t players, std::uint32_t workers, Capacity& out) {
-  if (players < kMinPlayers || players > kMaxPlayers) return false;
-  if (workers < kMinWorkers || workers > kMaxWorkers) return false;
+bool fitsTier(std::uint64_t budgetBytes, std::uint32_t players, std::uint32_t workers, Capacity& out) {
   Capacity next{};
   next.players = players;
   next.bodies = bodiesFor(players);
@@ -125,6 +123,18 @@ bool plan(std::uint64_t budgetBytes, std::uint32_t players, std::uint32_t worker
   next.arenaBytes = totalBytes(next);
   out = next;
   return next.arenaBytes <= budgetBytes && next.arenaBytes <= arena::kBytes;
+}
+
+constexpr std::uint32_t kFallbackTiers[] = {1024, 256, 64};
+
+bool plan(std::uint64_t budgetBytes, std::uint32_t players, std::uint32_t workers, Capacity& out) {
+  if (players < kMinPlayers || players > kMaxPlayers) return false;
+  if (workers < kMinWorkers || workers > kMaxWorkers) return false;
+  if (fitsTier(budgetBytes, players, workers, out)) return true;
+  for (const std::uint32_t tier : kFallbackTiers) {
+    if (tier < players && fitsTier(budgetBytes, tier, workers, out)) return true;
+  }
+  return false;
 }
 
 }

@@ -165,7 +165,7 @@ Every item below is `unvalidated`. Nothing in this section was compiled. The C++
   - `ENGINE_THREADS` selects `JobSystemThreadPool(maxJobs, maxBarriers, workers − 1)`. Only the single-threaded path is in scope for Phase A.
   - Leak variant keeps its `malloc` on purpose, as the witness. Cached views assume fixed memory, so the leak variant reads detached views once memory grows.
 - Per-unit costs, as estimated in code: body 119 bytes plus 1024 for Jolt; static, trunk or fixed body 512; contact 384; pair 128; Jolt fixed 524,288; Jolt temp 16 MiB; pool prime 669,696; page slot 1033 (×64); vegetation cell 772 (×1024); material 64; texture 32; light 32; input slot 20 (×8 per player); event 16 (×256); interest cell 516 (×1024); snapshot 29 × 128 per player; baseline history 29 × 128 × 8 per player; codec 69,648; worker scratch 65,536 each; slack 1 MiB.
-- Totals from `budget::plan`, one worker: 64 players 28,696,656 bytes (27.4 MiB); 256 players 43,174,992 (41.2 MiB); 1024 players 82,344,016 (78.5 MiB). With eight workers: 256 players 43,633,744 (41.6 MiB); 1024 players 82,802,768 (79.0 MiB). At the 64 MiB default budget, 1024 players is refused, and the largest count that fits is 744.
+- Totals from `budget::plan`, one worker: 64 players 28,696,656 bytes (27.4 MiB); 256 players 43,174,992 (41.2 MiB); 1024 players 82,344,016 (78.5 MiB). With eight workers: 256 players 43,633,744 (41.6 MiB); 1024 players 82,802,768 (79.0 MiB). At the 64 MiB default budget, 1024 players does not fit, so `plan` falls back to the highest tier that does (256 players, owner decision 2026-11-08).
 - UNVERIFIED: the Jolt per-body, per-static, per-contact and per-pair costs are estimates. Witness: measure `PhysicsSystem::Init` and a full body footprint in Phase B against these.
 - UNVERIFIED on emscripten 4.0.10: the four memory exports and the `ENGINE_THREADS` branch, which is not compiled.
 
@@ -179,7 +179,7 @@ This is proposed text for the dispatcher to place under the Memory section. The 
 > |---|---|---|---|---|---|
 > | 64 | 2048 | 27.4 MiB | not computed | 4,752 B | 33,856 B (33 B entries, estimate in the memory plan: 29,696 B) |
 > | 256 | 5120 | 41.2 MiB | 41.6 MiB | 4,752 B | as above |
-> | 1024 | 10240 | 78.5 MiB, over the 64 MiB tier | 79.0 MiB | 4,752 B | as above |
+> | 1024 | 10240 | 78.5 MiB, over the 64 MiB tier, so a 64 MiB device runs 256 | 79.0 MiB | 4,752 B | as above |
 >
 > Per-client snapshot segment is `16 + 37 × visiblePerClient` with 128 visible. Baseline history is `baselineDepth × (8 + 33 × visiblePerClient)` with depth 8. The 1024-player row needs a larger tier than 64 MiB.
 
@@ -228,7 +228,7 @@ Phase B recomputes the table from `bytesFor` and replaces the estimate above.
 ### Deviations for the dispatcher to decide
 - Memory: one arena in one module, with the budget choosing the player count inside it (answers Problems item 1 by a different route from the tier model).
 - Memory: the allocator counts only fresh arena carves as allocations (changes the meaning of `allocations_since_warmup`).
-- Memory: the 1024-player tier does not fit in 64 MiB. Either the tier is 128 MiB or the player cap is 744 at 64 MiB.
+- Memory: under the owner's tier rule (2026-11-08), a device that cannot hold the requested tier runs the highest tier its budget allows and reports it in `layout.players`. At the 64 MiB budget, 1024 players falls back to 256 players (41.2 MiB). Phase B checks that the fallback reports 256 and never allocates above the budget.
 - Materials and textures: C++ owns the slots and handles, but the texture pixels are not yet in engine memory.
 - Interest: 33-byte ring entries; `baselineDepth − 1` usable baselines; constant rotation and scale; 32-bit ticks.
 - Renderer: single-threaded; no multi-draw; flat lights; cube props; constant capacities; 4096 body slots cap the 1024-player tier.
