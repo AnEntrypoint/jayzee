@@ -94,23 +94,23 @@ export function createDormantStatics(host) {
     return batch.length
   }
 
-  function drain(budgetMs, movers) {
+  function drain(budgetMs, movers, clock = () => performance.now()) {
     if (entries.size === 0) return 0
-    const startedAt = performance.now()
+    const startedAt = clock()
     if (movers.length > 0 && needsReorder(movers)) orderNearestFirst(movers)
     let done = 0
     for (;;) {
-      const batchStartedAt = performance.now()
+      const batchStartedAt = clock()
       const n = reinsertBatch()
       if (n === 0) break
       done += n
-      const now = performance.now()
+      const now = clock()
       if (now - batchStartedAt > stats.maxBatchMs) stats.maxBatchMs = now - batchStartedAt
       if (now - startedAt >= budgetMs) break
     }
     if (entries.size === 0) { queue = []; cursor = 0; orderedFor = null }
     stats.drains++
-    const spent = performance.now() - startedAt
+    const spent = clock() - startedAt
     if (spent > stats.maxDrainMs) stats.maxDrainMs = spent
     return done
   }

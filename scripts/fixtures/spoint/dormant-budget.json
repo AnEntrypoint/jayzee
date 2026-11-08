@@ -1,0 +1,28 @@
+{
+  "source": {
+    "files": [
+      "src/physics/World.js",
+      "src/physics/DormantStatics.js"
+    ],
+    "sha256": {
+      "src/physics/World.js": "2c978302c0fa894b8168e0e1ad8242a5bd5e70c0ee571274b22e4815197e1d3e",
+      "src/physics/DormantStatics.js": "933bb30f065e13cc6e3375fa64bae1cccafe937ac5033059f345ab222ffa957b"
+    },
+    "joltPhysics": "1.1.0",
+    "clock": "the global performance.now, swapped for a counted clock during each drain call, because spoint drain reads it directly"
+  },
+  "labels": [
+    "park 200 statics in ascending order",
+    "a zero budget reinserts one batch of 32",
+    "a counted budget of 5 ms drains three batches of 32",
+    "a zero budget after that reinserts one batch of 32",
+    "an unlimited budget drains the rest"
+  ],
+  "rows": [
+    "{\"label\":s:\"park 200 statics in ascending order\",\"value\":{\"pending\":n:200,\"returned\":n:200}}",
+    "{\"label\":s:\"a zero budget reinserts one batch of 32\",\"value\":{\"drained\":n:32,\"pending\":n:168,\"reads\":n:4}}",
+    "{\"label\":s:\"a counted budget of 5 ms drains three batches of 32\",\"value\":{\"drained\":n:96,\"pending\":n:72,\"reads\":n:8}}",
+    "{\"label\":s:\"a zero budget after that reinserts one batch of 32\",\"value\":{\"drained\":n:32,\"pending\":n:40,\"reads\":n:4}}",
+    "{\"label\":s:\"an unlimited budget drains the rest\",\"value\":{\"drained\":n:40,\"pending\":n:0,\"reads\":n:7}}"
+  ]
+}
