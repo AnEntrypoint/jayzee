@@ -93,6 +93,7 @@ extern "C" {
 
 EMSCRIPTEN_KEEPALIVE int engine_render_init(std::uint32_t backend) {
   if (!rnd::isBackendValue(backend)) return engine::kRange;
+  if (engine::world().bodyCapacity() > rnd::kBodySlots) return engine::kRange;
   if (rnd::renderState == nullptr) {
     if (!rnd::acceptCreate()) return engine::kRange;
     rnd::renderState = static_cast<rnd::RenderState*>(engine::arena::carve(sizeof(rnd::RenderState), alignof(rnd::RenderState)));
