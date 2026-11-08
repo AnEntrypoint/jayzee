@@ -214,6 +214,29 @@ gate('wired through the chart reanchor service, a real re-anchor event re-expres
   ok(position.every((c, i) => Math.abs(c - expected[i]) <= TOL), `position ${position} vs ${expected}`)
 })
 
+gate('the tilt clamp touches only a grounded body: an airborne body keeps a small upward velocity, a grounded one loses it (identity chart, bound 1e-3 m/s)', () => {
+  const transfer = createChartTransfer(FROM, FROM)
+  const body = (id) => ({ id, state: { position: [0, 0, 0], velocity: [0, 0.0005, 0], onGround: true, groundNormal: [0, 1, 0], wallNormals: [], rotation: [0, 0, 0, 1] }, lastInput: null })
+  const players = new Map([['air', body('air')], ['ground', body('ground')]])
+  const charIds = new Map([['air', 8], ['ground', 7]])
+  const physics = { applyChartTransfer: () => null, charIdOf: (id) => charIds.get(id) ?? null, isGrounded: (charId) => charId === 7 }
+  const migrate = createPlayerMigrator({ playerManager: { players, getInputs: () => [] }, networkState: { players: new Map() }, lagCompensator: new LagCompensator(1000, 60), physics })
+  const counts = migrate({ transfer })
+  ok(Math.abs(players.get('air').state.velocity[1] - 0.0005) <= 1e-9, `airborne velocity y ${players.get('air').state.velocity[1]}`)
+  ok(players.get('ground').state.velocity[1] === 0, `grounded velocity y ${players.get('ground').state.velocity[1]}`)
+  ok(counts.stateVelocityClamped === 1, `stateVelocityClamped ${counts.stateVelocityClamped}`)
+})
+
+gate('a rejoin rotation that is not a plain array is not re-expressed, as spoint Array.isArray guard leaves it; its position still is', () => {
+  const transfer = createChartTransfer(FROM, TO)
+  const rotation = new Float64Array([0, 0.3, 0, 0.954])
+  const rejoin = { position: [1, 2, 3], rotation }
+  const counts = createWorldAnchorMigrator({ ctx: { pendingRejoinState: new Map([['r', rejoin]]) }, stageLoader: { allStages: () => [] } })({ transfer }, createReexpressPass(transfer))
+  ok(counts.rejoinStates === 1, `rejoinStates ${counts.rejoinStates}`)
+  ok(Array.from(rotation).every((c, i) => c === [0, 0.3, 0, 0.954][i]), `rotation changed to ${Array.from(rotation)}`)
+  ok(rejoin.position.every((c, i) => Math.abs(c - transfer.point([1, 2, 3])[i]) <= TOL), `position ${rejoin.position}`)
+})
+
 gate('the two new source files carry no comments and read no host globals', () => {
   for (const file of ['../src/sdk/chartState/migratePlayers.js', '../src/sdk/chartState/migrateWorldAnchors.js']) {
     const source = readFileSync(new URL(file, import.meta.url), 'utf8')
