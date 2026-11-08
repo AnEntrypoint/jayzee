@@ -158,3 +158,4 @@ Non-obvious facts for automated edits. Architecture and measured costs live in d
 - The pose and cadence values in `scripts/fixtures/spoint/crowd-dots.json` are transcriptions of spoint arithmetic, not spoint module output, because PlayerLOD needs three.js and TickHandler does not export its modulus.
 - `scripts/check-marching-drift.mjs` imports spoint terrain modules from `/workspace/spoint`, so it is a script and not part of `npm test`.
 - `scripts/fixtures/spoint/spline-erosion.json` is written by `scripts/gen-spline-erosion-fixture.mjs`, the only script that reads `/workspace/spoint`. The gate reads the fixture and runs in `npm test`.
+- `destroy` parks a destructible parent at `[0, -5000, 0]` (`PARK_OFFSET` in `src/behaviours/destructiblePool.js`), as spoint does, and the gate fails when that offset changes.

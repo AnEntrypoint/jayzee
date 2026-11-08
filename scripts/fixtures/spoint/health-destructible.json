@@ -1,0 +1,2210 @@
+{
+  "generatedFrom": "spoint src/behaviours/health.js, destructible.js and destructibleSpec.js, run through scripts/lib/healthDestructibleScenarios.mjs",
+  "spointHead": "620d93cf67353dd4f75323b87745f8262302338d",
+  "sources": {
+    "src/behaviours/health.js": "cb51a640d447105461e271b8e73c1e3057d3dc47a7f38bc065045df9d37ea611",
+    "src/behaviours/destructible.js": "5e3f77c4f4123167060e5870673670cbde3ba45585ff0b24214b55e8c4fe15c5",
+    "src/behaviours/destructibleSpec.js": "4d8b33683c54c06cde4178612dc35d6f92aa2272f8cdba6ffeb3f90692d129ad"
+  },
+  "scenarios": {
+    "health-schema": {
+      "hp": {
+        "type": "u16",
+        "tier": "full"
+      },
+      "max": {
+        "type": "u16",
+        "tier": "full"
+      },
+      "alive": {
+        "type": "bool",
+        "tier": "full"
+      }
+    },
+    "health-death-and-hooks": {
+      "steps": [
+        [
+          "damage30",
+          70,
+          {
+            "hp": 70,
+            "max": 100,
+            "alive": true,
+            "fraction": 0.7
+          }
+        ],
+        [
+          "damage200",
+          0,
+          {
+            "hp": 0,
+            "max": 100,
+            "alive": false,
+            "fraction": 0
+          }
+        ],
+        [
+          "damage5",
+          0,
+          {
+            "hp": 0,
+            "max": 100,
+            "alive": false,
+            "fraction": 0
+          }
+        ],
+        [
+          "kill",
+          null,
+          {
+            "hp": 0,
+            "max": 100,
+            "alive": false,
+            "fraction": 0
+          }
+        ],
+        [
+          "healDead",
+          0,
+          {
+            "hp": 0,
+            "max": 100,
+            "alive": false,
+            "fraction": 0
+          }
+        ]
+      ],
+      "events": [
+        [
+          "onDamage",
+          {
+            "amount": 30,
+            "hp": 70,
+            "max": 100,
+            "source": "gun"
+          }
+        ],
+        [
+          "onDeath",
+          {
+            "source": "gun"
+          }
+        ]
+      ]
+    },
+    "health-float32-storage": {
+      "returned": 99.9000015258789,
+      "hp": 99.9000015258789,
+      "fraction": 0.999000015258789,
+      "smallMax": 0.30000001192092896,
+      "smallFraction": 1,
+      "events": [
+        [
+          "onDamage",
+          {
+            "amount": 0.1,
+            "hp": 99.9,
+            "max": 100,
+            "source": null
+          }
+        ]
+      ]
+    },
+    "health-invulnerability-window": {
+      "seq": [
+        [
+          1000,
+          90
+        ],
+        [
+          1100,
+          90
+        ],
+        [
+          1600,
+          80
+        ]
+      ],
+      "hp": 80,
+      "events": [
+        [
+          "onDamage",
+          {
+            "amount": 10,
+            "hp": 90,
+            "max": 100,
+            "source": null
+          }
+        ],
+        [
+          "onDamage",
+          {
+            "amount": 10,
+            "hp": 80,
+            "max": 100,
+            "source": null
+          }
+        ]
+      ]
+    },
+    "health-heal-and-respawn": {
+      "steps": [
+        [
+          "heal5",
+          15,
+          {
+            "hp": 15,
+            "max": 50,
+            "alive": true,
+            "fraction": 0.3
+          }
+        ],
+        [
+          "heal100",
+          50,
+          {
+            "hp": 50,
+            "max": 50,
+            "alive": true,
+            "fraction": 1
+          }
+        ],
+        [
+          "healNaN",
+          50,
+          {
+            "hp": 50,
+            "max": 50,
+            "alive": true,
+            "fraction": 1
+          }
+        ],
+        [
+          "healDead",
+          0,
+          {
+            "hp": 0,
+            "max": 50,
+            "alive": false,
+            "fraction": 0
+          }
+        ],
+        [
+          "respawnFull",
+          50,
+          {
+            "hp": 50,
+            "max": 50,
+            "alive": true,
+            "fraction": 1
+          }
+        ],
+        [
+          "respawnZero",
+          0,
+          {
+            "hp": 0,
+            "max": 50,
+            "alive": false,
+            "fraction": 0
+          }
+        ],
+        [
+          "respawn30",
+          30,
+          {
+            "hp": 30,
+            "max": 50,
+            "alive": true,
+            "fraction": 0.6
+          }
+        ]
+      ],
+      "events": [
+        [
+          "onDeath",
+          {
+            "source": "fall"
+          }
+        ],
+        [
+          "onRespawn"
+        ],
+        [
+          "onRespawn"
+        ]
+      ]
+    },
+    "health-set-max": {
+      "steps": [
+        [
+          "setMax40",
+          40,
+          {
+            "hp": 40,
+            "max": 40,
+            "alive": true,
+            "fraction": 1
+          }
+        ],
+        [
+          "setMaxNegative",
+          40,
+          {
+            "hp": 40,
+            "max": 40,
+            "alive": true,
+            "fraction": 1
+          }
+        ],
+        [
+          "setMaxNaN",
+          40,
+          {
+            "hp": 40,
+            "max": 40,
+            "alive": true,
+            "fraction": 1
+          }
+        ],
+        [
+          "setMaxZero",
+          40,
+          {
+            "hp": 40,
+            "max": 40,
+            "alive": true,
+            "fraction": 1
+          }
+        ],
+        [
+          "setMax90",
+          90,
+          {
+            "hp": 40,
+            "max": 90,
+            "alive": true,
+            "fraction": 0.4444444444444444
+          }
+        ]
+      ],
+      "events": [
+        [
+          "onDamage",
+          {
+            "amount": 30,
+            "hp": 70,
+            "max": 100,
+            "source": null
+          }
+        ]
+      ]
+    },
+    "health-pool-growth-keeps-handles": {
+      "states": [
+        [
+          0.5,
+          10,
+          true
+        ],
+        [
+          2,
+          10,
+          true
+        ],
+        [
+          3,
+          10,
+          true
+        ],
+        [
+          4,
+          10,
+          true
+        ],
+        [
+          5,
+          10,
+          true
+        ],
+        [
+          6,
+          10,
+          true
+        ],
+        [
+          7,
+          10,
+          true
+        ],
+        [
+          8,
+          10,
+          true
+        ],
+        [
+          9,
+          10,
+          true
+        ],
+        [
+          10,
+          10,
+          true
+        ],
+        [
+          1,
+          10,
+          true
+        ],
+        [
+          2,
+          10,
+          true
+        ],
+        [
+          3,
+          10,
+          true
+        ],
+        [
+          4,
+          10,
+          true
+        ],
+        [
+          5,
+          10,
+          true
+        ],
+        [
+          6,
+          10,
+          true
+        ],
+        [
+          7,
+          10,
+          true
+        ],
+        [
+          8,
+          10,
+          true
+        ],
+        [
+          9,
+          10,
+          true
+        ],
+        [
+          0,
+          10,
+          false
+        ]
+      ]
+    },
+    "health-dispose-and-slot-reuse": {
+      "before": {
+        "hp": 6,
+        "max": 10,
+        "alive": true,
+        "fraction": 0.6
+      },
+      "after": {
+        "hp": 20,
+        "max": 20,
+        "alive": true,
+        "fraction": 1
+      },
+      "staleHandle": {
+        "hp": 20,
+        "max": 20,
+        "alive": true,
+        "fraction": 1
+      },
+      "disposers": 2
+    },
+    "health-refused-specs": {
+      "missingMax": true,
+      "zeroMax": true,
+      "unknownKey": true,
+      "stringHp": true,
+      "numberHook": true,
+      "stringSpec": true
+    },
+    "destructible-destroy-and-debris": {
+      "steps": [
+        [
+          "damage60",
+          false,
+          {
+            "destroyed": false,
+            "damageTaken": 60,
+            "health": 100,
+            "debrisIds": [],
+            "poolSize": 0,
+            "poolFree": 0,
+            "lod": [],
+            "position": [
+              10,
+              2,
+              -4
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          }
+        ],
+        [
+          "damage40",
+          true,
+          {
+            "destroyed": true,
+            "damageTaken": 100,
+            "health": 100,
+            "debrisIds": [
+              "crate_debris_0_1000_304665",
+              "crate_debris_1_1000_774074",
+              "crate_debris_2_1000_600171"
+            ],
+            "poolSize": 3,
+            "poolFree": 0,
+            "lod": [
+              {
+                "id": "crate_debris_0_1000_304665",
+                "age": 0,
+                "remaining": 8,
+                "lod": "physical"
+              },
+              {
+                "id": "crate_debris_1_1000_774074",
+                "age": 0,
+                "remaining": 8,
+                "lod": "physical"
+              },
+              {
+                "id": "crate_debris_2_1000_600171",
+                "age": 0,
+                "remaining": 8,
+                "lod": "physical"
+              }
+            ],
+            "position": [
+              10,
+              -4998,
+              -4
+            ],
+            "scale": [
+              0,
+              0,
+              0
+            ]
+          }
+        ]
+      ],
+      "events": [
+        [
+          "onDestroyed",
+          [
+            "crate_debris_0_1000_304665",
+            "crate_debris_1_1000_774074",
+            "crate_debris_2_1000_600171"
+          ]
+        ]
+      ],
+      "world": [
+        [
+          "spawnChild",
+          "crate_debris_0_1000_304665",
+          {
+            "position": [
+              10.155141787849299,
+              1.6865265897749013,
+              -3.717004260388083
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "bodyType": "dynamic",
+            "app": "destructible-debris",
+            "config": {
+              "hx": 0.6933612743506348,
+              "hy": 1.3867225487012695,
+              "hz": 0.6933612743506348,
+              "mass": 13.333333333333334,
+              "color": 16711680,
+              "roughness": 0.5
+            }
+          }
+        ],
+        [
+          "applyImpulse",
+          "crate_debris_0_1000_304665",
+          [
+            0,
+            7.183803604217246,
+            0
+          ]
+        ],
+        [
+          "spawnChild",
+          "crate_debris_1_1000_774074",
+          {
+            "position": [
+              9.82544955368953,
+              1.6483379285311428,
+              -4.183795114359034
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "bodyType": "dynamic",
+            "app": "destructible-debris",
+            "config": {
+              "hx": 0.6933612743506348,
+              "hy": 1.3867225487012695,
+              "hz": 0.6933612743506348,
+              "mass": 13.333333333333334,
+              "color": 16711680,
+              "roughness": 0.5
+            }
+          }
+        ],
+        [
+          "applyImpulse",
+          "crate_debris_1_1000_774074",
+          [
+            0,
+            7.281499007949606,
+            0
+          ]
+        ],
+        [
+          "spawnChild",
+          "crate_debris_2_1000_600171",
+          {
+            "position": [
+              10.024350344851083,
+              1.637545467122454,
+              -3.6647231723850044
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "bodyType": "dynamic",
+            "app": "destructible-debris",
+            "config": {
+              "hx": 0.6933612743506348,
+              "hy": 1.3867225487012695,
+              "hz": 0.6933612743506348,
+              "mass": 13.333333333333334,
+              "color": 16711680,
+              "roughness": 0.5
+            }
+          }
+        ],
+        [
+          "applyImpulse",
+          "crate_debris_2_1000_600171",
+          [
+            0,
+            8.435171160148457,
+            0
+          ]
+        ]
+      ]
+    },
+    "destructible-respawn-after-delay": {
+      "steps": [
+        [
+          "destroy",
+          true,
+          {
+            "destroyed": true,
+            "damageTaken": 10,
+            "health": 10,
+            "debrisIds": [
+              "crate_debris_0_1000_761333",
+              "crate_debris_1_1000_875760"
+            ],
+            "poolSize": 2,
+            "poolFree": 0,
+            "lod": [
+              {
+                "id": "crate_debris_0_1000_761333",
+                "age": 0,
+                "remaining": null,
+                "lod": "physical"
+              },
+              {
+                "id": "crate_debris_1_1000_875760",
+                "age": 0,
+                "remaining": null,
+                "lod": "physical"
+              }
+            ],
+            "position": [
+              10,
+              -4998,
+              -4
+            ],
+            "scale": [
+              0,
+              0,
+              0
+            ]
+          }
+        ],
+        [
+          "tick1",
+          true,
+          {
+            "destroyed": true,
+            "damageTaken": 10,
+            "health": 10,
+            "debrisIds": [
+              "crate_debris_0_1000_761333",
+              "crate_debris_1_1000_875760"
+            ],
+            "poolSize": 2,
+            "poolFree": 0,
+            "lod": [
+              {
+                "id": "crate_debris_0_1000_761333",
+                "age": 1,
+                "remaining": null,
+                "lod": "physical"
+              },
+              {
+                "id": "crate_debris_1_1000_875760",
+                "age": 1,
+                "remaining": null,
+                "lod": "physical"
+              }
+            ],
+            "position": [
+              10,
+              -4998,
+              -4
+            ],
+            "scale": [
+              0,
+              0,
+              0
+            ]
+          }
+        ],
+        [
+          "tick2",
+          false,
+          {
+            "destroyed": false,
+            "damageTaken": 0,
+            "health": 10,
+            "debrisIds": [],
+            "poolSize": 2,
+            "poolFree": 2,
+            "lod": [],
+            "position": [
+              10,
+              2,
+              -4
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          }
+        ]
+      ],
+      "events": [
+        [
+          "onDestroyed",
+          [
+            "crate_debris_0_1000_761333",
+            "crate_debris_1_1000_875760"
+          ]
+        ],
+        [
+          "onRespawn"
+        ]
+      ],
+      "world": [
+        [
+          "spawnChild",
+          "crate_debris_0_1000_761333",
+          {
+            "position": [
+              9.676027877556038,
+              1.7012964444599095,
+              -4.260262368482906
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "bodyType": "dynamic",
+            "app": "destructible-debris",
+            "config": {
+              "hx": 0.7937005259840997,
+              "hy": 1.5874010519681994,
+              "hz": 0.7937005259840997,
+              "mass": 20,
+              "color": 16711680,
+              "roughness": 0.5
+            }
+          }
+        ],
+        [
+          "applyImpulse",
+          "crate_debris_0_1000_761333",
+          [
+            4.40035287223136,
+            0,
+            0.6127596009964308
+          ]
+        ],
+        [
+          "spawnChild",
+          "crate_debris_1_1000_875760",
+          {
+            "position": [
+              10.034085644364167,
+              2.497615046767854,
+              -3.7439689108073413
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "bodyType": "dynamic",
+            "app": "destructible-debris",
+            "config": {
+              "hx": 0.7937005259840997,
+              "hy": 1.5874010519681994,
+              "hz": 0.7937005259840997,
+              "mass": 20,
+              "color": 16711680,
+              "roughness": 0.5
+            }
+          }
+        ],
+        [
+          "applyImpulse",
+          "crate_debris_1_1000_875760",
+          [
+            -4.03333585236647,
+            0,
+            -0.22398843981741015
+          ]
+        ],
+        [
+          "isAtRest",
+          "crate_debris_0_1000_761333"
+        ],
+        [
+          "isAtRest",
+          "crate_debris_1_1000_875760"
+        ],
+        [
+          "isAtRest",
+          "crate_debris_0_1000_761333"
+        ],
+        [
+          "isAtRest",
+          "crate_debris_1_1000_875760"
+        ],
+        [
+          "setPosition",
+          "crate_debris_0_1000_761333",
+          [
+            0,
+            -5000,
+            0
+          ],
+          null
+        ],
+        [
+          "setBodyActive",
+          "crate_debris_0_1000_761333",
+          false
+        ],
+        [
+          "setPosition",
+          "crate_debris_1_1000_875760",
+          [
+            0,
+            -5000,
+            0
+          ],
+          null
+        ],
+        [
+          "setBodyActive",
+          "crate_debris_1_1000_875760",
+          false
+        ]
+      ]
+    },
+    "destructible-lifetime-expiry-and-reuse": {
+      "steps": [
+        [
+          "destroy",
+          true,
+          {
+            "destroyed": true,
+            "damageTaken": 5,
+            "health": 5,
+            "debrisIds": [
+              "crate_debris_0_1000_806813",
+              "crate_debris_1_1000_671516"
+            ],
+            "poolSize": 2,
+            "poolFree": 0,
+            "lod": [
+              {
+                "id": "crate_debris_0_1000_806813",
+                "age": 0,
+                "remaining": 3,
+                "lod": "physical"
+              },
+              {
+                "id": "crate_debris_1_1000_671516",
+                "age": 0,
+                "remaining": 3,
+                "lod": "physical"
+              }
+            ],
+            "position": [
+              10,
+              -4998,
+              -4
+            ],
+            "scale": [
+              0,
+              0,
+              0
+            ]
+          }
+        ],
+        [
+          "tick06",
+          true,
+          {
+            "destroyed": true,
+            "damageTaken": 5,
+            "health": 5,
+            "debrisIds": [
+              "crate_debris_0_1000_806813",
+              "crate_debris_1_1000_671516"
+            ],
+            "poolSize": 2,
+            "poolFree": 0,
+            "lod": [
+              {
+                "id": "crate_debris_0_1000_806813",
+                "age": 0.6,
+                "remaining": 2.4,
+                "lod": "frozen"
+              },
+              {
+                "id": "crate_debris_1_1000_671516",
+                "age": 0.6,
+                "remaining": 2.4,
+                "lod": "frozen"
+              }
+            ],
+            "position": [
+              10,
+              -4998,
+              -4
+            ],
+            "scale": [
+              0,
+              0,
+              0
+            ]
+          }
+        ],
+        [
+          "tick12",
+          true,
+          {
+            "destroyed": true,
+            "damageTaken": 5,
+            "health": 5,
+            "debrisIds": [
+              "crate_debris_0_1000_806813",
+              "crate_debris_1_1000_671516"
+            ],
+            "poolSize": 2,
+            "poolFree": 0,
+            "lod": [
+              {
+                "id": "crate_debris_0_1000_806813",
+                "age": 1.2,
+                "remaining": 1.7999999999999998,
+                "lod": "static"
+              },
+              {
+                "id": "crate_debris_1_1000_671516",
+                "age": 1.2,
+                "remaining": 1.7999999999999998,
+                "lod": "static"
+              }
+            ],
+            "position": [
+              10,
+              -4998,
+              -4
+            ],
+            "scale": [
+              0,
+              0,
+              0
+            ]
+          }
+        ],
+        [
+          "expire",
+          true,
+          {
+            "destroyed": true,
+            "damageTaken": 5,
+            "health": 5,
+            "debrisIds": [],
+            "poolSize": 2,
+            "poolFree": 2,
+            "lod": [],
+            "position": [
+              10,
+              -4998,
+              -4
+            ],
+            "scale": [
+              0,
+              0,
+              0
+            ]
+          }
+        ],
+        [
+          "respawn",
+          false,
+          {
+            "destroyed": false,
+            "damageTaken": 0,
+            "health": 5,
+            "debrisIds": [],
+            "poolSize": 2,
+            "poolFree": 2,
+            "lod": [],
+            "position": [
+              10,
+              2,
+              -4
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          }
+        ],
+        [
+          "redestroy",
+          true,
+          {
+            "destroyed": true,
+            "damageTaken": 5,
+            "health": 5,
+            "debrisIds": [
+              "crate_debris_1_1000_671516",
+              "crate_debris_0_1000_806813"
+            ],
+            "poolSize": 2,
+            "poolFree": 0,
+            "lod": [
+              {
+                "id": "crate_debris_1_1000_671516",
+                "age": 0,
+                "remaining": 3,
+                "lod": "physical"
+              },
+              {
+                "id": "crate_debris_0_1000_806813",
+                "age": 0,
+                "remaining": 3,
+                "lod": "physical"
+              }
+            ],
+            "position": [
+              10,
+              -4998,
+              -4
+            ],
+            "scale": [
+              0,
+              0,
+              0
+            ]
+          }
+        ]
+      ],
+      "events": [
+        [
+          "onDestroyed",
+          [
+            "crate_debris_0_1000_806813",
+            "crate_debris_1_1000_671516"
+          ]
+        ],
+        [
+          "onRespawn"
+        ],
+        [
+          "onDestroyed",
+          [
+            "crate_debris_1_1000_671516",
+            "crate_debris_0_1000_806813"
+          ]
+        ]
+      ],
+      "world": [
+        [
+          "spawnChild",
+          "crate_debris_0_1000_806813",
+          {
+            "position": [
+              10.08380337103246,
+              2.504715324721425,
+              -4.016841424083386
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "bodyType": "dynamic",
+            "app": "destructible-debris",
+            "config": {
+              "hx": 0.7937005259840997,
+              "hy": 1.5874010519681994,
+              "hz": 0.7937005259840997,
+              "mass": 20,
+              "color": 16711680,
+              "roughness": 0.5
+            }
+          }
+        ],
+        [
+          "applyImpulse",
+          "crate_debris_0_1000_806813",
+          [
+            0,
+            8.720128417247906,
+            0
+          ]
+        ],
+        [
+          "spawnChild",
+          "crate_debris_1_1000_671516",
+          {
+            "position": [
+              9.72959063928692,
+              1.2341207623913277,
+              -4.020393156017244
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "bodyType": "dynamic",
+            "app": "destructible-debris",
+            "config": {
+              "hx": 0.7937005259840997,
+              "hy": 1.5874010519681994,
+              "hz": 0.7937005259840997,
+              "mass": 20,
+              "color": 16711680,
+              "roughness": 0.5
+            }
+          }
+        ],
+        [
+          "applyImpulse",
+          "crate_debris_1_1000_671516",
+          [
+            0,
+            6.039817038690671,
+            0
+          ]
+        ],
+        [
+          "isAtRest",
+          "crate_debris_0_1000_806813"
+        ],
+        [
+          "setMotionType",
+          "crate_debris_0_1000_806813",
+          "kinematic"
+        ],
+        [
+          "isAtRest",
+          "crate_debris_1_1000_671516"
+        ],
+        [
+          "setMotionType",
+          "crate_debris_1_1000_671516",
+          "kinematic"
+        ],
+        [
+          "setMotionType",
+          "crate_debris_0_1000_806813",
+          "static"
+        ],
+        [
+          "setMotionType",
+          "crate_debris_1_1000_671516",
+          "static"
+        ],
+        [
+          "setPosition",
+          "crate_debris_0_1000_806813",
+          [
+            0,
+            -5000,
+            0
+          ],
+          null
+        ],
+        [
+          "setBodyActive",
+          "crate_debris_0_1000_806813",
+          false
+        ],
+        [
+          "setPosition",
+          "crate_debris_1_1000_671516",
+          [
+            0,
+            -5000,
+            0
+          ],
+          null
+        ],
+        [
+          "setBodyActive",
+          "crate_debris_1_1000_671516",
+          false
+        ],
+        [
+          "setPosition",
+          "crate_debris_1_1000_671516",
+          [
+            10.214900238098995,
+            1.3099389986772016,
+            -4.2590657888400125
+          ],
+          [
+            0,
+            0,
+            0,
+            1
+          ]
+        ],
+        [
+          "applyImpulse",
+          "crate_debris_1_1000_671516",
+          [
+            0,
+            6.097119615180418,
+            0
+          ]
+        ],
+        [
+          "setPosition",
+          "crate_debris_0_1000_806813",
+          [
+            10.17780693074544,
+            1.5346670584353808,
+            -3.8995087106914834
+          ],
+          [
+            0,
+            0,
+            0,
+            1
+          ]
+        ],
+        [
+          "applyImpulse",
+          "crate_debris_0_1000_806813",
+          [
+            0,
+            8.89162123692222,
+            0
+          ]
+        ]
+      ]
+    },
+    "destructible-fractured-keyed-pieces": {
+      "steps": [
+        [
+          "destroy",
+          true,
+          {
+            "destroyed": true,
+            "damageTaken": 1,
+            "health": 1,
+            "debrisIds": [
+              "crate_debris_0_1000_144321",
+              "crate_debris_1_1000_990935"
+            ],
+            "poolSize": 2,
+            "poolFree": 0,
+            "lod": [
+              {
+                "id": "crate_debris_0_1000_144321",
+                "age": 0,
+                "remaining": 8,
+                "lod": "physical"
+              },
+              {
+                "id": "crate_debris_1_1000_990935",
+                "age": 0,
+                "remaining": 8,
+                "lod": "physical"
+              }
+            ],
+            "position": [
+              10,
+              -4998,
+              -4
+            ],
+            "scale": [
+              0,
+              0,
+              0
+            ]
+          }
+        ],
+        [
+          "respawn",
+          false,
+          {
+            "destroyed": false,
+            "damageTaken": 0,
+            "health": 1,
+            "debrisIds": [],
+            "poolSize": 2,
+            "poolFree": 0,
+            "lod": [],
+            "position": [
+              10,
+              2,
+              -4
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          }
+        ],
+        [
+          "redestroy",
+          true,
+          {
+            "destroyed": true,
+            "damageTaken": 1,
+            "health": 1,
+            "debrisIds": [
+              "crate_debris_0_1000_144321",
+              "crate_debris_1_1000_990935"
+            ],
+            "poolSize": 2,
+            "poolFree": 0,
+            "lod": [
+              {
+                "id": "crate_debris_0_1000_144321",
+                "age": 0,
+                "remaining": 8,
+                "lod": "physical"
+              },
+              {
+                "id": "crate_debris_1_1000_990935",
+                "age": 0,
+                "remaining": 8,
+                "lod": "physical"
+              }
+            ],
+            "position": [
+              10,
+              -4998,
+              -4
+            ],
+            "scale": [
+              0,
+              0,
+              0
+            ]
+          }
+        ],
+        [
+          "drain",
+          true,
+          {
+            "destroyed": true,
+            "damageTaken": 1,
+            "health": 1,
+            "debrisIds": [],
+            "poolSize": 0,
+            "poolFree": 0,
+            "lod": [],
+            "position": [
+              10,
+              -4998,
+              -4
+            ],
+            "scale": [
+              0,
+              0,
+              0
+            ]
+          }
+        ]
+      ],
+      "events": [
+        [
+          "onDestroyed",
+          [
+            "crate_debris_0_1000_144321",
+            "crate_debris_1_1000_990935"
+          ]
+        ],
+        [
+          "onRespawn"
+        ],
+        [
+          "onDestroyed",
+          [
+            "crate_debris_0_1000_144321",
+            "crate_debris_1_1000_990935"
+          ]
+        ]
+      ],
+      "world": [
+        [
+          "spawnChild",
+          "crate_debris_0_1000_144321",
+          {
+            "position": [
+              10,
+              2,
+              -4
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "bodyType": "dynamic",
+            "app": "destructible-debris",
+            "config": {
+              "fracturedAsset": "crate.glb",
+              "pieceIndex": 0,
+              "mass": 20,
+              "color": 16711680,
+              "roughness": 0.5
+            },
+            "model": "crate.glb"
+          }
+        ],
+        [
+          "applyImpulse",
+          "crate_debris_0_1000_144321",
+          [
+            3.8015121142990522,
+            0,
+            -0.7778806690471683
+          ]
+        ],
+        [
+          "spawnChild",
+          "crate_debris_1_1000_990935",
+          {
+            "position": [
+              10,
+              2,
+              -4
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "bodyType": "dynamic",
+            "app": "destructible-debris",
+            "config": {
+              "fracturedAsset": "crate.glb",
+              "pieceIndex": 1,
+              "mass": 20,
+              "color": 16711680,
+              "roughness": 0.5
+            },
+            "model": "crate.glb"
+          }
+        ],
+        [
+          "applyImpulse",
+          "crate_debris_1_1000_990935",
+          [
+            -3.9819918799991068,
+            0,
+            0.9099926293652386
+          ]
+        ],
+        [
+          "setPosition",
+          "crate_debris_0_1000_144321",
+          [
+            0,
+            -5000,
+            0
+          ],
+          null
+        ],
+        [
+          "setBodyActive",
+          "crate_debris_0_1000_144321",
+          false
+        ],
+        [
+          "setPosition",
+          "crate_debris_1_1000_990935",
+          [
+            0,
+            -5000,
+            0
+          ],
+          null
+        ],
+        [
+          "setBodyActive",
+          "crate_debris_1_1000_990935",
+          false
+        ],
+        [
+          "setPosition",
+          "crate_debris_0_1000_144321",
+          [
+            10,
+            2,
+            -4
+          ],
+          [
+            0,
+            0,
+            0,
+            1
+          ]
+        ],
+        [
+          "applyImpulse",
+          "crate_debris_0_1000_144321",
+          [
+            4.369038305639305,
+            0,
+            -0.4171917137766096
+          ]
+        ],
+        [
+          "setPosition",
+          "crate_debris_1_1000_990935",
+          [
+            10,
+            2,
+            -4
+          ],
+          [
+            0,
+            0,
+            0,
+            1
+          ]
+        ],
+        [
+          "applyImpulse",
+          "crate_debris_1_1000_990935",
+          [
+            -3.798705287682184,
+            0,
+            -0.09238518121165713
+          ]
+        ],
+        [
+          "destroy",
+          "crate_debris_0_1000_144321"
+        ],
+        [
+          "destroy",
+          "crate_debris_1_1000_990935"
+        ]
+      ]
+    },
+    "destructible-impact-scan": {
+      "slowNear": {
+        "destroyed": false,
+        "damageTaken": 0,
+        "health": 50,
+        "debrisIds": [],
+        "poolSize": 0,
+        "poolFree": 0,
+        "lod": [],
+        "position": [
+          10,
+          2,
+          -4
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "fastFar": {
+        "destroyed": false,
+        "damageTaken": 0,
+        "health": 50,
+        "debrisIds": [],
+        "poolSize": 0,
+        "poolFree": 0,
+        "lod": [],
+        "position": [
+          10,
+          2,
+          -4
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "fastNear": {
+        "destroyed": true,
+        "damageTaken": 50,
+        "health": 50,
+        "debrisIds": [
+          "crate_debris_0_1000_566019",
+          "crate_debris_1_1000_853817"
+        ],
+        "poolSize": 2,
+        "poolFree": 0,
+        "lod": [
+          {
+            "id": "crate_debris_0_1000_566019",
+            "age": 0,
+            "remaining": 8,
+            "lod": "physical"
+          },
+          {
+            "id": "crate_debris_1_1000_853817",
+            "age": 0,
+            "remaining": 8,
+            "lod": "physical"
+          }
+        ],
+        "position": [
+          10,
+          -4998,
+          -4
+        ],
+        "scale": [
+          0,
+          0,
+          0
+        ]
+      },
+      "worldBall": {
+        "destroyed": true,
+        "damageTaken": 50,
+        "health": 50,
+        "debrisIds": [
+          "crate_debris_0_1000_731596",
+          "crate_debris_1_1000_253215"
+        ],
+        "poolSize": 2,
+        "poolFree": 0,
+        "lod": [
+          {
+            "id": "crate_debris_0_1000_731596",
+            "age": 0,
+            "remaining": 8,
+            "lod": "physical"
+          },
+          {
+            "id": "crate_debris_1_1000_253215",
+            "age": 0,
+            "remaining": 8,
+            "lod": "physical"
+          }
+        ],
+        "position": [
+          10,
+          -4998,
+          -4
+        ],
+        "scale": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    "destructible-drain-destroys-pool": {
+      "beforeDrain": {
+        "destroyed": true,
+        "damageTaken": 1,
+        "health": 1,
+        "debrisIds": [
+          "crate_debris_0_1000_353371",
+          "crate_debris_1_1000_292843",
+          "crate_debris_2_1000_114993"
+        ],
+        "poolSize": 3,
+        "poolFree": 0,
+        "lod": [
+          {
+            "id": "crate_debris_0_1000_353371",
+            "age": 0,
+            "remaining": 8,
+            "lod": "physical"
+          },
+          {
+            "id": "crate_debris_1_1000_292843",
+            "age": 0,
+            "remaining": 8,
+            "lod": "physical"
+          },
+          {
+            "id": "crate_debris_2_1000_114993",
+            "age": 0,
+            "remaining": 8,
+            "lod": "physical"
+          }
+        ],
+        "position": [
+          10,
+          -4998,
+          -4
+        ],
+        "scale": [
+          0,
+          0,
+          0
+        ]
+      },
+      "afterDrain": {
+        "destroyed": true,
+        "damageTaken": 1,
+        "health": 1,
+        "debrisIds": [],
+        "poolSize": 0,
+        "poolFree": 0,
+        "lod": [],
+        "position": [
+          10,
+          -4998,
+          -4
+        ],
+        "scale": [
+          0,
+          0,
+          0
+        ]
+      },
+      "world": [
+        [
+          "spawnChild",
+          "crate_debris_0_1000_353371",
+          {
+            "position": [
+              9.804850078127307,
+              2.5935997404167153,
+              -3.825202345347019
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "bodyType": "dynamic",
+            "app": "destructible-debris",
+            "config": {
+              "hx": 0.6933612743506348,
+              "hy": 1.3867225487012695,
+              "hz": 0.6933612743506348,
+              "mass": 13.333333333333334,
+              "color": 16711680,
+              "roughness": 0.5
+            }
+          }
+        ],
+        [
+          "applyImpulse",
+          "crate_debris_0_1000_353371",
+          [
+            2.5864485161637765,
+            8.993747676722705,
+            0.8663609659910622
+          ]
+        ],
+        [
+          "spawnChild",
+          "crate_debris_1_1000_292843",
+          {
+            "position": [
+              10.315795321270828,
+              1.9936154662420524,
+              -3.738733529530003
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "bodyType": "dynamic",
+            "app": "destructible-debris",
+            "config": {
+              "hx": 0.6933612743506348,
+              "hy": 1.3867225487012695,
+              "hz": 0.6933612743506348,
+              "mass": 13.333333333333334,
+              "color": 16711680,
+              "roughness": 0.5
+            }
+          }
+        ],
+        [
+          "applyImpulse",
+          "crate_debris_1_1000_292843",
+          [
+            -3.165590907332057,
+            8.627169869840145,
+            3.6646363026861026
+          ]
+        ],
+        [
+          "spawnChild",
+          "crate_debris_2_1000_114993",
+          {
+            "position": [
+              10.23543984878114,
+              2.298935536378832,
+              -3.991299960482646
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "bodyType": "dynamic",
+            "app": "destructible-debris",
+            "config": {
+              "hx": 0.6933612743506348,
+              "hy": 1.3867225487012695,
+              "hz": 0.6933612743506348,
+              "mass": 13.333333333333334,
+              "color": 16711680,
+              "roughness": 0.5
+            }
+          }
+        ],
+        [
+          "applyImpulse",
+          "crate_debris_2_1000_114993",
+          [
+            -1.015287904196382,
+            7.558706135489047,
+            -2.7645850441177227
+          ]
+        ],
+        [
+          "destroy",
+          "crate_debris_0_1000_353371"
+        ],
+        [
+          "destroy",
+          "crate_debris_1_1000_292843"
+        ],
+        [
+          "destroy",
+          "crate_debris_2_1000_114993"
+        ]
+      ]
+    },
+    "destructible-reset-and-chart-reanchor": {
+      "afterReset": {
+        "destroyed": false,
+        "damageTaken": 0,
+        "health": 2,
+        "debrisIds": [],
+        "poolSize": 2,
+        "poolFree": 2,
+        "lod": [],
+        "position": [
+          10,
+          2,
+          -4
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "moved": [
+        [
+          [
+            10,
+            2,
+            -4
+          ],
+          [
+            10,
+            2,
+            -4
+          ]
+        ]
+      ],
+      "world": [
+        [
+          "spawnChild",
+          "crate_debris_0_1000_880749",
+          {
+            "position": [
+              10.344450890109616,
+              1.2134659587396381,
+              -3.7494258027691276
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "bodyType": "dynamic",
+            "app": "destructible-debris",
+            "config": {
+              "hx": 0.7937005259840997,
+              "hy": 1.5874010519681994,
+              "hz": 0.7937005259840997,
+              "mass": 20,
+              "color": 16711680,
+              "roughness": 0.5
+            }
+          }
+        ],
+        [
+          "applyImpulse",
+          "crate_debris_0_1000_880749",
+          [
+            4.364723932238285,
+            5.631662855856121,
+            1.206900389666953
+          ]
+        ],
+        [
+          "spawnChild",
+          "crate_debris_1_1000_656810",
+          {
+            "position": [
+              10.024089076068337,
+              1.3387194390309087,
+              -4.3630154565147645
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "bodyType": "dynamic",
+            "app": "destructible-debris",
+            "config": {
+              "hx": 0.7937005259840997,
+              "hy": 1.5874010519681994,
+              "hz": 0.7937005259840997,
+              "mass": 20,
+              "color": 16711680,
+              "roughness": 0.5
+            }
+          }
+        ],
+        [
+          "applyImpulse",
+          "crate_debris_1_1000_656810",
+          [
+            -4.8435874995914,
+            7.185158302076161,
+            1.0558170567441372
+          ]
+        ],
+        [
+          "setPosition",
+          "crate_debris_0_1000_880749",
+          [
+            0,
+            -5000,
+            0
+          ],
+          null
+        ],
+        [
+          "setBodyActive",
+          "crate_debris_0_1000_880749",
+          false
+        ],
+        [
+          "setPosition",
+          "crate_debris_1_1000_656810",
+          [
+            0,
+            -5000,
+            0
+          ],
+          null
+        ],
+        [
+          "setBodyActive",
+          "crate_debris_1_1000_656810",
+          false
+        ]
+      ]
+    },
+    "destructible-forced-freeze-then-static": {
+      "steps": [
+        [
+          "t03",
+          {
+            "destroyed": true,
+            "damageTaken": 1,
+            "health": 1,
+            "debrisIds": [
+              "crate_debris_0_1000_938389"
+            ],
+            "poolSize": 1,
+            "poolFree": 0,
+            "lod": [
+              {
+                "id": "crate_debris_0_1000_938389",
+                "age": 0.3,
+                "remaining": null,
+                "lod": "physical"
+              }
+            ],
+            "position": [
+              10,
+              -4998,
+              -4
+            ],
+            "scale": [
+              0,
+              0,
+              0
+            ]
+          }
+        ],
+        [
+          "t11",
+          {
+            "destroyed": true,
+            "damageTaken": 1,
+            "health": 1,
+            "debrisIds": [
+              "crate_debris_0_1000_938389"
+            ],
+            "poolSize": 1,
+            "poolFree": 0,
+            "lod": [
+              {
+                "id": "crate_debris_0_1000_938389",
+                "age": 1.1,
+                "remaining": null,
+                "lod": "frozen"
+              }
+            ],
+            "position": [
+              10,
+              -4998,
+              -4
+            ],
+            "scale": [
+              0,
+              0,
+              0
+            ]
+          }
+        ],
+        [
+          "t12",
+          {
+            "destroyed": true,
+            "damageTaken": 1,
+            "health": 1,
+            "debrisIds": [
+              "crate_debris_0_1000_938389"
+            ],
+            "poolSize": 1,
+            "poolFree": 0,
+            "lod": [
+              {
+                "id": "crate_debris_0_1000_938389",
+                "age": 1.2000000000000002,
+                "remaining": null,
+                "lod": "static"
+              }
+            ],
+            "position": [
+              10,
+              -4998,
+              -4
+            ],
+            "scale": [
+              0,
+              0,
+              0
+            ]
+          }
+        ]
+      ],
+      "world": [
+        [
+          "spawnChild",
+          "crate_debris_0_1000_938389",
+          {
+            "position": [
+              9.646512072300538,
+              2.9699646327644587,
+              -4.432602551532909
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "bodyType": "dynamic",
+            "app": "destructible-debris",
+            "config": {
+              "hx": 1,
+              "hy": 2,
+              "hz": 1,
+              "mass": 40,
+              "color": 16711680,
+              "roughness": 0.5
+            }
+          }
+        ],
+        [
+          "applyImpulse",
+          "crate_debris_0_1000_938389",
+          [
+            2.7248737428649163,
+            5.783163158223033,
+            0.004498529674710704
+          ]
+        ],
+        [
+          "isAtRest",
+          "crate_debris_0_1000_938389"
+        ],
+        [
+          "setMotionType",
+          "crate_debris_0_1000_938389",
+          "kinematic"
+        ],
+        [
+          "setMotionType",
+          "crate_debris_0_1000_938389",
+          "static"
+        ]
+      ]
+    },
+    "destructible-ignored-inputs": {
+      "returns": [
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "snap": {
+        "destroyed": false,
+        "damageTaken": 0,
+        "health": 10,
+        "debrisIds": [],
+        "poolSize": 0,
+        "poolFree": 0,
+        "lod": [],
+        "position": [
+          10,
+          2,
+          -4
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      }
+    },
+    "destructible-validation-messages": {
+      "health0": "[destructible] health must be a positive finite number",
+      "healthString": "[destructible] health must be a positive finite number",
+      "impactThresholdNegative": "[destructible] impactThreshold must be a non-negative finite number",
+      "impactRadiusZero": "[destructible] impactRadius must be a positive finite number",
+      "debrisCountFraction": "[destructible] debrisCount must be a positive integer",
+      "debrisLifetimeNegative": "[destructible] debrisLifetime must be a non-negative finite number (seconds); 0 = never despawn",
+      "settleGraceNegative": "[destructible] debrisSettleGrace must be a non-negative finite number (seconds)",
+      "freezeAfterNaN": "[destructible] debrisFreezeAfter must be a non-negative finite number (seconds); 0 = disable force-freeze",
+      "respawnNegative": "[destructible] respawnDelay must be a non-negative finite number (seconds); 0 = never respawn",
+      "impulseWord": "[destructible] debrisImpulsePattern must be \"outward\", \"outward-up\", \"up\", or a function(i, n, rng) -> [x,y,z]",
+      "shapeArray": "[destructible] debrisShape must be a plain object",
+      "fracturedNoCount": "[destructible] fracturedPieceCount is required when fracturedAsset is set (read it from the baked <asset>.pieces.json sidecar's pieceCount field)",
+      "fracturedNumber": "[destructible] fracturedAsset must be a string path to a scripts/fracture-glb.mjs-baked GLB",
+      "fracturedCountZero": "[destructible] fracturedPieceCount must be a positive integer (the number of baked pieces in fracturedAsset)",
+      "onDestroyedNumber": "[destructible] onDestroyed must be a function",
+      "onRespawnNumber": "[destructible] onRespawn must be a function",
+      "stringSpec": "[destructible] spec must be an object",
+      "valid": null
+    }
+  }
+}
