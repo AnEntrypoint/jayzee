@@ -23,6 +23,10 @@ Consequences that follow from it:
 | Determinism | Jolt `CROSS_PLATFORM_DETERMINISTIC=ON`, `-ffp-contract=off`, no fast-math, fixed timestep | Client prediction and server authority must produce identical hashes. |
 | The jz kernel | Superseded | It stays only as the reference until the C++ core passes the same behavioural witnesses, then it is removed. |
 | Threads | Two builds with one API: multithreaded (pthreads and the Jolt job system) and single-threaded | Threads need `crossOriginIsolated`. GitHub Pages cannot set COOP and COEP headers, so the site needs a service-worker isolation shim or falls back to the single-threaded build. |
+| Rendering | Renderer in the same wasm module, C++ calling WebGPU through Dawn's `emdawnwebgpu` port (`webgpu_cpp.h`), with a WebGL2 path in the same module for browsers without WebGPU. three.js is retired once parity is witnessed. | Removes the JS scene graph and the per-object crossings. The research found no maintained option that targets Emscripten besides emdawnwebgpu. WebGPU is absent on many Linux and older-hardware browsers, so WebGL2 is required, not optional. |
+| Rendering library | Own thin renderer over `webgpu_cpp.h` and WebGL2, not a third-party engine | bgfx, Diligent and sokol_gfx all build both backends from Emscripten. sokol_gfx has no indirect draw and Diligent needs heavier isolation. bgfx and Diligent add indirection and per-frame state tracking that the crosstalk budget removes. Revisit if the own renderer's WebGPU path proves too costly to maintain (see Open items). |
+| Shared terrain data | One terrain page cache, written by the core, read by physics and by the renderer through `writeTexture` from the same slot | The same planet height is never computed twice. Physics and rendering read one fixed source, so there is no second terrain pass. |
+| GPU float use | GPU compute never feeds collision, prediction or the state hash | WGSL float results are not guaranteed bit-identical across vendors, so GPU results can differ. The GPU may compute display-only effects. |
 
 ## Memory
 
@@ -69,9 +73,19 @@ Vegetation must not be one Jolt body per tree.
 - Placement streams into cell slots the same way terrain pages do, so moving costs a slot write.
 - Destructible or interactive instances are promoted to a pooled dynamic body only when touched, and returned to the field when they settle.
 
-## Client resources
+## Client resources and rendering
 
-The same invariant applies to rendering:
+The same invariant applies to rendering. The renderer lives in the same wasm module as the core.
+
+- **Device and thread.** The WebGPU device is created once at boot. Rendering runs on one pthread that owns a canvas transferred with `OFFSCREENCANVAS_SUPPORT`. The device is not shared across threads, because no browser ships shared devices (UNVERIFIED). WebGL2 uses the same thread model through `OFFSCREENCANVASES_TO_PTHREAD`.
+- **Uploads.** Buffer and texture writes use `wgpuQueueWriteBuffer` and `wgpuQueueWriteTexture` from views over wasm memory, with no JS copy in the glue. Mapped ranges (`wgpuBufferGetMappedRange`) are not used for uploads, because they copy through a shadow block.
+- **One buffer for indirect args.** All indirect draw and dispatch arguments live in one buffer, so the per-frame validation cost does not scale with the number of buffers (UNVERIFIED: measure in phase 10).
+- **GPU-driven culling.** Culling and instance compaction run as compute where WebGPU exists, and the WebGL2 path culls on the CPU with `WEBGL_multi_draw` and instancing.
+- **Presentation.** Present from `requestAnimationFrame`. Surface presentation in the Emscripten port is UNVERIFIED and is witnessed in phase 10.
+- **Blocking waits.** `WaitAny` with a timeout needs JSPI or Asyncify. Otherwise use callbacks. JSPI support per browser is UNVERIFIED for Safari and must be checked in phase 10.
+- **Fallback.** Chrome, Edge, Firefox and Safari run WebGPU on the paths that MDN lists. Everything else runs the WebGL2 renderer. Both paths read the same slots.
+
+The slot rules still apply:
 - One large vertex buffer and one large index buffer, sub-allocated from fixed ranges per mesh class.
 - Texture arrays and atlases allocated at boot. Loading a texture writes into a free layer.
 - A fixed-size clustered light buffer. Adding a light writes a slot. The shader never changes when lights are added.
@@ -98,9 +112,16 @@ Each phase ends with a red witness on the old code and a green witness on the ne
 7. **Netcode codecs in C++.** Witness: the existing wire formats are bit-for-bit compatible.
 8. **Client resource pools.** Witness: adding lights, textures and meshes during play leaves frame-time p99 unchanged and compiles no pipeline after loading.
 9. **Retire the jz kernel** once phases 2 to 7 are green.
+10. **Renderer in the module (WebGPU).** The renderer runs on the render pthread and draws the terrain pages and props from the slots. Witness: the scene renders on a WebGPU device in a self-launched Chromium, with `allocations_since_warmup() == 0` during play and a per-frame API call count recorded, and a control run that shows the same scene from the current three.js renderer.
+11. **Renderer fallback (WebGL2).** The same slots render on WebGL2. Witness: the same scene renders with the WebGL2 path in a browser with WebGPU disabled.
+12. **Retire three.js** once phases 10 and 11 match the three.js reference images within an agreed tolerance.
 
 ## Open items to verify
 
 - Whether Jolt's job system stays deterministic across thread counts in the multithreaded wasm build. A cross-machine hash witness settles it.
 - The exact Jolt collision-dispatch entries needed for `CharacterVirtual` against the custom planet shape.
 - The isolation shim for GitHub Pages, or confirmation that the single-threaded build is the Pages default.
+- Whether the own renderer's WebGPU path is too costly to maintain. If it is, reconsider bgfx, which has a maintained WebGPU backend and a WebGL backend.
+- Measured cost of the wasm-to-JS glue per WebGPU call. The research found no published number, so benchmark 10 000 `wgpuRenderPassEncoderDraw` calls against the same loop in JavaScript.
+- Whether the emdawnwebgpu port in use presents correctly from a pthread with an OffscreenCanvas.
+- Whether Safari has JSPI.
