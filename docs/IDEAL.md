@@ -31,7 +31,7 @@ Every row id from the upstream register appears below as row N. Titles and gate 
 | row 14 | Desync detection, consensus voting and peer ejection | 13 | built | scripts/check-consensus.mjs, scripts/check-anticheat.mjs, scripts/check-event-log.mjs |
 | row 15 | Interest management: relevance radius 200 m and cell lookup | 14 | owner-decision (spawn learnings 57 to 58 not in either repo) | scripts/check-aoi.mjs |
 | row 16 | Bandwidth budget and priority: 900 bytes per tick, decay 0.02, 64 entities | 15 | built | scripts/check-aoi.mjs |
-| row 17 | Snapshot LOD: full detail for 30 players, 5 Hz beyond 120 m | 16 | partial | scripts/check-snapshot-lod.mjs, scripts/check-row16-client-decoder.mjs |
+| row 17 | Snapshot LOD: full detail for 30 players, 5 Hz beyond 120 m | 16 | partial | scripts/check-snapshot-lod.mjs, scripts/check-row16-client-decoder.mjs, scripts/check-lod-tiers.mjs |
 | row 18 | Replication scope and audience | 17 | owner-decision (spawn learnings 30 to 37 not in either repo) | scripts/check-aoi.mjs |
 | row 19 | Server authority per tick, catch-up limits and starvation holds | 18 | partial | scripts/check-tick-authority.mjs, scripts/check-tick-order.mjs |
 | row 20 | Anticheat: input rate limit (capacity 120, refill 90 per second), envelope clamp, shot out | 19 | partial | scripts/check-anticheat.mjs |
@@ -357,7 +357,7 @@ Read-only slice. No file was edited or committed, and docs/IDEAL.md was not writ
 | Stream 17 (Anti-cheat) — src/netcode/OutlierDetector.js | Headshot outlier detector with cooldown | built | src/anticheat/OutlierDetector.js; scripts/check-anticheat.mjs | PARITY row 43. |
 | Stream 17 (Anti-cheat) — src/netcode/LockstepChecksum.js | Second-lane checksum | built | src/anticheat/LockstepChecksum.js; scripts/check-anticheat.mjs | PARITY row 43. |
 | Stream 17 (Snapshot binary) — src/netcode/SnapshotBinFormat.js | 29-byte entity and 22-byte player records, reduced pose | built | src/wire/binSnapshot.js; scripts/check-bin-snapshot.mjs | PARITY row 40. Truncated records and flags above 255 are refused. |
-| Stream 17 (Snapshot binary) — src/netcode/SnapshotEncoder.js | LOD tiers: 30 full, 120 m, 5 Hz | partial | src/snapshot-lod-pure/playerLod.js, src/snapshot-lod-pure/snapshotEncoder.js; scripts/check-snapshot-lod.mjs | PARITY row 16. The crowd-dot decode quirk is kept on purpose. |
+| Stream 17 (Snapshot binary) — src/netcode/SnapshotEncoder.js | LOD tiers: 30 full, 120 m, 5 Hz | partial | src/snapshot-lod-pure/playerLod.js, src/snapshot-lod-pure/snapshotEncoder.js; scripts/check-snapshot-lod.mjs, scripts/check-lod-tiers.mjs | PARITY row 16. The crowd-dot decode quirk is kept on purpose. |
 | Stream 17 (Snapshot binary) — src/netcode/SnapshotPacker.js | packSnapshotBytes msgpack splice | partial | src/netcode/SnapshotPacker.js; scripts/check-snapshot-packer.mjs | The splice is ported and inert under msgpackr 2.0.4, as in spoint. The -0 encoding is closed (row 27). |
 | Stream 17 (Wire) — src/protocol/MessageTypes.js line 1 | WIRE_PROTOCOL_VERSION 5 | built | src/protocol/messages.js; scripts/check-messages.mjs | Client version check is in the message handler. |
 | Stream 17 (Wire) — src/protocol/MessageTypes.js lines 146-154 | Message registry and unreliable set | built | src/protocol/messages.js; scripts/check-messages.mjs | PARITY row 3. |
