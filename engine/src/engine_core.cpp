@@ -1,40 +1,91 @@
 #include <cstdint>
 #include <cstdlib>
+
 #include <emscripten/emscripten.h>
+
+#include "world.h"
 
 namespace {
 
-std::uint64_t tick_count = 0;
+#if defined(ENGINE_LEAK_ON_TICK)
 volatile std::uintptr_t retained = 0;
 
-void run_step() {
-  ++tick_count;
-#ifdef ENGINE_LEAK_ON_TICK
-  char* block = static_cast<char*>(std::malloc(65536));
-  block[0] = static_cast<char>(tick_count);
+void leakBlock() {
+  unsigned char* block = static_cast<unsigned char*>(std::malloc(65536));
+  block[0] = static_cast<unsigned char>(engine::world().tick());
   retained = reinterpret_cast<std::uintptr_t>(block);
-#endif
 }
+#endif
 
 }
 
 extern "C" {
 
 EMSCRIPTEN_KEEPALIVE int engine_init() {
-  tick_count = 0;
-  return 0;
+  return engine::World::initialize();
+}
+
+EMSCRIPTEN_KEEPALIVE int engine_world_configure(std::uint32_t capacity, std::uint32_t tickRate, float gravity, float drag,
+                                                float radius, float restitution, std::uint32_t iterations) {
+  const engine::Config config{capacity, tickRate, gravity, drag, radius, restitution, iterations};
+  return engine::world().configure(config);
+}
+
+EMSCRIPTEN_KEEPALIVE int engine_world_add_box(float minX, float minY, float minZ, float maxX, float maxY, float maxZ) {
+  const float box[6] = {minX, minY, minZ, maxX, maxY, maxZ};
+  return engine::world().addBox(box);
+}
+
+EMSCRIPTEN_KEEPALIVE int engine_spawn(float px, float py, float pz, float vx, float vy, float vz) {
+  const float position[3] = {px, py, pz};
+  const float velocity[3] = {vx, vy, vz};
+  return engine::world().spawn(position, velocity);
+}
+
+EMSCRIPTEN_KEEPALIVE int engine_set_position(std::uint32_t id, float x, float y, float z) {
+  const float position[3] = {x, y, z};
+  return engine::world().setPosition(id, position);
+}
+
+EMSCRIPTEN_KEEPALIVE int engine_set_velocity(std::uint32_t id, float x, float y, float z) {
+  const float velocity[3] = {x, y, z};
+  return engine::world().setVelocity(id, velocity);
+}
+
+EMSCRIPTEN_KEEPALIVE void engine_set_tick(std::uint64_t tick) {
+  engine::world().setTick(tick);
 }
 
 EMSCRIPTEN_KEEPALIVE void engine_tick(int steps) {
-  for (int i = 0; i < steps; ++i) run_step();
+  if (steps <= 0) return;
+#if defined(ENGINE_LEAK_ON_TICK)
+  for (int i = 0; i < steps; ++i) {
+    engine::world().step(1);
+    leakBlock();
+  }
+#else
+  engine::world().step(static_cast<std::uint32_t>(steps));
+#endif
 }
 
 EMSCRIPTEN_KEEPALIVE std::uint64_t engine_ticks() {
-  return tick_count;
+  return engine::world().tick();
 }
 
 EMSCRIPTEN_KEEPALIVE std::uint64_t engine_memory_bytes() {
   return static_cast<std::uint64_t>(__builtin_wasm_memory_size(0)) * 65536ull;
+}
+
+EMSCRIPTEN_KEEPALIVE std::uint32_t engine_body_count() {
+  return engine::world().count();
+}
+
+EMSCRIPTEN_KEEPALIVE const double* engine_positions() {
+  return engine::world().positions();
+}
+
+EMSCRIPTEN_KEEPALIVE const double* engine_velocities() {
+  return engine::world().velocities();
 }
 
 }

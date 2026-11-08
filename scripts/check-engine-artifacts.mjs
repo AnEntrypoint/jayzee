@@ -9,6 +9,7 @@ const read = (file) => readFileSync(join(root, file), 'utf8')
 const manifest = JSON.parse(read('engine/artifacts.json'))
 const workflow = read('.github/workflows/engine-core.yml')
 const build = read('engine/build.sh')
+const cmake = read('engine/CMakeLists.txt')
 const SHA = /^[0-9a-f]{40}$/
 
 gate('the emsdk commit in engine/artifacts.json is a full 40-hex commit', () => {
@@ -35,7 +36,12 @@ gate('every pinned artifact has a 64-hex sha256 and a wasm path under engine/out
 })
 
 gate('the fixed variant links with ALLOW_MEMORY_GROWTH=0 and a maximum equal to the tier', () => {
-  assert.match(build, /fixed\) link\+=\(-sALLOW_MEMORY_GROWTH=0 "-sMAXIMUM_MEMORY=\$\{tier_bytes\}"\)/)
+  assert.ok(cmake.includes('-sALLOW_MEMORY_GROWTH=0 -sMAXIMUM_MEMORY=${ENGINE_TIER_BYTES}'), 'engine/CMakeLists.txt fixed link line')
+})
+
+gate('the build script configures through emcmake and builds the CMake target', () => {
+  assert.ok(build.includes('emcmake cmake'), 'engine/build.sh does not call emcmake')
+  assert.ok(build.includes('cmake --build'), 'engine/build.sh does not build')
 })
 
 finish()
