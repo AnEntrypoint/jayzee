@@ -152,3 +152,5 @@ Non-obvious facts for automated edits. Architecture and measured costs live in d
 - `DeferredLoadQueue` takes its clock, timers and warn sink as a fourth `host` argument and throws a TypeError when now, setTimer or clearTimer is missing.
 - `src/animation/rigMath.js` copies three 0.185.1 formulas in the same operation order. A simplified formula breaks the 1e-12 cross-check with spoint, so do not simplify it.
 - `scripts/check-animation-rig.mjs` needs the `/workspace/spoint` checkout and is not part of `npm test`.
+- `createAnimationController` in `src/animation/animationController.js` needs a `{ now }` clock as its third argument. Its land timer fires on the first update at or after 500 ms on that clock.
+- `AnimationSystem` throws at construction when grounding finds a hips bone and `host.moveHips` is missing, because spoint always moves the hips.
