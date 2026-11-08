@@ -7,14 +7,19 @@
 #include <Jolt/Physics/Body/BodyInterface.h>
 #include <Jolt/Physics/Collision/BroadPhase/BroadPhaseLayer.h>
 #include <Jolt/Physics/Collision/Shape/BoxShape.h>
+#include <Jolt/Physics/Collision/Shape/CapsuleShape.h>
 #include <Jolt/Physics/Collision/Shape/SphereShape.h>
 #include <Jolt/Physics/PhysicsSettings.h>
+#include <Jolt/Physics/PhysicsStepListener.h>
 #include <Jolt/Physics/PhysicsSystem.h>
 #include <Jolt/RegisterTypes.h>
 
 #include <algorithm>
 #include <cstdlib>
 
+#include "planet_frame.h"
+#include "planet_shape.h"
+#include "vegetation.h"
 #include "world.h"
 
 namespace engine {
@@ -96,9 +101,23 @@ class ObjectPairs final : public JPH::ObjectLayerPairFilter {
   }
 };
 
+class RadialGravity final : public JPH::PhysicsStepListener {
+ public:
+  explicit RadialGravity(World& owner) : owner_(owner) {}
+
+  void OnStep(const JPH::PhysicsStepListenerContext& context) override {
+    owner_.applyRadialGravity(context.mDeltaTime);
+  }
+
+ private:
+  World& owner_;
+};
+
 }
 
 struct World::Runtime {
+  explicit Runtime(World& owner) : gravity(owner) {}
+
   BroadPhaseLayers broadPhase;
   ObjectVsBroadPhase objectVsBroadPhase;
   ObjectPairs objectPairs;
@@ -106,6 +125,9 @@ struct World::Runtime {
   JPH::JobSystemSingleThreaded jobs{JPH::cMaxPhysicsJobs};
   JPH::PhysicsSystem physics;
   JPH::ShapeRefC sphere;
+  JPH::ShapeRefC planetShape;
+  JPH::ShapeRefC vegetationShape;
+  RadialGravity gravity;
   JPH::BodyID batch[kMaxBodies];
 };
 
@@ -136,6 +158,8 @@ Status World::initialize() {
   JPH::Trace = silentTrace;
   JPH::Factory::sInstance = new JPH::Factory();
   JPH::RegisterTypes();
+  planet::registerCollisions();
+  vegetation::registerCollisions();
   joltReady = true;
   return kOk;
 }
@@ -148,7 +172,7 @@ Status World::configure(const Config& config) {
   if (!joltReady) return kNotConfigured;
 
   delete runtime_;
-  runtime_ = new Runtime();
+  runtime_ = new Runtime(*this);
   capacity_ = config.capacity;
   statics_ = 0;
   live_ = 0;
@@ -158,22 +182,36 @@ Status World::configure(const Config& config) {
   tickRate_ = config.tickRate;
   drag_ = config.drag;
   restitution_ = config.restitution;
+  planetGravity_ = 0.0f;
+  groundBody_ = kNoBody;
+  planetBody_ = kNoBody;
+  vegetationBody_ = kNoBody;
+  trunkBodies_ = 0;
   std::fill(generations_, generations_ + kMaxBodies, static_cast<std::uint16_t>(0));
   std::fill(alive_, alive_ + kMaxBodies, static_cast<std::uint8_t>(0));
 
-  runtime_->physics.Init(kMaxBodies + kMaxStatics + 1, 0, kMaxBodyPairs, kMaxContactConstraints,
+  runtime_->physics.Init(kMaxBodies + kMaxStatics + kMaxLegacyTrunks + 1, 0, kMaxBodyPairs, kMaxContactConstraints,
                          runtime_->broadPhase, runtime_->objectVsBroadPhase, runtime_->objectPairs);
   runtime_->physics.SetGravity(JPH::Vec3(0.0f, config.gravity, 0.0f));
   JPH::PhysicsSettings settings = runtime_->physics.GetPhysicsSettings();
   settings.mNumVelocitySteps = config.iterations;
   runtime_->physics.SetPhysicsSettings(settings);
+  runtime_->physics.AddStepListener(&runtime_->gravity);
 
   runtime_->sphere = new JPH::SphereShape(config.radius);
   JPH::ShapeRefC ground = new JPH::BoxShape(JPH::Vec3(kGroundHalfExtent, 1.0f, kGroundHalfExtent), kConvexRadius);
   JPH::BodyCreationSettings groundSettings(ground.GetPtr(), JPH::RVec3(0.0f, -1.0f, 0.0f), JPH::Quat::sIdentity(),
                                            JPH::EMotionType::Static, kLayerNonMoving);
-  runtime_->physics.GetBodyInterface().CreateAndAddBody(groundSettings, JPH::EActivation::DontActivate);
+  const JPH::BodyID groundId = runtime_->physics.GetBodyInterface().CreateAndAddBody(groundSettings, JPH::EActivation::DontActivate);
+  groundBody_ = groundId.GetIndexAndSequenceNumber();
   return kOk;
+}
+
+void World::removeBody(std::uint32_t index) {
+  JPH::BodyInterface& bodies = runtime_->physics.GetBodyInterface();
+  const JPH::BodyID id(index);
+  bodies.RemoveBody(id);
+  bodies.DestroyBody(id);
 }
 
 Status World::addBox(const float* box) {
@@ -190,6 +228,55 @@ Status World::addBox(const float* box) {
   const JPH::BodyID id = runtime_->physics.GetBodyInterface().CreateAndAddBody(settings, JPH::EActivation::DontActivate);
   if (id.IsInvalid()) return kFull;
   statics_ += 1;
+  return kOk;
+}
+
+Status World::configurePlanet(double radius, double cellSize, double gravity, double maxHeight) {
+  if (runtime_ == nullptr) return kNotConfigured;
+  if (!(gravity > 0.0)) return kRange;
+  if (!planet::configure(planet::state(), radius, cellSize, maxHeight)) return kRange;
+  if (groundBody_ != kNoBody) {
+    removeBody(groundBody_);
+    groundBody_ = kNoBody;
+  }
+  if (planetBody_ != kNoBody) {
+    removeBody(planetBody_);
+    planetBody_ = kNoBody;
+  }
+  runtime_->physics.SetGravity(JPH::Vec3::sZero());
+  runtime_->planetShape = new planet::PlanetShape(planet::state(), static_cast<float>(radius + maxHeight));
+  JPH::BodyCreationSettings settings(runtime_->planetShape.GetPtr(), JPH::RVec3::sZero(), JPH::Quat::sIdentity(),
+                                     JPH::EMotionType::Static, kLayerNonMoving);
+  const JPH::BodyID id = runtime_->physics.GetBodyInterface().CreateAndAddBody(settings, JPH::EActivation::DontActivate);
+  if (id.IsInvalid()) return kFull;
+  planetBody_ = id.GetIndexAndSequenceNumber();
+  planetGravity_ = static_cast<float>(gravity);
+  return kOk;
+}
+
+Status World::attachVegetation() {
+  if (runtime_ == nullptr) return kNotConfigured;
+  if (!vegetation::state().configured) return kNotConfigured;
+  if (vegetationBody_ != kNoBody) return kOk;
+  runtime_->vegetationShape = new vegetation::VegetationShape();
+  JPH::BodyCreationSettings settings(runtime_->vegetationShape.GetPtr(), JPH::RVec3::sZero(), JPH::Quat::sIdentity(),
+                                     JPH::EMotionType::Static, kLayerNonMoving);
+  const JPH::BodyID id = runtime_->physics.GetBodyInterface().CreateAndAddBody(settings, JPH::EActivation::DontActivate);
+  if (id.IsInvalid()) return kFull;
+  vegetationBody_ = id.GetIndexAndSequenceNumber();
+  return kOk;
+}
+
+Status World::addTrunk(const float* trunk) {
+  if (runtime_ == nullptr) return kNotConfigured;
+  if (trunkBodies_ == kMaxLegacyTrunks) return kFull;
+  if (!(trunk[3] > 0.0f) || !(trunk[4] >= 0.0f)) return kRange;
+  JPH::ShapeRefC shape = new JPH::CapsuleShape(trunk[4], trunk[3]);
+  JPH::BodyCreationSettings settings(shape.GetPtr(), JPH::RVec3(trunk[0], trunk[1], trunk[2]), JPH::Quat::sIdentity(),
+                                     JPH::EMotionType::Static, kLayerNonMoving);
+  const JPH::BodyID id = runtime_->physics.GetBodyInterface().CreateAndAddBody(settings, JPH::EActivation::DontActivate);
+  if (id.IsInvalid()) return kFull;
+  trunkBodies_ += 1;
   return kOk;
 }
 
@@ -271,6 +358,20 @@ Status World::setVelocity(std::uint32_t handle, const float* velocity) {
   return kOk;
 }
 
+void World::applyRadialGravity(float dt) {
+  if (runtime_ == nullptr || planetBody_ == kNoBody) return;
+  JPH::BodyInterface& bodies = runtime_->physics.GetBodyInterface();
+  for (std::uint32_t slot = 0; slot < fresh_; ++slot) {
+    if (alive_[slot] == 0) continue;
+    const JPH::BodyID id(bodyIds_[slot]);
+    const JPH::RVec3 position = bodies.GetCenterOfMassPosition(id);
+    const float distance = position.Length();
+    if (!(distance > 0.0f)) continue;
+    const float scale = -planetGravity_ * dt / distance;
+    bodies.AddLinearVelocity(id, JPH::Vec3(position.GetX() * scale, position.GetY() * scale, position.GetZ() * scale));
+  }
+}
+
 void World::step(std::uint32_t steps) {
   const float dt = 1.0f / static_cast<float>(tickRate_);
   for (std::uint32_t s = 0; s < steps; ++s) {
@@ -286,6 +387,10 @@ void World::step(std::uint32_t steps) {
 
 void World::setTick(std::uint64_t tick) {
   tick_ = tick;
+}
+
+std::uint32_t World::physicsBodies() const {
+  return runtime_ == nullptr ? 0 : runtime_->physics.GetNumBodies();
 }
 
 int World::resolve(std::uint32_t handle) const {

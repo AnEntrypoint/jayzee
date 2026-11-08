@@ -1,5 +1,6 @@
 #include "bridge.h"
 
+#include "planet_frame.h"
 #include "world.h"
 
 namespace engine::bridge {
@@ -47,6 +48,7 @@ EventSlot* eventSlots() {
 
 void tickBatch(std::uint32_t steps) {
   control[kEpoch] += 1;
+  planet::state().pages.applyPending();
   drainInputs();
   World& w = world();
   w.step(steps);

@@ -4,15 +4,18 @@ import { createBridge } from './bridge.js'
 const MAX_STEPS_PER_ADVANCE = 8
 const BOX_WORDS = 6
 const BATCH_WORDS = 6
+const PAGE_SAMPLES = 256
 const SLOT_MASK = 0xffff
 const FNV_OFFSET = 0x811c9dc5
 const FNV_PRIME = 0x01000193
+const ENGINE_OK = 0
 const ENGINE_MAX_BODIES = 4096
 const ENGINE_MAX_STATICS = 64
-const ENGINE_OK = 0
 const ENGINE_ZERO_THICKNESS = -6
 const ENGINE_TOO_MANY_STATICS = -5
 const DEFAULT_GLUE = new URL('../../engine/out/engine-core-64mib.mjs', import.meta.url).href
+
+export const TREE_CLASS = { trunk: 0, rock: 1, pass: 2 }
 
 const fnvWords = (hash, words) => {
   let h = hash
@@ -185,6 +188,101 @@ export class EngineWorld {
 
   allocationsSinceWarmup() {
     return Number(this.#module._engine_allocations_since_warmup())
+  }
+
+  memoryBytes() {
+    return Number(this.#module._engine_memory_bytes())
+  }
+
+  physicsBodies() {
+    return this.#module._engine_physics_bodies()
+  }
+
+  addTrunk(position, radius, halfHeight) {
+    checkVector(position, 'position')
+    this.#write(this.#module._engine_world_add_trunk(position[0], position[1], position[2], radius, halfHeight), 'trunk')
+  }
+
+  configurePlanet({ radius, cellSize, gravity, maxHeight }) {
+    if (![radius, cellSize, gravity, maxHeight].every(isFiniteNumber)) throw new RangeError('planet values must be finite numbers')
+    this.#write(this.#module._engine_planet_configure(radius, cellSize, gravity, maxHeight), 'planet configuration')
+  }
+
+  locateCell(point) {
+    checkVector(point, 'point')
+    this.#write(this.#module._engine_planet_locate(point[0], point[1], point[2]), 'cell lookup')
+    const scratch = this.#scratch()
+    return { face: scratch[0], cx: scratch[1], cy: scratch[2] }
+  }
+
+  resolveCell(face, cx, cy) {
+    this.#write(this.#module._engine_planet_resolve(face, cx, cy), 'cell resolve')
+    const scratch = this.#scratch()
+    return { face: scratch[0], cx: scratch[1], cy: scratch[2] }
+  }
+
+  cellKey(face, cx, cy) {
+    const key = this.#module._engine_planet_key(face, cx, cy)
+    this.#write(this.#scratch()[3], 'cell key')
+    return Number(key)
+  }
+
+  height(x, y, z) {
+    return this.#module._engine_planet_height(x, y, z)
+  }
+
+  gapQueries() {
+    return Number(this.#module._engine_planet_gap_queries())
+  }
+
+  residentPages() {
+    return this.#module._engine_planet_resident()
+  }
+
+  pageSlot(key) {
+    return this.#module._engine_page_lookup(BigInt(key))
+  }
+
+  stagePage(key) {
+    const slot = this.#module._engine_page_stage(BigInt(key))
+    if (slot < 0) throw new RangeError('no free page slot for key ' + key)
+    return slot
+  }
+
+  writePage(key, samples) {
+    if (samples.length !== PAGE_SAMPLES) throw new RangeError('a page holds ' + PAGE_SAMPLES + ' samples')
+    const slot = this.stagePage(key)
+    const base = this.#module._engine_page_samples(slot) / 4
+    this.#module.HEAPF32.set(samples, base)
+    this.#write(this.#module._engine_page_commit(slot), 'page commit')
+    return slot
+  }
+
+  releasePage(key) {
+    this.#write(this.#module._engine_page_release(BigInt(key)), 'page release')
+  }
+
+  configureVegetation({ origin, cellSize }) {
+    if (!isFiniteNumber(origin) || !isFiniteNumber(cellSize)) throw new RangeError('vegetation origin and cellSize must be finite numbers')
+    this.#write(this.#module._engine_veg_configure(origin, cellSize), 'vegetation field')
+  }
+
+  placeTree(position, yaw, scale, cls) {
+    checkVector(position, 'position')
+    this.#write(this.#module._engine_veg_place(position[0], position[1], position[2], yaw, scale, cls), 'tree')
+  }
+
+  attachVegetation() {
+    this.#write(this.#module._engine_veg_attach(), 'vegetation body')
+  }
+
+  vegetationPlaced() {
+    return Number(this.#module._engine_veg_placed())
+  }
+
+  #scratch() {
+    const base = this.#module._engine_planet_scratch() / 4
+    return this.#module.HEAP32.subarray(base, base + 4)
   }
 
   #handles() {

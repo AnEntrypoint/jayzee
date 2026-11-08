@@ -44,7 +44,14 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(JoltPhysics)
 
-add_executable(engine_core src/engine_core.cpp src/world.cpp src/bridge.cpp)
+add_executable(engine_core
+  src/engine_core.cpp
+  src/world.cpp
+  src/bridge.cpp
+  src/planet_frame.cpp
+  src/page_cache.cpp
+  src/planet_shape.cpp
+  src/vegetation.cpp)
 target_link_libraries(engine_core PRIVATE Jolt)
 target_compile_definitions(engine_core PRIVATE JPH_CROSS_PLATFORM_DETERMINISTIC)
 
@@ -52,6 +59,7 @@ set(ENGINE_EXPORTS
   _engine_init
   _engine_world_configure
   _engine_world_add_box
+  _engine_world_add_trunk
   _engine_spawn
   _engine_set_position
   _engine_set_velocity
@@ -60,6 +68,7 @@ set(ENGINE_EXPORTS
   _engine_ticks
   _engine_memory_bytes
   _engine_body_count
+  _engine_physics_bodies
   _engine_positions
   _engine_velocities
   _engine_transforms
@@ -72,7 +81,24 @@ set(ENGINE_EXPORTS
   _engine_despawn
   _engine_mark_warmup
   _engine_allocations_since_warmup
-  _engine_allocations_total)
+  _engine_allocations_total
+  _engine_planet_configure
+  _engine_planet_locate
+  _engine_planet_resolve
+  _engine_planet_key
+  _engine_planet_scratch
+  _engine_planet_height
+  _engine_planet_gap_queries
+  _engine_planet_resident
+  _engine_page_stage
+  _engine_page_samples
+  _engine_page_commit
+  _engine_page_release
+  _engine_page_lookup
+  _engine_veg_configure
+  _engine_veg_place
+  _engine_veg_attach
+  _engine_veg_placed)
 string(JOIN "," ENGINE_EXPORT_LIST ${ENGINE_EXPORTS})
 
 target_link_options(engine_core PRIVATE

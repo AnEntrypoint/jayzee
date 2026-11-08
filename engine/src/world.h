@@ -7,9 +7,11 @@ namespace engine {
 
 constexpr std::uint32_t kMaxBodies = 4096;
 constexpr std::uint32_t kMaxStatics = 64;
+constexpr std::uint32_t kMaxLegacyTrunks = 1024;
 constexpr std::uint32_t kMaxIterations = 32;
 constexpr std::uint32_t kSlotMask = 0xffffu;
 constexpr std::uint32_t kBatchFloats = 6;
+constexpr std::uint32_t kNoBody = 0xffffffffu;
 
 enum Status : int {
   kOk = 0,
@@ -58,6 +60,9 @@ class World {
 
   Status configure(const Config& config);
   Status addBox(const float* box);
+  Status configurePlanet(double radius, double cellSize, double gravity, double maxHeight);
+  Status attachVegetation();
+  Status addTrunk(const float* trunk);
   int spawn(const float* position, const float* velocity);
   int spawnBatch(const float* rows, std::uint32_t count, std::uint32_t* handles);
   Status despawn(std::uint32_t handle);
@@ -65,8 +70,10 @@ class World {
   Status setVelocity(std::uint32_t handle, const float* velocity);
   void step(std::uint32_t steps);
   void setTick(std::uint64_t tick);
+  void applyRadialGravity(float dt);
 
   std::uint32_t count() const { return live_; }
+  std::uint32_t physicsBodies() const;
   std::uint64_t tick() const { return tick_; }
   const double* positions() const { return positions_; }
   const double* velocities() const { return velocities_; }
@@ -78,6 +85,7 @@ class World {
   int resolve(std::uint32_t handle) const;
   int allocateSlot();
   void sync(std::uint32_t slot);
+  void removeBody(std::uint32_t index);
 
   Runtime* runtime_ = nullptr;
   std::uint32_t capacity_ = 0;
@@ -88,6 +96,11 @@ class World {
   std::uint32_t tickRate_ = 1;
   float drag_ = 0.0f;
   float restitution_ = 0.0f;
+  float planetGravity_ = 0.0f;
+  std::uint32_t groundBody_ = kNoBody;
+  std::uint32_t planetBody_ = kNoBody;
+  std::uint32_t vegetationBody_ = kNoBody;
+  std::uint32_t trunkBodies_ = 0;
   std::uint64_t tick_ = 0;
   std::uint32_t bodyIds_[kMaxBodies];
   std::uint32_t freeSlots_[kMaxBodies];

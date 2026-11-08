@@ -254,7 +254,9 @@
     "check:collision-mirror": "node scripts/check-collision-mirror.mjs",
     "check:collider-streamer": "node scripts/check-collider-streamer.mjs",
     "check:socket-upgrade": "node scripts/check-socket-upgrade.mjs",
-    "check:app-watch": "node scripts/check-app-watch.mjs"
+    "check:app-watch": "node scripts/check-app-watch.mjs",
+    "check:engine-planet": "node scripts/check-engine-planet.mjs",
+    "check:engine-vegetation": "node scripts/check-engine-vegetation.mjs"
   },
   "dependencies": {
     "@pixiv/three-vrm": "3.5.5",

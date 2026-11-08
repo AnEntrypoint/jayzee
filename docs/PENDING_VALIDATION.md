@@ -56,3 +56,36 @@ The dispatcher owns docs/ENGINE.md, so these are recorded here and not edited.
 - src/engine/EngineWorld.js, ENGINE.md phase 4. Bodies are tracked in a set of live handles. count is the set size. spawnMany writes rows into the stage region as float32 and reads handles back from the handle region. despawn, markWarmup and allocationsSinceWarmup are new. Hash, snapshot and state export gather positions in slot order, so a world with holes hashes the same way a contiguous world does. Witness: check-engine-pools and check-engine-world. Unvalidated.
 - scripts/check-engine-pools.mjs, ENGINE.md phase 4. Six gates, not in npm test until Phase B passes them. Package script check:engine-pools added.
 
+
+
+## Phase 5: PlanetShape and the page cache (coded, not built or run)
+
+- Files: engine/src/planet_frame.h/.cpp (cube-sphere port of src/terrain-pure/cubeSphereCells.js: FACE_FRAME, EDGE_TABLE, pickFace, worldToFaceLocal, worldToCell, packCellKey, resolveCell, heightAt, state()), engine/src/page_cache.h/.cpp (64 slots of 16 by 16 float samples: stage, commit, releaseKey, applyPending), engine/src/surface_shape.h (shared Jolt Shape overrides), engine/src/sphere_contact.h (contact conversion to CollideShapeResult), engine/src/planet_shape.h/.cpp (PlanetShape with subtype User1; collide functions for (User1, Sphere) and (Sphere, User1)), engine/src/world.h/.cpp (configurePlanet removes the flat ground body and sets zero world gravity; applyRadialGravity from a PhysicsStepListener), engine/src/bridge.cpp (applyPending at tick start, before the input drain), engine/src/engine_core.cpp (planet and page exports), engine/CMakeLists.txt (sources and exports), src/engine/EngineWorld.js (planet and page methods), scripts/check-engine-planet.mjs, package.json (check:engine-planet, not in npm test).
+- ENGINE.md phase: 5. Witness needed: scripts/check-engine-planet.mjs, run after the build. Gates: locateCell, resolveCell and cellKey match cubeSphereCells.js; a commit is resident only after the next tick; a release leaves the table at the next tick; a zero radius or zero cell size is refused; a sphere settles at R plus its radius within 0.05 m; 2000 ticks of scripted flight after warm-up give zero allocations, an unchanged physics body count and unchanged memory.
+- NOT measured here and still owed: frame-time p99 against spoint's streamer on the same path (ENGINE.md phase 5 witness).
+- Decisions made in code, for the dispatcher to confirm:
+  - The far field is flat, height 0. Spoint's procedural height is not ported. heightAt counts each fallback in engine_planet_gap_queries.
+  - heightAt and the collide function sample only the owning face's page, at the sphere centre. There is no neighbour resolve at a seam and no footprint sampling.
+  - Pending commits apply at tick start. Within one batch, releases apply before commits. A commit to a key that is already resident replaces the older slot.
+  - CastRay returns no hit, GetTrianglesNext returns 0 and CollidePoint is a no-op. No cast shape is registered. CharacterVirtual and cast queries against the planet are therefore unsupported. ENGINE.md phase 5 asks for triangles for the patch under a contact and for sRegisterCastShape, which this does not do.
+  - PlanetShape bounds are radius plus maxHeight. A page above maxHeight is outside the broadphase bounds, and nothing refuses it.
+  - Radial gravity writes through BodyInterface::AddLinearVelocity inside OnStep.
+  - Reconfiguring the planet removes the previous planet body. The flat ground returns only after World is configured again.
+- Jolt calls not checked against the headers in a build: CollideShapeCollector::ShouldEarlyOut, the CollideShapeResult constructor argument types (Vec3 or RVec3), CollideShapeSettings::mMaxSeparationDistance, PhysicsStepListener registration, PhysicsSystem::GetNumBodies, RVec3::sZero, Vec3::sReplicate, Mat44::Inversed, PhysicsMaterial::sDefault.GetPtr, MassProperties default construction. surface_shape.h guards the JPH_DEBUG_RENDERER overloads, and this build does not define that macro.
+- Parity risk: the atan in the wasm libm and in V8 can differ in the last bit, so a point on a cell boundary may map to the neighbouring cell. The parity gates report that as a FAIL, with no tolerance.
+- Precision: Jolt body positions are float32. At R = 1000 the step is about 6e-5 m. Larger planets need a precision review.
+- Open against ENGINE.md: the non-planet ENGINE.md phase 5 text for the sphere, capsule and box cast pairs and for CharacterVirtual is not coded.
+
+## Phase 6: vegetation field (coded, not built or run)
+
+- Files: engine/src/vegetation.h/.cpp (Field of 32 by 32 XZ cells of 8 m, 32 instances per cell, classes trunk, rock and pass-through; VegetationShape with subtype User2; collide functions for (User2, Sphere) and (Sphere, User2)), engine/src/world.h/.cpp (attachVegetation, addTrunk, kMaxLegacyTrunks, Init body capacity raised by 1024 for the one-body-per-tree arm), engine/src/engine_core.cpp (vegetation, trunk and physics body exports), engine/CMakeLists.txt, src/engine/EngineWorld.js (configureVegetation, placeTree, attachVegetation, vegetationPlaced, addTrunk, physicsBodies), scripts/check-engine-vegetation.mjs, package.json (check:engine-vegetation, not in npm test).
+- ENGINE.md phase: 6. Witness needed: scripts/check-engine-vegetation.mjs, run after the build. Gates: one vegetation body for 1024 trunks; a sphere is stopped by a trunk; a control sphere outside the reach passes it; a rock stops a sphere and a pass-through class does not; 40 dropped spheres stay above the ground; the field adds 1 body and the one-body-per-tree arm adds 1024, with timings printed and not thresholded; a full cell refuses a 33rd tree, and out-of-field and oversized placements are refused.
+- Deviations from ENGINE.md for the dispatcher to decide:
+  - ENGINE.md keys the per-cell table by cube-sphere cell. Phase 6 uses a planar XZ grid on the flat ground. Cube-sphere keying for vegetation is not coded, and it must be decided before the phase 6 witness is run on the planet.
+  - ENGINE.md tests against the class's prebuilt shape transformed in place. This code tests analytic capsules and yaw-rotated boxes, so no Jolt sub-shape is built per class.
+  - Promotion of touched instances to pooled dynamic bodies is not coded. The phase 6 witness does not need it.
+  - Horizontal reach is capped at 2 m and scale at 2. Larger values are refused by place.
+  - Trunk geometry is a vertical segment from the base up 6 m times the scale, with radius 0.4 times the scale. A rock is an axis-aligned box of half-size 0.6 times the scale, rotated about Y by yaw.
+  - Inside a rock box the contact axis falls back to +Y.
+  - The one-body-per-tree arm exists only for the cost comparison. It raises Init's body capacity by 1024, so the phase 2 world witness must be run again.
+- Jolt calls to check in a build: the (User2, Sphere) registration order, and CapsuleShape's half height, which is the half length of the cylinder part.
