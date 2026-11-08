@@ -1,7 +1,7 @@
 export { decodeName, encodeName } from './cdnName.js'
 export { readFrames } from './frames.js'
 export { sha256Hex, verifyContent, parseHead, parseHeadResponse, worldStoreError, WorldStoreError, HeadNotFoundError, UnknownWorldStoreKeyError, ValueNotFoundError, WORLD_STORE_SCOPE } from './content.js'
-export { parseManifest, bindFrames } from './manifest.js'
+export { parseManifest, bindFrames, decodeFrame, parseFileMap, parseSummary, parseLeafMap } from './manifest.js'
 export { normalizeFeedEntry, walkFeed } from './feed.js'
 export { parseResolve, classifyResolve } from './resolve.js'
 export { ledgerBucket, ledgerKey, parseLedgerKey, cdnValue } from './ledger.js'

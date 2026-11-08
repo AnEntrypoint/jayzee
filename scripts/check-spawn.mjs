@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { gate, finish } from './lib/gate.mjs'
-import { decodeName, encodeName, readFrames, sha256Hex, verifyContent, parseHead, parseHeadResponse, parseManifest, bindFrames, normalizeFeedEntry, walkFeed, parseResolve, classifyResolve, ledgerBucket, ledgerKey, parseLedgerKey, cdnValue } from '../src/spawn/index.js'
+import { decodeName, encodeName, readFrames, sha256Hex, verifyContent, parseHead, parseHeadResponse, parseManifest, bindFrames, normalizeFeedEntry, walkFeed, parseResolve, classifyResolve, ledgerBucket, ledgerKey, parseLedgerKey, cdnValue, decodeFrame, parseFileMap, parseSummary, parseLeafMap } from '../src/spawn/index.js'
 
 const fixtures = join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'spawn')
 const bytesOf = (path) => readFileSync(join(fixtures, path))
@@ -332,14 +332,42 @@ gate('the captured not_found body classifies as not_found, and the captured 400 
   assert(refused, 'a 400 was classified')
 })
 
-gate('a 410 gone is refused, since no body has been captured for it', () => {
+gate('a 410 is refused, since the upstream spec documents no 410 for the resolve route', () => {
   let refused = false
   try {
     classifyResolve({ status: 410, text: '' })
   } catch (error) {
-    refused = error.message.includes('no body has been captured')
+    refused = error.message.includes('does not document')
   }
   assert(refused, 'a 410 was classified')
+})
+
+gate('a renamed world (the spec\'s redirect result) reads its new name under 200', () => {
+  const result = parseResolve(JSON.stringify({ ok: true, result: { type: 'redirect', username: 'alice', newAdventureName: 'gauntlet' } }))
+  assert(JSON.stringify(result) === JSON.stringify({ type: 'renamed', username: 'alice', newAdventureName: 'gauntlet' }), 'renamed ' + JSON.stringify(result))
+})
+
+gate('a deleted world (the spec\'s gone result) reads its name and deletion time under 200', () => {
+  const body = { ok: true, result: { type: 'gone', appName: 'Gauntlet', username: 'alice', adventureName: 'gauntlet', deletedAt: '2026-10-01T00:00:00Z' } }
+  const result = parseResolve(JSON.stringify(body))
+  assert(JSON.stringify(result) === JSON.stringify({ type: 'gone', appName: 'Gauntlet', username: 'alice', adventureName: 'gauntlet', deletedAt: '2026-10-01T00:00:00Z' }), 'gone ' + JSON.stringify(result))
+  assert(classifyResolve({ status: 200, text: JSON.stringify(body) }).type === 'gone', 'gone through classifyResolve')
+})
+
+gate('negative control: a renamed or gone result without its required fields is refused', () => {
+  const cases = [
+    { type: 'redirect', username: 'alice' },
+    { type: 'gone', appName: 'G', username: 'alice', adventureName: 'a' },
+  ]
+  for (const result of cases) {
+    let refused = false
+    try {
+      parseResolve(JSON.stringify({ ok: true, result }))
+    } catch {
+      refused = true
+    }
+    assert(refused, 'accepted ' + JSON.stringify(result))
+  }
 })
 
 gate('negative control: a redirect with another body, or with no location, is refused', () => {
@@ -368,6 +396,54 @@ gate('the exception manifest binds the sheet and its second frame, and its third
   assert(bound.framesAfterIndex === 3, 'frames after the index: ' + bound.framesAfterIndex)
   assert(JSON.stringify(bound.mismatches) === JSON.stringify([{ position: 2, frame: 3, json: false }]), 'mismatches: ' + JSON.stringify(bound.mismatches))
   assert(bound.hashesWithoutFrame.length === 1, 'hashes without a frame: ' + bound.hashesWithoutFrame.length)
+})
+
+const frameKinds = (bytes) => readFrames(new Uint8Array(bytes)).map((frame) => { const d = decodeFrame(frame); return d.encoding + '/' + d.kind })
+const indexHashesOf = (bytes) => new Set(Object.values(JSON.parse(readFrames(new Uint8Array(bytes))[0].toString('utf8')).hashes))
+
+gate('the fixture manifest frames are an index, a sheet, and two file maps, all identity-encoded', () => {
+  sameText(frameKinds(bytesOf('manifest.bin')).join(' '), 'identity/other identity/other identity/file-map identity/file-map', 'fixture frame kinds')
+})
+
+gate('the exception manifest frames are an index, a sheet, a summary and a gzipped leaf map', () => {
+  sameText(frameKinds(exceptionManifest).join(' '), 'identity/other identity/other identity/summary gzip/leaf-map', 'exception frame kinds')
+})
+
+gate('the fixture file map names two world files with their sizes and imports', () => {
+  const frames = readFrames(new Uint8Array(bytesOf('manifest.bin')))
+  const scene = parseFileMap(frames[2])
+  const config = parseFileMap(frames[3])
+  sameText(JSON.stringify(scene.map((e) => [e.path, e.size, e.imports.length])), JSON.stringify([['places/main/cells/x0z0.scene', 251, 2]]), 'scene entry')
+  sameText(JSON.stringify(config.map((e) => [e.path, e.size])), JSON.stringify([['places/main/config.yaml', 1498]]), 'config entry')
+})
+
+gate('the exception summary holds 197 values and 35 leaves, and its gzipped leaf map holds three named leaves', () => {
+  const frames = readFrames(new Uint8Array(exceptionManifest))
+  const summary = parseSummary(frames[2])
+  sameText(JSON.stringify([summary.bytes, summary.values, summary.leaves.length]), JSON.stringify([2766682, 197, 35]), 'summary totals')
+  const leaves = parseLeafMap(frames[3])
+  sameText(leaves.map((e) => e.path).join(','), 'beach,bedroom,classroom', 'leaf names')
+})
+
+gate('no leaf or file hash in either frame set is one of that manifest\'s 80 index hashes, so the frame contents bind to nothing in the index', () => {
+  for (const [bytes, frameIndexes] of [[bytesOf('manifest.bin'), [2, 3]], [exceptionManifest, [2, 3]]]) {
+    const index = indexHashesOf(bytes)
+    const frames = readFrames(new Uint8Array(bytes))
+    for (const k of frameIndexes) {
+      const d = decodeFrame(frames[k])
+      const hashes = d.kind === 'file-map' ? parseFileMap(frames[k]).map((e) => e.hash) : d.kind === 'summary' ? parseSummary(frames[k]).leaves.map((e) => e.hash) : d.kind === 'leaf-map' ? parseLeafMap(frames[k]).map((e) => e.hash) : []
+      if (hashes.length === 0) throw new Error('frame ' + k + ' has no hashes to check')
+      const bound = hashes.filter((h) => index.has(h))
+      if (bound.length !== 0) throw new Error('frame ' + k + ' has ' + bound.length + ' hashes in the index')
+    }
+  }
+})
+
+gate('negative control: a gzipped frame is not a file map and a file map is not a summary', () => {
+  let refused = 0
+  try { parseFileMap(readFrames(new Uint8Array(exceptionManifest))[3]) } catch { refused++ }
+  try { parseSummary(readFrames(new Uint8Array(bytesOf('manifest.bin')))[2]) } catch { refused++ }
+  sameText(String(refused), '2', 'refusals')
 })
 
 finish()
