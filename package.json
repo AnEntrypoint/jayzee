@@ -261,6 +261,7 @@
     "check:engine-materials": "node scripts/check-engine-materials.mjs",
     "check:engine-interest": "node scripts/check-engine-interest.mjs",
     "check:engine-render": "node scripts/check-engine-render.mjs",
+    "check:engine-isolation": "node scripts/check-engine-isolation.mjs",
     "gen:engine-codec-fixtures": "node scripts/gen-engine-codec-fixtures.mjs",
     "check:client-resource-pools": "node scripts/check-client-resource-pools.mjs"
   },
