@@ -44,7 +44,7 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(JoltPhysics)
 
-add_executable(engine_core src/engine_core.cpp src/world.cpp)
+add_executable(engine_core src/engine_core.cpp src/world.cpp src/bridge.cpp)
 target_link_libraries(engine_core PRIVATE Jolt)
 target_compile_definitions(engine_core PRIVATE JPH_CROSS_PLATFORM_DETERMINISTIC)
 
@@ -61,14 +61,18 @@ set(ENGINE_EXPORTS
   _engine_memory_bytes
   _engine_body_count
   _engine_positions
-  _engine_velocities)
+  _engine_velocities
+  _engine_transforms
+  _engine_control
+  _engine_inputs
+  _engine_events)
 string(JOIN "," ENGINE_EXPORT_LIST ${ENGINE_EXPORTS})
 
 target_link_options(engine_core PRIVATE
   -sMODULARIZE=1
   -sEXPORT_ES6=1
   -sENVIRONMENT=web,node
-  -sEXPORTED_RUNTIME_METHODS=HEAPU8,HEAP32,HEAPU32,HEAPF64
+  -sEXPORTED_RUNTIME_METHODS=HEAPU8,HEAP32,HEAPU32,HEAPF32,HEAPF64
   -sSTRICT=1
   -sINITIAL_MEMORY=${ENGINE_TIER_BYTES}
   -sEXPORTED_FUNCTIONS=${ENGINE_EXPORT_LIST})

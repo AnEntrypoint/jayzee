@@ -32,6 +32,7 @@
     "check:engine-artifacts": "node scripts/check-engine-artifacts.mjs",
     "check:engine-core": "node scripts/check-engine-core.mjs",
     "check:engine-world": "node scripts/check-engine-world.mjs",
+    "check:engine-bridge": "node scripts/check-engine-bridge.mjs",
     "check:types": "tsc -p tsconfig.json",
     "bench": "node scripts/bench.mjs",
     "prepare": "npm run build:kernel",

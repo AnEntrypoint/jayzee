@@ -1,4 +1,5 @@
 import { checkVector, isFiniteNumber, resolveWorldOptions } from '../world/options.js'
+import { createBridge } from './bridge.js'
 
 const MAX_STEPS_PER_ADVANCE = 8
 const BOX_WORDS = 6
@@ -19,8 +20,16 @@ const fnvWords = (hash, words) => {
 
 const engineError = (status, message) => new RangeError(message + ' (engine status ' + status + ')')
 
+export const loadEngineModule = async (glue = DEFAULT_GLUE) => {
+  const factory = (await import(glue)).default
+  const module = await factory()
+  if (module._engine_init() !== ENGINE_OK) throw new Error('engine_init failed')
+  return module
+}
+
 export class EngineWorld {
   #module
+  #bridge
   #capacity
   #tickRate
   #count = 0
@@ -28,6 +37,7 @@ export class EngineWorld {
 
   constructor(module, settings) {
     this.#module = module
+    this.#bridge = createBridge(module)
     this.#capacity = settings.capacity
     this.#tickRate = settings.tickRate
   }
@@ -71,7 +81,7 @@ export class EngineWorld {
   }
 
   step() {
-    this.#module._engine_tick(1)
+    this.#bridge.tick(1)
   }
 
   advance(seconds) {
@@ -152,9 +162,7 @@ export const createEngineWorld = async (options = {}, glue = DEFAULT_GLUE) => {
   if (settings.capacity > ENGINE_MAX_BODIES) throw new RangeError('engine capacity is at most ' + ENGINE_MAX_BODIES)
   if (settings.boxCount > ENGINE_MAX_STATICS) throw new RangeError('engine holds at most ' + ENGINE_MAX_STATICS + ' static boxes')
   if (settings.drag >= 1) throw new RangeError('drag must be below 1 on the engine, where it is a Jolt damping factor')
-  const factory = (await import(glue)).default
-  const module = await factory()
-  if (module._engine_init() !== ENGINE_OK) throw new Error('engine_init failed')
+  const module = await loadEngineModule(glue)
   const configured = module._engine_world_configure(
     settings.capacity,
     settings.tickRate,

@@ -203,6 +203,15 @@ void World::sync(std::uint32_t index) {
   velocity[0] = v.GetX();
   velocity[1] = v.GetY();
   velocity[2] = v.GetZ();
+  const JPH::Quat q = bodies.GetRotation(id);
+  Transform& transform = transforms_[index];
+  transform.x = p.GetX();
+  transform.y = p.GetY();
+  transform.z = p.GetZ();
+  transform.qx = q.GetX();
+  transform.qy = q.GetY();
+  transform.qz = q.GetZ();
+  transform.qw = q.GetW();
 }
 
 World& world() {

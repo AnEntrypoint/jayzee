@@ -3,6 +3,7 @@
 
 #include <emscripten/emscripten.h>
 
+#include "bridge.h"
 #include "world.h"
 
 namespace {
@@ -60,11 +61,11 @@ EMSCRIPTEN_KEEPALIVE void engine_tick(int steps) {
   if (steps <= 0) return;
 #if defined(ENGINE_LEAK_ON_TICK)
   for (int i = 0; i < steps; ++i) {
-    engine::world().step(1);
+    engine::bridge::tickBatch(1);
     leakBlock();
   }
 #else
-  engine::world().step(static_cast<std::uint32_t>(steps));
+  engine::bridge::tickBatch(static_cast<std::uint32_t>(steps));
 #endif
 }
 
@@ -86,6 +87,22 @@ EMSCRIPTEN_KEEPALIVE const double* engine_positions() {
 
 EMSCRIPTEN_KEEPALIVE const double* engine_velocities() {
   return engine::world().velocities();
+}
+
+EMSCRIPTEN_KEEPALIVE const engine::Transform* engine_transforms() {
+  return engine::world().transforms();
+}
+
+EMSCRIPTEN_KEEPALIVE std::uint32_t* engine_control() {
+  return engine::bridge::controlWords();
+}
+
+EMSCRIPTEN_KEEPALIVE engine::bridge::InputSlot* engine_inputs() {
+  return engine::bridge::inputSlots();
+}
+
+EMSCRIPTEN_KEEPALIVE engine::bridge::EventSlot* engine_events() {
+  return engine::bridge::eventSlots();
 }
 
 }

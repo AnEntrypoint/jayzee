@@ -29,6 +29,18 @@ struct Config {
   std::uint32_t iterations;
 };
 
+struct Transform {
+  float x;
+  float y;
+  float z;
+  float qx;
+  float qy;
+  float qz;
+  float qw;
+};
+
+static_assert(sizeof(Transform) == 28);
+
 class World {
  public:
   World() = default;
@@ -50,6 +62,7 @@ class World {
   std::uint64_t tick() const { return tick_; }
   const double* positions() const { return positions_; }
   const double* velocities() const { return velocities_; }
+  const Transform* transforms() const { return transforms_; }
 
  private:
   struct Runtime;
@@ -67,6 +80,7 @@ class World {
   std::uint32_t bodyIds_[kMaxBodies];
   alignas(8) double positions_[kMaxBodies * 3];
   alignas(8) double velocities_[kMaxBodies * 3];
+  Transform transforms_[kMaxBodies];
 };
 
 World& world();
