@@ -1,0 +1,125 @@
+export const STRIDE = 17
+const OFF_X = 0, OFF_Y = 1, OFF_Z = 2
+const OFF_VX = 3, OFF_VY = 4, OFF_VZ = 5
+const OFF_RX = 6, OFF_RY = 7, OFF_RZ = 8, OFF_RW = 9
+const OFF_LX = 10, OFF_LY = 11, OFF_LZ = 12
+const OFF_LRX = 13, OFF_LRY = 14, OFF_LRZ = 15, OFF_LRW = 16
+const ROTATION_DELTA_EPS_SQ = 1e-12
+const UNIT_QUAT_NORM_SQ_TOLERANCE = 1e-6
+
+function normalizeQuaternion(q) {
+  const len = Math.sqrt(q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w)
+  if (len === 0) {
+    q.x = 0; q.y = 0; q.z = 0; q.w = 1
+    return
+  }
+  const inv = 1 / len
+  q.x *= inv; q.y *= inv; q.z *= inv; q.w *= inv
+}
+
+export function lerpEntityTransform(mesh, target, lerpFactor, frameDt) {
+  const gx = target.x + (target.vx || 0) * frameDt
+  const gy = target.y + (target.vy || 0) * frameDt
+  const gz = target.z + (target.vz || 0) * frameDt
+  mesh.position.x += (gx - mesh.position.x) * lerpFactor
+  mesh.position.y += (gy - mesh.position.y) * lerpFactor
+  mesh.position.z += (gz - mesh.position.z) * lerpFactor
+  if (!(Number.isFinite(target.rx) && Number.isFinite(target.ry) && Number.isFinite(target.rz) && Number.isFinite(target.rw))) return
+  const q = mesh.quaternion
+  const dot = q.x * target.rx + q.y * target.ry + q.z * target.rz + q.w * target.rw
+  const s = dot < 0 ? -1 : 1
+  const dx = s * target.rx - q.x, dy = s * target.ry - q.y
+  const dz = s * target.rz - q.z, dw = s * target.rw - q.w
+  if (dx * dx + dy * dy + dz * dz + dw * dw > ROTATION_DELTA_EPS_SQ) {
+    q.x += dx * lerpFactor; q.y += dy * lerpFactor
+    q.z += dz * lerpFactor; q.w += dw * lerpFactor
+    const nrm2 = q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w
+    if (Math.abs(nrm2 - 1) > UNIT_QUAT_NORM_SQ_TOLERANCE) normalizeQuaternion(q)
+  }
+}
+
+export function applyPlayerTransform(mesh, pos, lerpFactor) {
+  if (!mesh.userData.initialized) {
+    mesh.position.x = pos.x; mesh.position.y = pos.y; mesh.position.z = pos.z
+    mesh.userData.initialized = true
+    return
+  }
+  if (lerpFactor === undefined) {
+    mesh.position.x = pos.x; mesh.position.y = pos.y; mesh.position.z = pos.z
+  } else {
+    mesh.position.x += (pos.x - mesh.position.x) * lerpFactor
+    mesh.position.y += (pos.y - mesh.position.y) * lerpFactor
+    mesh.position.z += (pos.z - mesh.position.z) * lerpFactor
+  }
+}
+
+export function ensureBatchCapacity(state, count) {
+  const needed = count * STRIDE
+  if (!state.buf || state.buf.length < needed) {
+    const buf = new Float32Array(Math.max(needed, state.buf ? state.buf.length * 2 : 64))
+    if (state.buf) buf.set(state.buf)
+    state.buf = buf
+  }
+  return state.buf
+}
+
+export function tickBatch(state, records, lerpFactor, frameDt) {
+  const n = records.length
+  if (n === 0) return false
+  const buf = ensureBatchCapacity(state, n)
+
+  for (let i = 0; i < n; i++) {
+    const o = i * STRIDE
+    const { mesh, target: t, last } = records[i]
+    buf[o + OFF_X] = mesh.position.x; buf[o + OFF_Y] = mesh.position.y; buf[o + OFF_Z] = mesh.position.z
+    buf[o + OFF_VX] = t.vx || 0; buf[o + OFF_VY] = t.vy || 0; buf[o + OFF_VZ] = t.vz || 0
+    buf[o + OFF_RX] = mesh.quaternion.x; buf[o + OFF_RY] = mesh.quaternion.y
+    buf[o + OFF_RZ] = mesh.quaternion.z; buf[o + OFF_RW] = mesh.quaternion.w
+    buf[o + OFF_LX] = t.x; buf[o + OFF_LY] = t.y; buf[o + OFF_LZ] = t.z
+    buf[o + OFF_LRX] = last.hasRot ? t.rx : mesh.quaternion.x
+    buf[o + OFF_LRY] = last.hasRot ? t.ry : mesh.quaternion.y
+    buf[o + OFF_LRZ] = last.hasRot ? t.rz : mesh.quaternion.z
+    buf[o + OFF_LRW] = last.hasRot ? t.rw : mesh.quaternion.w
+  }
+
+  for (let i = 0; i < n; i++) {
+    const o = i * STRIDE
+    const px = buf[o + OFF_X], py = buf[o + OFF_Y], pz = buf[o + OFF_Z]
+    const gx = buf[o + OFF_LX] + buf[o + OFF_VX] * frameDt
+    const gy = buf[o + OFF_LY] + buf[o + OFF_VY] * frameDt
+    const gz = buf[o + OFF_LZ] + buf[o + OFF_VZ] * frameDt
+    buf[o + OFF_X] = px + (gx - px) * lerpFactor
+    buf[o + OFF_Y] = py + (gy - py) * lerpFactor
+    buf[o + OFF_Z] = pz + (gz - pz) * lerpFactor
+
+    const qx = buf[o + OFF_RX], qy = buf[o + OFF_RY], qz = buf[o + OFF_RZ], qw = buf[o + OFF_RW]
+    const tx = buf[o + OFF_LRX], ty = buf[o + OFF_LRY], tz = buf[o + OFF_LRZ], tw = buf[o + OFF_LRW]
+    const dot = qx * tx + qy * ty + qz * tz + qw * tw
+    const s = dot < 0 ? -1 : 1
+    const dx = s * tx - qx, dy = s * ty - qy, dz = s * tz - qz, dw = s * tw - qw
+    const d2 = dx * dx + dy * dy + dz * dz + dw * dw
+    if (d2 > ROTATION_DELTA_EPS_SQ) {
+      let nx = qx + dx * lerpFactor, ny = qy + dy * lerpFactor
+      let nz = qz + dz * lerpFactor, nw = qw + dw * lerpFactor
+      const nrm2 = nx * nx + ny * ny + nz * nz + nw * nw
+      if (Math.abs(nrm2 - 1) > UNIT_QUAT_NORM_SQ_TOLERANCE) {
+        const inv = 1 / Math.sqrt(nrm2)
+        nx *= inv; ny *= inv; nz *= inv; nw *= inv
+      }
+      buf[o + OFF_RX] = nx; buf[o + OFF_RY] = ny; buf[o + OFF_RZ] = nz; buf[o + OFF_RW] = nw
+    }
+  }
+
+  let moved = false
+  for (let i = 0; i < n; i++) {
+    const o = i * STRIDE
+    const { mesh, last } = records[i]
+    mesh.position.x = buf[o + OFF_X]; mesh.position.y = buf[o + OFF_Y]; mesh.position.z = buf[o + OFF_Z]
+    if (last.hasRot) {
+      mesh.quaternion.x = buf[o + OFF_RX]; mesh.quaternion.y = buf[o + OFF_RY]
+      mesh.quaternion.z = buf[o + OFF_RZ]; mesh.quaternion.w = buf[o + OFF_RW]
+    }
+    moved = true
+  }
+  return moved
+}
