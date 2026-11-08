@@ -1,0 +1,342 @@
+{
+  "source": "spoint apps/world/_shared/worldDefParse.js parseWorldDef and the five shipped apps/world files",
+  "synthetic": [
+    {
+      "label": "a world def that is not an object is refused",
+      "def": "nope",
+      "expect": {
+        "code": "world-def-not-an-object",
+        "message": "[world-parse] w: world-def-not-an-object: got string"
+      }
+    },
+    {
+      "label": "a world with no planetRadius is refused",
+      "def": {},
+      "expect": {
+        "code": "world-planet-radius-not-declared",
+        "message": "[world-parse] w: world-planet-radius-not-declared: declare planetRadius 0 for a flat chart or the cluster-resolved sphere radius"
+      }
+    },
+    {
+      "label": "a string planetRadius is refused",
+      "def": {
+        "planetRadius": "6000"
+      },
+      "expect": {
+        "code": "world-planet-radius-not-a-number",
+        "message": "[world-parse] w: world-planet-radius-not-a-number: got \"6000\""
+      }
+    },
+    {
+      "label": "a negative planetRadius is refused",
+      "def": {
+        "planetRadius": -1
+      },
+      "expect": {
+        "code": "world-planet-radius-not-a-number",
+        "message": "[world-parse] w: world-planet-radius-not-a-number: got -1"
+      }
+    },
+    {
+      "label": "a flat world with no terrain is accepted",
+      "def": {
+        "planetRadius": 0
+      },
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "label": "a flat world with clusters disabled is accepted",
+      "def": {
+        "planetRadius": 0,
+        "terrain": {
+          "enabled": true,
+          "clusters": {
+            "enabled": false
+          }
+        }
+      },
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "label": "a terrain with no clusters declaration is refused",
+      "def": {
+        "planetRadius": 0,
+        "terrain": {
+          "enabled": true
+        }
+      },
+      "expect": {
+        "code": "world-clusters-not-declared",
+        "message": "[world-parse] w: world-clusters-not-declared: declare terrain.clusters { enabled } so resolveClusterConfig is never reached unstated"
+      }
+    },
+    {
+      "label": "a clusters flag that is not an object is refused",
+      "def": {
+        "planetRadius": 0,
+        "terrain": {
+          "clusters": "on"
+        }
+      },
+      "expect": {
+        "code": "world-terrain-field-type-invalid",
+        "message": "[world-parse] w: world-terrain-field-type-invalid: terrain field \"clusters\" declared object, got string"
+      }
+    },
+    {
+      "label": "a null clusters flag is refused as not declared",
+      "def": {
+        "planetRadius": 0,
+        "terrain": {
+          "enabled": true,
+          "clusters": null
+        }
+      },
+      "expect": {
+        "code": "world-clusters-not-declared",
+        "message": "[world-parse] w: world-clusters-not-declared: declare terrain.clusters { enabled } so resolveClusterConfig is never reached unstated"
+      }
+    },
+    {
+      "label": "a terrain radius that is not a number is refused",
+      "def": {
+        "planetRadius": 0,
+        "terrain": {
+          "clusters": {
+            "enabled": false
+          },
+          "radius": "6000"
+        }
+      },
+      "expect": {
+        "code": "world-terrain-field-type-invalid",
+        "message": "[world-parse] w: world-terrain-field-type-invalid: terrain field \"radius\" declared number, got string"
+      }
+    },
+    {
+      "label": "a clusters flag whose enabled is not a boolean is refused",
+      "def": {
+        "planetRadius": 0,
+        "terrain": {
+          "clusters": {
+            "enabled": "yes"
+          }
+        }
+      },
+      "expect": {
+        "code": "world-clusters-not-declared",
+        "message": "[world-parse] w: world-clusters-not-declared: declare terrain.clusters { enabled } so resolveClusterConfig is never reached unstated"
+      }
+    },
+    {
+      "label": "clusters enabled without a terrain radius is refused",
+      "def": {
+        "planetRadius": 0,
+        "terrain": {
+          "clusters": {
+            "enabled": true
+          }
+        }
+      },
+      "expect": {
+        "code": "world-clusters-enabled-without-terrain-radius",
+        "message": "[world-parse] w: world-clusters-enabled-without-terrain-radius: terrain.radius undefined"
+      }
+    },
+    {
+      "label": "clusters enabled with a zero terrain radius is refused",
+      "def": {
+        "planetRadius": 0,
+        "terrain": {
+          "clusters": {
+            "enabled": true
+          },
+          "radius": 0
+        }
+      },
+      "expect": {
+        "code": "world-clusters-enabled-without-terrain-radius",
+        "message": "[world-parse] w: world-clusters-enabled-without-terrain-radius: terrain.radius 0"
+      }
+    },
+    {
+      "label": "clusters enabled on a flat world is refused",
+      "def": {
+        "planetRadius": 0,
+        "terrain": {
+          "clusters": {
+            "enabled": true
+          },
+          "radius": 6000
+        }
+      },
+      "expect": {
+        "code": "world-clusters-enabled-without-planet-radius",
+        "message": "[world-parse] w: world-clusters-enabled-without-planet-radius: terrain.radius 6000 needs planetRadius 6000"
+      }
+    },
+    {
+      "label": "a sphere with clusters disabled is refused",
+      "def": {
+        "planetRadius": 6000,
+        "terrain": {
+          "clusters": {
+            "enabled": false
+          },
+          "radius": 6000
+        }
+      },
+      "expect": {
+        "code": "world-planet-radius-unreachable",
+        "message": "[world-parse] w: world-planet-radius-unreachable: planetRadius 6000 needs terrain.clusters.enabled true"
+      }
+    },
+    {
+      "label": "a sphere with a mismatched terrain radius is refused",
+      "def": {
+        "planetRadius": 6000,
+        "terrain": {
+          "clusters": {
+            "enabled": true
+          },
+          "radius": 5000
+        }
+      },
+      "expect": {
+        "code": "world-planet-radius-unreachable",
+        "message": "[world-parse] w: world-planet-radius-unreachable: terrain.radius 5000 != planetRadius 6000"
+      }
+    },
+    {
+      "label": "a sphere with no terrain config is refused",
+      "def": {
+        "planetRadius": 6000
+      },
+      "expect": {
+        "code": "world-planet-radius-unreachable",
+        "message": "[world-parse] w: world-planet-radius-unreachable: planetRadius 6000 with no terrain config"
+      }
+    },
+    {
+      "label": "a sphere whose clusters and radius agree is accepted",
+      "def": {
+        "planetRadius": 6000,
+        "terrain": {
+          "clusters": {
+            "enabled": true
+          },
+          "radius": 6000
+        }
+      },
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "label": "a sphere whose terrain comes from a terrain entity is accepted",
+      "def": {
+        "planetRadius": 6000,
+        "entities": [
+          {
+            "id": "terrain",
+            "app": "terrain",
+            "config": {
+              "clusters": {
+                "enabled": true
+              },
+              "radius": 6000
+            }
+          }
+        ]
+      },
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "label": "a terrain entity with no clusters declaration is refused",
+      "def": {
+        "planetRadius": 0,
+        "entities": [
+          {
+            "id": "terrain",
+            "app": "terrain",
+            "config": {
+              "enabled": true
+            }
+          }
+        ]
+      },
+      "expect": {
+        "code": "world-clusters-not-declared",
+        "message": "[world-parse] w: world-clusters-not-declared: declare terrain.clusters { enabled } so resolveClusterConfig is never reached unstated"
+      }
+    }
+  ],
+  "shipped": [
+    {
+      "world": "construct",
+      "routed": true,
+      "projection": {
+        "planetRadius": 0,
+        "terrain": {
+          "clusters": {
+            "enabled": false
+          },
+          "radius": 1000
+        }
+      },
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "world": "deathrun",
+      "routed": false,
+      "projection": {},
+      "expect": {
+        "code": "world-planet-radius-not-declared",
+        "message": "[world-parse] deathrun: world-planet-radius-not-declared: declare planetRadius 0 for a flat chart or the cluster-resolved sphere radius"
+      }
+    },
+    {
+      "world": "tps-game",
+      "routed": true,
+      "projection": {
+        "planetRadius": 0,
+        "terrain": {
+          "clusters": {
+            "enabled": false
+          }
+        }
+      },
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "world": "tutorial-rpg",
+      "routed": false,
+      "projection": {},
+      "expect": {
+        "code": "world-planet-radius-not-declared",
+        "message": "[world-parse] tutorial-rpg: world-planet-radius-not-declared: declare planetRadius 0 for a flat chart or the cluster-resolved sphere radius"
+      }
+    },
+    {
+      "world": "tutorial",
+      "routed": false,
+      "projection": {
+        "terrain": {}
+      },
+      "expect": {
+        "code": "world-planet-radius-not-declared",
+        "message": "[world-parse] tutorial: world-planet-radius-not-declared: declare planetRadius 0 for a flat chart or the cluster-resolved sphere radius"
+      }
+    }
+  ]
+}
