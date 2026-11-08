@@ -1,0 +1,14 @@
+{
+  "source": "spoint src/apps/AppBehaviours.js lines 9 to 17 (BEHAVIOUR_FACTORIES) and src/apps/AppGameplay.js line 21 (MAX_FOOTPRINT_INTRUSION_M), transcribed by hand at d5e3860. Upstream's copy of AppBehaviours.js is not in this checkout; upstream's FEATURESET cites it at line 9.",
+  "order": ["health", "combat", "checkpoint", "pickup", "steering", "teams", "buffs"],
+  "factoryNames": {
+    "health": "defineHealth",
+    "combat": "defineCombat",
+    "checkpoint": "defineCheckpoint",
+    "pickup": "definePickup",
+    "steering": "defineSteering",
+    "teams": "defineTeams",
+    "buffs": "createBuffStack"
+  },
+  "footprintIntrusionM": 0.15
+}
