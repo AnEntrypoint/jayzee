@@ -97,13 +97,16 @@ gate('a planet with a zero radius or a zero cell size is refused', async () => {
   assert.throws(() => world.configurePlanet({ radius: R, cellSize: 0, gravity: 9.8, maxHeight: 0 }), RangeError)
 })
 
-gate('a sphere dropped above the planet settles at R plus its radius within 0.05 m', async () => {
+gate('a sphere dropped above the planet settles at R plus its radius within 0.05 m and at rest', async () => {
   const world = await planetWorld()
   const handle = world.spawn([0, R + BALL + 3, 0])
   for (let t = 0; t < 1200; t++) world.step()
   const p = world.position(handle)
+  const v = world.velocity(handle)
   const distance = Math.hypot(p[0], p[1], p[2])
+  const speed = Math.hypot(v[0], v[1], v[2])
   assert.ok(Math.abs(distance - (R + BALL)) <= SETTLE_TOLERANCE, 'settled at ' + distance + ', expected ' + (R + BALL))
+  assert.ok(speed <= SETTLE_TOLERANCE, 'still moving at ' + speed + ' m/s after 1200 ticks')
 })
 
 gate('scripted flight after warm-up: zero allocations, unchanged body count and memory, pages streamed each 50 ticks', async () => {
