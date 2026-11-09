@@ -1302,3 +1302,38 @@ The Phase A pass of the new round changes the thread sampler so that a G1 burn d
 5. `package.json` gains `check:thread-sampler`, and the `test` script runs it between `check:stall-probe` and `check:engine-host-witness`.
 
 Not run in this pass, as the request asked: the gate, the sampler and `npm test` have not been executed. Phase B runs them. The live gate is a timing check on the machine it runs on, so its pass depends on that machine's load, and a fail there is the sampler gap the check exists to report.
+
+Phase A is committed as `921279f` (lanmower, no trailer).
+
+### Phase B: G1 runs with the fixed sampler, the sampling gap check, the stall classification and npm test
+
+Load gate: 1-minute load below 3 before each G1 start (`/proc/loadavg`). The first start (r2) was at load 2.57, and the r1 start passed the gate after a background wait. Other projects' Chromium and check processes on this machine raised the load before the first wait, and they were not touched.
+
+Runs, each a paired G1 with 12 burn workers and a 240 s window, with the thread sampler (`scripts/browser/thread-cpu-sampler.mjs`, period 50 ms, profile `/workspace/jayzee/.playwriter/browser-profile`) as a gm job alongside, and one page render per run (`engine-render.html?phase=10&tier=1024&timed=1`) through the project browser:
+
+- `r2-G1-fixed`, round 2, paired-run exit 0. Files in `build/diag/paired-F` (git-ignored).
+- `r1-G1-fixed`, round 1, paired-run exit 0. Files in `build/diag/paired-F`.
+
+Sampling gap check, measured on each run's `<label>.threads.txt.ticks` with `samplingGaps` and `gapsOverLimit` (limit 2 × 50 ms):
+
+- `r2-G1-fixed`: 5082 ticks, median gap 50 ms, p99 69 ms, max 84 ms, 0 gaps over 100 ms. PASS.
+- `r1-G1-fixed`: 4932 ticks, median gap 50 ms, p99 77 ms, max 142 ms, 2 gaps over 100 ms. FAIL.
+
+The r1 failure is recorded as a fail. The gate threshold was not changed to pass it. Its two late gaps are 2 of 4932, so the r1 stall counts are less reliable than r2's by that much, and the check is reported as failing.
+
+Stall counts by category, from `scripts/browser/stall-probe.mjs` with the page, cgroup sampler and renderer main-thread log of each run:
+
+- `r2-G1-fixed`: 164 stalls. cpu-bound 27, starved 32, blocked 105. Per-stall rows in `docs/stall-causes/round2-r2-G1-fixed.tsv`.
+- `r1-G1-fixed`: 124 stalls. cpu-bound 22, starved 52, blocked 50. Per-stall rows in `docs/stall-causes/round2-r1-G1-fixed.tsv`.
+
+The earlier round 2 counts (`r1-G1` 135 stalls, `r2-G1` 150 stalls) are kept as they were, and they came from the sampler that did not keep up. The r2 cpu-bound count was 0 before and is 27 now, which is the sampler-limited difference the request asked to settle.
+
+Blocked-stall cause, written to `docs/stall-causes/blocked-stall-cause.md`:
+
+- Phase coverage: for every stall in both runs, the nine frame phases sum to the frame's tick time (median coverage 1.00 to 1.02). Every blocked stall sits inside physics and readback, and `docs/stall-causes/wait-sites.md` finds no wait in either phase.
+- r2: most blocked stalls are short (75 of 105 under 20 ms, median 9.7 ms). The CPU counter moves in 10 ms jiffies, so for these the probe cannot separate CPU from waiting. This part is settled as a counter-resolution effect, not a wait.
+- r1: the blocked stalls are longer (median 26.9 ms), with renderer CPU about 56% of their time and no cgroup pressure. About 44% is off the CPU inside physics and readback, and no engine site there blocks. This part is open. The next measurement is `/proc/<pid>/task/<tid>/schedstat` for the renderer main thread (run time and run-queue wait in nanoseconds), which would split sleep from runnable-but-not-running.
+
+Physics at 10240 awake is kept as recorded, not a defect, as in the Phase A decision above.
+
+`npm test`: EXIT 0, 4687 PASS and 0 FAIL, log `build/diag/phase-b3-npm-test.log`. The count is 4682 before this round plus the five `check:thread-sampler` lines.
