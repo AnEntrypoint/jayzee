@@ -15,6 +15,12 @@ const CPU_MAX = '/sys/fs/cgroup/cpu.max'
 const PAGE_PORT = 8843
 const PAGE_DEBUG_PORT = 9843
 const PAGE_QUERY = 'phase=10&tier=1024&timed=1'
+const SAMPLER_CPUS = process.env.SAMPLER_CPUS ?? '15'
+
+function spawnSampler(args) {
+  if (SAMPLER_CPUS === '') return spawn(process.execPath, args, { stdio: 'ignore' })
+  return spawn('taskset', ['-c', SAMPLER_CPUS, process.execPath, ...args], { stdio: 'ignore' })
+}
 
 function checkWindow(window, name) {
   if (!window || !Number.isFinite(window.startMs) || !Number.isFinite(window.endMs) || !(window.endMs > window.startMs)) {
@@ -29,7 +35,7 @@ export function hostRecord(readText = (path) => readFileSync(path, 'utf8'), npro
   } catch {
     cpuMax = null
   }
-  return { cpuMax, nproc }
+  return { cpuMax, nproc, samplerCpus: SAMPLER_CPUS === '' ? null : SAMPLER_CPUS }
 }
 
 export function runRecord({ label, condition, round, sampler, generator = null, streamer, host = null, page = null }) {
@@ -56,7 +62,7 @@ export function runRecord({ label, condition, round, sampler, generator = null, 
     sampler: { file: sampler.file, startMs: sampler.startMs, endMs: sampler.endMs },
     generator: generator ? { workers: generator.workers, requestedDurationMs: generator.requestedDurationMs, startMs: generator.startMs, endMs: generator.endMs } : null,
     streamer: { startMs: streamer.startMs, endMs: streamer.endMs, samples: streamer.samples, p50Ms: streamer.p50Ms, p99Ms: streamer.p99Ms, maxMs: streamer.maxMs },
-    host: host ? { cpuMax: host.cpuMax ?? null, nproc: host.nproc ?? null } : null,
+    host: host ? { cpuMax: host.cpuMax ?? null, nproc: host.nproc ?? null, samplerCpus: host.samplerCpus ?? null } : null,
     page: page ? { file: page.file, error: page.error ?? null } : null,
   }
 }
@@ -99,9 +105,9 @@ if (process.argv[1] && process.argv[1].endsWith('/browser/paired-run.mjs')) {
   const path = await flightPath(Number(ticksArg))
 
   const samplerStart = Date.now()
-  const sampler = spawn(process.execPath, [SAMPLER, samplerFile, String(durationMs), '2'], { stdio: 'ignore' })
+  const sampler = spawnSampler([SAMPLER, samplerFile, String(durationMs), '2'])
   const samplerDone = exited(sampler)
-  const threadSampler = spawn(process.execPath, [THREAD_SAMPLER, join(outDir, label + '.threads.txt'), '50', join(ROOT, '.playwriter', 'browser-profile')], { stdio: 'ignore' })
+  const threadSampler = spawnSampler([THREAD_SAMPLER, join(outDir, label + '.threads.txt'), '50', join(ROOT, '.playwriter', 'browser-profile')])
   const threadDone = exited(threadSampler)
   const generatorDone = condition === 'G1' && workers > 0 ? burn({ workers, durationMs }) : Promise.resolve(null)
   const streamer = await measureStreamerUntil(path, samplerStart + durationMs)

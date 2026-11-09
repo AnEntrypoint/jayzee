@@ -90,6 +90,23 @@ const median = (values) => {
   return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2
 }
 
+const FNV_OFFSET = 0x811c9dc5
+const fnvWords = (hash, words) => {
+  let h = hash
+  for (const w of words) h = Math.imul(h ^ w, 0x01000193) >>> 0
+  return h
+}
+const floatWords = (values) => Array.from(new Uint32Array(Float32Array.from(values).buffer))
+const sceneDigest = (module, placed, camera) => {
+  let hash = fnvWords(FNV_OFFSET, floatWords([...camera.eye, ...camera.viewProj]))
+  for (const p of placed) {
+    hash = fnvWords(hash, floatWords([...p.origin, ...p.uEdge, ...p.vEdge]))
+    const samples = module._engine_page_samples(p.slot) >> 2
+    hash = fnvWords(hash, Array.from(module.HEAPU32.subarray(samples, samples + PAGE_SIDE * PAGE_SIDE)))
+  }
+  return hash.toString(16).padStart(8, '0')
+}
+
 const setupWorld = (module) => {
   const status = module._engine_world_configure(WORLD.capacity, WORLD.tickRate, WORLD.gravity, WORLD.drag, WORLD.radius, WORLD.restitution, WORLD.iterations)
   if (status !== 0) throw new Error('world configure status ' + status)
@@ -111,7 +128,7 @@ const cellOf = (module, x, y, z) => {
   return { face: module.HEAPU32[at], cx: module.HEAPU32[at + 1], cy: module.HEAPU32[at + 2] }
 }
 
-const setupPlanet = (module, renderer) => {
+const setupPlanet = (module, renderer, placed) => {
   const status = module._engine_planet_configure(PLANET.radius, PLANET.cellSize, PLANET.gravity, PLANET.maxHeight)
   if (status !== 0) throw new Error('planet configure status ' + status)
   const surface = planetSurface(module)
@@ -129,16 +146,20 @@ const setupPlanet = (module, renderer) => {
         module.HEAPF32[samples + s] = 0.5 * Math.sin((s % PAGE_SIDE) * 0.6 + k) * Math.cos(Math.floor(s / PAGE_SIDE) * 0.6)
       }
       module._engine_page_commit(slot)
-      if (dx >= -2 && dx <= 1 && dy >= -2 && dy <= 1) renderer.placePage(slot, [dx * PAGE_SPAN, 0, dy * PAGE_SPAN], uEdge, vEdge)
+      if (dx >= -2 && dx <= 1 && dy >= -2 && dy <= 1) {
+        const origin = [dx * PAGE_SPAN, 0, dy * PAGE_SPAN]
+        renderer.placePage(slot, origin, uEdge, vEdge)
+        placed.push({ slot, origin, uEdge, vEdge })
+      }
       k += 1
     }
   }
   return surface
 }
 
-const setupScene = (module, renderer) => {
+const setupScene = (module, renderer, placed) => {
   setupWorld(module)
-  const surface = setupPlanet(module, renderer)
+  const surface = setupPlanet(module, renderer, placed)
   const classes = new Uint8Array(RENDER_LAYOUT.BODY_SLOTS).fill(255)
   for (let i = 0; i < BODIES; i++) classes[i] = i % RENDER_LAYOUT.PROP_CLASSES
   renderer.setBodyClasses(classes)
@@ -185,7 +206,8 @@ const run = async () => {
   result.adapter = await adapterInfo()
   const renderer = await loadRenderer({ glue: new URL(TIER_GLUE, import.meta.url).href, canvas, navigatorLike, requested, players: TIER, budgetBytes: TIER_BUDGET })
   const module = renderer.module
-  const surface = setupScene(module, renderer)
+  const placed = []
+  const surface = setupScene(module, renderer, placed)
 
   const aspect = canvas.width / canvas.height
   const frameTimes = []
@@ -194,6 +216,7 @@ const run = async () => {
   const phaseCount = TIMED && module._engine_phase_count ? module._engine_phase_count() : 0
   const readPhases = () => Array.from({ length: phaseCount }, (_, i) => module._engine_phase_total_ms(i))
   let lastStats = null
+  let lastCamera = null
   await new Promise((resolve, reject) => {
     let frame = 0
     let lastStarted = null
@@ -205,6 +228,7 @@ const run = async () => {
         const tickEnd = performance.now()
         const { viewProj, eye } = orbitCamera(frame, aspect, surface)
         renderer.setCamera({ viewProj, eye })
+        lastCamera = { viewProj, eye }
         if (DRAW) {
           const status = renderer.frame()
           if (status !== 0) throw new Error('engine_render_frame status ' + status)
@@ -251,6 +275,7 @@ const run = async () => {
     result.allocationsSinceWarmup = String(lastStats.allocationsSinceWarmup)
     result.createsAfterSeal = lastStats.createsAfterSeal
     result.checksum = String(lastStats.checksum)
+    result.sceneDigest = sceneDigest(module, placed, lastCamera)
     result.visible = lastStats.visible
     result.pages = lastStats.pages
     result.uploads = lastStats.uploads
