@@ -615,3 +615,20 @@ The earlier timed medians in this file (WebGPU r2 83.85 ms, WebGL2 83.15 ms) wer
 - Null adapter, from "Null adapter after the browser restart": did not recur. The first `requestAdapter()` after the 03:33 browser start returned the NVIDIA adapter. The launcher-level fix stays OPEN.
 - `.mcp.json` route from ee68993: NOT witnessed. The browser pid 4095457 was started by `/bin/bash /usr/bin/chromium --user-data-dir=/workspace/jayzee/.playwriter/browser-profile --remote-debugging-port=10221 ...`, not by `scripts/browser/chromium-webgpu.sh`. The gate (pid 4041849) started at 03:09:47 UTC, before ee68993 landed at 03:33 UTC (05:33 +0200), so its environment has no `PLAYWRITER_BROWSER_PATH`. The adapter here came from the profile's labs, not from the wrapper. Witnessing the route needs the gate restarted. That was not done in this pass, because the gate holds this run's browser lease. OPEN.
 - No new WebGPU defect in this pass: no errors in either backend, no outlier at 1024 in either backend, and the largest frame was 51.7 ms (WebGPU). The 705 ms long-frame stall from the "Stalls at 1024" section did not reproduce.
+
+## Phase A: WebGPU frame uploads the visible records (cause and changes)
+
+Cause, from the code. The 1024-tier gap in the timed pair above (WebGPU median 39.5 ms against WebGL2 37.6 ms) is in the tick. The physics phase is 37.7 ms against 36.0 ms, and the render part is about 0.4 ms against about 0.25 ms, so the gap is not in the render calls. The WebGPU frame does two things the WebGL2 frame does not:
+
+- It uploads every body record each frame: `writeBuffer(bodyBuf, 0, plan.bodyRecords, bodyCount * 32)`, 10240 records and about 327 KB. It then culls them again on the GPU. `planFrame` has already culled on the CPU, and the per-class visible records are in `plan.propRecords`. WebGL2 uploads only those, 2972 records (about 95 KB) at the recorded visible counts 729, 746, 747 and 750.
+- It runs a counter reset, a cull dispatch and a finalize dispatch each frame to repeat that cull.
+
+Whether this uses up the 1.7 ms of physics time is an inference from the phase split, and Phase B measures it.
+
+Changes, one local commit each, not pushed:
+
+- `engine/src/render/render_webgpu.cpp`, phase 10. Removes the cull and finalize shaders and pipelines, the body and counter buffers, and the dispatch. Uploads `plan.propRecords` per class with `propCount`, and writes the prop draw args from the same counts. Witness needed: `npm run check:engine-render`, then the timed WebGPU 1024 run: checksum `-3826851758512048142`, visible `[729,746,747,750]`, allocations after warm-up `"0"`, and the median and p99 against the WebGL2 1024 run.
+- `engine/src/render/render_frame.h`, phases 10 and 11. Removes `kCullGroupSize` and `kArgsDispatchWord`, and sets `kArgsWords` to 20. Witness needed: the four wasm builds (64 MiB, 128 MiB fixed, 64 MiB leak, 128 MiB timed) and `npm run check:engine-render`.
+- `scripts/check-engine-render.mjs`, the indirect-args gate. It now asserts queue-written args and no compute dispatch in the WebGPU frame. Witness needed: `npm run check:engine-render`.
+- `docs/ENGINE.md`, the indirect-args and culling bullets. Design text only.
+- `engine/artifacts.json`, the pins. These are stale after the render change, since `render_webgpu.cpp` is compiled into all three builds. Witness needed: the rebuilt hashes written into the pins, then `npm run check:engine-artifacts`.
