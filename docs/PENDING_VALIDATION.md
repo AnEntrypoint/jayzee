@@ -1450,3 +1450,35 @@ Decision: recorded, no code fix. The stall is the quota and run queue under the 
 Tool. `scripts/browser/frame-stall-cause.mjs` gives this split for any run: `node scripts/browser/frame-stall-cause.mjs <page.json> <cgroup.sampler.txt> [<threads.txt.sched>] [quotaCores]`. It prints each share, the throttle, the cores and a cause label: `off-cpu`, `cpu-work`, `runnable-wait`, `cpu-and-runnable-wait`, `quota-saturated` (cgroup alone, when cores reach the quota and throttling runs), `no-long-frames` or `unattributed`. The pure functions and the labels are gated by `scripts/check-frame-stall-cause.mjs` in `npm test` (`check:frame-stall-cause`). The labels come from thresholds on shares (0.3 and 0.5), not from a fit. Run and wait are read at the frame's start and end, so a frame edge inside a 50 ms tick is interpolated.
 
 Witness here: `node scripts/check-frame-stall-cause.mjs` RESULT: PASS (9 gates). The CLI on the three recorded runs reproduces the table above. The witness for this item runs in the next Phase B: a fresh round 2 G1 pair with the thread sampler, its frame causes printed by the CLI, and the sampler gap check.
+
+### Phase B: fresh round 1 and round 2 G1 pairs, for commit 02fdbfc
+
+Runs, each a paired G1 with 12 burn workers and a 240 s window (`scripts/browser/paired-run.mjs`), the thread sampler at 50 ms alongside (stopped only after the paired job had exited), and one WebGPU page render (`engine-render.html?phase=10&tier=1024&timed=1`) about 25 s into the window, through the project's playwriter browser. Files in `build/diag/paired-G` (git-ignored). Load was checked before each start (1-minute load below 3): 2.77 for r2 and 2.91 for r1. Another project's job (`oscraft` `pack-package`) was running during r1, and its 5-minute load was about 9.
+
+Sampler gap check, each over its own paired window from `run.json` (limit 2 × 50 ms):
+
+- `r1-G1-fix4`, round 1, paired exit 0. 4741 ticks over 240282 ms, median gap 50 ms, p99 69 ms, max 80 ms, 0 gaps over 100 ms. PASS.
+- `r2-G1-fix4`, round 2, paired exit 0. 4700 ticks over 240258 ms, median gap 50 ms, p99 75 ms, max 157 ms, 2 gaps over 100 ms. FAIL. Both gaps are run-queue waits of the sampler: tick at t 1794238772063 with gap 138 ms and 88.4 ms of wait, `workMs` 0; tick at t 1794238830965 with gap 157 ms and 107.6 ms of wait, `workMs` 1. The earlier clean round 2 run (`r2-G1-fix3`) passed with max 84 ms, so the round 2 check is not stable across runs under this burn. The cause is the same as the recorded round 1 cause: run-queue wait under the saturated 12-CPU quota.
+
+Frame causes from `scripts/browser/frame-stall-cause.mjs` (renderer main thread from the sched rows, cgroup from the sampler file, long frame = tick over 50 ms):
+
+- `r2-G1-fix4`: 540 frames, all covered. Long frames 24, tick median 65.7 ms, run share 0.59 (about 39 ms), runnable-wait share 0.39 (about 26 ms), off-CPU share 0.006, cgroup throttle median 392 ms per frame, cgroup cores 10.1. Normal frames 516, tick median 7.2 ms. Cause label `cpu-and-runnable-wait`.
+- `r1-G1-fix4`: 540 frames, all covered. Long frames 15, tick median 55.4 ms, run share 0.65 (about 36 ms), runnable-wait share 0.34 (about 19 ms), off-CPU share 0.002, cgroup throttle median 316 ms per frame, cgroup cores 9.9. Normal frames 525, tick median 3.9 ms. Cause label `cpu-and-runnable-wait`.
+
+Both runs fit item 3's measured mechanism: about 36 to 39 ms of physics run per long frame, and the rest runnable wait under the quota.
+
+Stall classes from `scripts/browser/stall-off-cpu.mjs`:
+
+- `r2-G1-fix4`: blocked 42 (sleep median 0.40 ms; waits running 44, futex 3), starved 60, cpu-bound 17.
+- `r1-G1-fix4`: blocked 82 (sleep median 2.0 ms; waits running 65, futex 20), starved 21, cpu-bound 22.
+
+Page results (`*.page.json`): `r2-G1-fix4` p99 70.8 ms, median 8.75 ms, max 79.3 ms, 600 frames, `ok` true, 0 errors, backend `webgpu` on NVIDIA GeForce RTX 3060 Laptop GPU, not a fallback adapter. `r1-G1-fix4` p99 59.4 ms, median 4.4 ms, max 77.4 ms, 600 frames, `ok` true, 0 errors, same adapter.
+
+Witness discrepancy, recorded, not fixed here. Both fresh pages report checksum `8711882901550134279` and visible `[0,0,0,0]`. The ledger's Phase B witness is checksum `-3826851758512048142` with visible `[729,746,747,750]` (the `paired-B` runs, and `paired-B/r2-G1` at 298.2 ms p99 among them). The `8711…` checksum and `[0,0,0,0]` appear in every run from `paired-E` onward, and the `-3826851758512048142` value in `paired-B`, which runs first. The change falls between those runs, so it lies in the commit range `f2b5c23..dbc869b`. That range includes the sleep and radial-gravity change (`f2b5c23`) and the removal of the planet sleep threshold with re-pinned engine artifacts (`dbc869b`). No ledger entry records the change. So the 1024-tier render witness does not currently match its recorded value, and `visible` reports zero bodies. The cause is not measured here: it could be a physics change in that range, the cull, or the witness itself. OPEN, and it needs a decision on which value is the witness.
+
+Witnesses of this pass:
+
+- `npm test`: EXIT 0, PASS 4709, FAIL 0 (log `build/diag/phase-b2-npm-test.log`, which includes `check:frame-stall-cause` and `check:stall-off-cpu`).
+- `node scripts/check-frame-stall-cause.mjs`: RESULT PASS, 9 gates.
+
+Invalid run, kept under `build/diag/paired-G/invalid-r2-G1-fix4/` and not a witness. The first attempt at `r2-G1-fix4` stopped its sampler about 2 minutes into the 240 s window, while the paired job was still running. The paired job then finished normally (its `run.json` is there), but the sampler log covers only the first part of the window, and load reached 17 during the run.
