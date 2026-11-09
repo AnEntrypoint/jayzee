@@ -8,15 +8,15 @@ const BOX_WORDS = 6
 const FNV_OFFSET = 0x811c9dc5
 const FNV_PRIME = 0x01000193
 
-const fnvWords = (hash, words) => {
+const fnvWords = (hash, words, length = words.length) => {
   let h = hash
-  for (let i = 0; i < words.length; i++) h = Math.imul(h ^ words[i], FNV_PRIME)
+  for (let i = 0; i < length; i++) h = Math.imul(h ^ words[i], FNV_PRIME)
   return h
 }
 
 export class World {
   #memory
-  #kernel
+  #step
   #capacity
   #tickRate
   #gravity
@@ -34,12 +34,14 @@ export class World {
   #count = 0
   #tick = 0
   #accumulator = 0
+  #views = new Map()
+  #words = new Map()
 
   constructor(options = {}) {
     const resolved = resolveWorldOptions(options)
     const instance = instantiateKernel()
     this.#memory = instance.memory
-    this.#kernel = instance.exports
+    this.#step = instance.instance.exports.step
     this.#capacity = resolved.capacity
     this.#tickRate = resolved.tickRate
     this.#gravity = resolved.gravity
@@ -97,7 +99,7 @@ export class World {
   }
 
   step() {
-    this.#kernel.step(
+    this.#step(
       this.#position,
       this.#velocity,
       this.#count,
@@ -130,12 +132,8 @@ export class World {
   }
 
   hash() {
-    const positions = this.#view(this.#position)
-    const velocities = this.#view(this.#velocity)
     const wordCount = this.#count * 6
-    const positionWords = new Uint32Array(positions.buffer, positions.byteOffset, wordCount)
-    const velocityWords = new Uint32Array(velocities.buffer, velocities.byteOffset, wordCount)
-    return fnvWords(fnvWords(FNV_OFFSET, positionWords), velocityWords) >>> 0
+    return fnvWords(fnvWords(FNV_OFFSET, this.#wordsOf(this.#position), wordCount), this.#wordsOf(this.#velocity), wordCount) >>> 0
   }
 
   snapshot() {
@@ -174,7 +172,22 @@ export class World {
   }
 
   #view(handle) {
-    return this.#memory.read(handle)
+    const buffer = this.#memory.buffer
+    const cached = this.#views.get(handle)
+    if (cached !== undefined && cached.buffer === buffer) return cached.view
+    const view = this.#memory.read(handle)
+    this.#views.set(handle, { buffer, view })
+    return view
+  }
+
+  #wordsOf(handle) {
+    const buffer = this.#memory.buffer
+    const cached = this.#words.get(handle)
+    if (cached !== undefined && cached.buffer === buffer) return cached.words
+    const view = this.#view(handle)
+    const words = new Uint32Array(view.buffer, view.byteOffset, this.#capacity * 6)
+    this.#words.set(handle, { buffer, words })
+    return words
   }
 
   #copyBody(handle, id, out) {

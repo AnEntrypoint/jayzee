@@ -2014,3 +2014,35 @@ The one measured run that would confirm the cause. Run B, re-executed with its c
 4. The reuse changes (the 59 sites above) in the Phase A pass, each gated by its witness tags W1 to W8.
 
 Nothing in this section is measured by this pass. It is the audit, the defects as recorded, and the plan.
+
+## Gates W2 and W7 for the reuse pass (Phase A: written and committed, W7 not yet witnessed)
+
+### W2, Node GC witness: `check:gc-witness` (`scripts/check-gc-witness.mjs`, in `npm test`)
+
+What it measures. 2000 warm-up ticks, then 20000 measured ticks of a 64-body `World`, with a `PerformanceObserver` on `gc` entries. The reused path is `step()` then `position(id, out)` and `velocity(id, out)` for each body, with `out` held outside the loop. A control loop that allocates per call must show garbage collection, so the witness can see churn.
+
+First run in this pass: FAIL, 423 garbage collection entries on the reused path. Cause, measured: `World#view` created a typed-array view per `position`/`velocity` call through `memory.read`, and `hash()` created two `Uint32Array` views per call. That is the JT1 residual the Phase A pass left in place.
+
+Fix in `src/world/World.js`, this pass:
+- `#view` and `#wordsOf` cache each handle's view per `memory.buffer` identity, so a wasm memory grow still forces a fresh view.
+- `hash()` reads the cached words. `fnvWords` takes an explicit length, so a capacity-sized view hashes only `count * 6` words, as before.
+- `step()` calls `instance.instance.exports.step`, the raw export, not jz's wrapped export. The wrapper's `enter()` (`node_modules/jz/interop.js` near line 1290) builds a mark object on every call, and that was the last source of collections: step-only ran 20 entries over 20000 ticks, and the raw call runs 1 (warm-up).
+
+Result after the fix: reused path 0 collections, control shows collections, `judgeGc` cases pass. `check:world` and `check:engine-world` pass (13 PASS each, 0 FAIL). `hash()` values were not compared bit for bit against HEAD in this pass; W9 (`check:world-query`, `check:world`) is the witness for that and runs in Phase B.
+
+What the gate does not witness. It covers `World` only. The other W2 sites (`G2` `bridge.transform`, `JF5`, `JF6`, `JF7`, `JM12`, `JM13`) are not run by it. Each still needs its own run or the rows stay open.
+
+### W7, browser heap: `check:browser-heap` (`scripts/check-browser-heap.mjs`, in `npm test`)
+
+What it judges. A witness JSON from a playwriter page, with `forcedGc: true`, at least 600 frames, at least 3 samples, and growth (last `usedBytes` minus first) at most 64 KiB. The gate's pure cases (flat passes, over-limit fails, no forced GC refused, 599 frames refused) run in `npm test`. Its argv form judges a witness file.
+
+What produces the witness. `scripts/browser/heap-witness.mjs`: `heapUsedAfterGc(cdp)` runs `HeapProfiler.collectGarbage` then `Runtime.getHeapUsage`. `sampleWindow` samples after forced GC until the page reports done. The CDP session comes from `getCDPSession({ page })` in the playwriter page, as the playwriter rule requires.
+
+Still needed (Phase B). A page that runs the engine render path for 600 frames after warm-up, through playwriter inside gm, writes its `sampleWindow` result to `build/diag/witness/heap-1024.json`, then `node scripts/check-browser-heap.mjs build/diag/witness/heap-1024.json`. Until that file exists, W7 is unwitnessed.
+
+### Files in this commit
+
+- `src/world/World.js`: view and words caches, raw `step` export.
+- `scripts/check-gc-witness.mjs`, `scripts/check-browser-heap.mjs`, `scripts/browser/heap-witness.mjs`: the two gates and the witness helper.
+- `package.json`: `check:gc-witness` and `check:browser-heap`, both appended to `test`.
+- this ledger section.
