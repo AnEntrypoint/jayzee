@@ -83,6 +83,12 @@ const p99 = (values) => {
   return sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.99))]
 }
 
+const median = (values) => {
+  const sorted = values.slice().sort((a, b) => a - b)
+  const mid = sorted.length >> 1
+  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2
+}
+
 const setupWorld = (module) => {
   const status = module._engine_world_configure(WORLD.capacity, WORLD.tickRate, WORLD.gravity, WORLD.drag, WORLD.radius, WORLD.restitution, WORLD.iterations)
   if (status !== 0) throw new Error('world configure status ' + status)
@@ -191,6 +197,8 @@ const run = async () => {
   result.bodies = BODIES
   result.frames = FRAMES
   result.frameTimeP99Ms = p99(timed)
+  result.frameTimeMedianMs = median(timed)
+  result.frameTimeMaxMs = Math.max(...timed)
   result.apiCallsPerFrame = lastStats.apiCallsLastFrame
   result.allocationsSinceWarmup = String(lastStats.allocationsSinceWarmup)
   result.createsAfterSeal = lastStats.createsAfterSeal
