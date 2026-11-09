@@ -1,0 +1,136 @@
+import { spawn } from 'node:child_process'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { basename, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { attributeOverLimit, parseCgroupSamples, sampledRows } from './sampler-gap-check.mjs'
+
+export const LOAD_LIMIT = 0.2
+export const MODES = Object.freeze({ pinned: '15', unpinned: '' })
+export const CAUSES = Object.freeze(['host-cfs-quota', 'run-queue-wait', 'sampler-work', 'unattributed'])
+const PAIRED = fileURLToPath(new URL('./paired-run.mjs', import.meta.url))
+
+export const parseProcStatCpu = (text) => {
+  const line = String(text).split('\n').find((row) => /^cpu\s/.test(row))
+  if (!line) throw new TypeError('proc stat has no aggregate cpu line')
+  const fields = line.trim().split(/\s+/).slice(1).map(Number)
+  if (fields.length < 5 || !fields.every(Number.isFinite)) throw new TypeError('proc stat cpu line is not numbers: ' + line)
+  return { idle: fields[3] + fields[4], total: fields.reduce((sum, value) => sum + value, 0) }
+}
+
+export const busyFraction = (before, after) => {
+  const total = after.total - before.total
+  if (!(total > 0)) throw new RangeError('proc stat did not advance between the two reads')
+  return 1 - (after.idle - before.idle) / total
+}
+
+export const loadGate = (busy, limit = LOAD_LIMIT) => (busy <= limit
+  ? { ok: true, reason: null }
+  : { ok: false, reason: 'host busy ' + busy.toFixed(3) + ' is above the load limit ' + limit })
+
+export const frequencyPlan = (n) => {
+  if (!Number.isInteger(n) || n < 1) throw new RangeError('n must be a whole number from 1: ' + n)
+  const plan = []
+  for (let index = 1; index <= n; index++) plan.push({ mode: 'pinned', index }, { mode: 'unpinned', index })
+  return plan
+}
+
+export const summarizeFrequency = (results) => Object.fromEntries(Object.keys(MODES).map((mode) => {
+  const rows = results.filter((row) => row.mode === mode)
+  const valid = rows.filter((row) => row.status === 'valid')
+  const gaps = valid.flatMap((row) => row.gaps)
+  const causes = Object.fromEntries(CAUSES.map((cause) => [cause, gaps.filter((gap) => gap.cause === cause).length]))
+  return [mode, {
+    requested: rows.length,
+    valid: valid.length,
+    skipped: rows.filter((row) => row.status === 'skipped').length,
+    error: rows.filter((row) => row.status === 'error').length,
+    runsWithGap: valid.filter((row) => row.gaps.length > 0).length,
+    gaps: gaps.length,
+    maxGapMs: gaps.reduce((max, gap) => Math.max(max, gap.gapMs), 0),
+    causes,
+  }]
+}))
+
+export const formatTable = (table) => {
+  const head = ['mode', 'requested', 'valid', 'skipped', 'error', 'runs with gap', 'gaps', 'max gap ms', ...CAUSES].join(' | ')
+  const rows = Object.entries(table).map(([mode, row]) => [mode, row.requested, row.valid, row.skipped, row.error, row.runsWithGap, row.gaps, row.maxGapMs, ...CAUSES.map((cause) => row.causes[cause])].join(' | '))
+  return [head, ...rows].join('\n')
+}
+
+const sleep = (ms) => new Promise((done) => setTimeout(done, ms))
+const readStat = () => readFileSync('/proc/stat', 'utf8')
+
+const runPaired = (label, mode, index, outDir, durationMs, workers, ticks) => new Promise((resolve, reject) => {
+  const env = { ...process.env, SAMPLER_CPUS: MODES[mode] }
+  const child = spawn(process.execPath, [PAIRED, label, 'G1', String(index), outDir, String(durationMs), String(workers), String(ticks), '0'], { env, stdio: ['ignore', 'pipe', 'pipe'] })
+  let out = ''
+  let err = ''
+  child.stdout.on('data', (chunk) => { out += chunk })
+  child.stderr.on('data', (chunk) => { err += chunk })
+  child.once('error', reject)
+  child.once('exit', (code) => resolve({ code, out, err }))
+})
+
+const gapsOf = (record, ticksText, cgroupText) => attributeOverLimit(sampledRows(ticksText, record.sampler), parseCgroupSamples(cgroupText))
+
+export const runFrequency = async ({ n, outDir, durationMs, workers, ticks, loadLimit = LOAD_LIMIT, log = console.log }) => {
+  mkdirSync(outDir, { recursive: true })
+  const results = []
+  for (const { mode, index } of frequencyPlan(n)) {
+    const label = 'freq-' + mode + '-' + index
+    const before = parseProcStatCpu(readStat())
+    await sleep(5000)
+    const busy = busyFraction(before, parseProcStatCpu(readStat()))
+    const load = loadGate(busy, loadLimit)
+    let result
+    if (!load.ok) {
+      result = { label, mode, index, status: 'skipped', reason: load.reason, loadBefore: busy, gaps: [], maxGapMs: 0 }
+    } else {
+      const run = await runPaired(label, mode, index, outDir, durationMs, workers, ticks)
+      if (run.code !== 0) {
+        result = { label, mode, index, status: 'error', reason: 'paired-run exit ' + run.code + ': ' + run.err.slice(-300), loadBefore: busy, gaps: [], maxGapMs: 0 }
+      } else {
+        const runPath = join(outDir, label + '.run.json')
+        const record = JSON.parse(readFileSync(runPath, 'utf8'))
+        const samplerPath = existsSync(record.sampler.file) ? record.sampler.file : join(outDir, basename(record.sampler.file))
+        const gaps = gapsOf(record, readFileSync(join(outDir, label + '.threads.txt.ticks'), 'utf8'), readFileSync(samplerPath, 'utf8'))
+        result = {
+          label,
+          mode,
+          index,
+          status: 'valid',
+          reason: null,
+          loadBefore: busy,
+          gaps: gaps.map((gap) => ({ t0: gap.t0, gapMs: gap.gapMs, cause: gap.cause, threadCause: gap.threadCause, cgroupThrottleMs: gap.cgroupThrottleMs, selfWaitMs: gap.selfWaitMs })),
+          maxGapMs: gaps.reduce((max, gap) => Math.max(max, gap.gapMs), 0),
+          runJson: runPath,
+        }
+      }
+    }
+    writeFileSync(join(outDir, label + '.result.json'), JSON.stringify(result, null, 1) + '\n')
+    results.push(result)
+    log(label + ' ' + result.status + (result.reason ? ' (' + result.reason + ')' : '') + ' gaps=' + result.gaps.length)
+  }
+  const table = summarizeFrequency(results)
+  const text = formatTable(table)
+  writeFileSync(join(outDir, 'summary.json'), JSON.stringify({ table, results }, null, 1) + '\n')
+  writeFileSync(join(outDir, 'summary.md'), '```\n' + text + '\n```\n')
+  log(text)
+  return { table, results }
+}
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  const args = Object.fromEntries(process.argv.slice(2).map((arg) => {
+    const match = /^--([\w-]+)=(.*)$/.exec(arg)
+    if (!match) throw new TypeError('usage: node scripts/browser/frequency-runs.mjs --n=5 --out=DIR [--duration=240000 --workers=12 --ticks=6000 --load-limit=0.2]: ' + arg)
+    return [match[1], match[2]]
+  }))
+  await runFrequency({
+    n: Number(args.n ?? 5),
+    outDir: args.out ?? 'build/diag/paired-G/freq',
+    durationMs: Number(args.duration ?? 240000),
+    workers: Number(args.workers ?? 12),
+    ticks: Number(args.ticks ?? 6000),
+    loadLimit: Number(args['load-limit'] ?? LOAD_LIMIT),
+  })
+}

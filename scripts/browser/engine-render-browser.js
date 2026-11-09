@@ -1,4 +1,5 @@
 import { loadRenderer, RENDER_LAYOUT } from '../../src/engine/renderer.js'
+import { cellOrigin, PAGE_SIDE, PAGE_U_EDGE, PAGE_V_EDGE, planetCellSize } from '../../src/engine/pageLayout.js'
 
 const QUERY = new URLSearchParams(location.search)
 const PHASE = QUERY.get('phase') === '11' ? 11 : 10
@@ -13,8 +14,6 @@ const BODIES = TIER === 1024 ? 10240 : 512
 const LIGHTS = 8
 const ALBEDO_SIDE = 16
 const TICK_STEPS = 1
-const PAGE_SPAN = 20
-const PAGE_SIDE = 16
 const CAMERA_RADIUS = 60
 const CAMERA_HEIGHT = 25
 const CAMERA_FOV = Math.PI / 3
@@ -22,7 +21,7 @@ const NEAR = 0.1
 const FAR = 500
 const GROUND = [-200, -1, -200, 200, 0, 200]
 const WORLD = { capacity: TIER === 1024 ? 10240 : 2048, tickRate: 60, gravity: -9.8, drag: 0, radius: 0.5, restitution: 0, iterations: 8 }
-const PLANET = { radius: 6371000, cellSize: PAGE_SPAN, gravity: 9.8, maxHeight: 8000 }
+const PLANET = { radius: 6371000, cellSize: planetCellSize(6371000), gravity: 9.8, maxHeight: 8000 }
 const CLASS_MATERIALS = [0, 1, 2, 3]
 
 const result = { phase: PHASE, errors: [], done: false }
@@ -133,8 +132,8 @@ const setupPlanet = (module, renderer, placed) => {
   if (status !== 0) throw new Error('planet configure status ' + status)
   const surface = planetSurface(module)
   const anchor = cellOf(module, 0, PLANET.radius, 0)
-  const uEdge = [0, 0, PAGE_SPAN]
-  const vEdge = [PAGE_SPAN, 0, 0]
+  const uEdge = PAGE_U_EDGE
+  const vEdge = PAGE_V_EDGE
   let k = 0
   for (let dy = -3; dy <= 2; dy++) {
     for (let dx = -3; dx <= 2; dx++) {
@@ -147,7 +146,7 @@ const setupPlanet = (module, renderer, placed) => {
       }
       module._engine_page_commit(slot)
       if (dx >= -2 && dx <= 1 && dy >= -2 && dy <= 1) {
-        const origin = [dx * PAGE_SPAN, 0, dy * PAGE_SPAN]
+        const origin = cellOrigin(dx, dy)
         renderer.placePage(slot, origin, uEdge, vEdge)
         placed.push({ slot, origin, uEdge, vEdge })
       }
