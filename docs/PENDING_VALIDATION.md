@@ -1217,3 +1217,35 @@ Limits that stay open after these changes. CPU is read in jiffies of 10 ms from 
 Category and cause rules for Phase B, applied to each stall after the fix. Starved: cgroup some pressure is at least 50% of the stall, which is host CPU contention from the 12 burn workers and is not a code defect. Cpu-bound: the renderer main thread ran at least 80% of the stall, and the cause is the dominant phase. Blocked: neither threshold, and the cause is the dominant phase, with the remainder recorded as waiting or below the sample resolution. Phase B writes one row per stall to `docs/stall-causes/round2-G1-r1.tsv` and `docs/stall-causes/round2-G1-r2.tsv`, with the frame, active count, total, tick, physics, readback, backend, CPU, pressure, category and cause.
 
 Witnesses in Phase B are appended below this line.
+
+### Phase B: witnesses after the two probe fixes
+
+Build and gates. `npm test` (its first step rebuilds the kernel) exited 0 with 4682 PASS and 0 FAIL; log `build/diag/phase-b-npm-test.log`. `check:stall-probe` is RESULT PASS with 6 gates, including the two new witnesses. `docs/play` did not change in this pass, so the site build was not rerun.
+
+Paired report on `build/diag/paired-E`: verdict `supported`, `starvationRatio` 158.08. Unchanged by the probe fixes, because the report counts stalls through `attributeStalls`, not `probeStalls`. Pairs: round 1, G0 71 stalls and G1 338; round 2, G0 71 and G1 312.
+
+Stall categories, before and after the two fixes, with the active count at each stall:
+
+| run | category | before (total, at 10240, between, at 0) | after (total, at 10240, between, at 0) |
+|---|---|---|---|
+| r1-G1 | cpu-bound | 48, 32, 4, 12 | 39, 33, 5, 1 |
+| r1-G1 | starved | 28, 6, 0, 22 | 28, 6, 0, 22 |
+| r1-G1 | blocked | 59, 24, 4, 31 | 68, 23, 3, 42 |
+| r2-G1 | cpu-bound | 0, 0, 0, 0 | 0, 0, 0, 0 |
+| r2-G1 | starved | 31, 8, 1, 22 | 31, 8, 1, 22 |
+| r2-G1 | blocked | 119, 54, 7, 58 | 119, 54, 7, 58 |
+
+The r2-G1 cpu-bound count stays at 0 after the fix, and that is measured, not a defect: its stalls now carry 8 to 30 ms of renderer CPU each, which is 30 to 60% of a stall, below the 80% line. The renderer was not the busy thread for most of that run. The r2-G1 counts are identical before and after for starved and blocked because the probe's pressure term does not depend on the CPU fix, and the blocked stalls stay blocked because their CPU share stays below 80%. The r1-G1 changes come from the interpolation, which moves stalls shorter than a sample interval out of cpu-bound.
+
+Per-stall rows: `docs/stall-causes/round2-r1-G1.tsv` (135 rows) and `docs/stall-causes/round2-r2-G1.tsv` (150 rows). Columns: frame, active count, total, tick, physics, readback, backend, CPU, pressure, category, dominant phase and its time, and the cause text. The category rule is the one written above, and a stall within two frames of an active step carries that note in its cause.
+
+Causes by category, from the rows:
+
+- starved: 28 on r1-G1 and 31 on r2-G1, with cgroup some pressure at least 50% of the stall. Host CPU contention from the 12 burn workers of the G1 condition. Not a code defect.
+- cpu-bound: 39 on r1-G1, of which 38 have a dominant physics phase and 1 a dominant readback phase. 33 of them are at 10240 active bodies, so the renderer thread's time in the frame is the physics step. No code defect is found in this pass. Whether the physics step should cost this much at 10240 bodies is open; the stall rows record its time against the 1.4 ms normal physics median.
+- blocked: 68 on r1-G1 and 119 on r2-G1. The renderer CPU share is below 80% and the pressure share below 50%, so the thread was not busy for most of these stalls. Dominant phases: physics 30 and readback 37 on r1-G1, physics 65 and readback 54 on r2-G1, backend 1 on r1-G1. The stall tick median is 21.9 ms on r1-G1 and 17.95 ms on r2-G1, against 4.4 ms and 4.2 ms for frames without a stall. These stalls are waits inside the frame, not CPU on the renderer thread. Their wait is not located to a code path here, so they stay open.
+- Active count and transitions. The run has no 0-to-10240 transition. The active count steps down 10240, 8192, 6144, 4096, 2048, 0 at frames 122, 124, 126, 128 and 130, and stays at 0. Eleven stalls on each run are within two frames of one of those steps. Most stalls are not near a step: 65 on r1-G1 and 80 on r2-G1 are at active 0, after every body has slept, and their physics and readback phases are the cause recorded above.
+
+Code defects, fixed in the Phase A commit `858d271` and witnessed in Phase B: the renderer pick in `rendererMainSeries` (defect 1) and the CPU share in `cpuMsBetween` (defect 2). Both are probe defects, not engine defects. No engine change was made in this pass.
+
+Open after this pass. The blocked stalls with dominant physics or readback phases (186 on the two runs: 67 on r1-G1 and 119 on r2-G1) are measured as waits, and the code that waits is not located. The physics spikes at active 0 have no code path located yet. Neither is recorded as a fix. The uncommitted `engine/src/world.cpp` and `engine/artifacts.json` changes (the planet sleep-threshold removal and the re-pin) were not committed in this pass, because this pass did not rebuild the engine and so did not verify those pins against a source-to-binary build. They stay out of the push.

@@ -1,0 +1,136 @@
+frame	active	totalMs	tickMs	physicsMs	readbackMs	backendMs	cpuMs	someMs	verdict	dominantPhase	dominantMs	cause
+60	10240	42.80	41.7	39.6	2.1	1	17.38	24.11	starved	physics	39.6	host CPU contention: cgroup some pressure 56% of the stall, dominant phase physics 39.60 ms
+61	10240	20.40	19.9	18	1.8	0.3	18.71	1.33	cpu-bound	physics	18	renderer main thread busy 92% of the stall, dominant phase physics 18.00 ms
+62	10240	17.60	16.9	15.1	1.8	0.5	17.60	1.08	cpu-bound	physics	15.1	renderer main thread busy 100% of the stall, dominant phase physics 15.10 ms
+63	10240	19.50	18.8	16.6	2.2	0.6	18.88	1.67	cpu-bound	physics	16.6	renderer main thread busy 97% of the stall, dominant phase physics 16.60 ms
+64	10240	37.20	36.8	34.7	2.1	0.3	21.85	20.72	starved	physics	34.7	host CPU contention: cgroup some pressure 56% of the stall, dominant phase physics 34.70 ms
+65	10240	21.90	20.6	18.3	2.3	1.1	20.92	1.90	cpu-bound	physics	18.3	renderer main thread busy 96% of the stall, dominant phase physics 18.30 ms
+66	10240	23.20	22.5	20.1	2.4	0.5	20.96	3.16	cpu-bound	physics	20.1	renderer main thread busy 90% of the stall, dominant phase physics 20.10 ms
+67	10240	42.20	20.8	18.6	2.2	21.2	15.55	20.87	blocked	backend	21.2	renderer CPU 37% and pressure 49% of the stall, dominant phase backend 21.20 ms; rest is waiting or below sample resolution
+68	10240	18.60	17	15.3	1.7	0.5	12.67	0.89	blocked	physics	15.3	renderer CPU 68% and pressure 5% of the stall, dominant phase physics 15.30 ms; rest is waiting or below sample resolution
+69	10240	20.40	20	17.7	2.3	0.3	20.40	1.76	cpu-bound	physics	17.7	renderer main thread busy 100% of the stall, dominant phase physics 17.70 ms
+70	10240	17.30	16.7	15.1	1.6	0.3	15.60	1.12	cpu-bound	physics	15.1	renderer main thread busy 90% of the stall, dominant phase physics 15.10 ms
+71	10240	18.70	18.2	16.9	1.3	0.4	13.59	4.03	blocked	physics	16.9	renderer CPU 73% and pressure 22% of the stall, dominant phase physics 16.90 ms; rest is waiting or below sample resolution
+72	10240	23.10	22.6	20.4	2.1	0.3	21.91	1.76	cpu-bound	physics	20.4	renderer main thread busy 95% of the stall, dominant phase physics 20.40 ms
+73	10240	23.50	22.9	20.9	2	0.4	18.17	2.27	blocked	physics	20.9	renderer CPU 77% and pressure 10% of the stall, dominant phase physics 20.90 ms; rest is waiting or below sample resolution
+74	10240	20.10	18.1	15.8	2.3	1.9	24.00	1.06	cpu-bound	physics	15.8	renderer main thread busy 119% of the stall, dominant phase physics 15.80 ms
+75	10240	46.00	45.5	42	3.4	0.1	15.65	23.72	starved	physics	42	host CPU contention: cgroup some pressure 52% of the stall, dominant phase physics 42.00 ms
+76	10240	25.10	24.7	22.6	2.1	0.3	24.75	1.80	cpu-bound	physics	22.6	renderer main thread busy 99% of the stall, dominant phase physics 22.60 ms
+77	10240	23.30	22.8	18.9	3.9	0.4	21.95	1.65	cpu-bound	physics	18.9	renderer main thread busy 94% of the stall, dominant phase physics 18.90 ms
+78	10240	46.20	45.7	43.7	1.9	0.4	20.60	23.68	starved	physics	43.7	host CPU contention: cgroup some pressure 51% of the stall, dominant phase physics 43.70 ms
+79	10240	22.50	21.9	19.9	2	0.4	21.05	1.24	cpu-bound	physics	19.9	renderer main thread busy 94% of the stall, dominant phase physics 19.90 ms
+80	10240	20.40	19.8	18	1.6	0.4	25.67	1.05	cpu-bound	physics	18	renderer main thread busy 126% of the stall, dominant phase physics 18.00 ms
+81	10240	21.30	21	19.8	1.2	0.2	17.10	6.93	cpu-bound	physics	19.8	renderer main thread busy 80% of the stall, dominant phase physics 19.80 ms
+82	10240	19.20	18.7	16.8	1.7	0.3	21.77	1.02	cpu-bound	physics	16.8	renderer main thread busy 113% of the stall, dominant phase physics 16.80 ms
+83	10240	23.60	22.5	20.4	2.1	0.9	11.71	1.23	blocked	physics	20.4	renderer CPU 50% and pressure 5% of the stall, dominant phase physics 20.40 ms; rest is waiting or below sample resolution
+84	10240	27.30	25.3	22.5	2.8	1.7	25.62	2.27	cpu-bound	physics	22.5	renderer main thread busy 94% of the stall, dominant phase physics 22.50 ms
+85	10240	42.30	41.7	39.8	1.9	0.4	25.42	21.59	starved	physics	39.8	host CPU contention: cgroup some pressure 51% of the stall, dominant phase physics 39.80 ms
+86	10240	21.90	21.4	19.5	1.9	0.3	20.66	1.83	cpu-bound	physics	19.5	renderer main thread busy 94% of the stall, dominant phase physics 19.50 ms
+87	10240	22.60	21.9	20	1.9	0.4	21.75	1.19	cpu-bound	physics	20	renderer main thread busy 96% of the stall, dominant phase physics 20.00 ms
+88	10240	44.20	43.8	40.9	2.6	0.2	15.64	23.35	starved	physics	40.9	host CPU contention: cgroup some pressure 53% of the stall, dominant phase physics 40.90 ms
+89	10240	27.10	25.3	22.9	2.4	1.6	24.72	2.55	cpu-bound	physics	22.9	renderer main thread busy 91% of the stall, dominant phase physics 22.90 ms
+90	10240	27.10	26.6	24.2	2.4	0.2	22.85	1.17	cpu-bound	physics	24.2	renderer main thread busy 84% of the stall, dominant phase physics 24.20 ms
+91	10240	47.50	47.1	45	2	0.3	24.08	22.67	blocked	physics	45	renderer CPU 51% and pressure 48% of the stall, dominant phase physics 45.00 ms; rest is waiting or below sample resolution
+92	10240	61.80	61.1	58.8	2.3	0.4	41.74	11.04	blocked	physics	58.8	renderer CPU 68% and pressure 18% of the stall, dominant phase physics 58.80 ms; rest is waiting or below sample resolution
+93	10240	63.80	62	59.7	2.3	1.6	28.55	26.77	blocked	physics	59.7	renderer CPU 45% and pressure 42% of the stall, dominant phase physics 59.70 ms; rest is waiting or below sample resolution
+94	10240	69.00	68.8	66.7	1.9	0.1	38.14	24.52	blocked	physics	66.7	renderer CPU 55% and pressure 36% of the stall, dominant phase physics 66.70 ms; rest is waiting or below sample resolution
+95	10240	35.10	34.5	32.6	1.9	0.3	41.38	1.99	cpu-bound	physics	32.6	renderer main thread busy 118% of the stall, dominant phase physics 32.60 ms
+96	10240	58.30	57.8	55.9	1.9	0.4	27.48	22.74	blocked	physics	55.9	renderer CPU 47% and pressure 39% of the stall, dominant phase physics 55.90 ms; rest is waiting or below sample resolution
+97	10240	35.30	34.7	32.4	2.3	0.4	31.62	1.83	cpu-bound	physics	32.4	renderer main thread busy 90% of the stall, dominant phase physics 32.40 ms
+98	10240	60.50	60	36.4	23.6	0.2	40.50	21.44	blocked	physics	36.4	renderer CPU 67% and pressure 35% of the stall, dominant phase physics 36.40 ms; rest is waiting or below sample resolution
+99	10240	37.60	37.2	34.8	2.4	0.2	42.80	1.95	cpu-bound	physics	34.8	renderer main thread busy 114% of the stall, dominant phase physics 34.80 ms
+100	10240	63.60	63.3	61.3	2	0.2	42.32	20.91	blocked	physics	61.3	renderer CPU 67% and pressure 33% of the stall, dominant phase physics 61.30 ms; rest is waiting or below sample resolution
+101	10240	39.80	39.3	37.1	2.1	0.3	33.59	1.32	cpu-bound	physics	37.1	renderer main thread busy 84% of the stall, dominant phase physics 37.10 ms
+102	10240	57.00	55.7	35.2	20.5	1	40.36	21.74	blocked	physics	35.2	renderer CPU 71% and pressure 38% of the stall, dominant phase physics 35.20 ms; rest is waiting or below sample resolution
+103	10240	38.00	37.5	35.1	2.4	0.3	37.78	1.33	cpu-bound	physics	35.1	renderer main thread busy 99% of the stall, dominant phase physics 35.10 ms
+104	10240	39.40	39	36.9	2.1	0.2	38.26	3.66	cpu-bound	physics	36.9	renderer main thread busy 97% of the stall, dominant phase physics 36.90 ms
+105	10240	40.80	40.3	37.3	3	0.3	30.84	2.47	blocked	physics	37.3	renderer CPU 76% and pressure 6% of the stall, dominant phase physics 37.30 ms; rest is waiting or below sample resolution
+106	10240	61.90	61.5	59.8	1.7	0.3	40.81	21.01	blocked	physics	59.8	renderer CPU 66% and pressure 34% of the stall, dominant phase physics 59.80 ms; rest is waiting or below sample resolution
+107	10240	39.50	39	37	2	0.3	44.90	1.73	cpu-bound	physics	37	renderer main thread busy 114% of the stall, dominant phase physics 37.00 ms
+108	10240	59.20	58.8	56.8	2	0.3	33.23	21.51	blocked	physics	56.8	renderer CPU 56% and pressure 36% of the stall, dominant phase physics 56.80 ms; rest is waiting or below sample resolution
+109	10240	45.90	44.4	41.8	2.6	1.3	36.89	3.79	cpu-bound	physics	41.8	renderer main thread busy 80% of the stall, dominant phase physics 41.80 ms
+110	10240	66.70	66.3	63.5	2.8	0.3	39.70	22.36	blocked	physics	63.5	renderer CPU 60% and pressure 34% of the stall, dominant phase physics 63.50 ms; rest is waiting or below sample resolution
+111	10240	44.30	43.5	41.4	2.1	0.5	53.30	2.56	cpu-bound	physics	41.4	renderer main thread busy 120% of the stall, dominant phase physics 41.40 ms
+112	10240	62.30	61.7	59.3	2.3	0.4	34.98	24.26	blocked	physics	59.3	renderer CPU 56% and pressure 39% of the stall, dominant phase physics 59.30 ms; rest is waiting or below sample resolution
+113	10240	41.80	41.1	38.8	2.3	0.3	35.17	4.04	cpu-bound	physics	38.8	renderer main thread busy 84% of the stall, dominant phase physics 38.80 ms
+114	10240	64.60	64.1	62	2.1	0.3	42.66	22.33	blocked	physics	62	renderer CPU 66% and pressure 35% of the stall, dominant phase physics 62.00 ms; rest is waiting or below sample resolution
+115	10240	40.50	40	37.9	2.1	0.2	37.37	1.53	cpu-bound	physics	37.9	renderer main thread busy 92% of the stall, dominant phase physics 37.90 ms
+116	10240	59.90	59.5	57.1	2.3	0.3	44.16	23.54	blocked	physics	57.1	renderer CPU 74% and pressure 39% of the stall, dominant phase physics 57.10 ms; rest is waiting or below sample resolution
+117	10240	39.50	39.1	37.2	1.8	0.3	29.63	7.30	blocked	physics	37.2	renderer CPU 75% and pressure 18% of the stall, dominant phase physics 37.20 ms; rest is waiting or below sample resolution
+118	10240	41.10	40.7	38.5	2.2	0.2	31.09	4.25	blocked	physics	38.5	renderer CPU 76% and pressure 10% of the stall, dominant phase physics 38.50 ms; rest is waiting or below sample resolution
+119	10240	40.40	40.1	37.9	2.1	0.2	44.29	5.95	cpu-bound	physics	37.9	renderer main thread busy 110% of the stall, dominant phase physics 37.90 ms
+120	10240	41.80	41.4	39.5	1.8	0.2	33.63	4.79	cpu-bound	physics	39.5	renderer main thread busy 80% of the stall, dominant phase physics 39.50 ms; within two frames of an active step
+121	10240	62.40	61.9	60	1.9	0.3	37.66	23.08	blocked	physics	60	renderer CPU 60% and pressure 37% of the stall, dominant phase physics 60.00 ms; rest is waiting or below sample resolution; within two frames of an active step
+122	8192	39.70	39	37.1	1.9	0.4	39.62	1.95	cpu-bound	physics	37.1	renderer main thread busy 100% of the stall, dominant phase physics 37.10 ms; within two frames of an active step
+123	8192	55.80	55.1	52.9	2.1	0.3	38.51	23.00	blocked	physics	52.9	renderer CPU 69% and pressure 41% of the stall, dominant phase physics 52.90 ms; rest is waiting or below sample resolution; within two frames of an active step
+124	6144	40.40	39.5	37.4	2.1	0.7	35.40	6.28	cpu-bound	physics	37.4	renderer main thread busy 88% of the stall, dominant phase physics 37.40 ms; within two frames of an active step
+125	6144	27.90	27.4	24.8	2.5	0.4	23.17	2.93	cpu-bound	physics	24.8	renderer main thread busy 83% of the stall, dominant phase physics 24.80 ms; within two frames of an active step
+126	4096	46.20	45.8	43.5	2.3	0.2	29.33	22.81	blocked	physics	43.5	renderer CPU 63% and pressure 49% of the stall, dominant phase physics 43.50 ms; rest is waiting or below sample resolution; within two frames of an active step
+127	4096	19.10	17.9	15.5	2.4	0.9	19.92	3.24	cpu-bound	physics	15.5	renderer main thread busy 104% of the stall, dominant phase physics 15.50 ms; within two frames of an active step
+128	2048	20.10	19.5	17.4	2.1	0.4	17.64	1.38	cpu-bound	physics	17.4	renderer main thread busy 88% of the stall, dominant phase physics 17.40 ms; within two frames of an active step
+129	2048	12.90	12.3	10	2.3	0.3	6.86	1.62	blocked	physics	10	renderer CPU 53% and pressure 13% of the stall, dominant phase physics 10.00 ms; rest is waiting or below sample resolution; within two frames of an active step
+130	0	30.20	29.7	27.7	2	0.3	12.12	18.18	starved	physics	27.7	host CPU contention: cgroup some pressure 60% of the stall, dominant phase physics 27.70 ms; within two frames of an active step
+136	0	16.50	16	13.8	2.2	0.3	4.85	12.84	starved	physics	13.8	host CPU contention: cgroup some pressure 78% of the stall, dominant phase physics 13.80 ms
+142	0	9.20	7.5	1.2	6.3	1.5	1.96	2.74	blocked	readback	6.3	renderer CPU 21% and pressure 30% of the stall, dominant phase readback 6.30 ms; rest is waiting or below sample resolution
+153	0	8.70	6.8	1.5	5.3	1.7	1.53	3.47	blocked	readback	5.3	renderer CPU 18% and pressure 40% of the stall, dominant phase readback 5.30 ms; rest is waiting or below sample resolution
+158	0	33.40	33	1.2	31.7	0.2	4.70	23.93	starved	readback	31.7	host CPU contention: cgroup some pressure 72% of the stall, dominant phase readback 31.70 ms
+160	0	9.00	8	1.5	6.4	0.8	4.09	2.02	blocked	readback	6.4	renderer CPU 45% and pressure 22% of the stall, dominant phase readback 6.40 ms; rest is waiting or below sample resolution
+163	0	27.60	10.5	2.9	7.5	16.8	4.84	19.50	starved	backend	16.8	host CPU contention: cgroup some pressure 71% of the stall, dominant phase backend 16.80 ms
+168	0	25.70	4.7	1.4	3.2	20.8	7.56	20.93	starved	backend	20.8	host CPU contention: cgroup some pressure 81% of the stall, dominant phase backend 20.80 ms
+173	0	9.20	8	1.2	6.6	1	8.99	1.66	cpu-bound	readback	6.6	renderer main thread busy 98% of the stall, dominant phase readback 6.60 ms
+174	0	27.40	26.9	1.5	25.4	0.2	4.89	21.61	starved	readback	25.4	host CPU contention: cgroup some pressure 79% of the stall, dominant phase readback 25.40 ms
+185	0	29.30	28.9	1.2	27.6	0.3	6.10	20.91	starved	readback	27.6	host CPU contention: cgroup some pressure 71% of the stall, dominant phase readback 27.60 ms
+190	0	26.60	5.4	1.2	4.2	21	5.54	17.65	starved	backend	21	host CPU contention: cgroup some pressure 66% of the stall, dominant phase backend 21.00 ms
+204	0	9.00	5.7	3.2	2.5	3.2	3.07	1.21	blocked	physics	3.2	renderer CPU 34% and pressure 13% of the stall, dominant phase physics 3.20 ms; rest is waiting or below sample resolution
+205	0	8.80	6.7	1.3	5.4	1.9	3.52	1.49	blocked	readback	5.4	renderer CPU 40% and pressure 17% of the stall, dominant phase readback 5.40 ms; rest is waiting or below sample resolution
+206	0	8.60	5.2	1.4	3.8	3.2	1.54	1.00	blocked	readback	3.8	renderer CPU 18% and pressure 12% of the stall, dominant phase readback 3.80 ms; rest is waiting or below sample resolution
+207	0	27.20	25.1	4.4	20.7	0.2	4.86	20.37	starved	readback	20.7	host CPU contention: cgroup some pressure 75% of the stall, dominant phase readback 20.70 ms
+223	0	24.20	23.9	4.3	19.6	0.3	6.93	18.54	starved	readback	19.6	host CPU contention: cgroup some pressure 77% of the stall, dominant phase readback 19.60 ms
+229	0	25.00	24.5	1.3	23.1	0.3	4.39	17.70	starved	readback	23.1	host CPU contention: cgroup some pressure 71% of the stall, dominant phase readback 23.10 ms
+234	0	23.80	23.4	2.2	21.1	0.2	4.58	18.47	starved	readback	21.1	host CPU contention: cgroup some pressure 78% of the stall, dominant phase readback 21.10 ms
+242	0	10.20	7.6	1.4	6.2	0.3	2.43	1.09	blocked	readback	6.2	renderer CPU 24% and pressure 11% of the stall, dominant phase readback 6.20 ms; rest is waiting or below sample resolution
+246	0	26.50	24.8	22.8	1.9	1.5	4.57	19.25	starved	physics	22.8	host CPU contention: cgroup some pressure 73% of the stall, dominant phase physics 22.80 ms
+252	0	24.00	23.6	21.1	2.4	0.3	6.67	17.36	starved	physics	21.1	host CPU contention: cgroup some pressure 72% of the stall, dominant phase physics 21.10 ms
+262	0	9.00	8.6	1.3	7.3	0.2	1.70	1.66	blocked	readback	7.3	renderer CPU 19% and pressure 18% of the stall, dominant phase readback 7.30 ms; rest is waiting or below sample resolution
+266	0	9.00	6.9	1.3	5.6	1.9	1.98	1.01	blocked	readback	5.6	renderer CPU 22% and pressure 11% of the stall, dominant phase readback 5.60 ms; rest is waiting or below sample resolution
+267	0	8.70	7.5	1.3	6.1	1.1	1.78	1.38	blocked	readback	6.1	renderer CPU 20% and pressure 16% of the stall, dominant phase readback 6.10 ms; rest is waiting or below sample resolution
+268	0	26.90	25.4	20.8	4.6	1.2	7.62	18.87	starved	physics	20.8	host CPU contention: cgroup some pressure 70% of the stall, dominant phase physics 20.80 ms
+274	0	21.40	21	1.2	19.8	0.3	4.83	17.35	starved	readback	19.8	host CPU contention: cgroup some pressure 81% of the stall, dominant phase readback 19.80 ms
+290	0	23.30	22.8	20.4	2.3	0.3	5.23	16.40	starved	physics	20.4	host CPU contention: cgroup some pressure 70% of the stall, dominant phase physics 20.40 ms
+308	0	9.20	8.1	1.2	6.8	1	3.07	0.91	blocked	readback	6.8	renderer CPU 33% and pressure 10% of the stall, dominant phase readback 6.80 ms; rest is waiting or below sample resolution
+316	0	8.90	7.3	1.3	5.9	1.5	2.13	0.84	blocked	readback	5.9	renderer CPU 24% and pressure 9% of the stall, dominant phase readback 5.90 ms; rest is waiting or below sample resolution
+325	0	10.20	8.3	1.6	6.6	1.7	2.95	0.95	blocked	readback	6.6	renderer CPU 29% and pressure 9% of the stall, dominant phase readback 6.60 ms; rest is waiting or below sample resolution
+340	0	14.10	11.7	1.3	10.3	2.1	3.59	1.94	blocked	readback	10.3	renderer CPU 25% and pressure 14% of the stall, dominant phase readback 10.30 ms; rest is waiting or below sample resolution
+341	0	9.90	8.8	2.7	6.1	0.9	2.83	2.35	blocked	readback	6.1	renderer CPU 29% and pressure 24% of the stall, dominant phase readback 6.10 ms; rest is waiting or below sample resolution
+346	0	9.90	7.2	1.4	5.8	2.6	3.09	1.88	blocked	readback	5.8	renderer CPU 31% and pressure 19% of the stall, dominant phase readback 5.80 ms; rest is waiting or below sample resolution
+370	0	9.50	8	1.7	6.3	1.1	3.80	0.84	blocked	readback	6.3	renderer CPU 40% and pressure 9% of the stall, dominant phase readback 6.30 ms; rest is waiting or below sample resolution
+379	0	9.40	9	1.6	7.3	0.3	2.09	2.23	blocked	readback	7.3	renderer CPU 22% and pressure 24% of the stall, dominant phase readback 7.30 ms; rest is waiting or below sample resolution
+380	0	8.80	8.3	1.3	7	0.2	1.76	1.52	blocked	readback	7	renderer CPU 20% and pressure 17% of the stall, dominant phase readback 7.00 ms; rest is waiting or below sample resolution
+381	0	11.60	9.2	1.3	7.8	2.1	2.76	1.61	blocked	readback	7.8	renderer CPU 24% and pressure 14% of the stall, dominant phase readback 7.80 ms; rest is waiting or below sample resolution
+383	0	10.20	8.4	1.5	6.9	1.6	2.43	0.99	blocked	readback	6.9	renderer CPU 24% and pressure 10% of the stall, dominant phase readback 6.90 ms; rest is waiting or below sample resolution
+398	0	8.60	8.2	1.4	6.8	0.2	2.69	1.33	blocked	readback	6.8	renderer CPU 31% and pressure 15% of the stall, dominant phase readback 6.80 ms; rest is waiting or below sample resolution
+418	0	25.20	24.3	21.7	2.5	0.2	6.63	18.40	starved	physics	21.7	host CPU contention: cgroup some pressure 73% of the stall, dominant phase physics 21.70 ms
+428	0	26.60	26.2	1.4	24.6	0.2	5.02	21.59	starved	readback	24.6	host CPU contention: cgroup some pressure 81% of the stall, dominant phase readback 24.60 ms
+433	0	25.70	25.3	1.2	24	0.2	5.84	20.63	starved	readback	24	host CPU contention: cgroup some pressure 80% of the stall, dominant phase readback 24.00 ms
+435	0	10.60	9.8	1.4	8.4	0.6	3.34	2.49	blocked	readback	8.4	renderer CPU 32% and pressure 24% of the stall, dominant phase readback 8.40 ms; rest is waiting or below sample resolution
+436	0	9.00	6.8	1.5	5.2	1.9	2.90	2.09	blocked	readback	5.2	renderer CPU 32% and pressure 23% of the stall, dominant phase readback 5.20 ms; rest is waiting or below sample resolution
+438	0	9.50	8.1	1.4	6.7	1.1	1.73	1.52	blocked	readback	6.7	renderer CPU 18% and pressure 16% of the stall, dominant phase readback 6.70 ms; rest is waiting or below sample resolution
+452	0	8.60	7	1.7	5.2	1.4	4.30	1.24	blocked	readback	5.2	renderer CPU 50% and pressure 14% of the stall, dominant phase readback 5.20 ms; rest is waiting or below sample resolution
+458	0	10.20	6.3	1.5	4.8	3.7	3.29	2.52	blocked	readback	4.8	renderer CPU 32% and pressure 25% of the stall, dominant phase readback 4.80 ms; rest is waiting or below sample resolution
+469	0	9.40	7.4	4.3	3.1	1.8	1.74	1.41	blocked	physics	4.3	renderer CPU 19% and pressure 15% of the stall, dominant phase physics 4.30 ms; rest is waiting or below sample resolution
+471	0	9.90	8.2	4.1	4	1.5	3.00	1.43	blocked	physics	4.1	renderer CPU 30% and pressure 14% of the stall, dominant phase physics 4.10 ms; rest is waiting or below sample resolution
+472	0	31.30	8.4	1.3	7	22.7	6.86	24.13	starved	backend	22.7	host CPU contention: cgroup some pressure 77% of the stall, dominant phase backend 22.70 ms
+476	0	9.20	8.7	1.5	7.1	0.3	1.93	1.69	blocked	readback	7.1	renderer CPU 21% and pressure 18% of the stall, dominant phase readback 7.10 ms; rest is waiting or below sample resolution
+486	0	8.80	6.5	1.3	5.2	2.1	2.26	1.83	blocked	readback	5.2	renderer CPU 26% and pressure 21% of the stall, dominant phase readback 5.20 ms; rest is waiting or below sample resolution
+487	0	11.60	11.2	1.3	9.8	0.2	2.65	1.60	blocked	readback	9.8	renderer CPU 23% and pressure 14% of the stall, dominant phase readback 9.80 ms; rest is waiting or below sample resolution
+500	0	30.70	29.3	22.2	7.1	1.2	5.85	18.69	starved	physics	22.2	host CPU contention: cgroup some pressure 61% of the stall, dominant phase physics 22.20 ms
+532	0	8.90	7.5	1.5	6	1.2	2.12	0.93	blocked	readback	6	renderer CPU 24% and pressure 10% of the stall, dominant phase readback 6.00 ms; rest is waiting or below sample resolution
+540	0	10.20	8.8	1.5	7.2	1.2	3.19	0.82	blocked	readback	7.2	renderer CPU 31% and pressure 8% of the stall, dominant phase readback 7.20 ms; rest is waiting or below sample resolution
+546	0	9.80	7.6	2.6	5	1.5	3.16	1.08	blocked	readback	5	renderer CPU 32% and pressure 11% of the stall, dominant phase readback 5.00 ms; rest is waiting or below sample resolution
+547	0	10.50	10.1	1.4	8.7	0.3	2.54	1.46	blocked	readback	8.7	renderer CPU 24% and pressure 14% of the stall, dominant phase readback 8.70 ms; rest is waiting or below sample resolution
+548	0	11.60	11.2	1.3	9.8	0.1	2.32	1.92	blocked	readback	9.8	renderer CPU 20% and pressure 17% of the stall, dominant phase readback 9.80 ms; rest is waiting or below sample resolution
+553	0	9.50	7.7	1.2	6.5	1.6	1.58	1.53	blocked	readback	6.5	renderer CPU 17% and pressure 16% of the stall, dominant phase readback 6.50 ms; rest is waiting or below sample resolution
+554	0	11.80	9.1	5	4.1	2.4	3.11	1.57	blocked	physics	5	renderer CPU 26% and pressure 13% of the stall, dominant phase physics 5.00 ms; rest is waiting or below sample resolution
+559	0	9.10	8.7	1.4	7.2	0.3	2.84	1.27	blocked	readback	7.2	renderer CPU 31% and pressure 14% of the stall, dominant phase readback 7.20 ms; rest is waiting or below sample resolution
+566	0	8.80	7.3	4.1	3.1	1.4	1.69	0.75	blocked	physics	4.1	renderer CPU 19% and pressure 9% of the stall, dominant phase physics 4.10 ms; rest is waiting or below sample resolution
+577	0	10.60	7.3	1.6	5.7	3.1	3.42	1.13	blocked	readback	5.7	renderer CPU 32% and pressure 11% of the stall, dominant phase readback 5.70 ms; rest is waiting or below sample resolution
