@@ -6,6 +6,7 @@ import { readFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, extname, join, normalize, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { connectCdp } from './browser/cdp-client.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const args = process.argv.slice(2)
@@ -23,6 +24,7 @@ const joltDir = join(root, 'build', 'jolt')
 const RENDER_PATH = '/scripts/browser/engine-render.html?phase=10&tier=1024&timed=1'
 const RENDER_TIMEOUT_MS = 1200000
 const POLL_MS = 2000
+const SEND_TIMEOUT_MS = 60000
 const MAX_BUFFER = 256 * 1024 * 1024
 const WASM_NAME = 'engine-core-128mib-timed.wasm'
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.json': 'application/json', '.wasm': 'application/wasm', '.css': 'text/css' }
@@ -73,27 +75,7 @@ const serve = (dir, listenPort) => new Promise((ready, failed) => {
 })
 
 const renderInPlaywriterBrowser = async (url) => {
-  const version = await (await fetch('http://127.0.0.1:' + debugPort + '/json/version')).json()
-  const socket = new WebSocket(version.webSocketDebuggerUrl)
-  await new Promise((open, failed) => {
-    socket.addEventListener('open', open, { once: true })
-    socket.addEventListener('error', () => failed(new Error('no devtools socket on port ' + debugPort)), { once: true })
-  })
-  let nextId = 0
-  const waiting = new Map()
-  socket.addEventListener('message', (event) => {
-    const message = JSON.parse(event.data)
-    const settle = waiting.get(message.id)
-    if (!settle) return
-    waiting.delete(message.id)
-    if (message.error) settle.reject(new Error(message.error.message))
-    else settle.resolve(message.result)
-  })
-  const send = (method, params = {}, sessionId) => new Promise((resolveSend, rejectSend) => {
-    const id = ++nextId
-    waiting.set(id, { resolve: resolveSend, reject: rejectSend })
-    socket.send(JSON.stringify(sessionId ? { id, method, params, sessionId } : { id, method, params }))
-  })
+  const { send, close } = await connectCdp(debugPort, { sendTimeoutMs: SEND_TIMEOUT_MS })
   let targetId = null
   try {
     ({ targetId } = await send('Target.createTarget', { url: 'about:blank' }))
@@ -109,7 +91,7 @@ const renderInPlaywriterBrowser = async (url) => {
     return { error: 'the render did not finish within ' + RENDER_TIMEOUT_MS + ' ms' }
   } finally {
     if (targetId) await send('Target.closeTarget', { targetId }).catch(() => {})
-    socket.close()
+    close()
   }
 }
 
