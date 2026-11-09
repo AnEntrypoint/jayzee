@@ -757,3 +757,32 @@ Chromium, from the project browser (gate pid 101717, debug port 10221, browser p
 - WebGL2 for comparison: ANGLE over OpenGL 4.5 on the same NVIDIA device (`libGLX_nvidia` is mapped by the same GPU process), as recorded in the earlier runs.
 
 Run plan, Phase B: the timed 1024 build `engine/out/engine-core-128mib-timed.wasm` (sha256 `2b28cd2381f4385b4226d2c0e3a9f55090024b9b2ed0f56d1212613715c044d3`, the Phase A build). Three alternating rounds, WebGPU (phase 10) then WebGL2 (phase 11), one at a time in the project browser. Each file in `build/diag/` records `load.before` and `load.after` from `/proc/loadavg`. Medians and p99s are then quoted side by side from those files, and the speedup is computed only from them.
+
+## WebGPU re-run with Vulkan enabled: timed 1024 results (Phase B)
+
+Files: `build/diag/vulkan-{webgpu,webgl2}-1024-r{1,2,3}.json`, each with `load.before`, `load.after` and the six busiest processes before and after. Build `engine/out/engine-core-128mib-timed.wasm`, sha256 `2b28cd23…`. The runs went one at a time in the project browser, alternating WebGPU then WebGL2.
+
+Conditions. The machine was shared. Other lanes ran a `zig test`, a node replay and `fx-test`, and the load stayed between 3.4 and 4.8 for every run. No foreign browser was running. The runs were alone with respect to this project's own work, and not alone with respect to the machine.
+
+| Run | Backend | Median ms | p99 ms | Max ms | Tick median | Physics median | Physics p99 | Plan median | Backend median | Readback median | Outliers | API calls | Load before to after | Runnable before to after |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| r1 | WebGPU | 43.70 | 54.2 | 58.1 | 43.4 | 41.80 | 52.1 | 0.1 | 0.2 | 1.5 | 0 | 29 | 3.38 to 4.80 | 6 to 4 |
+| r1 | WebGL2 | 39.80 | 51.0 | 53.0 | 39.6 | 38.30 | 48.8 | 0.1 | 0.1 | 1.3 | 0 | 45 | 4.66 to 4.37 | 5 to 3 |
+| r2 | WebGPU | 40.60 | 46.8 | 48.7 | 40.3 | 38.95 | 44.7 | 0.1 | 0.2 | 1.3 | 0 | 29 | 4.37 to 4.72 | 5 to 4 |
+| r2 | WebGL2 | 39.70 | 45.9 | 47.2 | 39.5 | 38.20 | 44.2 | 0.1 | 0.1 | 1.3 | 0 | 45 | 4.42 to 4.29 | 3 to 6 |
+| r3 | WebGPU | 39.40 | 44.4 | 45.9 | 39.0 | 37.80 | 42.6 | 0.1 | 0.2 | 1.3 | 0 | 29 | 4.10 to 3.73 | 5 to 4 |
+| r3 | WebGL2 | 38.70 | 44.5 | 47.6 | 38.5 | 37.20 | 42.9 | 0.1 | 0.1 | 1.2 | 0 | 45 | 3.59 to 3.89 | 6 to 5 |
+
+Every run has checksum `-3826851758512048142`, visible `[729,746,747,750]`, allocations after warm-up `0`, `ok` true, no errors. The adapter is the NVIDIA RTX 3060 for WebGPU and ANGLE over that device for WebGL2.
+
+Side by side, from the files:
+
+- Median, WebGPU against WebGL2, round by round: 43.70 against 39.80, 40.60 against 39.70, and 39.40 against 38.70. The gaps are 3.90, 0.90 and 0.70 ms, WebGPU slower in every round.
+- Mean of medians: WebGPU 41.23 ms, WebGL2 39.40 ms.
+- p99, round by round: 54.2 against 51.0, 46.8 against 45.9, and 44.4 against 44.5. The median of the three p99s is 46.8 ms for WebGPU and 45.9 ms for WebGL2.
+
+Speedup, from the mean medians only: WebGL2 divided by WebGPU is 39.40 / 41.23 = 0.956. WebGPU is about 4.6% slower at the median. There is no speedup in this run. Round 1 carries most of the gap (WebGPU's physics phase is 41.8 ms against 38.3 ms), and rounds 2 and 3 are within 0.7 to 0.9 ms. Physics is the dominant phase in both backends, and the plan and backend phases are 0.1 to 0.2 ms.
+
+Consistency with the earlier re-run. The earlier 1024 runs in this doc (round 1 of the Phase B table, 39.65 ms against 39.35 ms) were on the same build and gave a smaller gap. The round-1 gap here is larger and comes with a larger WebGPU physics p99. The machine state was different (other lanes), and I have not separated those causes.
+
+Verdict. The Vulkan-enabled WebGPU adapter works, and the WebGPU witnesses pass (checksum, visible counts, zero allocations, `ok`). WebGPU is not faster than WebGL2 at 1024 in this run. The result is 0.956 times WebGL2, slower in all three rounds.
