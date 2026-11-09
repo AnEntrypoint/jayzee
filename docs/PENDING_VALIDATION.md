@@ -1249,3 +1249,24 @@ Causes by category, from the rows:
 Code defects, fixed in the Phase A commit `858d271` and witnessed in Phase B: the renderer pick in `rendererMainSeries` (defect 1) and the CPU share in `cpuMsBetween` (defect 2). Both are probe defects, not engine defects. No engine change was made in this pass.
 
 Open after this pass. The blocked stalls with dominant physics or readback phases (186 on the two runs: 67 on r1-G1 and 119 on r2-G1) are measured as waits, and the code that waits is not located. The physics spikes at active 0 have no code path located yet. Neither is recorded as a fix. The uncommitted `engine/src/world.cpp` and `engine/artifacts.json` changes (the planet sleep-threshold removal and the re-pin) were not committed in this pass, because this pass did not rebuild the engine and so did not verify those pins against a source-to-binary build. They stay out of the push.
+
+## Blocked stalls, the physics cost and the thread sampler (Phase A: code and docs, not built or run)
+
+Correction to the Phase B text above. It says the blocked stalls "are waits inside the frame, not CPU on the renderer thread". That is withdrawn. The blocked class is what the probe reports when the renderer's CPU share is below 80% and the pressure share below 50%, and the CPU share came from a thread sampler whose real interval was 250 to 330 ms. A blocked stall therefore means the probe could not resolve it, not that it waited on a call.
+
+Wait sites. There is no wait site in the physics or readback phases of this build. The engine is single-threaded (no `ENGINE_THREADS` in `engine/CMakeLists.txt`, `engine/build.sh` or `engine/src`), so Jolt's job barrier is `JobSystemSingleThreaded`, which runs each job inline and has an empty `WaitForJobs`. The readback phase is a host loop (`engine/src/world.cpp:431-437`, `sync` at `:474-496`) with no GPU fence. The per-site list, with file and line, measured durations and reason, is in `docs/stall-causes/wait-sites.md`. Inherent or defect: neither, because there is no wait to remove. The cause of the blocked time needs a new G1 run with the fixed sampler to settle.
+
+Physics cost at 10240 awake bodies, from the page rows of `r1-G1` and `r2-G1` (median, ms):
+
+| frames | tick | physics | readback | backend | upload | submit |
+|---|---|---|---|---|---|---|
+| active 0, 470 per run | 4.4 to 4.6 | 1.4 | 2.8 | 0.3 | 0 | 0.1 |
+| active 10240, 62 per run | 39.0 to 39.3 | 36.1 to 36.4 | 2.0 to 2.1 | 0.3 | 0 to 0.1 | 0.1 |
+
+The physics phase is the step that dominates an awake frame: 36 ms of a 39 ms tick. Its 35 ms above the sleeping case is about 3.4 µs per awake body per step (about 10240 bodies). What the engine code shows inside `Update`: the radial gravity listener (`engine/src/world.cpp:99` and `:403-423`), which takes about five body locks per awake body per step; and the planet contact (`engine/src/planet_shape.cpp:14-27`), which calls `heightAt` (`engine/src/planet_frame.cpp:193`), a page-table lookup and a bilinear blend rather than a noise evaluation. The split of the 36 ms between Jolt's broadphase, narrowphase, solver and the two engine parts is not measured.
+
+Decision on the physics cost: not a defect. Nothing in the code is a wait or a repeated expensive step large enough to be called a defect, and the cost is Jolt's per-body work at this body count on one thread. The budget overrun of 62 frames at 10240 awake is recorded under `ENGINE_THREADS` in the ranked list, which is where the lever is. The lock count in the gravity listener and the readback loop is an optimisation candidate, recorded as open and not changed here, because it changes the sleep path.
+
+Defect fixed: `scripts/browser/thread-cpu-sampler.mjs`. Each tick the sampler read `/proc/<pid>/task/<tid>/stat` for every thread of every Chromium process, including GPU and utility threads that no probe reads. The real interval was 250 to 330 ms against the 50 ms period it was started with (`r2-G0.threads.txt` has 979 distinct timestamps over about 240 s). The change reads renderer processes every tick and the other processes every 20th tick. Output lines are unchanged. Witness in Phase B: the sample count over 10 s of the project browser, before and after the change.
+
+Engine change for the waits: none. Engine pin check: Phase B, with the rebuild.
