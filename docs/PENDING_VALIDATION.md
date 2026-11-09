@@ -20,10 +20,10 @@ Each entry names the file, the ENGINE.md phase and the witness it needs. The sta
 | Gap closure 2: schema-driven input codec | `check-engine-codecs` schema packet gates | PASS. |
 | Gap closure 3: material table as slots | `check-engine-materials` 15 PASS, `check-client-resource-pools` | PASS. |
 | Service-worker isolation shim | `check-engine-isolation` 9 PASS; public site `anentrypoint.github.io/jayzee/play/` in the gm playwriter browser | PASS. The public site reports `crossOriginIsolated` true and `SharedArrayBuffer` defined, before and after the reload (profile caveat in the section below). |
-| Renderer (phases 10 and 11) | `check-engine-render` 17 PASS; WebGPU and WebGL2 pages at 64 and 1024 tiers on the real NVIDIA RTX 3060 Laptop adapter (see "Real-adapter runs" under the renderer section) | PASS. The two backends agree on the checksum at each tier. WebGPU is faster on this GPU: p99 78.6 ms against WebGL2's 362.9 ms at 1024 (ratio 4.62), and 8.9 ms against 34.7 ms at 64 (ratio 3.90). Each is one run. |
+| Renderer (phases 10 and 11) | `check-engine-render` 17 PASS; WebGPU and WebGL2 pages at 64 and 1024 tiers on the real NVIDIA RTX 3060 Laptop adapter (see "Real-adapter runs" under the renderer section) | PASS. The two backends agree on the checksum at each tier, and every run has zero allocations after warm-up. Over three repeats per backend per tier, the medians show no WebGPU speedup at 1024 (67.9 ms against 68.6 ms, within the spread) and WebGL2 faster at 64 (3.2 ms against 4.0 ms). The earlier single-run speedup is withdrawn. See "WebGPU and WebGL2 repeats". |
 | Memory, arena and allocator | `check-engine-core`, `check-engine-tiers` 6 PASS, native host witness | PASS. Post-warm-up carves are zero at 64 and 1024 players. |
 
-Still OPEN after Phase B: the phase 5 frame-time comparison; the phase 3 rotation gate; the `USE_WEBGPU` migration (`emdawnwebgpu`); the `ENGINE_THREADS` branch, which is not compiled; the self-launched runner `scripts/browser/run-engine-render.mjs`, untested after its SwiftShader flags were removed (needs `PLAYWRIGHT_CORE`); the cause of the SwiftShader adapter on direct Chromium launches (Defect 2 below).
+Still OPEN after Phase B: the phase 5 frame-time comparison; the phase 3 rotation gate; the `USE_WEBGPU` migration (`emdawnwebgpu`); the `ENGINE_THREADS` branch, which is not compiled; `scripts/browser/run-player-webgpu.mjs`, which still needs `PLAYWRIGHT_CORE`; a direct backend-type query for the WebGPU adapter.
 
 ## Problems in docs/ENGINE.md (for the dispatcher)
 
@@ -306,7 +306,7 @@ Phase A items below are unchanged unless marked Phase B. Phase B items are recor
 - Renderer (Phase B, body slots): `kBodySlots` is `budget::kTopTierBodies`, 10240, replacing the Phase A cap of 4096. `engine_render_init` still refuses a larger world with `kRange`, which no tier can reach.
 - Renderer (Phase B, present): `surface.Present()` is removed. Emscripten refuses it, and the canvas presents at the end of the task.
 - Renderer (Phase B, page layers): 64 page layers, one per page slot in the budget.
-- Renderer (Phase B, WebGPU witness): the playwriter browser reports `navigator.gpu` with no adapter, so the WebGPU witness runs in a self-launched Chromium with SwiftShader flags (`scripts/browser/run-engine-render.mjs`, which needs `PLAYWRIGHT_CORE`). The WebGL2 witness runs in playwriter.
+- Renderer (Phase B, WebGPU witness): superseded. The first Phase B pass ran the WebGPU witness in a self-launched Chromium that forced SwiftShader, and that runner has since been removed. Both witnesses now run in the gm playwriter browser, which reports the NVIDIA adapter. See "Adapter defects" below.
 - Renderer (Phase B, witness scale): the witness page draws 512 bodies at the 64 tier, not the 2048 the 64-player plan holds, and 10240 at the 1024 tier. The checksum is pinned to the 512 scale.
 - Renderer (Phase B, warning kept): the Dawn port is the legacy `USE_WEBGPU`. Emscripten 4.0.10 warns that it is deprecated for `emdawnwebgpu`, which implements a different `webgpu.h`. The migration is a separate change. Recorded, not fixed.
 - Build (Phase B, warning kept): `-sMAXIMUM_MEMORY` is set on the fixed module with `ALLOW_MEMORY_GROWTH=0`. Emscripten warns that it is inert without growth. The flag stays so the fixed module's maximum is in its link line, and `check-engine-artifacts` asserts it. Recorded, not fixed.
@@ -341,24 +341,56 @@ Each block quotes the output of a run made in Phase B on the committed state. Th
 
 ### Renderer in the module (phases 10 and 11)
 - `scripts/check-engine-render.mjs`: 17 PASS, `RESULT: PASS`.
-Real-adapter runs (Phase B, WebGPU and Vulkan enabled on this machine). All four were run in the gm playwriter browser (pid 3562307, launched with `--user-data-dir=/workspace/.playwriter/browser-profile --remote-debugging-port=10252 --no-first-run --no-default-browser-check --no-sandbox`, no GPU flags), one page per run, reading `window.engineRenderResult`. Each run is one 600-frame pass with the first 60 frames dropped, so each timing is a single run and has no variance estimate.
+Real-adapter runs (Phase B, WebGPU and Vulkan enabled on this machine). All four were run in the gm playwriter browser (pid 3562307, launched with `--user-data-dir=/workspace/.playwriter/browser-profile --remote-debugging-port=10252 --no-first-run --no-default-browser-check --no-sandbox`; the NVIDIA WebGPU comes from the profile's labs flags, see "WebGPU open items" below), one page per run, reading `window.engineRenderResult`. Each run is one 600-frame pass with the first 60 frames dropped, so each timing is a single run and has no variance estimate.
 
 - WebGPU, 1024 tier (`engine-render.html?phase=10&tier=1024`): adapter `{"api":"webgpu","vendor":"nvidia","architecture":"ampere","device":"0x2520","description":"NVIDIA GeForce RTX 3060 Laptop GPU","isFallbackAdapter":false}`, backend `webgpu`, `frameTimeP99Ms` 78.60000002384186, `apiCallsPerFrame` 34, `allocationsSinceWarmup` "0", `createsAfterSeal` 0, `checksum` "-3826851758512048142", `visible` [729,746,747,750], `errors` [], `ok` true.
 - WebGPU, 64 tier (`engine-render.html?phase=10&tier=64`), same adapter: `frameTimeP99Ms` 8.899999976158142, `apiCallsPerFrame` 34, `allocationsSinceWarmup` "0", `checksum` "-5415737363265412373", `visible` [18,20,21,20], `ok` true.
 - WebGL2, 1024 tier (`engine-render.html?phase=11&tier=1024`), same GPU through ANGLE: adapter `{"api":"webgl2","vendor":"Google Inc. (NVIDIA Corporation)","renderer":"ANGLE (NVIDIA Corporation, NVIDIA GeForce RTX 3060 Laptop GPU/PCIe/SSE2, OpenGL 4.5.0)"}`, backend `webgl2`, `frameTimeP99Ms` 362.89999997615814, `apiCallsPerFrame` 45, `allocationsSinceWarmup` "0", `createsAfterSeal` 0, `checksum` "-3826851758512048142", `ok` true.
 - WebGL2, 64 tier, same GPU: `frameTimeP99Ms` 34.69999998807907, `apiCallsPerFrame` 45, `allocationsSinceWarmup` "0", `checksum` "-5415737363265412373", `ok` true.
 
-Timing lines, 1024 tier, side by side, same GPU: WebGPU `frameTimeP99Ms` 78.6 ms, WebGL2 `frameTimeP99Ms` 362.9 ms. The ratio is 362.9 / 78.6 = 4.62. At the 64 tier: WebGPU 8.9 ms, WebGL2 34.7 ms, ratio 34.7 / 8.9 = 3.90. These speedups come only from those four numbers. They are single runs, so they are not a confidence interval.
+Withdrawn. The single-run timings above (WebGPU 78.6 ms against WebGL2 362.9 ms at 1024, and 8.9 ms against 34.7 ms at 64) did not reproduce. The 4.62 and 3.90 ratios that were computed from them are withdrawn, and no speedup is claimed from single runs. The three-repeat medians in "WebGPU and WebGL2 repeats" replace them. The cause of the 362.9 ms WebGL2 outlier is not established.
 
 - The checksum agrees between the two backends at each tier (1024: -3826851758512048142, 64: -5415737363265412373).
 - The SwiftShader WebGPU 1024 run in `build/diag/webgpu1024.json` (`frameTimeP99Ms` 140.4) is a software adapter. It is a defect record and not a baseline; the speedup above does not use it. See the defect below.
 - The witness budgets (64 API calls per frame, 600 frames) are still placeholders.
 - The `engine_render_init` refusal is not witnessed directly. No tier can reach it (see the renderer section).
 
+### WebGPU open items, closed in the Phase A pass
+
+- Decision, runner and dependency. The self-launched runner `scripts/browser/run-engine-render.mjs` is deleted. Jayzee does not depend on playwright-core, and the gm playwriter browser is the project's browser (INVARIANT 11), so the WebGPU and WebGL2 witnesses run there. Trade-off: the witness needs a headed browser with a display and cannot run in CI. `scripts/browser/run-player-webgpu.mjs` also reads `PLAYWRIGHT_CORE` and is not touched by this pass. It is recorded as OPEN in the same way.
+- Cause of the SwiftShader adapter on direct launches. It is headless mode. `chromium.real --headless=new` loads `/usr/lib/chromium/libvk_swiftshader.so` in its GPU process and gets the SwiftShader adapter (`vendor google, architecture swiftshader, isFallbackAdapter true`), and WebGL2 reports `ANGLE (Google, Vulkan 1.3.0 (SwiftShader ...))`. The same binary launched headed, on the display, with `--enable-unsafe-webgpu --enable-features=Vulkan,WebGPUService`, gets the NVIDIA adapter (`isFallbackAdapter false`). Probe: `build/diag/probe/` (a local page that posts its adapter info to a local node server), run in four variants:
+
+  | variant | WebGPU adapter | WebGL2 renderer |
+  |---|---|---|
+  | headed, no flags | none (`navigator.gpu.requestAdapter()` returns null) | NVIDIA, ANGLE over OpenGL 4.5 |
+  | headed, `--enable-unsafe-webgpu --enable-features=Vulkan,WebGPUService` | NVIDIA ampere, not fallback | NVIDIA, ANGLE over OpenGL 4.5 |
+  | `--headless=new` with the same flags | SwiftShader, fallback | SwiftShader |
+  | `--headless=new`, no flags | none | SwiftShader |
+
+- The gm playwriter browser's flags. Its command line has no GPU flags, as the earlier note said, but its profile `/workspace/.playwriter/browser-profile/Local State` carries the labs flags `enable-unsafe-webgpu`, `enable-vulkan@1` and `enable-webgpu-developer-features` in `enabled_labs_experiments`. So its NVIDIA WebGPU comes from the profile, not from the command line. If that profile is reset, the WebGPU adapter disappears, and the fix is the command-line flags above.
+- Proof of the backend. Dawn's adapter comes from the Vulkan loader, shown three ways. (a) The NVIDIA GPU process of the gm browser (pid 3562360 at the time) maps `/dev/nvidia0`, `libnvidia-glvkspirv.so.580.178.04` and `libvulkan.so.1.4.341`, and the ICD file `/etc/vulkan/icd.d/nvidia_icd.json` is present. (b) With `VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json` set for the headed run, the WebGPU adapter changes to the SwiftShader fallback, so the choice follows the Vulkan ICD. (c) With `--disable-features=Vulkan`, the hardware adapter is also gone and only the fallback remains. Chromium's own log does not name Dawn or Vulkan at `--v=1`, so this is inference from the loader, not a log line. The adapter info has no backend field, so the backend is not read from the API directly. OPEN: a direct backend-type query.
+- Timing repeats. Three repeats per backend per tier, medians and spread, are in "WebGPU and WebGL2 repeats" below.
+
+### WebGPU and WebGL2 repeats (three runs per backend per tier)
+
+Each run is a fresh page in the gm playwriter browser on the NVIDIA RTX 3060 Laptop adapter (WebGPU: `isFallbackAdapter` false, vendor nvidia; WebGL2: ANGLE over OpenGL 4.5 on the same GPU). Each run is 600 frames with the first 60 dropped. The value is `frameTimeP99Ms` from `window.engineRenderResult`. The raw runs are in `build/diag/repeats.json`.
+
+| tier | backend | run 1 | run 2 | run 3 | median | spread (max − min) |
+|---|---|---|---|---|---|---|
+| 64 | WebGPU | 4.1 | 4.0 | 3.7 | 4.0 ms | 0.4 ms |
+| 64 | WebGL2 | 3.2 | 3.1 | 3.3 | 3.2 ms | 0.2 ms |
+| 1024 | WebGPU | 59.7 | 68.2 | 67.9 | 67.9 ms | 8.5 ms |
+| 1024 | WebGL2 | 51.3 | 69.8 | 68.6 | 68.6 ms | 18.5 ms |
+
+- Speedup from the medians. At 1024, WebGL2 median ÷ WebGPU median = 68.6 ÷ 67.9 = 1.01, so WebGPU is 1.01 times as fast. That is within the spread of both backends, so there is no measured difference. At 64, WebGPU median ÷ WebGL2 median = 4.0 ÷ 3.2 = 1.25, so WebGL2 is 1.25 times as fast. The 64-tier ranges do not overlap (WebGPU 3.7 to 4.1, WebGL2 3.1 to 3.3), so the gap held in all three runs of this set.
+- Correctness, every run. `ok` true, no errors, `allocationsSinceWarmup` "0". The checksum is the same for every run of a tier and for both backends: 64 tier -5415737363265412373, 1024 tier -3826851758512048142.
+- Withdrawn. The earlier single runs (WebGPU 78.6 ms and WebGL2 362.9 ms at 1024; 8.9 ms and 34.7 ms at 64) and the ratios computed from them (4.62 and 3.90) are not reproduced. The 362.9 ms WebGL2 value is an outlier in this set's terms: the three WebGL2 1024 runs here are 51.3 to 69.8 ms. Its cause is not established.
+- Scope. Three runs is a small sample, and a p99 over 600 frames includes the page's CPU work (`engine_tick` and the CPU culling plan), so these numbers compare the two whole frames, not the GPU draw alone. A different GPU or driver may change the answer.
+
 ### Adapter defects found in this Phase B (WebGPU and Vulkan)
-- Defect 1, the self-launched runner forced SwiftShader. `scripts/browser/run-engine-render.mjs` passed `--use-vulkan=swiftshader`, `--use-webgpu-adapter=swiftshader` and `--use-angle=swiftshader`, so its WebGPU runs measured the CPU adapter. Evidence: `build/diag/webgpu1024.json` (`frameTimeP99Ms` 140.4, checksum -3826851758512048142), against 78.6 for the same module on the NVIDIA adapter (above). Fix in this Phase B: those three flags are removed, the feature list is `Vulkan,WebGPUService`, and the runner exits non-zero when the page reports `isFallbackAdapter` true or the vendor `google`. Not re-run: the runner needs `PLAYWRIGHT_CORE`, which is unset here, and jayzee has no playwright-core dependency. So the runner's new flags are untested. OPEN until the runner runs once with `PLAYWRIGHT_CORE` set.
-- Defect 2, direct Chromium launches get a SwiftShader WebGPU adapter. With `--use-vulkan=native`, `--enable-features=Vulkan`, and each adapter selection (`dgpu`, `default`, `swiftshader`), `navigator.gpu.requestAdapter()` returned `vendor google, arch swiftshader` (probes `build/diag/gpu_probe.mjs`, `gpu_probe2.mjs`, `gpu_adapter.html`). With ANGLE on Vulkan, WebGL reports the NVIDIA GPU, but the WebGPU `requestAdapter()` did not return within 6 s. `vulkaninfo` reports NVIDIA GeForce RTX 3060 Laptop GPU, driver 580.178.4.0, so Vulkan works on the machine. The cause of the direct-launch software adapter is not established. The gm playwriter browser returned the NVIDIA adapter with no GPU flags on its command line. OPEN.
-- What the NVIDIA runs do not show. The adapter info does not name the WebGPU backend, so the WebGPU runs do not prove Dawn used Vulkan. The WebGL2 runs report ANGLE over OpenGL 4.5 on the same driver, so they do not use Vulkan either.
+- Defect 1, the self-launched runner forced SwiftShader. `scripts/browser/run-engine-render.mjs` passed `--use-vulkan=swiftshader`, `--use-webgpu-adapter=swiftshader` and `--use-angle=swiftshader`, so its WebGPU runs measured the CPU adapter. Evidence: `build/diag/webgpu1024.json` (`frameTimeP99Ms` 140.4, checksum -3826851758512048142), against 78.6 for the same module on the NVIDIA adapter (above). Fix in this Phase B: those three flags are removed, the feature list is `Vulkan,WebGPUService`, and the runner exits non-zero when the page reports `isFallbackAdapter` true or the vendor `google`. Closed in the Phase A pass: the runner is deleted (see the decision above), so its flags are no longer used.
+- Defect 2, direct Chromium launches got a SwiftShader WebGPU adapter. Cause found in the Phase A pass: headless mode, not the flags. See "WebGPU open items, closed in the Phase A pass" above. The earlier probes that reported SwiftShader were all headless (`--dump-dom` and the playwright runner). Fixed by the choice of a headed browser on the gm playwriter path. The direct recipe for a headed launch is the flags in that section.
+- What the NVIDIA runs show, and what they do not. The gm GPU process loads the NVIDIA Vulkan driver, and the WebGPU adapter follows the Vulkan ICD. The WebGL2 runs report ANGLE over OpenGL 4.5 on the same driver, so they do not use Vulkan. The adapter info does not name the WebGPU backend type.
 - Defect 3, fixed: the phase 8 page threw on `createTexturePool` (see the phase 8 record above).
 
 ### Witnesses for phases 2 to 8 (native host build)
