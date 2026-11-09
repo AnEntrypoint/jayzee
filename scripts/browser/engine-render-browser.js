@@ -21,6 +21,7 @@ const CAMERA_HEIGHT = 25
 const CAMERA_FOV = Math.PI / 3
 const NEAR = 0.1
 const FAR = 500
+const GROUND = [-200, -1, -200, 200, 0, 200]
 const WORLD = { capacity: TIER === 1024 ? 10240 : 2048, tickRate: 60, gravity: -9.8, drag: 0, radius: 0.5, restitution: 0, iterations: 8 }
 const PLANET = { radius: 6371000, cellSize: 1000, gravity: 9.8, maxHeight: 8000 }
 const CLASS_MATERIALS = [0, 1, 2, 3]
@@ -93,13 +94,10 @@ const median = (values) => {
 const setupWorld = (module) => {
   const status = module._engine_world_configure(WORLD.capacity, WORLD.tickRate, WORLD.gravity, WORLD.drag, WORLD.radius, WORLD.restitution, WORLD.iterations)
   if (status !== 0) throw new Error('world configure status ' + status)
-}
-
-const spawnOnSurface = (module) => {
+  module._engine_world_add_box(...GROUND)
   for (let i = 0; i < BODIES; i++) {
-    const [x, z, lift] = TIER === 1024 ? [(i % 100) * 1.2 - 60, Math.floor(i / 100) * 1.2 - 60, 1 + (i % 5)] : [(i % 32) * 2 - 32, Math.floor(i / 32) * 2 - 16, 2 + (i % 5)]
-    const y = PLANET.radius + module._engine_planet_height(x, PLANET.radius, z) + lift
-    module._engine_spawn(x, y, z, 0, 0, 0)
+    const at = TIER === 1024 ? [(i % 100) * 0.6 - 30, 1 + (i % 5), Math.floor(i / 100) * 0.6 - 30] : [(i % 32) * 2 - 32, 2 + (i % 5), Math.floor(i / 32) * 2 - 16]
+    module._engine_spawn(at[0], at[1], at[2], 0, 0, 0)
   }
 }
 
@@ -124,7 +122,6 @@ const setupPlanet = (module, renderer) => {
 const setupScene = (module, renderer) => {
   setupWorld(module)
   setupPlanet(module, renderer)
-  spawnOnSurface(module)
   const classes = new Uint8Array(RENDER_LAYOUT.BODY_SLOTS).fill(255)
   for (let i = 0; i < BODIES; i++) classes[i] = i % RENDER_LAYOUT.PROP_CLASSES
   renderer.setBodyClasses(classes)
