@@ -10,7 +10,6 @@ const TIER_BUDGET = TIER === 1024 ? 128 * 1024 * 1024 : 64 * 1024 * 1024
 const FRAMES = 600
 const WARMUP_FRAMES = 60
 const BODIES = TIER === 1024 ? 10240 : 512
-const PAGES = 16
 const LIGHTS = 8
 const ALBEDO_SIDE = 16
 const TICK_STEPS = 1
@@ -23,7 +22,7 @@ const NEAR = 0.1
 const FAR = 500
 const GROUND = [-200, -1, -200, 200, 0, 200]
 const WORLD = { capacity: TIER === 1024 ? 10240 : 2048, tickRate: 60, gravity: -9.8, drag: 0, radius: 0.5, restitution: 0, iterations: 8 }
-const PLANET = { radius: 6371000, cellSize: 1000, gravity: 9.8, maxHeight: 8000 }
+const PLANET = { radius: 6371000, cellSize: PAGE_SPAN, gravity: 9.8, maxHeight: 8000 }
 const CLASS_MATERIALS = [0, 1, 2, 3]
 
 const result = { phase: PHASE, errors: [], done: false }
@@ -106,25 +105,33 @@ const planetSurface = (module) => {
   return (x, z) => module._engine_planet_height(x, PLANET.radius, z) - anchor
 }
 
+const cellOf = (module, x, y, z) => {
+  module._engine_planet_locate(x, y, z)
+  const at = module._engine_planet_scratch() >> 2
+  return { face: module.HEAPU32[at], cx: module.HEAPU32[at + 1], cy: module.HEAPU32[at + 2] }
+}
+
 const setupPlanet = (module, renderer) => {
   const status = module._engine_planet_configure(PLANET.radius, PLANET.cellSize, PLANET.gravity, PLANET.maxHeight)
   if (status !== 0) throw new Error('planet configure status ' + status)
   const surface = planetSurface(module)
+  const anchor = cellOf(module, 0, PLANET.radius, 0)
   const uEdge = [0, 0, PAGE_SPAN]
   const vEdge = [PAGE_SPAN, 0, 0]
-  for (let i = 0; i < PAGES; i++) {
-    const key = module._engine_planet_key(0, i, 0)
-    const slot = module._engine_page_stage(key)
-    if (slot < 0) throw new Error('page stage refused at ' + i)
-    const origin = [(i % 4) * PAGE_SPAN - 30, 0, Math.floor(i / 4) * PAGE_SPAN - 30]
-    const samples = module._engine_page_samples(slot) >> 2
-    for (let s = 0; s < PAGE_SIDE * PAGE_SIDE; s++) {
-      const u = (s % PAGE_SIDE) / (PAGE_SIDE - 1)
-      const v = Math.floor(s / PAGE_SIDE) / (PAGE_SIDE - 1)
-      module.HEAPF32[samples + s] = surface(origin[0] + u * uEdge[0] + v * vEdge[0], origin[2] + u * uEdge[2] + v * vEdge[2])
+  let k = 0
+  for (let dy = -3; dy <= 2; dy++) {
+    for (let dx = -3; dx <= 2; dx++) {
+      const key = module._engine_planet_key(anchor.face, anchor.cx + dx, anchor.cy + dy)
+      const slot = module._engine_page_stage(key)
+      if (slot < 0) throw new Error('page stage refused at cell ' + dx + ',' + dy)
+      const samples = module._engine_page_samples(slot) >> 2
+      for (let s = 0; s < PAGE_SIDE * PAGE_SIDE; s++) {
+        module.HEAPF32[samples + s] = 0.5 * Math.sin((s % PAGE_SIDE) * 0.6 + k) * Math.cos(Math.floor(s / PAGE_SIDE) * 0.6)
+      }
+      module._engine_page_commit(slot)
+      if (dx >= -2 && dx <= 1 && dy >= -2 && dy <= 1) renderer.placePage(slot, [dx * PAGE_SPAN, 0, dy * PAGE_SPAN], uEdge, vEdge)
+      k += 1
     }
-    module._engine_page_commit(slot)
-    renderer.placePage(slot, origin, uEdge, vEdge)
   }
   return surface
 }

@@ -1,5 +1,7 @@
 import { spawn } from 'node:child_process'
+import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 export const sleep = (ms) => new Promise((done) => setTimeout(done, ms))
 
@@ -51,4 +53,17 @@ export const runRenderWitness = async ({ root, port, debugPort, profile, pageUrl
   } finally {
     stopChild(server, live)
   }
+}
+
+if (process.argv[1] && process.argv[1].endsWith('/browser/render-witness.mjs')) {
+  const root = fileURLToPath(new URL('../..', import.meta.url))
+  const [outPath, portArg = '8843', debugArg = '9843'] = process.argv.slice(2)
+  if (!outPath) throw new TypeError('usage: node scripts/browser/render-witness.mjs <out.json> [port] [debugPort]')
+  const playwrightCore = process.env.PLAYWRIGHT_CORE
+  if (!playwrightCore) throw new TypeError('PLAYWRIGHT_CORE must name the playwright-core index.mjs')
+  const port = Number(portArg)
+  const run = await runRenderWitness({ root, port, debugPort: Number(debugArg), profile: join(root, '.playwriter', 'browser-profile'), pageUrl: 'http://127.0.0.1:' + port + '/scripts/browser/engine-render.html?phase=10&tier=1024&timed=1', playwrightCore, live: [] })
+  const text = JSON.stringify(run.result ?? { error: run.error }, null, 1) + '\n'
+  writeFileSync(outPath, text)
+  console.log(text)
 }
