@@ -50,7 +50,8 @@ const witness = async () => {
       const cdp = await chromium.connectOverCDP('http://127.0.0.1:' + debugPort)
       try {
         const context = cdp.contexts()[0]
-        const page = context.pages().find((p) => p.url().includes('engine-render')) || await context.waitForEvent('page', { timeout: 60000, predicate: (p) => p.url().includes('engine-render') })
+        const page = await poll(async () => context.pages().find((p) => p.url().includes('engine-render')), 120, 500)
+        if (!page) return { error: 'the engine-render page never opened' }
         await page.waitForFunction(() => window.engineRenderResult && window.engineRenderResult.done === true, null, { timeout: 1200000, polling: 2000 })
         return { result: await page.evaluate(() => window.engineRenderResult) }
       } finally {
