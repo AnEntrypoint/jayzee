@@ -924,3 +924,40 @@ Phase A changes (code and pins; no change to the logic of any frame).
 Witness for Phase A. `check:engine-artifacts` 7 PASS, `check:engine-core` 4 PASS, `check:engine-leak` 4 PASS, `check:engine-render` 18 PASS, `check:engine-host-witness` 197 PASS, `check:timed-result` 11 PASS. Each is `RESULT: PASS`. The render gate reports 18 PASS, where the earlier record says 17. That gate is not changed here, so the extra line needs a look before it is quoted.
 
 Phase B plan. Run the alternating WebGPU and WebGL2 timed 1024 runs (draw on) with load and CPU and GPU stamps per run, and quote the stall frames with their phase split side by side. Record whether the physics spikes coincide across backends again, now with the active-body count per frame, and whether the WebGPU render stalls land in acquire, upload or submit.
+
+## Long-frame stalls at 1024: Phase B result
+
+Conditions. Six timed draw-on runs at 1024, three alternating rounds, each run alone on the page server. Load and CPU and GPU stamps are taken before and after each run (`build/diag/phaseE-*-r*.json`). Load stayed between 2.1 and 4.1 in every run, below the 8 bound, and every run has `ok` true, no errors, the checksum `-3826851758512048142` and visible `[729,746,747,750]`. The wasm is the timed 128 MiB module `6159f169…`, built from the Phase A source.
+
+Medians and p99s, side by side (frame time, ms):
+
+| Round | WebGPU median | WebGPU p99 | WebGPU max | WebGL2 median | WebGL2 p99 | WebGL2 max |
+|---|---|---|---|---|---|---|
+| r1 | 44.60 | 54.0 | 72.2 | 43.55 | 53.2 | 54.8 |
+| r2 | 42.80 | 51.7 | 53.5 | 42.60 | 50.3 | 54.5 |
+| r3 | 42.30 | 55.2 | 58.4 | 36.95 | 43.8 | 48.0 |
+
+Physics median, load, CPU and GPU stamps per run (before→after):
+
+| Run | Physics median ms | Load | CPU MHz | GPU W |
+|---|---|---|---|---|
+| WebGPU r1 | 42.6 | 3.86→4.07 | 4374→2658 | 19.90→20.66 |
+| WebGL2 r1 | 41.7 | 4.07→3.52 | 3414→3053 | 20.69→20.13 |
+| WebGL2 r2 | 40.8 | 3.24→2.60 | 3410→1974 | 20.32→20.44 |
+| WebGPU r2 | 41.0 | 2.60→2.67 | 2646→3169 | 20.50→20.61 |
+| WebGPU r3 | 40.4 | 2.67→2.52 | 3856→2265 | 20.64→11.77 |
+| WebGL2 r3 | 35.6 | 2.52→2.13 | 2564→1775 | 11.73→10.61 |
+
+The round-3 gap in medians (WebGPU 42.30, WebGL2 36.95) is not explained by a stall. Every frame in that WebGL2 run is below its own 1.5 times median, so the difference is in the typical frame, and this section does not claim a cause for it.
+
+Stall frames. A stall is a frame above 1.5 times its run's median.
+
+- WebGPU r1: frames 538 and 539 are the only stalls in the six runs. Their total is 72 and 71 ms, and the tick is the whole of it (tick 72 and 71 ms, physics 70 and 69 ms, render 1 and 0 ms). Acquire, upload and submit are all under 0.2 ms in those frames. The active-body count is 10240 in every frame of every run, so the sleep state does not change across the stall.
+- WebGL2 r1, r2, r3 and WebGPU r2 and r3: no frame above 1.5 times its run's median.
+- Shared frames: zero, in all three rounds. Frame 538 and 539 are normal in the WebGL2 r1 run, which ran on the same simulation state (same checksum, same frame index). A cost in the simulation state would show there too, so the stall is not a simulation-state cost.
+- The WebGPU render stalls seen earlier (frame 233, 95 ms in the backend scope, and frame 174, 67 ms outside it) did not recur in these runs. Their maximum acquire, upload and submit in the six runs are 0.2, 0.4 and 0.2 ms.
+- The 705 ms WebGPU value and the 362.9 ms WebGL2 outlier from the earlier sets did not recur here either.
+
+Cause of the remaining stall (WebGPU r1, two frames). The stall is in the physics phase. It is not a render stall, and it is not a simulation-state effect, because the same frame in the matching WebGL2 run is normal and the active-body count is flat. The remaining candidate is host CPU sharing (a co-tenant process or a cgroup throttle), which the earlier diagnosis recorded. This is not proven here. A per-thread CPU time would prove or refute it, and the browser does not expose one for the wasm thread, so the cause is recorded as likely host sharing, not as proven.
+
+Verdict on the item. The stall is not reproduced at the level of the earlier 705 ms and 362.9 ms values. One two-frame stall in six runs remains, in the physics phase, not in our render path, and the evidence points to host CPU sharing. No code fix is made, since none is supported by the data. The Phase A changes stay as instrumentation so that a future stall can be attributed to a phase and a backend call at once.
