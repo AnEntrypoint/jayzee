@@ -11,22 +11,25 @@ gate('parseThreadLog reads six fields per line and refuses a short or non-numeri
   assert.throws(() => parseThreadLog('x 100 renderer 100 7 comm\n'), TypeError)
 })
 
-gate('rendererMainSeries keeps the main thread of the busiest renderer and refuses a log with no renderer', () => {
+gate('rendererMainSeries keeps the main thread that gained the most CPU inside the window, not the one with the most before it, and refuses a window or a log with no renderer', () => {
   const rows = parseThreadLog([
     '0 100 renderer 100 0 Chrome', '0 100 renderer 101 9 Compositor', '50 100 renderer 100 4 Chrome',
     '0 200 renderer 200 1 Chrome', '50 200 renderer 200 2 Chrome',
+    '0 400 renderer 400 90 Chrome', '50 400 renderer 400 90 Chrome',
     '60 100 renderer 100 6 Chrome', '60 300 gpu 300 99 GPU',
   ].join('\n') + '\n')
-  assert.deepEqual(rendererMainSeries(rows), [{ t: 0, jiffies: 0 }, { t: 50, jiffies: 4 }, { t: 60, jiffies: 6 }])
-  assert.throws(() => rendererMainSeries(parseThreadLog('0 300 gpu 300 1 GPU\n')), RangeError)
+  assert.deepEqual(rendererMainSeries(rows, 0, 60), [{ t: 0, jiffies: 0 }, { t: 50, jiffies: 4 }, { t: 60, jiffies: 6 }])
+  assert.throws(() => rendererMainSeries(rows, 60, 60), TypeError)
+  assert.throws(() => rendererMainSeries(parseThreadLog('0 300 gpu 300 1 GPU\n'), 0, 10), RangeError)
 })
 
-gate('cpuMsBetween is the main-thread time in ms, holds the last record, and is null before the first record', () => {
+gate('cpuMsBetween interpolates the main-thread time between records, holds the last record, and is null before the first record', () => {
   const series = [{ t: 0, jiffies: 0 }, { t: 100, jiffies: 5 }]
   assert.equal(cpuMsBetween(series, 0, 100), 50)
-  assert.equal(cpuMsBetween(series, 50, 150), 50)
+  assert.equal(cpuMsBetween(series, 50, 150), 25)
   assert.equal(cpuMsBetween(series, -10, 100), null)
   assert.equal(cpuMsBetween(series, 100, 100), null)
+  assert.equal(cpuMsBetween([{ t: 0, jiffies: 0 }, { t: 200, jiffies: 10 }], 100, 110), 5)
 })
 
 gate('classifyStall calls a frame cpu-bound when the main thread ran most of it, starved when cgroup some pressure covered it, and blocked otherwise', () => {

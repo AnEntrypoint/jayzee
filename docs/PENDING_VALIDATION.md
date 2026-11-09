@@ -1190,3 +1190,30 @@ Ranked remaining work, at the start of Phase B:
 8. CI for pushed commits. Recorded; it runs on GitHub after the push.
 
 Witnesses in Phase B are appended below this line.
+
+## Round 2 G1 stall classification (Phase A: code and docs, not built or run)
+
+Scope. The 135 stalls on `r1-G1` and the 150 stalls on `r2-G1` in `build/diag/paired-E`, each read from its probe row (`scripts/browser/stall-probe.mjs`, before this change) and from its page row (the phase columns of the same frame). Each stall is a defect until its cause is recorded.
+
+Before this change, by category and active-body count at the stall (the active count is the page's `active` column in the stall's frame):
+
+| run | stalls | cpu-bound | starved | blocked | active 10240 | active 0 | active between 0 and 10240 |
+|---|---|---|---|---|---|---|---|
+| r1-G1 | 135 | 48 | 28 | 59 | 62 | 65 | 8 |
+| r2-G1 | 150 | 0 | 31 | 119 | 62 | 80 | 8 |
+
+By verdict and active count: r1-G1 cpu-bound 32 at 10240, 12 at 0, 4 between; starved 6 at 10240, 22 at 0; blocked 24 at 10240, 31 at 0, 4 between. r2-G1 blocked 54 at 10240, 58 at 0, 7 between; starved 8 at 10240, 22 at 0, 1 between. The cpu-bound column of r2-G1 is not a measurement: see defect 1.
+
+Active count over the run. The count does not rise. It steps down from 10240 to 8192, 6144, 4096, 2048 and 0 at frames 122, 124, 126, 128 and 130, and stays at 0 after frame 130. So the run has no 0-to-10240 transition; the probe's `activeMin` 0 and `activeMax` 10240 are that one descent. Eleven stalls on each run fall within two frames of one of those five steps. Most stalls are not near a step: 53 on r1-G1 and 80 on r2-G1 are at active 0, after every body has slept.
+
+Dominant phase, from the page row of each stall. r1-G1: physics leads 38 cpu-bound, 30 blocked and 14 starved stalls; readback leads 28 blocked, 10 cpu-bound and 10 starved; backend leads 4 starved and 1 blocked. r2-G1: physics leads 65 blocked and 17 starved; readback leads 54 blocked and 11 starved; backend leads 3 starved. The stall tick median is 21.9 ms on r1-G1 and 17.95 ms on r2-G1, against 4.4 ms and 4.2 ms for the frames that are not stalls. The normal physics phase median is 1.4 ms and the normal readback median is 2.6 ms (the `r2-G1` page's `phaseMedianMs`).
+
+Defect 1: the renderer pick (`scripts/browser/stall-probe.mjs`, `rendererMainSeries`). It chose the renderer main thread with the most cumulative jiffies in the whole thread log. In `r2-G1.threads.txt`, pid 1252943 had 810 jiffies, flat during the window (it was the renderer of the first-attempt tab), and pid 1252941, the page under test, had 778 jiffies, 775 of them inside the window. The probe therefore read the wrong thread, and every `r2-G1` stall had `cpuMs` 0. `r1-G1` picked the right renderer (pid 1173751). Change: the renderer main thread with the largest gain of jiffies inside the frame window is chosen, and ties go to the larger total. Witness: `scripts/check-stall-probe.mjs`, "rendererMainSeries keeps the main thread that gained the most CPU inside the window". The new case has a renderer at 90 jiffies that is flat inside the window, and the gate expects the renderer that ran inside it.
+
+Defect 2: the CPU share of a stall (`scripts/browser/stall-probe.mjs`, `cpuMsBetween`). It read the cumulative jiffies at the sample at or before each stall edge. The thread sampler writes about every 0.25 to 0.33 s, so a stall of 9 to 30 ms that crosses a sample boundary received the CPU of the whole sample interval. That is why the cpu-bound stalls of `r1-G1` show `cpuMs` of 10, 20, 30, 40 and 50 on stalls of comparable length, and why 48 of them were labelled cpu-bound. Change: jiffies are interpolated linearly between samples, and the last sample is held after the end of the log. Witness: `scripts/check-stall-probe.mjs`, "cpuMsBetween interpolates the main-thread time between records": 25 ms over 50 to 150 against records at 0 and 100, and 5 ms over 100 to 110 against records at 0 and 200.
+
+Limits that stay open after these changes. CPU is read in jiffies of 10 ms from a sampler that writes every 0.25 to 0.33 s, so the CPU share of a stall is an estimate, and a stall shorter than one sample interval is not resolved. The physics spikes on frames at active 0 (tick 7 to 30 ms with no body awake, against a normal physics median of 1.4 ms) have no code path located yet. The readback phase has no code in `scripts/browser/engine-render-browser.js` or `src/` beyond its phase name, so the readback stalls are recorded as measured and their code is not located.
+
+Category and cause rules for Phase B, applied to each stall after the fix. Starved: cgroup some pressure is at least 50% of the stall, which is host CPU contention from the 12 burn workers and is not a code defect. Cpu-bound: the renderer main thread ran at least 80% of the stall, and the cause is the dominant phase. Blocked: neither threshold, and the cause is the dominant phase, with the remainder recorded as waiting or below the sample resolution. Phase B writes one row per stall to `docs/stall-causes/round2-G1-r1.tsv` and `docs/stall-causes/round2-G1-r2.tsv`, with the frame, active count, total, tick, physics, readback, backend, CPU, pressure, category and cause.
+
+Witnesses in Phase B are appended below this line.

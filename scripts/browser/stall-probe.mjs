@@ -18,18 +18,17 @@ export function parseThreadLog(text) {
   })
 }
 
-export function rendererMainSeries(rows) {
-  const busiest = new Map()
+function mainThreadSeries(rows) {
+  const byPid = new Map()
   for (const row of rows) {
     if (row.type !== 'renderer' || row.tid !== row.pid) continue
-    busiest.set(row.pid, Math.max(busiest.get(row.pid) ?? 0, row.jiffies))
+    if (!byPid.has(row.pid)) byPid.set(row.pid, [])
+    byPid.get(row.pid).push({ t: row.t, jiffies: row.jiffies })
   }
-  if (busiest.size === 0) throw new RangeError('no renderer main thread in the thread log')
-  const pid = [...busiest.entries()].sort((a, b) => b[1] - a[1])[0][0]
-  return rows.filter((row) => row.type === 'renderer' && row.pid === pid && row.tid === pid).map((row) => ({ t: row.t, jiffies: row.jiffies }))
+  return byPid
 }
 
-function jiffiesAt(series, t) {
+function cumulativeAt(series, t) {
   if (series.length === 0 || t < series[0].t) return null
   let lo = 0
   let hi = series.length - 1
@@ -38,13 +37,29 @@ function jiffiesAt(series, t) {
     if (series[mid].t <= t) lo = mid
     else hi = mid - 1
   }
-  return series[lo].jiffies
+  if (lo === series.length - 1 || series[lo].t === t) return series[lo].jiffies
+  const next = series[lo + 1]
+  return series[lo].jiffies + ((t - series[lo].t) / (next.t - series[lo].t)) * (next.jiffies - series[lo].jiffies)
+}
+
+function gainInWindow(series, startMs, endMs) {
+  const first = series[0].jiffies
+  return (cumulativeAt(series, endMs) ?? first) - (cumulativeAt(series, startMs) ?? first)
+}
+
+export function rendererMainSeries(rows, startMs, endMs) {
+  if (!(endMs > startMs)) throw new TypeError('rendererMainSeries needs a window with startMs before endMs')
+  const byPid = mainThreadSeries(rows)
+  if (byPid.size === 0) throw new RangeError('no renderer main thread in the thread log')
+  const ranked = [...byPid.entries()].map(([pid, series]) => ({ pid, gain: gainInWindow(series, startMs, endMs), last: series[series.length - 1].jiffies }))
+  ranked.sort((a, b) => b.gain - a.gain || b.last - a.last)
+  return byPid.get(ranked[0].pid)
 }
 
 export function cpuMsBetween(series, startMs, endMs) {
   if (!(endMs > startMs)) return null
-  const a = jiffiesAt(series, startMs)
-  const b = jiffiesAt(series, endMs)
+  const a = cumulativeAt(series, startMs)
+  const b = cumulativeAt(series, endMs)
   if (a === null || b === null) return null
   return (b - a) * JIFFY_MS
 }
@@ -64,7 +79,9 @@ const median = (values) => {
 export function probeStalls(result, samples, threadRows) {
   const frames = framesFromResult(result)
   const attribution = attributeStalls(frames, samples)
-  const series = rendererMainSeries(threadRows)
+  const windowStart = Math.min(...frames.map((f) => f.startMs))
+  const windowEnd = Math.max(...frames.map((f) => f.startMs + f.totalMs))
+  const series = rendererMainSeries(threadRows, windowStart, windowEnd)
   const columns = result.rowColumns
   const tickAt = columns.indexOf('tickMs')
   const frameAt = columns.indexOf('frame')
