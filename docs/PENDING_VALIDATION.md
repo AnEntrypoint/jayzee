@@ -2163,3 +2163,24 @@ Hosted Actions is at its spending limit, so no hosted result exists for 76f26db 
 | Defect B, sampler gap and off-CPU wait | `scripts/browser/thread-sampling.mjs`, `scripts/browser/cpu-load.mjs` | sampler wake trace and burn-worker placement control, as recorded in the Defect B entry | OPEN. Needs a measurement that this pass does not run. |
 
 Phase B order for this section: `npm run check:gc-reuse-rows`, `npm run check:gc-witness`, `npm run check:browser-heap`, `npm run check:ci-engine-glue`, the engine builds in the CI order, `bash engine/test/build_host.sh`, then one `npm test`, then the Defect C pair. Defect A (the WebGPU adapter in the playwriter browser) was already witnessed in the 9b3d726 record and is rerun only if the browser is needed for Defect C.
+
+### Phase B results for the local close-out (run 2026-11-09-22-13-02-d298cd)
+
+Commits in this pass, both lanmower with no trailer: `5fe66b5` (`check:gc-reuse-rows`, wired into npm test) and `270df5b` (the rows above).
+
+- Engine glue, CI order: `bash engine/build.sh`, `ENGINE_TIER_MIB=128`, `ENGINE_VARIANT=leak`, `ENGINE_VARIANT=timed`, and `timed` at 128 MiB: exit 0 for all five. The timed 128 MiB wasm is `b3f25bbd…`, the same hash as the earlier record.
+- Jolt host library, CI configure and build flags into `build/host-jolt`: exit 0 (`libJolt.a` linked). Jolt pin: `git -C build/jolt rev-parse HEAD` is `0373ec0dd762e4bc2f6acdb08371ee84fa23c6db`, the CMake pin.
+- `bash engine/test/build_host.sh`: exit 0, 196 PASS, 0 FAIL, RESULT PASS.
+- `npm test` once, at `270df5b`: exit 0. 4761 PASS lines, 235 RESULT lines all PASS, 0 FAIL. Includes `check:gc-witness`, `check:browser-heap`, `check:ci-engine-glue`, `check:engine-artifacts` and the new `check:gc-reuse-rows` (7 PASS). Log: `build/diag/phaseB-npm-test.log`.
+- Defect A (playwriter adapter): `engine-render.html?phase=10&tier=1024&timed=1` run through the project playwriter browser at HEAD. The adapter is NVIDIA GeForce RTX 3060 Laptop GPU with `isFallbackAdapter` false, and the backend is `webgpu`. Closed.
+- Defect C (1024-tier checksum): the HEAD page gives checksum `-3826851758512048142`, visible `[729,746,747,750]`, errors `[]`, 600 frames, `allocationsSinceWarmup` 0, `createsAfterSeal` 0. These are the recorded values, so the witness value is `-3826851758512048142` and `[729,746,747,750]`. The 8711 state is the old page at f2b5c23. Run B (engine 15fcb7a with the f2b5c23 page) is still open. Cause: `scripts/bisect-render-1024.mjs` checks out each commit in the shared checkout, and it launches its own Chromium through `render-witness.mjs` rather than the playwriter browser. Running it would break INVARIANT 7 and INVARIANT 11 as the script stands, so it needs a change before it is run.
+- Defect B (sampler gap): OPEN, unchanged. It needs the wake trace and the burn-worker control, which this pass did not run.
+- W2 rows JM13, G2, JF5 and JF7: OPEN, as in the rows above, with the cause recorded there.
+
+Hosted-only gaps, with cause:
+
+- Hosted CI for 76f26db has no result. Cause: Actions is at its spending limit. The Jolt steps in `.github/workflows/ci.yml` are checked locally by the same configure and build commands and by `build_host.sh`, not on a hosted runner.
+- The Node 22 leg of the CI matrix did not run. Cause: only Node v24.22.0 is installed here. The package needs Node 22.3 or newer, so the 22 leg is unwitnessed.
+- The `actions/cache` and emsdk fetch steps of CI were not run. Cause: the same hosted runner is needed. The local emsdk at `build/emsdk` was used.
+
+Push: `git push origin main` runs once after this section is committed.
