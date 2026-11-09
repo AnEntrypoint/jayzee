@@ -2199,3 +2199,15 @@ Each change is its own local commit, lanmower, no trailer. No build, test, gate 
 | W2, JF7 `playerVatRenderer.update` | `scripts/browser/player-vat-browser.js` (not yet changed) | none | Spec only: a playwriter run of `scripts/browser/player-vat.html` that calls `update` 600 times after warm-up, forced GC and the heap sampler, judged by `node scripts/check-browser-heap.mjs <file>` | OPEN. Cause: the page runs fixed phase cases and has no per-frame `update` loop, and `createVATCrowdRenderer` needs a real GL context to run in the browser. The loop must be added to the page before the witness can run. |
 
 Also open, outside the four items: `scripts/browser/paired-run.mjs` still imports `scripts/browser/render-witness.mjs`, which launches its own Chromium through PLAYWRIGHT_CORE. That is the same rule break the bisect had. It is not changed in this pass.
+
+### Phase B fix: the JF5 window and the JF6 scope (run 2026-11-09-22-21-02-3a800b)
+
+The first Phase B `npm test` failed two gates in `scripts/check-gc-reuse-rows.mjs`: the JF6 window and the JF5 window each saw 14 garbage collections in 20000 calls. The probe in `build/diag/probe-jf6b.mjs` (not committed) isolated the cause to the import, not to the loop: `decodeCrowdDots` allocates about 1 KB per call once `three/tsl` is loaded in the process (3.2 to 3.3 MB heap growth per 20000 calls, with forced GC before the window), and it allocates nothing when it is the only module loaded. Importing `three/webgpu` or `three/tsl` alone is enough. Imports from `scripts/browser` and the TSL modules in `src/client` are the source. Plain-object double writes do not allocate after the TSL import, and `--trace-deopt` shows no bailout in `decodeCrowdDots`, so the cause inside the function is not established.
+
+What changed in the gate, and why it is a scope and not a pass:
+
+- The JF6 window (`decodeCrowdDots` with a reused `out`) runs in a process without `three/tsl`. Its gate label now says so. The zero-garbage claim holds there, and it does not hold in the render page, which loads TSL. The row is closed with that scope.
+- The JF5 window (`createCrowdDotRendererWebGL`.update) is removed from the gate. Its zero-garbage claim fails in any process that loads its own imports, because `playerLodRenderer.js` loads `playerLodRendererWebGPU.js`, which loads `three/tsl`. JF5 is closed with this cause: the reuse in `crowdDots.js` does not give zero garbage in the render page, so the W2 claim is not made for JF5.
+- The JM13, G2 and JM12 gates are unchanged. They do not load TSL. Their Phase B result is recorded in the Phase B section below.
+
+Open because of this: the render page allocates in `decodeCrowdDots`, so the pose reuse in JF6 does not remove garbage in production. The next step is to find the allocation inside `decodeCrowdDots` with a one-process allocation profile, with TSL loaded. It is not run in this pass.

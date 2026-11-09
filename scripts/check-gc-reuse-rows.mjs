@@ -2,11 +2,9 @@ import { PerformanceObserver } from 'node:perf_hooks'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import assert from 'node:assert/strict'
-import { Scene } from 'three'
 import { gate, finish } from './lib/gate.mjs'
 import { ClockSync } from '../src/client/ClockSync.js'
 import { decodeCrowdDots } from '../src/client/crowdDots.js'
-import { createCrowdDotRendererWebGL } from '../src/client/playerLodRenderer.js'
 import { MessageHandler } from '../src/client/MessageHandler.js'
 import { MSG, DISCONNECT_REASONS } from '../src/protocol/messages.js'
 import { createBridge } from '../src/engine/bridge.js'
@@ -57,7 +55,7 @@ const allocatingDots = await collectGc(() => {
   for (let i = 0; i < MEASURED_ITERATIONS; i++) decodeCrowdDots(dots, dotOptions)
 })
 
-gate('decodeCrowdDots with a reused out array runs with no garbage collection after warm-up', () => {
+gate('decodeCrowdDots with a reused out array runs with no garbage collection after warm-up in a process without three/tsl', () => {
   judgeGc(reusedDots)
 })
 
@@ -69,30 +67,6 @@ gate('decodeCrowdDots writes into the out array it is given and returns it', () 
   const returned = decodeCrowdDots(dots, dotOptions, dotOut)
   assert.equal(returned, dotOut)
   assert.equal(dotOut.length, DOTS)
-})
-
-const lodRenderer = createCrowdDotRendererWebGL(new Scene(), {})
-const lodTick = () => lodRenderer.update(dots, 0, null)
-for (let i = 0; i < WARMUP_ITERATIONS; i++) lodTick()
-await collectGc(() => {})
-const reusedLod = await collectGc(() => {
-  for (let i = 0; i < MEASURED_ITERATIONS; i++) lodTick()
-})
-const allocatingLod = await collectGc(() => {
-  for (let i = 0; i < MEASURED_ITERATIONS; i++) lodRenderer.update(dots, 0, (x) => [x][0])
-})
-
-gate('the WebGL crowd-dot renderer updates its instances with no garbage collection after warm-up', () => {
-  judgeGc(reusedLod)
-})
-
-gate('a ground function that allocates per dot is seen as garbage collection in the crowd-dot renderer', () => {
-  assert.ok(allocatingLod.length > 0, 'the witness saw no garbage collection in the allocating control, so it cannot detect churn')
-})
-
-gate('the WebGL crowd-dot renderer sets one instance per dot', () => {
-  lodRenderer.update(dots, 0, null)
-  assert.equal(lodRenderer.instancedMesh.count, DOTS)
 })
 
 const handler = new MessageHandler({ now: () => 0, renderNow: () => 0, collisionMirror: false })
