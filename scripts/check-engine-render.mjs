@@ -109,11 +109,12 @@ gate('uploads go through queue writes or texSubImage, never mapped ranges', () =
   assert.ok(sources['engine/src/render/render_webgl2.cpp'].includes('glTexSubImage3D'))
 })
 
-gate('the indirect args live in one buffer shared by every indirect draw and dispatch', () => {
+gate('the indirect args live in one buffer, written by queue writes from the CPU-culled records', () => {
   const webgpu = sources['engine/src/render/render_webgpu.cpp']
   assert.equal([...webgpu.matchAll(/argsBuf/g)].length >= 6, true)
-  assert.ok(webgpu.includes('DispatchWorkgroupsIndirect(argsBuf'))
+  assert.ok(webgpu.includes('writeBuffer(argsBuf'))
   assert.ok(webgpu.includes('DrawIndirect(argsBuf'))
+  assert.ok(!webgpu.includes('DispatchWorkgroups'), 'the WebGPU frame has no compute dispatch')
 })
 
 gate('pipelines are compiled in init only, and a sealed registry refuses a create', () => {
