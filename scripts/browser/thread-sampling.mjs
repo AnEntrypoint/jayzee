@@ -120,3 +120,24 @@ export const pressureMsBetweenTicks = (ticks, key, startMs, endMs) => {
   const b = interpolateAt(points, endMs)
   return a === null || b === null ? null : (b - a) / 1000
 }
+
+export const gapCauses = (ticks, intervalMs, shareOfExcess = 0.8) => {
+  if (!(intervalMs > 0)) throw new TypeError('gapCauses needs a positive interval')
+  const causes = []
+  for (let i = 1; i < ticks.length; i += 1) {
+    const prev = ticks[i - 1]
+    const row = ticks[i]
+    const gapMs = row.t - prev.t
+    if (gapMs <= 2 * intervalMs) continue
+    const excessMs = gapMs - intervalMs
+    const selfWaitMs = (row.selfWaitNs - prev.selfWaitNs) / 1e6
+    const selfRunMs = (row.selfRunNs - prev.selfRunNs) / 1e6
+    const cause = selfWaitMs >= shareOfExcess * excessMs
+      ? 'run-queue-wait'
+      : row.workMs >= shareOfExcess * excessMs
+        ? 'sampler-work'
+        : 'unattributed'
+    causes.push({ t: row.t, gapMs, excessMs, selfWaitMs, selfRunMs, workMs: row.workMs, cause })
+  }
+  return causes
+}

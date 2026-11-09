@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { gate, finish } from './lib/gate.mjs'
 import { offCpuForStalls, summariseOffCpu } from './browser/stall-off-cpu.mjs'
-import { categoryOfWchan, offCpuWindow, parsePressureTotal, parseSchedLog, parseSchedStat, parseTicksLog, parseStat, pressureMsBetweenTicks } from './browser/thread-sampling.mjs'
+import { categoryOfWchan, gapCauses, offCpuWindow, parsePressureTotal, parseSchedLog, parseSchedStat, parseTicksLog, parseStat, pressureMsBetweenTicks } from './browser/thread-sampling.mjs'
 
 const schedRows = parseSchedLog([
   '0 9 0 0 0 0 0 0',
@@ -107,6 +107,15 @@ gate('pressureMsBetweenTicks converts the cgroup some total from microseconds an
   const ticks = parseTicksLog('0 0 0 0 0 0\n100 50000 0 0 0 0\n200 -1 0 0 0 0\n')
   assert.equal(pressureMsBetweenTicks(ticks, 'memSomeUs', 0, 100), 50)
   assert.equal(pressureMsBetweenTicks(ticks, 'memSomeUs', 150, 200), null)
+})
+
+gate('gapCauses names an over-limit gap as run-queue wait, sampler work or unattributed, and ignores gaps within twice the interval', () => {
+  const waited = parseTicksLog('0 0 0 0 0 0\n150 0 0 0 102000000 1\n')
+  assert.deepEqual(gapCauses(waited, 50), [{ t: 150, gapMs: 150, excessMs: 100, selfWaitMs: 102, selfRunMs: 0, workMs: 1, cause: 'run-queue-wait' }])
+  assert.equal(gapCauses(parseTicksLog('0 0 0 0 0 0\n150 0 0 0 0 90\n'), 50)[0].cause, 'sampler-work')
+  assert.equal(gapCauses(parseTicksLog('0 0 0 0 0 0\n150 0 0 0 0 1\n'), 50)[0].cause, 'unattributed')
+  assert.deepEqual(gapCauses(parseTicksLog('0 0 0 0 0 0\n100 0 0 0 0 0\n'), 50), [])
+  assert.throws(() => gapCauses(waited, 0), TypeError)
 })
 
 finish()
