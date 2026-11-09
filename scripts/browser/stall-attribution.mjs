@@ -2,13 +2,13 @@ import { readFileSync } from 'node:fs'
 
 export function parseThrottleLog(text) {
   return String(text).split('\n').filter((line) => line !== '').map((line) => {
-    const [t, throttledUs, usageUs] = line.split(' ').map(Number)
-    if (![t, throttledUs, usageUs].every(Number.isFinite)) throw new TypeError('throttle line is not three numbers: ' + line)
-    return { t, throttledUs, usageUs }
+    const [t, throttledUs, usageUs, someUs, fullUs] = line.split(' ').map(Number)
+    if (![t, throttledUs, usageUs, someUs, fullUs].every(Number.isFinite)) throw new TypeError('throttle line is not five numbers: ' + line)
+    return { t, throttledUs, usageUs, someUs, fullUs }
   })
 }
 
-function throttledUsAt(samples, t) {
+function fullUsAt(samples, t) {
   let lo = 0
   let hi = samples.length - 1
   while (hi - lo > 1) {
@@ -18,14 +18,14 @@ function throttledUsAt(samples, t) {
   }
   const a = samples[lo]
   const b = samples[hi]
-  if (b.t === a.t) return a.throttledUs
-  return a.throttledUs + ((t - a.t) / (b.t - a.t)) * (b.throttledUs - a.throttledUs)
+  if (b.t === a.t) return a.fullUs
+  return a.fullUs + ((t - a.t) / (b.t - a.t)) * (b.fullUs - a.fullUs)
 }
 
-export function throttledMs(samples, startMs, endMs) {
+export function starvedMs(samples, startMs, endMs) {
   if (samples.length < 2 || !(endMs > startMs)) return null
   if (startMs < samples[0].t || endMs > samples[samples.length - 1].t) return null
-  return (throttledUsAt(samples, endMs) - throttledUsAt(samples, startMs)) / 1000
+  return (fullUsAt(samples, endMs) - fullUsAt(samples, startMs)) / 1000
 }
 
 const median = (values) => {
@@ -40,19 +40,19 @@ export function attributeStalls(frames, samples, { factor = 1.5, share = 0.5 } =
   for (const f of frames) {
     if (!(f.totalMs > factor * base)) continue
     const excessMs = f.totalMs - base
-    const throttled = throttledMs(samples, f.startMs, f.startMs + f.totalMs)
-    const verdict = throttled === null ? 'uncovered' : throttled >= share * excessMs ? 'throttled' : 'unexplained'
-    stalls.push({ frame: f.frame, startMs: f.startMs, totalMs: f.totalMs, excessMs, throttledMs: throttled, verdict })
+    const starved = starvedMs(samples, f.startMs, f.startMs + f.totalMs)
+    const verdict = starved === null ? 'uncovered' : starved >= share * excessMs ? 'starved' : 'unexplained'
+    stalls.push({ frame: f.frame, startMs: f.startMs, totalMs: f.totalMs, excessMs, starvedMs: starved, verdict })
   }
   const normal = frames.filter((f) => !(f.totalMs > factor * base))
-  const normalThrottled = normal.map((f) => throttledMs(samples, f.startMs, f.startMs + f.totalMs)).filter((v) => v !== null)
-  const counts = { throttled: 0, unexplained: 0, uncovered: 0 }
+  const normalStarved = normal.map((f) => starvedMs(samples, f.startMs, f.startMs + f.totalMs)).filter((v) => v !== null)
+  const counts = { starved: 0, unexplained: 0, uncovered: 0 }
   for (const s of stalls) counts[s.verdict] += 1
   return {
     medianMs: base,
     stallCount: stalls.length,
     counts,
-    normalThrottledMeanMs: normalThrottled.length ? normalThrottled.reduce((a, b) => a + b, 0) / normalThrottled.length : null,
+    normalStarvedMeanMs: normalStarved.length ? normalStarved.reduce((a, b) => a + b, 0) / normalStarved.length : null,
     stalls,
   }
 }
