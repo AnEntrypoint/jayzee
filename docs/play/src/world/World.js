@@ -8,15 +8,15 @@ const BOX_WORDS = 6
 const FNV_OFFSET = 0x811c9dc5
 const FNV_PRIME = 0x01000193
 
-const fnvWords = (hash, words) => {
+const fnvWords = (hash, words, length = words.length) => {
   let h = hash
-  for (let i = 0; i < words.length; i++) h = Math.imul(h ^ words[i], FNV_PRIME)
+  for (let i = 0; i < length; i++) h = Math.imul(h ^ words[i], FNV_PRIME)
   return h
 }
 
 export class World {
   #memory
-  #kernel
+  #step
   #capacity
   #tickRate
   #gravity
@@ -34,12 +34,14 @@ export class World {
   #count = 0
   #tick = 0
   #accumulator = 0
+  #views = new Map()
+  #words = new Map()
 
   constructor(options = {}) {
     const resolved = resolveWorldOptions(options)
     const instance = instantiateKernel()
     this.#memory = instance.memory
-    this.#kernel = instance.exports
+    this.#step = instance.instance.exports.step
     this.#capacity = resolved.capacity
     this.#tickRate = resolved.tickRate
     this.#gravity = resolved.gravity
@@ -80,14 +82,14 @@ export class World {
     return id
   }
 
-  position(id) {
+  position(id, out = []) {
     this.#checkId(id)
-    return Array.from(this.#view(this.#position).subarray(id * 3, id * 3 + 3))
+    return this.#copyBody(this.#position, id, out)
   }
 
-  velocity(id) {
+  velocity(id, out = []) {
     this.#checkId(id)
-    return Array.from(this.#view(this.#velocity).subarray(id * 3, id * 3 + 3))
+    return this.#copyBody(this.#velocity, id, out)
   }
 
   setVelocity(id, velocity) {
@@ -97,7 +99,7 @@ export class World {
   }
 
   step() {
-    this.#kernel.step(
+    this.#step(
       this.#position,
       this.#velocity,
       this.#count,
@@ -130,10 +132,8 @@ export class World {
   }
 
   hash() {
-    const positions = this.#view(this.#position).subarray(0, this.#count * 3)
-    const velocities = this.#view(this.#velocity).subarray(0, this.#count * 3)
-    const words = (view) => new Uint32Array(view.buffer, view.byteOffset, view.length * 2)
-    return fnvWords(fnvWords(FNV_OFFSET, words(positions)), words(velocities)) >>> 0
+    const wordCount = this.#count * 6
+    return fnvWords(fnvWords(FNV_OFFSET, this.#wordsOf(this.#position), wordCount), this.#wordsOf(this.#velocity), wordCount) >>> 0
   }
 
   snapshot() {
@@ -172,7 +172,31 @@ export class World {
   }
 
   #view(handle) {
-    return this.#memory.read(handle)
+    const buffer = this.#memory.buffer
+    const cached = this.#views.get(handle)
+    if (cached !== undefined && cached.buffer === buffer) return cached.view
+    const view = this.#memory.read(handle)
+    this.#views.set(handle, { buffer, view })
+    return view
+  }
+
+  #wordsOf(handle) {
+    const buffer = this.#memory.buffer
+    const cached = this.#words.get(handle)
+    if (cached !== undefined && cached.buffer === buffer) return cached.words
+    const view = this.#view(handle)
+    const words = new Uint32Array(view.buffer, view.byteOffset, this.#capacity * 6)
+    this.#words.set(handle, { buffer, words })
+    return words
+  }
+
+  #copyBody(handle, id, out) {
+    const view = this.#view(handle)
+    const base = id * 3
+    out[0] = view[base]
+    out[1] = view[base + 1]
+    out[2] = view[base + 2]
+    return out
   }
 
   #checkId(id) {

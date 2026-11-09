@@ -8,9 +8,13 @@ const WARMUP_TICKS = 2000
 const MEASURED_TICKS = 20000
 const CONTROL_TICKS = 20000
 
+assert.equal(typeof globalThis.gc, 'function', 'run with node --expose-gc so the heap can be settled before each window')
+
 const kindOf = (entry) => (entry.detail && entry.detail.kind !== undefined ? entry.detail.kind : entry.kind)
 
 const collectGc = async (run) => {
+  globalThis.gc()
+  globalThis.gc()
   const kinds = []
   const observer = new PerformanceObserver((list) => {
     for (const entry of list.getEntries()) kinds.push(kindOf(entry))
@@ -41,6 +45,8 @@ const reusedTick = () => {
 }
 
 for (let i = 0; i < WARMUP_TICKS; i++) reusedTick()
+
+await collectGc(() => {})
 
 const measured = await collectGc(() => {
   for (let i = 0; i < MEASURED_TICKS; i++) reusedTick()

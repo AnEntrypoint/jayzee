@@ -2046,3 +2046,25 @@ Still needed (Phase B). A page that runs the engine render path for 600 frames a
 - `scripts/check-gc-witness.mjs`, `scripts/check-browser-heap.mjs`, `scripts/browser/heap-witness.mjs`: the two gates and the witness helper.
 - `package.json`: `check:gc-witness` and `check:browser-heap`, both appended to `test`.
 - this ledger section.
+
+## Phase B on the reuse pass: results (W7 FAILS, push held)
+
+The run order and results, as measured in this pass.
+
+- Gate fixes made during Phase B, both in `scripts/check-gc-witness.mjs`. (1) The gate runs under `node --expose-gc` and calls `gc()` twice before each observed window, so a major collection left from earlier work is not counted. An empty window through the same path showed one collection on the first observer use, and a major collection ([8,4]) showed in other runs; neither came from the reused path. (2) The gate's measurement is unchanged: the observer window is still async, because a synchronous `takeRecords()` read sees no `gc` entries, and the control then fails. Witness: the control still shows garbage collection; 5 of 5 runs through `npm run check:gc-witness` pass.
+- `npm run build:kernel`: exit 0.
+- `npm test`, first run: exit 1 at `check:site`, because `docs/play/src/world/World.js` was stale. Rebuilt by `node scripts/build-site.mjs`: 18 files written; `git diff --stat docs/play` is 1 file, 38 insertions and 14 deletions (the World.js copy).
+- `npm test`, fourth run, after the gate fix: exit 0, PASS 4749, FAIL 0, every chain RESULT PASS.
+- Named gates for the reuse rows. 22 are in the test chain and passed in that run. Six run on their own: `check:engine-world` (13 PASS), `check:engine-render` (17), `check:engine-bridge` (8), `check:engine-tiers` (6), `check:engine-pools` (7), `check:engine-leak` (3); each exit 0, RESULT PASS.
+- Native host witness, `bash engine/test/build_host.sh`: exit 0, 196 PASS, 0 FAIL, RESULT PASS.
+- Timed 128 MiB engine rebuild, `ENGINE_VARIANT=timed ENGINE_TIER_MIB=128`: exit 0, sha256 `b3f25bbd…`. The output is git-ignored and unpinned.
+- Playwriter adapter check, inside gm, on `serve-root.mjs` (PID 2296140, port 8843): `navigator.gpu.requestAdapter()` returned a non-fallback adapter on all five tries. Written to `build/diag/witness/playwriter-adapter.json`. Adapter: NVIDIA GeForce RTX 3060 Laptop GPU, `isFallbackAdapter: false`.
+- 1024 render witness, playwriter page `engine-render.html?phase=10&tier=1024&timed=1`: checksum `-3826851758512048142`, visible `[729,746,747,750]`, 600 frames, 0 errors, backend webgpu, `allocationsSinceWarmup` "0", `createsAfterSeal` 0. Written to `build/diag/witness/render-1024.json`. Both expected values match.
+- W7 heap window, same page, CDP heap after forced GC, 48 samples. Written to `build/diag/witness/heap-1024.json`. `node scripts/check-browser-heap.mjs build/diag/witness/heap-1024.json`: FAIL, "JS heap grew 560160 bytes over the window, above 65536". The first sample (731176 bytes) is taken at page load, before the first frame; sample 1 is 1173700, and the last is 1291336. From sample 6 (about 6 s in, 1218684) to the last, growth is 72652 bytes, still above the bound. The series is not monotonic (it dips to 1255464 at sample 46 and peaks at 1600068 at sample 39). The page's own per-frame retention is small: one `frameTimes` push per frame, and `lastStats` is replaced, not kept. The cause is not found. Candidates not measured: JIT and code growth, and engine or renderer state kept per frame. The bound is not relaxed.
+
+Consequence. W7 is not witnessed, so the push is held. The reuse pass is committed locally, and origin main is not updated.
+
+Open items.
+- W7: find what retains about 70 to 90 KB over the post-warm-up window, or show it is code growth, then rerun. The window also needs a warm-up mark: the page's `markWarmup()` at frame `WARMUP_FRAMES` is not visible to the sampler.
+- Pins: `engine/artifacts.json` still pins the fixed-64, fixed-128 and leak-64 binaries built before the reuse pass's C++ edits. Those binaries are not rebuilt, so the pins are stale against the sources. A rebuild needs a re-pin.
+- W2 covers `World` only. The other W2 rows (G2, JF5, JF6, JF7, JM12, JM13) still need their own runs.

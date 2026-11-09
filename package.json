@@ -282,7 +282,7 @@
     "check:engine-leak": "node scripts/check-engine-leak.mjs engine/out/engine-core-64mib-leak.mjs",
     "gen:engine-codec-fixtures": "node scripts/gen-engine-codec-fixtures.mjs",
     "check:client-resource-pools": "node scripts/check-client-resource-pools.mjs",
-    "check:gc-witness": "node scripts/check-gc-witness.mjs",
+    "check:gc-witness": "node --expose-gc scripts/check-gc-witness.mjs",
     "check:browser-heap": "node scripts/check-browser-heap.mjs"
   },
   "dependencies": {
