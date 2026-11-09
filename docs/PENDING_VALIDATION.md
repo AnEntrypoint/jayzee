@@ -887,3 +887,40 @@ Stamps and load across all 16 draw-on runs (Phase C and D). Correlation of physi
 Draw-off hypothesis. The hypothesis predicts a persistent WebGPU-slower physics gap that disappears with the backend frame skipped. There is no persistent gap under the bound, so there is nothing for it to explain. The only draw-off pair cannot test it: WebGPU draw0 r1 (`build/diag/phaseC-webgpu-draw0-r1.json`, physics 42.30, load 3.42→3.90) passes the load bound but records no checksum, and WebGL2 draw0 r1 (physics 101.50, load 3.90→6.54) records none either and is 2.5 times the clean physics values. Neither is kept.
 
 Consequence for the item. The physics item in Phase B is closed as noise. Any future physics gap claim needs a kept pair with load under 8 and a paired difference above 0.5 ms with a consistent sign across at least four pairs, and a draw-off run that records its checksum (`draw=0` currently skips the stats, so it cannot).
+
+## Long-frame stalls at 1024: capture and cause (Phase A)
+
+Question. The 1024 tier shows long frames: WebGPU up to 705 ms (set 2) and WebGL2 362.9 ms (an unsaved outlier). The earlier diagnosis recorded host CPU sharing as the cause and did not prove it. This section captures the stall frames with the phase split, and tests whether they land in the same frames in both backends.
+
+Test 1, same frame in both backends, from the 16 saved draw-on runs (`build/diag/phaseC-*`, `phaseD-*`). A stall is a physics phase above 1.5 times that run's physics median. The simulation is deterministic (the checksum is identical in every run), so a simulation-driven cost would recur at the same frame index in both backends.
+
+| Round | WebGPU spikes | WebGL2 spikes | Frames shared |
+|---|---|---|---|
+| C1 | 0 | 0 | 0 |
+| C2 | 0 | 0 | 0 |
+| C3 | 1 | 0 | 0 |
+| D1 | 2 | 0 | 0 |
+| D2 | 0 | 1 | 0 |
+| D3 | 0 | 20 | 0 |
+| D4 | 66 | 136 | 0 |
+| D5 | 0 | 1 | 0 |
+
+No frame index is a spike in both backends in any round. The spikes are rare in the clean rounds (load under 4) and common in the loaded rounds (D3 and D4, load 8 to 18). The spikes are the physics phase, not the render call. The tick is the time, and physics is most of the tick.
+
+Test 2, where the render-side stalls sit. WebGPU D1 frame 233 spent 95 ms in the render call, all of it in the wasm backend scope. WebGPU D1 frame 174 spent 67 ms in the render call with the backend scope at 0 ms, so the time is outside the scoped calls. In the other 15 runs the render call stays under 8 ms. The backend scope covers `frame()`, which calls `surface.GetCurrentTexture` (Fifo present mode, `render_webgpu.cpp`), the upload writes, and `queue.Submit`. The scope does not separate these, so the blocking call is not yet known.
+
+Cause, as far as the saved data goes. The physics spikes do not repeat across backends and scale with host load, so they are not simulation cost. They are host CPU sharing, consistent with the earlier cgroup finding, but the active-body count per frame is needed to rule out sim work inside a spike. The WebGPU render stalls point at the present path or GPU contention, and are not yet attributed to a call.
+
+Phase A changes (code and pins; no change to the logic of any frame).
+
+1. `engine/src/phase_timer.h`: three phases added, `kAcquire` (6), `kUpload` (7), `kSubmit` (8), and `kCount` is now 9.
+2. `engine/src/render/render_webgpu.cpp`: `frame()` scopes the upload writes as `kUpload`, `surface.GetCurrentTexture` and the view creation as `kAcquire`, and `queue.Submit` as `kSubmit`.
+3. `engine/src/render/render_webgl2.cpp`: `frame()` scopes its buffer and texture uploads as `kUpload`, so both backends split the same way.
+4. `engine/src/world.h`, `engine/src/world.cpp`, `engine/src/engine_core.cpp`, `engine/CMakeLists.txt`: `World::activeBodies()` reads the Jolt active rigid body count, and `engine_sim_active_bodies` is exported in the timed build only (added to `_engine_sim_active_bodies` in the export list).
+5. `scripts/browser/engine-render-browser.js`: the per-frame rows gain an `active` column after `gapMs`, and the phase names gain `acquire`, `upload` and `submit`.
+6. `engine/artifacts.json`: the three pinned hashes are updated, because the wasm bytes changed. The logic is the same. The new scopes are no-ops in the fixed build, but they change the code layout. Rebuilt from the edited source: fixed 64 MiB `9d8229e5…` (was `c678dd95…`), fixed 128 MiB `aacc85b5…` (was `bbcb9361…`, which is reproduced by a build from HEAD with the edits stashed), leak 64 MiB `d0bdd282…` (was `c411d496…`). The fixed 128 MiB build gave `aacc85b5…` on two separate builds from the same source.
+7. The timed 128 MiB module builds from the same source as `6159f169…`. It is not pinned.
+
+Witness for Phase A. `check:engine-artifacts` 7 PASS, `check:engine-core` 4 PASS, `check:engine-leak` 4 PASS, `check:engine-render` 18 PASS, `check:engine-host-witness` 197 PASS, `check:timed-result` 11 PASS. Each is `RESULT: PASS`. The render gate reports 18 PASS, where the earlier record says 17. That gate is not changed here, so the extra line needs a look before it is quoted.
+
+Phase B plan. Run the alternating WebGPU and WebGL2 timed 1024 runs (draw on) with load and CPU and GPU stamps per run, and quote the stall frames with their phase split side by side. Record whether the physics spikes coincide across backends again, now with the active-body count per frame, and whether the WebGPU render stalls land in acquire, upload or submit.

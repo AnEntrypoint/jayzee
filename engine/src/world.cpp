@@ -436,6 +436,10 @@ std::uint32_t World::physicsBodies() const {
   return runtime_ == nullptr ? 0 : runtime_->physics.GetNumBodies() - (capacity_ - live_);
 }
 
+std::uint32_t World::activeBodies() const {
+  return runtime_ == nullptr ? 0 : runtime_->physics.GetNumActiveBodies(JPH::EBodyType::RigidBody);
+}
+
 int World::resolve(std::uint32_t handle) const {
   const std::uint32_t slot = handle & kSlotMask;
   if (slot >= fresh_ || alive_[slot] == 0) return -1;

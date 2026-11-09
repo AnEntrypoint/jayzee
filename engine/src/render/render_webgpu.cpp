@@ -4,6 +4,7 @@
 #include <webgpu/webgpu_cpp.h>
 
 #include "../page_cache.h"
+#include "../phase_timer.h"
 
 namespace engine::render::webgpu {
 
@@ -445,38 +446,45 @@ int init(const char* selector, std::uint32_t width, std::uint32_t height) {
 int frame(const SceneView& scene, const FramePlan& plan, const Camera& camera) {
   if (!ready) return engine::kNotConfigured;
 
-  writeBuffer(cameraBuf, 0, &camera, kCameraBytes);
-  std::uint32_t propArgs[kPropClasses * 4];
-  for (std::uint32_t c = 0; c < kPropClasses; ++c) {
-    const std::uint32_t count = plan.propCount[c];
-    if (count != 0) {
-      writeBuffer(instanceBuf[c], 0, plan.propRecords + c * kBodySlots * kRecordWords, static_cast<std::uint64_t>(count) * kRecordBytes);
+  {
+    engine::phase::Scope scope(engine::phase::kUpload);
+    writeBuffer(cameraBuf, 0, &camera, kCameraBytes);
+    std::uint32_t propArgs[kPropClasses * 4];
+    for (std::uint32_t c = 0; c < kPropClasses; ++c) {
+      const std::uint32_t count = plan.propCount[c];
+      if (count != 0) {
+        writeBuffer(instanceBuf[c], 0, plan.propRecords + c * kBodySlots * kRecordWords, static_cast<std::uint64_t>(count) * kRecordBytes);
+      }
+      propArgs[c * 4 + 0] = kPropVertices;
+      propArgs[c * 4 + 1] = count;
+      propArgs[c * 4 + 2] = 0;
+      propArgs[c * 4 + 3] = 0;
     }
-    propArgs[c * 4 + 0] = kPropVertices;
-    propArgs[c * 4 + 1] = count;
-    propArgs[c * 4 + 2] = 0;
-    propArgs[c * 4 + 3] = 0;
-  }
-  writeBuffer(argsBuf, kArgsPropWord * 4, propArgs, sizeof propArgs);
-  const std::uint32_t terrainArgs[4] = {kPageVertices, plan.pageCount, 0, 0};
-  writeBuffer(argsBuf, kArgsTerrainWord * 4, terrainArgs, sizeof terrainArgs);
-  writeBuffer(lightBuf, 0, scene.lights, kLightBytes);
-  writeBuffer(materialBuf, 0, plan.materialWords, kMaterialBytes);
-  writeBuffer(pageBuf, 0, plan.pageRecords, kPageBytes);
+    writeBuffer(argsBuf, kArgsPropWord * 4, propArgs, sizeof propArgs);
+    const std::uint32_t terrainArgs[4] = {kPageVertices, plan.pageCount, 0, 0};
+    writeBuffer(argsBuf, kArgsTerrainWord * 4, terrainArgs, sizeof terrainArgs);
+    writeBuffer(lightBuf, 0, scene.lights, kLightBytes);
+    writeBuffer(materialBuf, 0, plan.materialWords, kMaterialBytes);
+    writeBuffer(pageBuf, 0, plan.pageRecords, kPageBytes);
 
-  for (std::uint32_t u = 0; u < plan.uploadCount; ++u) {
-    writeLayer(heightTex, plan.uploadLayer[u], scene.pages->pageSamples(static_cast<int>(plan.uploadSlot[u])), kPageSide, 4);
-  }
-  for (std::uint32_t layer = 0; layer < kAlbedoLayers; ++layer) {
-    if (plan.albedoPending[layer] == 0) continue;
-    writeLayer(albedoTex, layer, scene.albedoPixels + layer * kAlbedoBytes, kAlbedoSide, 4);
+    for (std::uint32_t u = 0; u < plan.uploadCount; ++u) {
+      writeLayer(heightTex, plan.uploadLayer[u], scene.pages->pageSamples(static_cast<int>(plan.uploadSlot[u])), kPageSide, 4);
+    }
+    for (std::uint32_t layer = 0; layer < kAlbedoLayers; ++layer) {
+      if (plan.albedoPending[layer] == 0) continue;
+      writeLayer(albedoTex, layer, scene.albedoPixels + layer * kAlbedoBytes, kAlbedoSide, 4);
+    }
   }
 
   wgpu::CommandEncoder encoder = ENGINE_RENDER_CALL(device.CreateCommandEncoder());
 
   wgpu::SurfaceTexture surfaceTexture{};
-  ENGINE_RENDER_CALL(surface.GetCurrentTexture(&surfaceTexture));
-  wgpu::TextureView target = ENGINE_RENDER_CALL(surfaceTexture.texture.CreateView());
+  wgpu::TextureView target;
+  {
+    engine::phase::Scope scope(engine::phase::kAcquire);
+    ENGINE_RENDER_CALL(surface.GetCurrentTexture(&surfaceTexture));
+    target = ENGINE_RENDER_CALL(surfaceTexture.texture.CreateView());
+  }
 
   wgpu::RenderPassColorAttachment colour{};
   colour.view = target;
@@ -505,7 +513,10 @@ int frame(const SceneView& scene, const FramePlan& plan, const Camera& camera) {
   ENGINE_RENDER_CALL(pass.End());
 
   wgpu::CommandBuffer commands = ENGINE_RENDER_CALL(encoder.Finish());
-  ENGINE_RENDER_CALL(queue.Submit(1, &commands));
+  {
+    engine::phase::Scope scope(engine::phase::kSubmit);
+    ENGINE_RENDER_CALL(queue.Submit(1, &commands));
+  }
   return engine::kOk;
 }
 

@@ -249,6 +249,10 @@ EMSCRIPTEN_KEEPALIVE double engine_phase_total_ms(int id) {
 EMSCRIPTEN_KEEPALIVE int engine_phase_count() {
   return static_cast<int>(engine::phase::kCount);
 }
+
+EMSCRIPTEN_KEEPALIVE int engine_sim_active_bodies() {
+  return static_cast<int>(engine::world().activeBodies());
+}
 #endif
 
 EMSCRIPTEN_KEEPALIVE std::uint64_t engine_ticks() {

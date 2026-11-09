@@ -189,7 +189,7 @@ set(ENGINE_EXPORTS
   _engine_texture_live_count
   _engine_texture_remove)
 if(ENGINE_PHASE_TIMERS)
-  list(APPEND ENGINE_EXPORTS _engine_phase_total_ms _engine_phase_count)
+  list(APPEND ENGINE_EXPORTS _engine_phase_total_ms _engine_phase_count _engine_sim_active_bodies)
 endif()
 string(JOIN "," ENGINE_EXPORT_LIST ${ENGINE_EXPORTS})
 

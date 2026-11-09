@@ -170,7 +170,7 @@ const run = async () => {
   const aspect = canvas.width / canvas.height
   const frameTimes = []
   const frameRows = []
-  const PHASE_NAMES = ['pages', 'inputs', 'physics', 'readback', 'plan', 'backend']
+  const PHASE_NAMES = ['pages', 'inputs', 'physics', 'readback', 'plan', 'backend', 'acquire', 'upload', 'submit']
   const phaseCount = TIMED && module._engine_phase_count ? module._engine_phase_count() : 0
   const readPhases = () => Array.from({ length: phaseCount }, (_, i) => module._engine_phase_total_ms(i))
   let lastStats = null
@@ -192,7 +192,7 @@ const run = async () => {
         const phasesAfter = readPhases()
         const totalMs = performance.now() - started
         frameTimes.push(totalMs)
-        frameRows.push({ frame, started, tickMs: tickEnd - started, renderMs: totalMs - (tickEnd - started), totalMs, gapMs: lastStarted === null ? null : started - lastStarted, phases: phasesAfter.map((v, i) => v - phasesBefore[i]) })
+        frameRows.push({ frame, started, tickMs: tickEnd - started, renderMs: totalMs - (tickEnd - started), totalMs, gapMs: lastStarted === null ? null : started - lastStarted, active: TIMED ? module._engine_sim_active_bodies() : null, phases: phasesAfter.map((v, i) => v - phasesBefore[i]) })
         lastStarted = started
         if (frame === WARMUP_FRAMES) renderer.markWarmup()
         if (frame >= WARMUP_FRAMES) lastStats = renderer.stats()
@@ -223,8 +223,8 @@ const run = async () => {
   result.outliers = timedRows.filter((row) => row.totalMs > 2 * result.frameTimeMedianMs).map((row) => ({ frame: row.frame, wallMs: Math.round(performance.timeOrigin + row.started), totalMs: round2(row.totalMs), tickMs: round2(row.tickMs), renderMs: round2(row.renderMs), gapMs: row.gapMs === null ? null : round2(row.gapMs), phasesMs: Object.fromEntries(row.phases.map((v, i) => [PHASE_NAMES[i], round2(v)])) }))
   result.phaseMedianMs = Object.fromEntries(PHASE_NAMES.slice(0, phaseCount).map((name, i) => [name, round2(median(timedRows.map((row) => row.phases[i])))]))
   result.phaseMaxMs = Object.fromEntries(PHASE_NAMES.slice(0, phaseCount).map((name, i) => [name, round2(Math.max(...timedRows.map((row) => row.phases[i])))]))
-  result.rowColumns = ['frame', 'tickMs', 'renderMs', 'gapMs', ...PHASE_NAMES.slice(0, phaseCount)]
-  result.rows = timedRows.map((row) => [row.frame, round2(row.tickMs), round2(row.renderMs), row.gapMs === null ? null : round2(row.gapMs), ...row.phases.map((v) => round2(v))])
+  result.rowColumns = ['frame', 'tickMs', 'renderMs', 'gapMs', 'active', ...PHASE_NAMES.slice(0, phaseCount)]
+  result.rows = timedRows.map((row) => [row.frame, round2(row.tickMs), round2(row.renderMs), row.gapMs === null ? null : round2(row.gapMs), row.active, ...row.phases.map((v) => round2(v))])
   if (DRAW) {
     result.apiCallsPerFrame = lastStats.apiCallsLastFrame
     result.allocationsSinceWarmup = String(lastStats.allocationsSinceWarmup)

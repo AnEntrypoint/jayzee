@@ -104,6 +104,7 @@ class World {
   std::uint32_t slotExtent() const { return fresh_; }
   std::uint32_t retiredSlots() const { return retired_; }
   std::uint32_t physicsBodies() const;
+  std::uint32_t activeBodies() const;
   std::uint64_t tick() const { return tick_; }
   std::uint32_t bodyCapacity() const { return limits_.bodies; }
   const double* positions() const { return positions_; }

@@ -6,6 +6,7 @@
 #include <emscripten/html5.h>
 
 #include "../page_cache.h"
+#include "../phase_timer.h"
 
 namespace engine::render::webgl2 {
 
@@ -335,26 +336,29 @@ int init(const char* selector, std::uint32_t width, std::uint32_t height) {
 int frame(const SceneView& scene, const FramePlan& plan, const Camera& camera) {
   if (!ready) return engine::kNotConfigured;
 
-  ENGINE_RENDER_CALL(glBindBuffer(GL_UNIFORM_BUFFER, frameUbo));
-  ENGINE_RENDER_CALL(glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(Camera), &camera));
-  ENGINE_RENDER_CALL(glBindBuffer(GL_UNIFORM_BUFFER, materialUbo));
-  ENGINE_RENDER_CALL(glBufferSubData(GL_UNIFORM_BUFFER, 0, kMaterialBlockBytes, plan.materialWords));
-  ENGINE_RENDER_CALL(glBindBuffer(GL_UNIFORM_BUFFER, lightUbo));
-  ENGINE_RENDER_CALL(glBufferSubData(GL_UNIFORM_BUFFER, 0, kLightBlockBytes, scene.lights));
+  {
+    engine::phase::Scope scope(engine::phase::kUpload);
+    ENGINE_RENDER_CALL(glBindBuffer(GL_UNIFORM_BUFFER, frameUbo));
+    ENGINE_RENDER_CALL(glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(Camera), &camera));
+    ENGINE_RENDER_CALL(glBindBuffer(GL_UNIFORM_BUFFER, materialUbo));
+    ENGINE_RENDER_CALL(glBufferSubData(GL_UNIFORM_BUFFER, 0, kMaterialBlockBytes, plan.materialWords));
+    ENGINE_RENDER_CALL(glBindBuffer(GL_UNIFORM_BUFFER, lightUbo));
+    ENGINE_RENDER_CALL(glBufferSubData(GL_UNIFORM_BUFFER, 0, kLightBlockBytes, scene.lights));
 
-  ENGINE_RENDER_CALL(glPixelStorei(GL_UNPACK_ALIGNMENT, 4));
-  ENGINE_RENDER_CALL(glActiveTexture(GL_TEXTURE1));
-  ENGINE_RENDER_CALL(glBindTexture(GL_TEXTURE_2D_ARRAY, heightTex));
-  for (std::uint32_t u = 0; u < plan.uploadCount; ++u) {
-    ENGINE_RENDER_CALL(glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, static_cast<GLint>(plan.uploadLayer[u]), kPageSide, kPageSide, 1, GL_RED, GL_FLOAT,
-                                       scene.pages->pageSamples(static_cast<int>(plan.uploadSlot[u]))));
-  }
-  ENGINE_RENDER_CALL(glActiveTexture(GL_TEXTURE0));
-  ENGINE_RENDER_CALL(glBindTexture(GL_TEXTURE_2D_ARRAY, albedoTex));
-  for (std::uint32_t layer = 0; layer < kAlbedoLayers; ++layer) {
-    if (plan.albedoPending[layer] == 0) continue;
-    ENGINE_RENDER_CALL(glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, static_cast<GLint>(layer), kAlbedoSide, kAlbedoSide, 1, GL_RGBA, GL_UNSIGNED_BYTE,
-                                       scene.albedoPixels + layer * kAlbedoBytes));
+    ENGINE_RENDER_CALL(glPixelStorei(GL_UNPACK_ALIGNMENT, 4));
+    ENGINE_RENDER_CALL(glActiveTexture(GL_TEXTURE1));
+    ENGINE_RENDER_CALL(glBindTexture(GL_TEXTURE_2D_ARRAY, heightTex));
+    for (std::uint32_t u = 0; u < plan.uploadCount; ++u) {
+      ENGINE_RENDER_CALL(glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, static_cast<GLint>(plan.uploadLayer[u]), kPageSide, kPageSide, 1, GL_RED, GL_FLOAT,
+                                         scene.pages->pageSamples(static_cast<int>(plan.uploadSlot[u]))));
+    }
+    ENGINE_RENDER_CALL(glActiveTexture(GL_TEXTURE0));
+    ENGINE_RENDER_CALL(glBindTexture(GL_TEXTURE_2D_ARRAY, albedoTex));
+    for (std::uint32_t layer = 0; layer < kAlbedoLayers; ++layer) {
+      if (plan.albedoPending[layer] == 0) continue;
+      ENGINE_RENDER_CALL(glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, static_cast<GLint>(layer), kAlbedoSide, kAlbedoSide, 1, GL_RGBA, GL_UNSIGNED_BYTE,
+                                         scene.albedoPixels + layer * kAlbedoBytes));
+    }
   }
 
   ENGINE_RENDER_CALL(glBindFramebuffer(GL_FRAMEBUFFER, 0));
