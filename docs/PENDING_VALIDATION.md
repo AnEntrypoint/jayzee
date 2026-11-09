@@ -1423,3 +1423,30 @@ Changed, code and tests only, nothing run or pushed in this pass:
 Witness on the recorded r1 G1 tick log (`build/diag/paired-F/r1-G1-fix2.threads.txt.ticks`, 5050 rows over the full file): one gap over 100 ms, at t 1794234440662, `gapMs` 153, `excessMs` 103, `selfWaitMs` 102.222389, `selfRunMs` 0.722135, `workMs` 1, cause `run-queue-wait`. This matches the cause recorded above.
 
 What this does not do: it does not change the r1 result. The gap is still over the limit, and the fix would need a change to the G1 condition (burn worker count or the streamer loop), which is the open decision.
+
+### Phase A: 1024-tier long-frame stalls, measured cause
+
+Source of the 298.2 ms p99 and 399.3 ms max (the ledger row above): `build/diag/paired-B/r2-G1.page.json`, WebGPU, tier 1024, 540 frames in the 240 s window. That run has a cgroup sampler only, no thread sampler, so its cause is read from the cgroup counters. The run is not a few spikes. All 540 frames are in the slow regime: tick median 103.1 ms and physics median 100.8 ms, against 36 ms physics with all bodies awake in the quiet runs.
+
+Cgroup over the same frames, from `build/diag/paired-B/r2-G1.sampler.txt` (`cpu.max` is 1200000 100000, so 12 CPUs per 100 ms period): median `throttled_usec` delta 397 ms per frame, median cgroup CPU 11.99 cores, median CPU pressure 36 ms per frame. The G0 control in the same round has 0 throttle and 2.7 cores in its normal frames. The ledger counts 905 s of throttled time in this window (`throttled_usec` summed over CPUs).
+
+Thread split, from the clean G1 runs that have the thread sampler (`build/diag/paired-F`). The renderer main thread is the one with the largest run gain in its sched rows. Each frame is split into schedstat run, runnable wait and off-CPU time:
+
+| run | long frames (tick > 50 ms) | run share | wait share | off-CPU share | throttle per frame | cgroup cores | normal frames: run ms, wait ms |
+|---|---|---|---|---|---|---|---|
+| r1-G1-fix2 | 31, tick median 70.8 ms | 0.457 (about 37.6 ms) | 0.518 (about 37 ms) | 0.005 | 387 ms | 10.9 | 1.6, 1.6 |
+| r2-G1-fix3 | 21, tick median 63.6 ms | 0.575 (about 38 ms) | 0.421 (about 26 ms) | 0.004 | 386 ms | 10.0 | 1.4, 0.9 |
+
+The run share is about 38 ms in every long frame. That is the physics work of 10240 awake bodies, the same cost as the quiet runs. The rest of each long frame is runnable wait on the same thread, not sleep and not a call the engine makes. The phase table in `docs/stall-causes/wait-sites.md` agrees: no wait site exists in the physics phase.
+
+Controls. In the G1 runs that have normal frames (`paired-E`, `paired-F`), normal frames have no throttle and a small wait. Both paired-B G1 runs have no normal frames. Round 2 G1 runs in other rounds reached max 73.1 ms (`paired-E/r2-G1`), 71.1 ms (`paired-F/r2-G1-fix3`) and 109.8 ms (`paired-E-r2-G1-first`). The 298 ms tail did not recur in any of them. So the 298 ms case is one run, and its cause is measured only from the cgroup counters.
+
+Cause, as measured. The long frames are the same physics work as a quiet frame, plus time the renderer main thread spends runnable or throttled under the 12-CPU quota that the G1 burn saturates. The stall is not an engine wait site. The engine's own 38 ms physics cost per frame is a known cost of this tier, and it is not a stall.
+
+What this does not show. schedstat wait counts both CPU contention and quota throttling, and the two are not split per thread. The 298 ms run has no thread data.
+
+Decision: recorded, no code fix. The stall is the quota and run queue under the G1 condition, which is the condition under test. Reducing the 38 ms physics cost would change the simulation's cost, not the stall, and is a separate item.
+
+Tool. `scripts/browser/frame-stall-cause.mjs` gives this split for any run: `node scripts/browser/frame-stall-cause.mjs <page.json> <cgroup.sampler.txt> [<threads.txt.sched>] [quotaCores]`. It prints each share, the throttle, the cores and a cause label: `off-cpu`, `cpu-work`, `runnable-wait`, `cpu-and-runnable-wait`, `quota-saturated` (cgroup alone, when cores reach the quota and throttling runs), `no-long-frames` or `unattributed`. The pure functions and the labels are gated by `scripts/check-frame-stall-cause.mjs` in `npm test` (`check:frame-stall-cause`). The labels come from thresholds on shares (0.3 and 0.5), not from a fit. Run and wait are read at the frame's start and end, so a frame edge inside a 50 ms tick is interpolated.
+
+Witness here: `node scripts/check-frame-stall-cause.mjs` RESULT: PASS (9 gates). The CLI on the three recorded runs reproduces the table above. The witness for this item runs in the next Phase B: a fresh round 2 G1 pair with the thread sampler, its frame causes printed by the CLI, and the sampler gap check.
