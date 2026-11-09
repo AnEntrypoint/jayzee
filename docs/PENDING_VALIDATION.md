@@ -860,3 +860,30 @@ Verdict on the physics gap. The round-1 gap from the Vulkan Phase B run (41.8 ms
 Cause, and the fix decision. The audit above found no WebGPU submit, readback or sync inside the physics scope, and the timer boundaries are the same for both backends. A gap that changes sign under the same build and the same wasm therefore has no code cause to fix. The Phase A commit `b41aed2` is unchanged by this Phase B result, and no code change is made for it.
 
 Remaining open item. The power hypothesis (GPU work lowers the CPU clock during the physics window) is untested, because the draw-off pair has no kept run. Settling it needs a clean WebGPU and WebGL2 `draw=0` pair with a checksum-equivalent control and load under 8 for both runs. That is not available while the other lanes hold load near 8 to 18.
+
+## Physics phase: decision (closes the item)
+
+Decision. The physics gap is measurement noise under the stated load bound (every kept run under 8). It is not a cause to fix, so the Phase A commit `b41aed2` is unchanged and no code changes. The draw-off power hypothesis is not confirmed and not disproven: no kept draw-off pair exists, and the item does not need it.
+
+Kept pairs, WebGPU first in each round, from `build/diag/phaseC-*` and `phaseD-*`. The CPU MHz and GPU W stamps are before→after per run.
+
+| Pair | Backend | Physics ms | CPU MHz | GPU W | Load | Paired physics diff, WebGPU − WebGL2 |
+|---|---|---|---|---|---|---|
+| C1 | WebGPU | 40.3 | 2921.7→2742.4 | 19.96→20.32 | 4.10→3.64 | +0.60 |
+| C1 | WebGL2 | 39.7 | 2881.3→2486.7 | 20.13→19.85 | 3.64→3.18 | |
+| C2 | WebGPU | 38.2 | 3413.3→2122.2 | 19.94→19.58 | 3.00→2.62 | +0.10 |
+| C2 | WebGL2 | 38.1 | 2582.4→2285.0 | 20.23→19.98 | 2.49→2.23 | |
+| C3 | WebGPU | 39.5 | 2758.5→2898.4 | 20.02→19.80 | 2.23→2.43 | +0.30 |
+| C3 | WebGL2 | 39.2 | 3436.2→2078.8 | 19.48→10.25 | 2.64→3.42 | |
+| D1 | WebGPU | 45.25 | 3516.7→3732.8 | 9.45→10.19 | 7.78→7.96 | −2.35 |
+| D1 | WebGL2 | 47.6 | 3319.0→3299.6 | 10.34→11.10 | 7.96→7.86 | |
+
+Over these four pairs the paired physics difference has mean −0.34 ms, median +0.20 ms and standard deviation 1.18 ms. The 95% interval on the mean (t, 3 degrees of freedom) is about −2.2 to +1.5 ms. Neither the mean nor the median reaches the 0.5 ms threshold, and the sign is not consistent.
+
+Runs not kept, shown only as a sensitivity check and not used: D2 paired diff +1.35, D3 −4.00, D4 −4.65 and D5 +0.30. Their loads were 8.1 to 17.9. The largest magnitudes come from D3 and D4. In D3 the WebGL2 run had the higher load and the higher physics time. In D4 the WebGPU run had the higher mean load (16.8 against 14.9) and the lower physics time, so load ordering does not explain both. These runs are too loaded to read, and they are not used.
+
+Stamps and load across all 16 draw-on runs (Phase C and D). Correlation of physics time with the mean 1-minute load of the run is +0.80. CPU MHz tracks load (+0.79), so the clock is a load proxy and not evidence of throttling. Physics time against the mean GPU power is −0.32. The clock-throttle reading of the power hypothesis is not supported: the clock rises and falls with load, and physics time follows load.
+
+Draw-off hypothesis. The hypothesis predicts a persistent WebGPU-slower physics gap that disappears with the backend frame skipped. There is no persistent gap under the bound, so there is nothing for it to explain. The only draw-off pair cannot test it: WebGPU draw0 r1 (`build/diag/phaseC-webgpu-draw0-r1.json`, physics 42.30, load 3.42→3.90) passes the load bound but records no checksum, and WebGL2 draw0 r1 (physics 101.50, load 3.90→6.54) records none either and is 2.5 times the clean physics values. Neither is kept.
+
+Consequence for the item. The physics item in Phase B is closed as noise. Any future physics gap claim needs a kept pair with load under 8 and a paired difference above 0.5 ms with a consistent sign across at least four pairs, and a draw-off run that records its checksum (`draw=0` currently skips the stats, so it cannot).
