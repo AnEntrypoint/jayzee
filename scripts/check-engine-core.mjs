@@ -10,7 +10,9 @@ const glue = resolve(process.argv[2] ?? join(root, 'engine/out/engine-core-64mib
 const name = basename(glue, '.mjs')
 const wasm = glue.replace(/\.mjs$/, '.wasm')
 const manifest = JSON.parse(readFileSync(join(root, 'engine/artifacts.json'), 'utf8'))
-const TIER = 64 * 1024 * 1024
+const tierMib = Number(/engine-core-(\d+)mib/.exec(name)?.[1])
+assert.ok(Number.isInteger(tierMib) && tierMib > 0, 'the glue name must carry its tier in MiB: ' + name)
+const TIER = tierMib * 1024 * 1024
 const TICKS = 10000
 
 gate('the wasm artifact hash equals the hash pinned in engine/artifacts.json', () => {
@@ -21,7 +23,7 @@ gate('the wasm artifact hash equals the hash pinned in engine/artifacts.json', (
 
 const mod = await (await import(pathToFileURL(glue).href)).default()
 
-gate('engine_init returns 0 and the memory starts at the 64 MiB tier', () => {
+gate('engine_init returns 0 and the memory starts at the tier named by the glue', () => {
   assert.equal(mod._engine_init(64, 1, TIER), 0)
   assert.equal(mod.HEAPU8.buffer.byteLength, TIER)
   assert.equal(Number(mod._engine_memory_bytes()), TIER)

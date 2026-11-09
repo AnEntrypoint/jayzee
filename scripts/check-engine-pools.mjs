@@ -62,7 +62,7 @@ gate('spawnMany creates a batch in one call, returns the handles, and sets each 
   const handles = world.spawnMany(rows)
   assert.equal(handles.length, 50)
   assert.equal(world.count, 50)
-  handles.forEach((handle, i) => assert.deepEqual(world.position(handle), [i, 2, -i]))
+  handles.forEach((handle, i) => assert.deepEqual(world.position(handle).map((v) => v + 0), [i, 2, -i + 0]))
 })
 
 gate('a world refuses a spawn past its capacity with a RangeError, as the JS world does', async () => {

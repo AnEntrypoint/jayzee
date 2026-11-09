@@ -9,7 +9,7 @@ permissions:
 jobs:
   fixed-memory-module:
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
@@ -30,22 +30,28 @@ jobs:
         run: |
           build/emsdk/emsdk install 4.0.10
           build/emsdk/emsdk activate 4.0.10
-      - name: Build the fixed-memory module
+      - name: Build the fixed-memory module, 64 MiB tier
         run: bash engine/build.sh
-      - name: Check the artifact hash and the memory witness
-        run: node scripts/check-engine-core.mjs
-      - name: Build the leak variant and check that its memory witness fails
+      - name: Build the fixed-memory module, 128 MiB tier
+        run: ENGINE_TIER_MIB=128 bash engine/build.sh
+      - name: Build the leak variant, 64 MiB tier
+        run: ENGINE_VARIANT=leak bash engine/build.sh
+      - name: Check the artifact hashes and the memory witness of both fixed tiers
         run: |
           set -euo pipefail
-          ENGINE_VARIANT=leak bash engine/build.sh
-          if node scripts/check-engine-core.mjs engine/out/engine-core-64mib-leak.mjs > leak-witness.log 2>&1; then
-            echo "the leak variant passed its memory witness"
-            exit 1
-          fi
-          grep -q 'FAIL memory.buffer.byteLength is unchanged' leak-witness.log
-          cat leak-witness.log
+          node scripts/check-engine-core.mjs engine/out/engine-core-64mib.mjs
+          node scripts/check-engine-core.mjs engine/out/engine-core-128mib.mjs
+      - name: Check the leak variant's pinned hash and that its memory grows
+        run: node scripts/check-engine-leak.mjs engine/out/engine-core-64mib-leak.mjs
+      - name: Run the engine gates
+        run: |
+          set -euo pipefail
+          for gate in artifacts world bridge pools planet vegetation codecs materials interest render isolation tiers; do
+            node scripts/check-engine-$gate.mjs
+          done
+          node scripts/check-client-resource-pools.mjs
       - if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: engine-core-64mib
-          path: engine/out/engine-core-64mib.*
+          name: engine-core-wasm
+          path: engine/out/engine-core-*.*

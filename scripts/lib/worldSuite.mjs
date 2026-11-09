@@ -11,14 +11,14 @@ const refuses = async (action, ErrorType) => {
   assert.ok(caught instanceof ErrorType, 'expected ' + ErrorType.name + ', got ' + (caught && caught.name))
 }
 
-export const worldGates = (make) => {
+export const worldGates = (make, tolerance = 1e-9) => {
   gate('a spawned body falls under gravity and comes to rest on the ground at its radius', async () => {
     const world = await make({ radius: 0.35 })
     const id = world.spawn([0, 10, 0])
     for (let i = 0; i < 64 * 4; i++) world.step()
     const [, y] = world.position(id)
-    assert.ok(Math.abs(y - 0.35) < 1e-9, 'resting height ' + y)
-    assert.ok(Math.abs(world.velocity(id)[1]) < 1e-9)
+    assert.ok(Math.abs(y - 0.35) < tolerance, 'resting height ' + y)
+    assert.ok(Math.abs(world.velocity(id)[1]) < tolerance)
   })
 
   gate('a body lands on a box top rather than falling through it', async () => {
@@ -26,7 +26,7 @@ export const worldGates = (make) => {
     const id = world.spawn([0, 6, 0])
     for (let i = 0; i < 64 * 4; i++) world.step()
     const [, y] = world.position(id)
-    assert.ok(Math.abs(y - 2.35) < 1e-9, 'resting height ' + y)
+    assert.ok(Math.abs(y - 2.35) < tolerance, 'resting height ' + y)
   })
 
   gate('advance steps by whole fixed ticks and carries the remainder', async () => {

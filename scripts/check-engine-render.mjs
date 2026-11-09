@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import assert from 'node:assert/strict'
 import { gate, finish } from './lib/gate.mjs'
 
@@ -46,7 +46,7 @@ const EXPECT_LAYOUT = {
 const EXPECT_PAGE_SIDE = 16
 const EXPECT_PAGE_LAYERS = 64
 const EXPECT_PROP_CLASSES = 4
-const EXPECT_BODY_SLOTS = 4096
+const EXPECT_BODY_SLOTS = 10240
 const EXPECT_ALLOCATIONS_SINCE_WARMUP = '0'
 const EXPECT_FRAMES = 600
 const PHASE10_MAX_API_CALLS_PER_FRAME = 64
@@ -57,6 +57,7 @@ const sources = Object.fromEntries(RENDER_FILES.map((file) => [file, read(file)]
 const cmake = read('engine/CMakeLists.txt')
 const exportsSource = sources['engine/src/exports_render.cpp']
 const renderFrameHeader = sources['engine/src/render/render_frame.h']
+const gluePath = join(root, 'engine/out/engine-core-64mib.mjs')
 const wasmPath = join(root, 'engine/out/engine-core-64mib.wasm')
 
 gate('every engine_render export is defined in exports_render.cpp as EMSCRIPTEN_KEEPALIVE C linkage', () => {
@@ -81,8 +82,8 @@ gate('the layout static_asserts pin the byte sizes of the slot structs and the t
   }
 })
 
-gate('the page is 16 by 16 float samples in 64 layers, matching planet::kPageSlots and kPageSide', () => {
-  assert.ok(renderFrameHeader.includes('kPageLayers = planet::kPageSlots'))
+gate('the page is 16 by 16 float samples in 64 layers, matching kPageSide and the 64 page slots of the budget', () => {
+  assert.ok(renderFrameHeader.includes('kPageLayers = 64'))
   assert.ok(renderFrameHeader.includes('kPageSide = planet::kPageSide'))
   assert.equal(EXPECT_PAGE_SIDE * EXPECT_PAGE_SIDE, 256)
   assert.equal(EXPECT_PAGE_LAYERS, 64)
@@ -90,9 +91,9 @@ gate('the page is 16 by 16 float samples in 64 layers, matching planet::kPageSlo
 
 gate('the prop classes and body slots match the expected instance buffer shape', () => {
   assert.ok(renderFrameHeader.includes('kPropClasses = 4'))
-  assert.ok(renderFrameHeader.includes('kBodySlots = 4096'))
+  assert.ok(renderFrameHeader.includes('kBodySlots = budget::kTopTierBodies'))
   assert.equal(EXPECT_PROP_CLASSES, 4)
-  assert.equal(EXPECT_BODY_SLOTS, 4096)
+  assert.equal(EXPECT_BODY_SLOTS, 10240)
 })
 
 gate('the render sources never map a buffer, wait on a future or allocate on the heap', () => {
@@ -156,10 +157,10 @@ gate('the JS loader exports the backend choice and the layout the C++ structs us
   assert.equal(renderer.RENDER_LAYOUT.ALBEDO_SIDE, 16)
 })
 
-gate('the built module exports every engine_render name when engine/out is present', () => {
+gate('the built module exports every engine_render name when engine/out is present', async () => {
   assert.ok(existsSync(wasmPath), 'engine/out/engine-core-64mib.wasm is not built, so the module exports cannot be read')
-  const exported = new Set(WebAssembly.Module.exports(new WebAssembly.Module(readFileSync(wasmPath))).map((entry) => entry.name))
-  for (const name of EXPECT_EXPORTS) assert.ok(exported.has('_' + name) || exported.has(name), name)
+  const mod = await (await import(pathToFileURL(gluePath).href)).default()
+  for (const name of EXPECT_EXPORTS) assert.equal(typeof mod['_' + name], 'function', name)
 })
 
 gate('the witness pages exist and run the two backends the phases name', () => {

@@ -7,5 +7,7 @@ import { worldGates } from './lib/worldSuite.mjs'
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const glue = pathToFileURL(join(root, 'engine/out/engine-core-64mib.mjs')).href
 
-worldGates((options) => createEngineWorld(options, glue))
+const FLOAT32_TOLERANCE = 1e-5
+
+worldGates((options) => createEngineWorld(options, glue), FLOAT32_TOLERANCE)
 finish()
