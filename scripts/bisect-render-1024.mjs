@@ -168,7 +168,10 @@ try {
     console.log(short + ' page=' + job.page.slice(0, 7) + ' ' + label + ' | ' + shown)
   }
 } finally {
-  if (server) server.close()
+  if (server) {
+    server.close()
+    server.closeAllConnections()
+  }
   cleanup()
 }
 writeFileSync(join(outDir, 'summary.json'), JSON.stringify(records.map(({ result, ...row }) => row), null, 1))
