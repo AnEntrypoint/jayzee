@@ -6,7 +6,9 @@ const HEIGHT = 200
 const FRAMES = 3
 const PHASES = [0, 0.25, 0.5, 0.75]
 const WARM_FRAMES = 60
-const LOOP_FRAMES = 600
+const MIN_LOOP_FRAMES = 600
+const requestedFrames = Number(new URLSearchParams(location.search).get('frames') ?? MIN_LOOP_FRAMES)
+const LOOP_FRAMES = Number.isInteger(requestedFrames) && requestedFrames >= MIN_LOOP_FRAMES ? requestedFrames : MIN_LOOP_FRAMES
 const LOOP_DOTS = 4
 const result = { ok: false, errors: [], cases: [] }
 const realError = console.error

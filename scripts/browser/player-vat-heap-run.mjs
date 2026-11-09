@@ -2,7 +2,8 @@ import { createServer } from 'node:http'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, extname, join, normalize, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { sampleWindow } from './heap-witness.mjs'
+import { connectCdp } from './cdp-client.mjs'
+import { liveObjectBytes } from './heap-witness.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const args = process.argv.slice(2)
@@ -12,13 +13,16 @@ const flag = (name, fallback) => {
 }
 const debugPort = Number(flag('debug-port', ''))
 const port = Number(flag('port', '8845'))
+const frames = Number(flag('frames', '600'))
 const outPath = resolve(root, flag('out', 'build/diag/player-vat-heap.json'))
-const PAGE_PATH = '/scripts/browser/player-vat.html?r=3'
 const TIMEOUT_MS = 1200000
-const POLL_MS = 500
+const SEND_TIMEOUT_MS = 120000
+const POLL_MS = 100
+const CHECKPOINT_SHARES = [0.1, 0.5, 1]
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.json': 'application/json', '.wasm': 'application/wasm', '.css': 'text/css' }
 
 if (!Number.isInteger(debugPort) || debugPort <= 0) throw new TypeError('--debug-port must name the remote debugging port of the project playwriter browser')
+if (!Number.isInteger(frames) || frames < 600) throw new RangeError('--frames must be a whole number from 600: ' + frames)
 
 const sleep = (ms) => new Promise((done) => setTimeout(done, ms))
 
@@ -41,44 +45,9 @@ const serve = (dir, listenPort) => new Promise((ready, failed) => {
   server.listen(listenPort, '127.0.0.1', () => ready(server))
 })
 
-const connect = async () => {
-  const version = await (await fetch('http://127.0.0.1:' + debugPort + '/json/version')).json()
-  const socket = new WebSocket(version.webSocketDebuggerUrl)
-  await new Promise((open, failed) => {
-    socket.addEventListener('open', open, { once: true })
-    socket.addEventListener('error', () => failed(new Error('no devtools socket on port ' + debugPort)), { once: true })
-  })
-  return socket
-}
-
-const openSession = (socket) => {
-  let nextId = 0
-  const waiting = new Map()
-  const listeners = new Map()
-  socket.addEventListener('message', (event) => {
-    const message = JSON.parse(event.data)
-    if (message.id === undefined) {
-      for (const listener of listeners.get(message.method) ?? []) listener(message.params)
-      return
-    }
-    const settle = waiting.get(message.id)
-    if (!settle) return
-    waiting.delete(message.id)
-    if (message.error) settle.reject(new Error(message.error.message))
-    else settle.resolve(message.result)
-  })
-  const send = (method, params = {}, sessionId) => new Promise((resolveSend, rejectSend) => {
-    const id = ++nextId
-    waiting.set(id, { resolve: resolveSend, reject: rejectSend })
-    socket.send(JSON.stringify(sessionId ? { id, method, params, sessionId } : { id, method, params }))
-  })
-  return { send, listeners }
-}
-
 const main = async () => {
   const server = await serve(root, port)
-  const socket = await connect()
-  const { send, listeners } = openSession(socket)
+  const { send, on, off, close } = await connectCdp(debugPort, { sendTimeoutMs: SEND_TIMEOUT_MS })
   let targetId = null
   let exitCode = 0
   try {
@@ -86,35 +55,53 @@ const main = async () => {
     const { sessionId } = await send('Target.attachToTarget', { targetId, flatten: true })
     const page = (method, params = {}) => send(method, params, sessionId)
     const evaluate = async (expression) => (await page('Runtime.evaluate', { expression, returnByValue: true })).result.value
-    const cdp = {
-      send: page,
-      on: (name, listener) => listeners.set(name, [...(listeners.get(name) ?? []), listener]),
-      off: (name, listener) => listeners.set(name, (listeners.get(name) ?? []).filter((kept) => kept !== listener)),
+    const cdp = { send: page, on, off }
+    const deadline = Date.now() + TIMEOUT_MS
+    const until = async (expression) => {
+      while ((await evaluate(expression)) !== true && Date.now() < deadline) await sleep(POLL_MS)
+      return (await evaluate(expression)) === true
+    }
+    const checkpoint = async () => {
+      const live = await liveObjectBytes(cdp)
+      return { frames: await evaluate('window.playerVatLoop.frames'), ...live }
     }
     await page('HeapProfiler.enable')
     await page('Page.bringToFront')
-    await page('Page.navigate', { url: 'http://127.0.0.1:' + port + PAGE_PATH })
-    const deadline = Date.now() + TIMEOUT_MS
-    while ((await evaluate('typeof window.playerVatLoop')) !== 'object' && Date.now() < deadline) await sleep(POLL_MS)
-    const witness = await sampleWindow({
-      cdp,
-      isStarted: async () => (await evaluate('window.playerVatLoop.warmed === true')) === true,
-      isDone: async () => (await evaluate('window.playerVatLoop.done === true')) === true,
-      frames: 0,
-      intervalMs: 200,
-      maxMs: TIMEOUT_MS,
-    })
+    await page('Page.navigate', { url: 'http://127.0.0.1:' + port + '/scripts/browser/player-vat.html?r=3&frames=' + frames })
+    await until("typeof window.playerVatLoop === 'object'")
+    const warmed = await until('window.playerVatLoop.warmed === true')
+    const checkpoints = [await checkpoint()]
+    for (const share of CHECKPOINT_SHARES) {
+      const reached = share === 1 ? await until('window.playerVatLoop.done === true') : await until('window.playerVatLoop.done === true || window.playerVatLoop.frames >= ' + Math.ceil(frames * share))
+      if (!reached) break
+      checkpoints.push(await checkpoint())
+    }
     const final = JSON.parse(await evaluate('JSON.stringify({ loop: window.playerVatLoop ?? null, result: window.playerVatResult ?? null })'))
-    witness.frames = final.loop?.frames ?? 0
-    witness.page = { loopError: final.loop ? final.loop.error : 'no loop', ok: final.result?.ok ?? null, errors: final.result?.errors ?? [], cases: final.result?.cases ?? [] }
+    const witness = {
+      forcedGc: true,
+      warmed,
+      frames: final.loop?.frames ?? 0,
+      requestedFrames: frames,
+      retained: { before: checkpoints[0], after: checkpoints[checkpoints.length - 1] },
+      checkpoints,
+      samples: [],
+      page: { loopError: final.loop ? final.loop.error : 'no loop', done: final.loop?.done ?? false, ok: final.result?.ok ?? null, errors: final.result?.errors ?? [], cases: final.result?.cases ?? [] },
+    }
     await mkdir(dirname(outPath), { recursive: true })
     await writeFile(outPath, JSON.stringify(witness, null, 1) + '\n')
-    if (witness.page.loopError !== null || witness.page.ok !== true) exitCode = 1
-    const growth = witness.retained.after.bytes - witness.retained.before.bytes
-    console.log(JSON.stringify({ out: outPath, warmed: witness.warmed, forcedGc: witness.forcedGc, frames: witness.frames, growthBytes: growth, pageOk: witness.page.ok, loopError: witness.page.loopError }))
+    if (witness.page.loopError !== null || witness.page.ok !== true || witness.page.done !== true) exitCode = 1
+    console.log(JSON.stringify({
+      out: outPath,
+      warmed,
+      frames: witness.frames,
+      growthBytes: witness.retained.after.bytes - witness.retained.before.bytes,
+      checkpoints: checkpoints.map((point) => ({ frames: point.frames, bytes: point.bytes, codeBytes: point.codeBytes })),
+      pageOk: witness.page.ok,
+      loopError: witness.page.loopError,
+    }))
   } finally {
     if (targetId) await send('Target.closeTarget', { targetId }).catch(() => {})
-    socket.close()
+    close()
     server.close()
     server.closeAllConnections()
   }
