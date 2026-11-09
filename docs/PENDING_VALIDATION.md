@@ -2087,3 +2087,54 @@ Change.
 - `scripts/browser/engine-render-browser.js`: `result.warmAt` is set to frame 60 where `markWarmup()` is called. The page also takes `?frames=N` (default 600). The default is unchanged, so the render witness's 600-frame checksum still holds. The heap run uses `frames=660` so that 600 frames run after warm-up.
 - `scripts/browser/heap-witness.mjs`: `sampleWindow` takes `isStarted`, waits for it, and returns `warmed`.
 - `scripts/check-browser-heap.mjs`: `judgeHeap` refuses `warmed !== true`. Witness: the gate "a window that starts before warm-up is refused". The existing gates now carry `warmed: true`, and the bound (65536 bytes) and the 600-frame minimum are unchanged.
+
+## Phase B for the reuse pass: CI, re-pin, and the W7 decision (this push)
+
+### Engine artifacts re-pinned from the current C++ source
+
+Rebuilt with `engine/build.sh` (variants fixed, fixed at 128 MiB, leak at 64 MiB, timed at 64 and 128 MiB). `engine/artifacts.json` now pins:
+
+- `engine-core-64mib`: `09efce6540352648e3a384b73029ad1fa3e3c72f689cffb309251bc3aecfcceb` (was `2e5ca6f2…`)
+- `engine-core-128mib`: `0c5587dabf1910398c6700d7e43fa7841cca54e64f360b060c1b6918219f89d6` (was `63d96697…`)
+- `engine-core-64mib-leak`: `0ccd23801bb3e0f82bcf0a0db085206c8b8e67a33c747b56f01d55d1a810e1f2` (was `4fe2b969…`)
+
+The timed variants are unpinned: timed-64 `9300bf3f…`, timed-128 `b3f25bbd…`, which is the same hash as the earlier timed-128 build, so that build reproduces. Witnesses: `check-engine-artifacts` RESULT PASS, `check-engine-core` on the 64 and 128 MiB glue RESULT PASS, `check-engine-leak` RESULT PASS.
+
+### W7: what the window retains, and the decision
+
+Measurement. The usedSize series from `Runtime.getHeapUsage` is not a retention measure at this bound. A control page that allocates small arrays at render rate and retains nothing moved between 658 KB and 741 KB over 33 s (a range of about 83 KB), so the 64 KiB bound on usedSize sits inside the metric's own noise.
+
+Change of the judged metric. The gate now judges live JS object bytes from heap snapshots: one at the warm mark (frame 60) and one at the held end. The bound stays 64 KiB. usedSize is still written to the witness as a reported series.
+
+The page changes that make this possible (`scripts/browser/engine-render-browser.js`). `window.engineRenderResult` is published when the run starts, not only at the end, so the sampler can read `warmAt` and `lastFrame`. `?hold=1` parks the page after its last frame, before the result is built, and `window.engineRenderRelease()` resumes it. The default page (no query) is unchanged, and so is the 600-frame checksum.
+
+Result, three runs of `frames=661&hold=1` (600 frames after warm-up):
+
+- run 1 (`build/diag/witness/heap-1024-run1.json`): before 869,120 B / 27,968 objects, after 916,092 B / 28,154 objects, growth 46,972 B, +186 objects
+- run 2 (`heap-1024-run2.json`): growth 47,612 B, +186 objects
+- run 3 (`heap-1024-run3.json`): growth 46,964 B, +186 objects
+
+The render checksum on all three is `-6818801958167617925`, with 0 errors and no allocations after warm-up. `node scripts/check-browser-heap.mjs build/diag/witness/heap-1024-run1.json build/diag/witness/heap-1024-run2.json build/diag/witness/heap-1024-run3.json`: RESULT PASS, 6 gate cases plus 3 witness files.
+
+Cause. A snapshot pair from a hold run, diffed by object type (JS-only, native and synthetic excluded): +55,964 bytes and +249 objects, of which about 51 KB is code. The largest rows are `code:InstructionStream` +31 objects (+30,848 B), `code:TrustedByteArray` +78 (+10,720 B), `code:ProtectedFixedArray` +24 (+5,460 B), `code:Code` +31 (+2,232 B), `code:FeedbackVector` +1 (+340 B). The non-code remainder is about 4.3 KB, mostly one array backing store (`array:(object elements)` +4,256 B, same count).
+
+Verdict: allowed code growth, not retention. The growth is V8 tier-up of the render loop after warm-up: once-only compiled code and its metadata, which stays live by design. The non-code data growth is about 4 KB, does not repeat per frame, and has no per-frame object type that grows steadily, so there is no retention cause to fix at source. The bound is kept at 64 KiB. Its reason: it bounds live JS object bytes over 600 frames, which is the criterion this witness states. A growth of 47 KB, all of it code, passes that criterion. A per-frame leak would show as steady growth in a non-code type, and none does.
+
+An earlier snapshot pair (frames=660, no hold, taken at the warm mark and at done) showed +472 bytes. That pair is superseded: its end snapshot was taken after the page had built its result, so it does not measure the frame window.
+
+### Witnesses for this push
+
+- `npm test`: exit 0, PASS 4754, FAIL 0 (234 RESULT lines, 0 RESULT FAIL) on the first run after the `check-engine-render` change, and again at HEAD before the push: exit 0, PASS 4754, FAIL 0.
+- Host witness, `bash engine/test/build_host.sh`: exit 0, PASS 196, FAIL 0, RESULT PASS.
+- `check:gc-witness`: RESULT PASS (5 of 5 earlier runs also PASS).
+- Named gates: `check:engine-world`, `check:engine-bridge`, `check:engine-tiers`, `check:engine-pools`, `check:engine-leak` RESULT PASS. `check:engine-render` FAILED once: its source check pinned the literal `FRAMES = 600`, which the `?frames=` change removed. The gate now pins the new default expression, `const FRAMES = QUERY.has('frames') ? Number(QUERY.get('frames')) : 600`, and RESULT PASS (17 PASS).
+- 1024 render witness through playwriter inside gm, default page: checksum `-3826851758512048142`, visible `[729,746,747,750]`, 600 frames, errors `[]`, ok true, backend webgpu, adapter NVIDIA GeForce RTX 3060 Laptop GPU, `isFallbackAdapter` false, `allocationsSinceWarmup` "0", `createsAfterSeal` 0. Written to `build/diag/witness/render-1024.json`.
+
+### Open after this push
+
+- Items 1 and 2 of the Phase A list (CI and warm-up) are in commit 953dc2b. The CI conclusion for the push is not recorded in this file; it is read from GitHub after the push.
+- The W2 gate covers `World` only. The other W2 rows (G2, JF5, JF6, JF7, JM12, JM13) still need their own runs.
+
+### Push
+
+Not pushed. `git push origin main` failed twice with `Could not resolve host: github.com`, once directly and once after a 30 s wait, as the instruction allows. A `getent hosts github.com` check made after the second attempt resolved to 20.87.245.0, so the failure may be transient or specific to the git process. No third attempt was made. Six commits are waiting locally: 77149a5, 23932db, f1a70fa, 93ecdaa, 953dc2b and 353d554. The CI run for the push, and its `test (24)` conclusion, cannot be read until the push succeeds.

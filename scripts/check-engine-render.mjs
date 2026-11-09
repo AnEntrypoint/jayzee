@@ -170,7 +170,7 @@ gate('the witness pages exist and run the two backends the phases name', () => {
   assert.ok(html.includes('engine-render-browser.js'))
   assert.ok(page.includes("requested = PHASE === 11 ? 'webgl2' : 'webgpu'"))
   assert.ok(page.includes('navigatorLike = PHASE === 11 ? {} : navigator'))
-  assert.ok(page.includes('FRAMES = ' + EXPECT_FRAMES))
+  assert.ok(page.includes("const FRAMES = QUERY.has('frames') ? Number(QUERY.get('frames')) : " + EXPECT_FRAMES))
   assert.ok(page.includes('allocationsSinceWarmup'))
 })
 

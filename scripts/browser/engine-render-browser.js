@@ -6,6 +6,7 @@ const PHASE = QUERY.get('phase') === '11' ? 11 : 10
 const TIER = QUERY.get('tier') === '1024' ? 1024 : 64
 const TIMED = QUERY.get('timed') === '1'
 const DRAW = QUERY.get('draw') !== '0'
+const HOLD_END = QUERY.get('hold') === '1'
 const TIER_GLUE = (TIER === 1024 ? '../../engine/out/engine-core-128mib' : '../../engine/out/engine-core-64mib') + (TIMED ? '-timed' : '') + '.mjs'
 const TIER_BUDGET = TIER === 1024 ? 128 * 1024 * 1024 : 64 * 1024 * 1024
 const WARMUP_FRAMES = 60
@@ -25,7 +26,8 @@ const WORLD = { capacity: TIER === 1024 ? 10240 : 2048, tickRate: 60, gravity: -
 const PLANET = { radius: 6371000, cellSize: planetCellSize(6371000), gravity: 9.8, maxHeight: 8000 }
 const CLASS_MATERIALS = [0, 1, 2, 3]
 
-const result = { phase: PHASE, errors: [], done: false, warmAt: null }
+const result = { phase: PHASE, errors: [], done: false, warmAt: null, lastFrame: -1, heldAtEnd: false }
+window.engineRenderResult = result
 const report = (line) => {
   const el = document.getElementById('result')
   if (el) el.textContent += line + '\n'
@@ -299,9 +301,13 @@ const run = async () => {
         lastStarted = started
         if (frame === WARMUP_FRAMES) { renderer.markWarmup(); result.warmAt = frame }
         if (frame >= WARMUP_FRAMES) lastStats = renderer.stats()
+        result.lastFrame = frame
         frame += 1
         if (frame < FRAMES) requestAnimationFrame(step)
-        else resolve()
+        else if (HOLD_END) {
+          result.heldAtEnd = true
+          window.engineRenderRelease = resolve
+        } else resolve()
       } catch (error) {
         reject(error)
       }
