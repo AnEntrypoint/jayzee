@@ -1269,4 +1269,24 @@ Decision on the physics cost: not a defect. Nothing in the code is a wait or a r
 
 Sampler change withdrawn. The Phase A commit `f913ac3` changed `scripts/browser/thread-cpu-sampler.mjs` on the premise that each tick took 250 to 330 ms because it read every Chromium thread. That premise is wrong: one full pass over the 200 threads of the profile takes about 3 ms (measured in Phase B). The 250 to 330 ms figure was the spacing of distinct timestamps in the thread log, and that log has a row only when a thread's jiffies change, so the spacing is not a tick period. The file is restored to its content before `f913ac3`. Measured row spacing, which is what the probe reads. The renderer main thread (the one the probe uses) in `r1-G1` (pid 1173751) has 729 rows with a median gap of 12 ms, a p90 of 47 ms and a longest gap of 1.1 s. In `r2-G1` (pid 1252941) it has 70 rows, a median gap of 282 ms and a longest gap of 133 s. In `r2-G0` (pid 1178784) it has 518 rows with a median gap of 11 ms. Over all thread types, `r1-G1` has 1109 distinct timestamps with a median gap of 11 ms and 50 gaps longer than 2 s, and `r2-G1` has 300 with a median of 567 ms and 16 gaps longer than 2 s. The cgroup sampler's log for `r2-G1` is dense (83082 rows). The thread sampler is a Node process, and the most likely cause of the sparse `r2-G1` log is that it got little CPU while the 12 burn workers ran. That is not measured directly. So the `r2-G1` CPU share per stall is sampler-limited, and its category counts cannot be read as CPU evidence. A reliable `r2` category needs a rerun in which the sampler keeps up, for example one pinned to a core the burn workers do not use. That rerun was not made in this pass.
 
-Engine change for the waits: none. Engine pin check: Phase B, with the rebuild.
+Engine change for the waits: none.
+
+### Phase B: engine pins, sampler measurement, npm test and the paired report
+
+Engine rebuild from the working tree (`engine/build.sh`, job `phase-b-engine`, exit 0): fixed 64 MiB, fixed 128 MiB and leak 64 MiB. The sha256 of each built file matches its pin in `engine/artifacts.json`:
+
+- `engine-core-64mib`: built `2e5ca6f21b57df5c694b8ab4ef0319b34ae7598ef7ea99fbc83d169d8e039fdd`, pinned the same. MATCH.
+- `engine-core-128mib`: built `63d96697c6bde5922d9774fb871e114fb112e2fdb0e5ebed8ff531ab1cf107e5`, pinned the same. MATCH.
+- `engine-core-64mib-leak`: built `4fe2b9693df5d3b8d9b9b40f6623315060c6ab9fb318217ffd490a9b2e7039ea`, pinned the same. MATCH.
+
+Both files are committed in `dbc869b`, with the threshold removal in `engine/src/world.cpp`.
+
+Sampler measurement that withdrew the change in `f913ac3`. One full pass over the 200 threads of the project browser profile (`readdirSync` of the task directories and `readFileSync` of each `stat`) takes about 0.4 ms of readdir and 2.8 to 3.2 ms of stat reads, about 14 to 16 µs per thread, with load 2.6 to 4.7. The sampler change is reverted in `378c109`.
+
+`npm test`: EXIT 0, 4682 PASS and 0 FAIL, log `build/diag/phase-b2-npm-test.log`. The engine-artifacts gate is in the chain.
+
+Paired report on `build/diag/paired-E`: verdict `supported`, starvationRatio 158.08, unchanged.
+
+Stall probes, the same as the previous pass: `r1-G1` starved 28, cpu-bound 39, blocked 68 (135 stalls). `r2-G1` starved 31, cpu-bound 0, blocked 119 (150 stalls). The `r2-G1` cpu-bound count is sampler-limited as recorded above, so it is not a measured zero.
+
+The wait sites and their durations are in `docs/stall-causes/wait-sites.md`. The physics breakdown and its decision are in the Phase A section above.
