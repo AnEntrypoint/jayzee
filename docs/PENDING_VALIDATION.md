@@ -19,11 +19,11 @@ Each entry names the file, the ENGINE.md phase and the witness it needs. The sta
 | Gap closure 1: generation wrap | `check-engine-pools` (retirement gate), `check-client-resource-pools`, native phase 4 (65535 cycles) | PASS. |
 | Gap closure 2: schema-driven input codec | `check-engine-codecs` schema packet gates | PASS. |
 | Gap closure 3: material table as slots | `check-engine-materials` 15 PASS, `check-client-resource-pools` | PASS. |
-| Service-worker isolation shim | `check-engine-isolation` 9 PASS | PASS for the gates. OPEN: the public-site witness on GitHub Pages was not run. |
+| Service-worker isolation shim | `check-engine-isolation` 9 PASS; public site `anentrypoint.github.io/jayzee/play/` in the gm playwriter browser | PASS. The public site reports `crossOriginIsolated` true and `SharedArrayBuffer` defined, before and after the reload (profile caveat in the section below). |
 | Renderer (phases 10 and 11) | `check-engine-render` 17 PASS; WebGPU and WebGL2 pages at 64 and 1024 tiers on the real NVIDIA RTX 3060 Laptop adapter (see "Real-adapter runs" under the renderer section) | PASS. The two backends agree on the checksum at each tier. WebGPU is faster on this GPU: p99 78.6 ms against WebGL2's 362.9 ms at 1024 (ratio 4.62), and 8.9 ms against 34.7 ms at 64 (ratio 3.90). Each is one run. |
 | Memory, arena and allocator | `check-engine-core`, `check-engine-tiers` 6 PASS, native host witness | PASS. Post-warm-up carves are zero at 64 and 1024 players. |
 
-Still OPEN after Phase B: the public-site isolation witness; the phase 5 frame-time comparison; the phase 3 rotation gate; the `USE_WEBGPU` migration (`emdawnwebgpu`); the `ENGINE_THREADS` branch, which is not compiled; the self-launched runner `scripts/browser/run-engine-render.mjs`, untested after its SwiftShader flags were removed (needs `PLAYWRIGHT_CORE`); the cause of the SwiftShader adapter on direct Chromium launches (Defect 2 below).
+Still OPEN after Phase B: the phase 5 frame-time comparison; the phase 3 rotation gate; the `USE_WEBGPU` migration (`emdawnwebgpu`); the `ENGINE_THREADS` branch, which is not compiled; the self-launched runner `scripts/browser/run-engine-render.mjs`, untested after its SwiftShader flags were removed (needs `PLAYWRIGHT_CORE`); the cause of the SwiftShader adapter on direct Chromium launches (Defect 2 below).
 
 ## Problems in docs/ENGINE.md (for the dispatcher)
 
@@ -371,9 +371,9 @@ Timing lines, 1024 tier, side by side, same GPU: WebGPU `frameTimeP99Ms` 78.6 ms
 
 ### Service-worker isolation shim
 - `scripts/check-engine-isolation.mjs`: 9 PASS, `RESULT: PASS`.
-- OPEN: the public-site witness. It needs `docs/play` served from GitHub Pages, and it must confirm `crossOriginIsolated === true` after the one reload and that `SharedArrayBuffer` is defined. It has not been run.
+- Public-site witness, run after the push (d0af9c1) in the gm playwriter browser on `https://anentrypoint.github.io/jayzee/play/`: `{ first: { crossOriginIsolated: true, sab: 'function', sw: true }, after: { crossOriginIsolated: true, sab: 'function', sw: true } }`, with the page reloaded once. Caveat: this browser profile had visited the site before, so the service worker may have been registered before the first load. A fresh profile's first load is not witnessed here.
 
 ### Gate summary
 - Every local engine gate and the CI run agree: artifacts 6, world 13, bridge 7, pools 7, planet 9, vegetation 7, codecs 11, materials 15, interest 4, render 17, isolation 9, tiers 6, client-resource-pools 13, core 64 MiB 3, core 128 MiB 3, leak 3. Each ends `RESULT: PASS`.
 - Warnings in the final builds: `USE_WEBGPU is deprecated` (3 lines, one per build), kept and recorded in the deviations. The `MAXIMUM_MEMORY` warning is also recorded there. All other compiler warnings were fixed.
-- Open: the public-site isolation witness; the `USE_WEBGPU` migration; the `ENGINE_THREADS` branch; the Jolt per-body cost estimates in the memory plan (the plan totals are measured, the per-body costs are not).
+- Open: the `USE_WEBGPU` migration; the `ENGINE_THREADS` branch; the Jolt per-body cost estimates in the memory plan (the plan totals are measured, the per-body costs are not).
