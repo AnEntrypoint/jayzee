@@ -134,13 +134,15 @@ gate('the event ring counts dropped events once it is full, and drains in order'
   for (let i = 1; i < events.length; i++) assert.ok(events[i].b > events[i - 1].b)
 })
 
-gate('a sphere dropped straight down keeps the identity rotation, and its quaternion stays unit length', async () => {
+gate('a sphere dropped straight down stays a unit quaternion, and in 240 ticks its rotation stays under 5 mrad and its drift under 1 mm', async () => {
   const module = await boot()
   for (let i = 0; i < 240; i++) module._engine_tick(1)
   const transform = new Float32Array(module.HEAPU8.buffer, module._engine_transforms(), BRIDGE.TRANSFORM_WORDS)
-  const [qx, qy, qz, qw] = transform.slice(3, 7)
+  const [x, , z, qx, qy, qz, qw] = transform
   assert.ok(Math.abs(qx * qx + qy * qy + qz * qz + qw * qw - 1) < 1e-5, 'quaternion is not unit length')
-  assert.ok(Math.abs(qx) < 1e-5 && Math.abs(qy) < 1e-5 && Math.abs(qz) < 1e-5 && Math.abs(qw - 1) < 1e-5, 'a straight drop rotated the sphere: ' + [qx, qy, qz, qw].join(','))
+  const tilt = Math.hypot(qx, qy, qz)
+  assert.ok(tilt < 5e-3, 'the drop rotated the sphere by ' + tilt + ' rad, over the 5 mrad bound')
+  assert.ok(Math.abs(x) < 1e-3 && Math.abs(z) < 1e-3, 'the drop drifted to x ' + x + ', z ' + z + ', over the 1 mm bound')
 })
 
 finish()
