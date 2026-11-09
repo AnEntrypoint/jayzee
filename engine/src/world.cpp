@@ -291,10 +291,6 @@ Status World::configurePlanet(double radius, double cellSize, double gravity, do
   if (id.IsInvalid()) return kFull;
   planetBody_ = id.GetIndexAndSequenceNumber();
   planetGravity_ = static_cast<float>(gravity);
-  constexpr float kPlanetSleepPointSpeed = 2.0f;
-  JPH::PhysicsSettings physicsSettings = runtime_->physics.GetPhysicsSettings();
-  physicsSettings.mPointVelocitySleepThreshold = kPlanetSleepPointSpeed;
-  runtime_->physics.SetPhysicsSettings(physicsSettings);
   for (std::uint32_t slot = 0; slot < fresh_; ++slot) {
     if (alive_[slot] != 0) runtime_->physics.GetBodyInterface().ActivateBody(JPH::BodyID(bodyIds_[slot]));
   }
