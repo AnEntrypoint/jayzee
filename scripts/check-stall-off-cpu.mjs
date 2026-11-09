@@ -29,6 +29,14 @@ gate('parseStat reads the minor and major fault counts of the thread next to uti
   assert.equal(parsed.majflt, 7)
 })
 
+gate('offCpuWindow reports faults as null when the sampler did not read them, and keeps the wait categories', () => {
+  const unread = parseSchedLog(['0 9 0 0 0 -1 -1 0', '50 9 30000000 5000000 4 -1 -1 futex_do_wait', '100 9 35000000 5000000 5 -1 -1 futex_do_wait'].join('\n') + '\n')
+  const window = offCpuWindow({ schedRows: unread, pid: 9, startMs: 50, endMs: 100 })
+  assert.equal(window.majflt, null)
+  assert.equal(window.minflt, null)
+  assert.deepEqual(window.waits, { futex: 2 })
+})
+
 gate('categoryOfWchan names the kernel wait: futex, epoll, page io, reclaim, sleep, socket, running, other', () => {
   assert.equal(categoryOfWchan('futex_do_wait'), 'futex')
   assert.equal(categoryOfWchan('do_epoll_wait'), 'epoll')
@@ -47,9 +55,9 @@ gate('parseSchedLog reads eight fields per line and refuses any other count or a
   assert.throws(() => parseSchedLog('x 9 1 1 1 1 1 0\n'), TypeError)
 })
 
-gate('parseTicksLog reads five fields per line and refuses any other count', () => {
-  assert.deepEqual(parseTicksLog('100 50000 -1 7 8\n')[0], { t: 100, memSomeUs: 50000, ioSomeUs: -1, selfRunNs: 7, selfWaitNs: 8 })
-  assert.throws(() => parseTicksLog('100 50000 -1 7\n'), TypeError)
+gate('parseTicksLog reads six fields per line and refuses any other count', () => {
+  assert.deepEqual(parseTicksLog('100 50000 -1 7 8 3\n')[0], { t: 100, memSomeUs: 50000, ioSomeUs: -1, selfRunNs: 7, selfWaitNs: 8, workMs: 3 })
+  assert.throws(() => parseTicksLog('100 50000 -1 7 8\n'), TypeError)
 })
 
 gate('offCpuWindow takes run and wait from the interpolated counters, names the waits and counts the major faults inside the window', () => {
@@ -72,7 +80,7 @@ gate('offCpuWindow interpolates inside one sample gap and names the sample befor
 })
 
 gate('offCpuForStalls gives sleep as the stall time minus run and wait, and null when the counters do not cover the window', () => {
-  const ticks = parseTicksLog('0 0 0 0 0\n100 50000 0 0 0\n')
+  const ticks = parseTicksLog('0 0 0 0 0 0\n100 50000 0 0 0 0\n')
   const stalls = [{ frame: 3, verdict: 'blocked', startMs: 50, totalMs: 50 }, { frame: 4, verdict: 'blocked', startMs: 500, totalMs: 20 }]
   const out = offCpuForStalls(stalls, schedRows, ticks, 9)
   assert.equal(out[0].sleepMs, 45)
@@ -96,7 +104,7 @@ gate('summariseOffCpu gives count, median and sum of sleep per verdict, and merg
 })
 
 gate('pressureMsBetweenTicks converts the cgroup some total from microseconds and skips an unavailable file', () => {
-  const ticks = parseTicksLog('0 0 0 0 0\n100 50000 0 0 0\n200 -1 0 0 0\n')
+  const ticks = parseTicksLog('0 0 0 0 0 0\n100 50000 0 0 0 0\n200 -1 0 0 0 0\n')
   assert.equal(pressureMsBetweenTicks(ticks, 'memSomeUs', 0, 100), 50)
   assert.equal(pressureMsBetweenTicks(ticks, 'memSomeUs', 150, 200), null)
 })

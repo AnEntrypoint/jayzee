@@ -49,9 +49,9 @@ export const parseSchedLog = (text) => String(text).split('\n').filter((line) =>
 
 export const parseTicksLog = (text) => String(text).split('\n').filter((line) => line !== '').map((line) => {
   const parts = line.split(' ').map(Number)
-  if (parts.length !== 5 || !parts.every(Number.isFinite)) throw new TypeError('tick line needs ts memSomeUs ioSomeUs selfRunNs selfWaitNs: ' + line)
-  const [t, memSomeUs, ioSomeUs, selfRunNs, selfWaitNs] = parts
-  return { t, memSomeUs, ioSomeUs, selfRunNs, selfWaitNs }
+  if (parts.length !== 6 || !parts.every(Number.isFinite)) throw new TypeError('tick line needs ts memSomeUs ioSomeUs selfRunNs selfWaitNs workMs: ' + line)
+  const [t, memSomeUs, ioSomeUs, selfRunNs, selfWaitNs, workMs] = parts
+  return { t, memSomeUs, ioSomeUs, selfRunNs, selfWaitNs, workMs }
 })
 
 export const samplingGaps = (stamps) => stamps.slice(1).map((t, i) => t - stamps[i])
@@ -98,18 +98,18 @@ export const offCpuWindow = ({ schedRows, pid, startMs, endMs }) => {
     const label = categoryOfWchan(row.wchan)
     waits[label] = (waits[label] ?? 0) + 1
   }
-  const faultAt = (key, t) => stepAt(mine.map((row) => ({ t: row.t, v: row[key] })), t)
-  const majStart = faultAt('majflt', startMs)
-  const majEnd = faultAt('majflt', endMs)
-  const minStart = faultAt('minflt', startMs)
-  const minEnd = faultAt('minflt', endMs)
+  const faultDelta = (key) => {
+    const a = stepAt(mine.map((row) => ({ t: row.t, v: row[key] })), startMs)
+    const b = stepAt(mine.map((row) => ({ t: row.t, v: row[key] })), endMs)
+    return a === null || b === null || a < 0 || b < 0 ? null : b - a
+  }
   return {
     runMs: runStart === null || runEnd === null ? null : (runEnd - runStart) / 1e6,
     waitMs: waitStart === null || waitEnd === null ? null : (waitEnd - waitStart) / 1e6,
     samples: inWindow.length,
     waits,
-    majflt: majStart === null || majEnd === null ? null : majEnd - majStart,
-    minflt: minStart === null || minEnd === null ? null : minEnd - minStart,
+    majflt: covered ? faultDelta('majflt') : null,
+    minflt: covered ? faultDelta('minflt') : null,
   }
 }
 

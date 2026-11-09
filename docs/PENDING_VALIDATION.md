@@ -1384,3 +1384,31 @@ Off-CPU wait site: the blocked stalls' stall time splits into 56% running, 42% r
 `npm test`: EXIT 0, 4698 PASS and 0 FAIL, log `build/diag/phase-b4-npm-test.log`, including `check:stall-off-cpu` and `check:thread-sampler`.
 
 Open: the r1 sampling gap check fails by 6 ms. The gate threshold is not changed, and the late tick is recorded as the sampler's own run-queue wait under the burn.
+
+### Clean r1 and r2 G1 reruns with the sampler fix: the gap check, the cause and the numbers
+
+Code changed in this pass (`scripts/browser/thread-cpu-sampler.mjs`, `scripts/browser/thread-sampling.mjs`, `scripts/check-stall-off-cpu.mjs`):
+
+1. The sampler reads no `mmap`-locked file on the tick path. Its per-tick CPU and wait come from `task/<pid>/schedstat` (which the kernel answers without the process's memory lock), jiffies are `floor(runNs / 1e7)`, and `comm` is read once per renderer. The earlier per-tick `stat` read is gone.
+2. The `/proc` scan reads `cmdline` only for pids it has not seen (readdir every 100 ticks), instead of every process every 100 ticks.
+3. Each tick makes one write per output file, through fds kept open, instead of an open, append and close per row.
+4. The ticks line has a sixth field, `workMs`, the sampler's own time for the tick.
+5. Major and minor faults are not read per tick, since reading `stat` needs the process's memory lock. The sched rows write `-1` for them, and `offCpuWindow` reports them as null.
+
+Invalid runs, kept under `build/diag/paired-F/invalid-r1-G1-fix/` and `partial-r2-G1-fix2/`. In `invalid-r1-G1-fix` the sampler was stopped at about 174 s of the 240 s window, and an oscraft process (`pathing_probe`, about 437% CPU, another project) pushed the host load to 22. In `partial-r2-G1-fix2` the sampler was also stopped before its paired job exited (about 202 s). Neither is a witness.
+
+Clean runs, each checked over its own 240 s paired window from `run.json`:
+
+- `r1-G1-fix2`, round 1, paired-run exit 0. Gap check FAIL: 4699 ticks, median 50 ms, p99 75 ms, max 153 ms, one gap over 100 ms (tick 3096). On that tick the sampler's own scheduler stats show 102.2 ms of run-queue wait and 0.7 ms of run time, with `workMs` 1, and tick 3096 is not a scan tick. The excess over the 50 ms period is 103 ms, which matches the wait. The earlier hypothesis that a scan or a memory-lock read stalled the sampler is not supported: this tick's excess is the run-queue wait.
+- `r2-G1-fix3`, round 2, paired-run exit 0. Gap check PASS: 4735 ticks, median 50 ms, p99 70 ms, max 84 ms, no gap over 100 ms.
+
+Cause, measured: the sampler's late ticks are run-queue waits for a CPU. The G1 burn runs 12 `node` workers on the 12 CPUs of this host, next to the paired run's streamer loop (a busy `while (Date.now() < untilMs)` in `scripts/browser/paired-run.mjs`, one more CPU-bound process), the cgroup sampler (2 ms period), this thread sampler, the renderer and the other projects' processes. The sampler cannot raise its priority (`CapEff` is 0 and `NoNewPrivs` is 1). Removing a busy process would change the G1 condition: the 12 workers are the recorded recipe, and the streamer loop is the measurement itself in both G0 and G1. So the cause is recorded and not fixed. Its margin is the excess above the 50 ms period, 103 ms on the failing tick, against a limit of 100 ms in total gap.
+
+Stall classification of the two clean runs (`docs/stall-causes/round2-r1-G1-fix2.tsv`, `round2-r2-G1-fix3.tsv`):
+
+- r1: cpu-bound 15, starved 40, blocked 57 (112 stalls). Blocked stall time 2422 ms: 46% running, 48% runnable and waiting for a CPU (1162 ms), 6% sleeping (156 ms).
+- r2: cpu-bound 22, starved 32, blocked 84 (138 stalls). Blocked stall time 2158 ms: 56% running, 34% runnable and waiting (730 ms), 11% sleeping (244 ms).
+
+The off-CPU finding from round 3 stands: the blocked stalls' off-CPU time is the scheduler's run queue. The sleep share is 6% in r1 and 11% in r2, and the sleep samples are not a single call that the engine makes. The wait-channel samples in the blocked stalls read `running` in 70 of 92 samples in r2 and 64 of 70 in r1. The rest read `futex_do_wait` (22 in r2, 6 in r1). A futex wait is a kernel wait on a user-space lock or condition, and the call that makes it is not named here, since no user-space stack can be read on this host (`/proc/<tid>/syscall` is refused, and `ptrace_scope` is 1).
+
+Witness: `npm test` EXIT 0, 4699 PASS, 0 FAIL (log `build/diag/phase-c-npm-test.log`), with `check:thread-sampler` and `check:stall-off-cpu` in the run.
