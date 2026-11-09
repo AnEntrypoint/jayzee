@@ -23,7 +23,7 @@ const port = srv.address().port
 const browser = await chromium.launch({
   executablePath: CHROMIUM,
   headless: true,
-  args: ['--enable-unsafe-webgpu', '--enable-features=Vulkan,UseSkiaRenderer,WebGPUService', '--use-vulkan=swiftshader', '--use-webgpu-adapter=swiftshader', '--use-angle=swiftshader', '--no-sandbox'],
+  args: ['--enable-unsafe-webgpu', '--enable-features=Vulkan,WebGPUService', '--no-sandbox'],
 })
 try {
   const page = await browser.newPage({ viewport: { width: 960, height: 540 } })
@@ -32,6 +32,7 @@ try {
   const result = await page.evaluate(() => window.engineRenderResult)
   process.stdout.write(JSON.stringify(result) + '\n')
   if (result.ok !== true) process.exitCode = 1
+  if (result.adapter?.isFallbackAdapter === true || result.adapter?.vendor === 'google') process.exitCode = 1
 } finally {
   await browser.close()
   srv.close()

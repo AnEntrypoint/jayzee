@@ -136,10 +136,25 @@ const orbitCamera = (frame, aspect) => {
   return { viewProj: multiply(proj, view), eye }
 }
 
+const adapterInfo = async () => {
+  if (PHASE === 11) {
+    const gl = document.createElement('canvas').getContext('webgl2')
+    const ext = gl && gl.getExtension('WEBGL_debug_renderer_info')
+    return ext
+      ? { api: 'webgl2', vendor: gl.getParameter(ext.UNMASKED_VENDOR_WEBGL), renderer: gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) }
+      : { api: 'webgl2', vendor: gl ? gl.getParameter(gl.VENDOR) : null, renderer: gl ? gl.getParameter(gl.RENDERER) : null, debugInfo: false }
+  }
+  const adapter = await navigator.gpu.requestAdapter()
+  if (!adapter) return { api: 'webgpu', adapter: null }
+  const info = adapter.info ?? (await adapter.requestAdapterInfo())
+  return { api: 'webgpu', vendor: info.vendor, architecture: info.architecture, device: info.device, description: info.description, isFallbackAdapter: adapter.info ? info.isFallbackAdapter : undefined }
+}
+
 const run = async () => {
   const canvas = document.getElementById('engine-canvas')
   const navigatorLike = PHASE === 11 ? {} : navigator
   const requested = PHASE === 11 ? 'webgl2' : 'webgpu'
+  result.adapter = await adapterInfo()
   const renderer = await loadRenderer({ glue: new URL(TIER_GLUE, import.meta.url).href, canvas, navigatorLike, requested, players: TIER, budgetBytes: TIER_BUDGET })
   const module = renderer.module
   setupScene(module, renderer)
