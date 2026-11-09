@@ -961,3 +961,22 @@ Stall frames. A stall is a frame above 1.5 times its run's median.
 Cause of the remaining stall (WebGPU r1, two frames). The stall is in the physics phase. It is not a render stall, and it is not a simulation-state effect, because the same frame in the matching WebGL2 run is normal and the active-body count is flat. The remaining candidate is host CPU sharing (a co-tenant process or a cgroup throttle), which the earlier diagnosis recorded. This is not proven here. A per-thread CPU time would prove or refute it, and the browser does not expose one for the wasm thread, so the cause is recorded as likely host sharing, not as proven.
 
 Verdict on the item. The stall is not reproduced at the level of the earlier 705 ms and 362.9 ms values. One two-frame stall in six runs remains, in the physics phase, not in our render path, and the evidence points to host CPU sharing. No code fix is made, since none is supported by the data. The Phase A changes stay as instrumentation so that a future stall can be attributed to a phase and a backend call at once.
+
+## Host CPU sharing as the cause of the remaining stall (Phase A, written before the runs)
+
+Hypothesis H. The two-frame physics stall (WebGPU r1, frames 538 and 539) is cgroup CPU throttling. The root cgroup has `cpu.max` 1200000 100000, a quota of 12 CPUs per 100 ms period on a 16-thread host, and `cpu.stat` counts `throttled_usec` as wall time with the whole group descheduled. Within a throttle window the page's thread cannot run, so a frame's wall time grows by the throttled time.
+
+Method. `scripts/browser/cgroup-sampler.mjs` reads `throttled_usec` every 2 ms into a log, with the wall time of each sample. `scripts/browser/stall-attribution.mjs` interpolates the cumulative throttled time over each frame's wall window (`startMs` is now a row column) and labels every stall frame `throttled` when its throttled time is at least half its excess over the run median, `unexplained` otherwise, and `uncovered` when the sampler did not span the frame. `scripts/browser/cpu-load.mjs` starts a fixed number of busy processes for a fixed window and records the window. Each run is WebGPU, draw on, timed 1024. Three runs have no generator (G0) and three run a 12-worker generator for 90 s from the start of the run (G1). The sampler runs 90 s in both.
+
+Predictions, each of which can fail.
+
+- P1. In every run, every stall frame is `throttled`, with throttled time at least 0.5 times its excess. A stall labelled `unexplained` disproves H as the cause of that stall.
+- P2. The generator raises the number of stall frames. Total stalls in G1 exceed total stalls in G0. If G1 has no more stalls than G0, the generator does not load the throttle, and H is not supported by the test.
+- P3. Frames with no throttled time in their window do not stall beyond the baseline. A stall in a frame with zero throttled time disproves H for that frame.
+- Coverage. No stall frame is `uncovered`. If one is, the sampler did not span the run and the run is void for P1.
+
+Engine side of the Phase 5 p99. `scripts/streamer-p99.mjs` runs the engine's planet flight in Node (6000 ticks at 30 m/s, the path that `scripts/check-engine-planet.mjs` uses) and times the streamer step each tick: `locateCell`, and `writePage` plus `releasePage` when the cell changes. Measured here: p50 0.00057 ms, p99 0.00394 ms, max 30.52 ms over 6000 steps. The 30.52 ms maximum is one step, not checked yet.
+
+Spoint side of the Phase 5 p99. Not measured in this pass. Spoint's `src/terrain/HeightfieldStreamer.js` does its work in its own `setTimeout` and promise chain, and `cover(points)` only enqueues. There is no per-step entry point to time from outside without patching spoint. The engine's frame-time p99 on a planet path is also not measured: the browser harness orbits a fixed scene and stages its 16 pages once. The ENGINE.md witness (frame-time p99 against spoint's streamer on the same path) therefore stays OPEN, with these two causes.
+
+Phase A changes. `scripts/browser/engine-render-browser.js` (row column `startMs`); `scripts/browser/stall-attribution.mjs`, `scripts/browser/cgroup-sampler.mjs`, `scripts/browser/cpu-load.mjs`; `scripts/streamer-p99.mjs`; `scripts/check-stall-attribution.mjs` and `scripts/check-streamer-p99.mjs`, both in the `npm test` chain before `check:engine-host-witness`.

@@ -223,8 +223,8 @@ const run = async () => {
   result.outliers = timedRows.filter((row) => row.totalMs > 2 * result.frameTimeMedianMs).map((row) => ({ frame: row.frame, wallMs: Math.round(performance.timeOrigin + row.started), totalMs: round2(row.totalMs), tickMs: round2(row.tickMs), renderMs: round2(row.renderMs), gapMs: row.gapMs === null ? null : round2(row.gapMs), phasesMs: Object.fromEntries(row.phases.map((v, i) => [PHASE_NAMES[i], round2(v)])) }))
   result.phaseMedianMs = Object.fromEntries(PHASE_NAMES.slice(0, phaseCount).map((name, i) => [name, round2(median(timedRows.map((row) => row.phases[i])))]))
   result.phaseMaxMs = Object.fromEntries(PHASE_NAMES.slice(0, phaseCount).map((name, i) => [name, round2(Math.max(...timedRows.map((row) => row.phases[i])))]))
-  result.rowColumns = ['frame', 'tickMs', 'renderMs', 'gapMs', 'active', ...PHASE_NAMES.slice(0, phaseCount)]
-  result.rows = timedRows.map((row) => [row.frame, round2(row.tickMs), round2(row.renderMs), row.gapMs === null ? null : round2(row.gapMs), row.active, ...row.phases.map((v) => round2(v))])
+  result.rowColumns = ['frame', 'startMs', 'tickMs', 'renderMs', 'gapMs', 'active', ...PHASE_NAMES.slice(0, phaseCount)]
+  result.rows = timedRows.map((row) => [row.frame, round2(performance.timeOrigin + row.started), round2(row.tickMs), round2(row.renderMs), row.gapMs === null ? null : round2(row.gapMs), row.active, ...row.phases.map((v) => round2(v))])
   if (DRAW) {
     result.apiCallsPerFrame = lastStats.apiCallsLastFrame
     result.allocationsSinceWarmup = String(lastStats.allocationsSinceWarmup)
