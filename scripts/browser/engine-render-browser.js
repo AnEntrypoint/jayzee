@@ -101,27 +101,37 @@ const setupWorld = (module) => {
   }
 }
 
+const planetSurface = (module) => {
+  const anchor = module._engine_planet_height(0, PLANET.radius, 0)
+  return (x, z) => module._engine_planet_height(x, PLANET.radius, z) - anchor
+}
+
 const setupPlanet = (module, renderer) => {
   const status = module._engine_planet_configure(PLANET.radius, PLANET.cellSize, PLANET.gravity, PLANET.maxHeight)
   if (status !== 0) throw new Error('planet configure status ' + status)
+  const surface = planetSurface(module)
+  const uEdge = [0, 0, PAGE_SPAN]
+  const vEdge = [PAGE_SPAN, 0, 0]
   for (let i = 0; i < PAGES; i++) {
     const key = module._engine_planet_key(0, i, 0)
     const slot = module._engine_page_stage(key)
     if (slot < 0) throw new Error('page stage refused at ' + i)
+    const origin = [(i % 4) * PAGE_SPAN - 30, 0, Math.floor(i / 4) * PAGE_SPAN - 30]
     const samples = module._engine_page_samples(slot) >> 2
     for (let s = 0; s < PAGE_SIDE * PAGE_SIDE; s++) {
-      const x = s % PAGE_SIDE
-      const y = Math.floor(s / PAGE_SIDE)
-      module.HEAPF32[samples + s] = 0.5 * Math.sin(x * 0.6 + i) * Math.cos(y * 0.6)
+      const u = (s % PAGE_SIDE) / (PAGE_SIDE - 1)
+      const v = Math.floor(s / PAGE_SIDE) / (PAGE_SIDE - 1)
+      module.HEAPF32[samples + s] = surface(origin[0] + u * uEdge[0] + v * vEdge[0], origin[2] + u * uEdge[2] + v * vEdge[2])
     }
     module._engine_page_commit(slot)
-    renderer.placePage(slot, [(i % 4) * PAGE_SPAN - 30, 0, Math.floor(i / 4) * PAGE_SPAN - 30], [0, 0, PAGE_SPAN], [PAGE_SPAN, 0, 0])
+    renderer.placePage(slot, origin, uEdge, vEdge)
   }
+  return surface
 }
 
 const setupScene = (module, renderer) => {
   setupWorld(module)
-  setupPlanet(module, renderer)
+  const surface = setupPlanet(module, renderer)
   const classes = new Uint8Array(RENDER_LAYOUT.BODY_SLOTS).fill(255)
   for (let i = 0; i < BODIES; i++) classes[i] = i % RENDER_LAYOUT.PROP_CLASSES
   renderer.setBodyClasses(classes)
@@ -134,11 +144,14 @@ const setupScene = (module, renderer) => {
     renderer.setLight(i, { position: [Math.cos(angle) * 30, 12, Math.sin(angle) * 30], radius: 60, colour: [1, 0.95, 0.85], intensity: 0.8 })
   }
   renderer.setLightCount(LIGHTS)
+  return surface
 }
 
-const orbitCamera = (frame, aspect) => {
+const orbitCamera = (frame, aspect, surface) => {
   const angle = frame * 0.01
-  const eye = [Math.sin(angle) * CAMERA_RADIUS, CAMERA_HEIGHT, Math.cos(angle) * CAMERA_RADIUS]
+  const ex = Math.sin(angle) * CAMERA_RADIUS
+  const ez = Math.cos(angle) * CAMERA_RADIUS
+  const eye = [ex, surface(ex, ez) + CAMERA_HEIGHT, ez]
   const view = lookAt(eye, [0, 0, 0], [0, 1, 0])
   const proj = perspective(CAMERA_FOV, aspect, NEAR, FAR)
   return { viewProj: multiply(proj, view), eye }
@@ -165,7 +178,7 @@ const run = async () => {
   result.adapter = await adapterInfo()
   const renderer = await loadRenderer({ glue: new URL(TIER_GLUE, import.meta.url).href, canvas, navigatorLike, requested, players: TIER, budgetBytes: TIER_BUDGET })
   const module = renderer.module
-  setupScene(module, renderer)
+  const surface = setupScene(module, renderer)
 
   const aspect = canvas.width / canvas.height
   const frameTimes = []
@@ -183,7 +196,7 @@ const run = async () => {
         const phasesBefore = readPhases()
         module._engine_tick(TICK_STEPS)
         const tickEnd = performance.now()
-        const { viewProj, eye } = orbitCamera(frame, aspect)
+        const { viewProj, eye } = orbitCamera(frame, aspect, surface)
         renderer.setCamera({ viewProj, eye })
         if (DRAW) {
           const status = renderer.frame()
@@ -210,6 +223,7 @@ const run = async () => {
   result.backend = renderer.backendName
   result.draw = DRAW ? 1 : 0
   result.tier = TIER
+  result.anchorHeightM = module._engine_planet_height(0, PLANET.radius, 0)
   result.bodies = BODIES
   result.frames = FRAMES
   result.frameTimeP99Ms = p99(timed)
