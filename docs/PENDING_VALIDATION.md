@@ -1657,3 +1657,222 @@ These values match the Phase B witness (`-3826851758512048142`, visible `[729,74
 4. npm test: `build/diag/phase-b3-npm-test.log`, `done exit 0`, `PASS=4741 FAIL=0`. The sample-order gate (`check:sample-order`) and the frequency gate (`check:frequency-runs`, which now includes the three `awaitLoadGate` gates) both ran and passed.
 
 Dependency to note. `engine/out/` is git-ignored, so `check:sample-order` depends on a local build of `engine/out/engine-core-128mib-timed.mjs`. A clean checkout needs that build before `npm test`.
+
+## Reuse pass: allocation audit and buffer reuse plan (Phase A, read-only)
+
+Scope. Read-only: no source edit, build, test, gate, witness or browser run was made in this pass. Audited at HEAD `efbd45d` on main. Four sweeps ran read-only: the C++ core and wasm glue (`engine/src`), the JS frame loop, tick, input and message paths (`src/kernel`, `src/world`, `src/transport`, `src/engine`, `src/netcode`, `src/client`, `src/protocol`, `src/wire`, and the page scripts under `scripts/browser`), and the evidence for defects A, B and C. The owner's rule is applied: reuse an existing buffer or variable instead of creating one.
+
+Result. 59 hot sites allocate or copy per tick, per frame, per call or per message. One more site is witness-only. The C++ hot path has no heap allocation on its own code: `engine_spawn`, `despawn`, `setPosition`, `setVelocity`, `drainInputs`, `pushEvent`, `tickBatch`, `applyPending`, `interest::update`, `encodeDelta`, `planFrame`, and the materials and textures `add` paths are clean. Its per-tick heap calls come from Jolt internals and the pool hooks. Its per-frame calls come from the WebGPU and WebGL2 backends. The kernel (`src/kernel`) allocates nothing: state is passed positionally, so no kernel change is proposed.
+
+Site count by category.
+
+| Category | Hot sites | IDs |
+|---|---|---|
+| C++ per tick (Jolt and pool) | 5 | C-T1 to C-T5 |
+| C++ per tick, witness build only | 1 | C-T6 |
+| C++ per frame (WebGPU and WebGL2 backends) | 8 | C-F1 to C-F8 |
+| Engine glue in `src/engine`, per call | 8 | G1 to G8 |
+| JS frame loop (harness and client render) | 7 | JF1 to JF7 |
+| JS per tick (sim, world, netcode) | 13 | JT1 to JT13 |
+| JS input path | 5 | JI1 to JI5 |
+| JS per message (transport, wire, client) | 13 | JM1 to JM13 |
+| Total hot | 59 | |
+
+Witness tags used in the tables are defined under "Witness plan" below.
+
+### C++ core: per tick
+
+| ID | file:line | function, frequency | allocation | proposed reuse | behaviour risk | witness |
+|---|---|---|---|---|---|---|
+| C-T1 | `engine/src/pool_alloc.cpp:70-77` | `joltReallocate`, per Jolt realloc inside a tick | heap temporary: allocate, memcpy, release | pre-size the Jolt arrays at init from measured peaks | none; budget only | W1 |
+| C-T2 | `engine/src/pool_alloc.cpp:116-130` | `allocate`, carve when the freelist is empty (line 129), per pool miss | arena carve | raise `kPrimeCounts` in `pool_alloc.h` so misses stop after warm-up | changes the tier footprint | W1 |
+| C-T3 | `engine/src/world.cpp:429` | `World::step` to Jolt `Update`, per step | Jolt temp allocator (`world.cpp:121`, sized at `budget.cpp:126`) spills to `JPH::Allocate` when full | size the temp allocator from the measured peak | none to determinism | W1 |
+| C-T4 | `engine/src/world.cpp:351-352` | `spawnBatch` to `AddBodiesPrepare` and `AddBodiesFinalize`, per spawn batch | Jolt internal, not visible in repo | none in repo; count through the operator-new wrapper | unknown until counted | W1 |
+| C-T5 | `engine/src/planet_shape.cpp:33-63`, `engine/src/vegetation.cpp:96-117`, via `engine/src/sphere_contact.h:9-19` | collide callbacks and `AddHit`, per candidate pair per step | value struct; any heap is in Jolt's collector | one collector object reused across calls | hit order sets contact order, so a changed collector can change determinism | W1, W5 |
+
+Checked, no heap: `pool_alloc.cpp:122-124` (`takeLarge`, a first-fit scan over the arena).
+
+### C++ core: witness build only
+
+| ID | file:line | function, frequency | allocation | proposed reuse | behaviour risk | witness |
+|---|---|---|---|---|---|---|
+| C-T6 | `engine/src/engine_core.cpp:25` | `leakBlock`, per tick, witness build only (`engine/CMakeLists.txt:9,215`) | `std::malloc(65536)` per tick | none; the leak build is the witness | must not ship | W1 |
+
+### C++ per frame (wasm render backends)
+
+| ID | file:line | function, frequency | allocation | proposed reuse | behaviour risk | witness |
+|---|---|---|---|---|---|---|
+| C-F1 | `engine/src/render/render_webgpu.cpp:479` | `frame`, per frame | `CreateCommandEncoder` (Dawn object) | one `RenderBundle` recorded once and run with `ExecuteBundles` each frame | the bundle must be re-recorded on any pipeline, bind-group or texture-table change | W4, W7 |
+| C-F2 | `render_webgpu.cpp:485-486` | `frame`, per frame | `GetCurrentTexture` and `CreateView` | none; the swapchain view must be fresh | a cached view binds a stale swapchain texture | W7 |
+| C-F3 | `render_webgpu.cpp:504, 515, 518` | `frame`, per frame | pass encoder, `Finish`, `Submit` | as C-F1 | as C-F1 | W7 |
+| C-F4 | `render_webgpu.cpp:293-295, 452-476` | `writeBuffer`, 6 to 10 calls per frame | one queue write per buffer | one staging buffer and one write with offsets (camera, args, lights, materials, pages) | shader bind offsets and uniform alignment must change together | W4, W7 |
+| C-F5 | `render_webgpu.cpp:297-307, 470-476` | `writeLayer`, per uploaded page and per pending albedo layer | `WriteTexture` per layer | batch contiguous layers | layout mismatch | W4 |
+| C-F6 | `engine/src/render/render_webgl2.cpp:341-346, 377, 388` | `glBufferSubData`, per frame | per-call crossing. Whether Emscripten 4.0.10 builds a subarray per call is unverified; the library is not in the repo | fix in the glue if it does | none | W7 |
+| C-F7 | `render_webgl2.cpp:351-353, 357-360` | `glTexSubImage3D`, per upload and per pending albedo | per-call crossing | batch the uploads | none | W7 |
+| C-F8 | `engine/src/render/render_frame.cpp:190-191` | `resolveMaterials` via `planFrame`, per frame | no heap; rewrites 256 slots each frame | dirty flag | must include texture-table changes (`textures.cpp:117`) and albedo commits (`exports_render.cpp:196`), or layers go stale | W4 |
+
+### Engine glue in src/engine (per call; off the live path, see the note below the tables)
+
+| ID | file:line | function, frequency | allocation | proposed reuse | behaviour risk | witness |
+|---|---|---|---|---|---|---|
+| G1 | `src/engine/bridge.js:126-137` | `drainEvents`, per tick if drained each tick | new array (129); one object per event (132) | caller-owned event buffer reset per drain, or read `eventWords` directly | callers holding the array or its objects across ticks | W5, W6 |
+| G2 | `src/engine/bridge.js:140-142` | `transform`, per body per call | `subarray` view (141) | one cached view per body, made at `createBridge` | none; the view is already live | W2 |
+| G3 | `src/engine/EngineWorld.js:139-149` | `position` and `velocity`, per call | 3-element array (143, 149) | optional `out` argument | a caller that stores the result sees later mutation | W6 |
+| G4 | `src/engine/EngineWorld.js:181-200`, sort at `:330`, gather at `:334-335` | `hash`, per call | `#handles` spread and sort; `#gather` array and `Float64Array` | keep a sorted handle list, invalidated on spawn and despawn; a scratch `Float64Array` for `hash` | the order must match `bySlot` (line 32); a stale cache changes the checksum | W4, W5 |
+| G5 | `src/engine/EngineWorld.js:211-216` | `importState`, per body per import | two `slice` arrays (212-213) | index the state arrays directly | none if values match | W3 |
+| G6 | `src/engine/EngineWorld.js:115-125` | `spawnMany`, per batch | `map` and per-row spread (115-118); `spawned` array (125) | write into `#stageRows` after validating every row | keep validate-all-first; the returned array's identity | W5 |
+| G7 | `src/engine/EngineWorld.js:165, 172-178` | `step` and `advance`, per step | one wasm call per step; this is a call, not an allocation | not batched. `tickBatch` drains inputs and applies pages once per call (`engine/src/bridge.cpp:72-81`) and bumps the epoch once (`bridge.cpp:74`), which changes semantics | rejected as a reuse; it changes semantics | none |
+| G8 | `src/engine/renderer.js:151-159` | `stats`, per poll | frozen object plus `Array.from` (154) | one reused stats object updated in place | a caller holding `lastStats` sees mutation; copy on read | W6 |
+
+### JS frame loop (harness and client render)
+
+| ID | file:line | function, frequency | allocation | proposed reuse | behaviour risk | witness |
+|---|---|---|---|---|---|---|
+| JF1 | `scripts/browser/engine-render-browser.js:177-185` (`lookAt` 47-52, `perspective` 41-45, `multiply` 54-64) | `orbitCamera`, 60 Hz | about 12 arrays per call, including `new Array(16)` at line 55 | module-level `Float64Array(16)` for view, proj, viewProj and eye | none; the engine reads the same values | W7 |
+| JF2 | `engine-render-browser.js:225, 235` (`readPhases` at 216) | `step`, 60 Hz, twice | `Array.from`, a closure, an array | `Float64Array(phaseCount)` filled in place | none | W7 |
+| JF3 | `engine-render-browser.js:228-230` | `step`, 60 Hz | `{viewProj, eye}` at 229; `lastCamera` literal at 230 | one camera object; copy once at the end | `lastCamera` aliasing: copy before the final read at line 277 | W4 |
+| JF4 | `engine-render-browser.js:238` | `step`, 60 Hz | row object; `phases.map` array and closure | typed row table written in place | the output JSON shape must stay identical | W4 |
+| JF5 | `src/client/playerLodRenderer.js:73-84` | `update`, per frame | options literal (74); `forEach` closure (76) | build the options once; a `for` loop | none | W7 |
+| JF6 | `src/client/crowdDots.js:24-33` | `decodeCrowdDots`, per frame per dot | pose literal per dot (16, 21); `dots.map` array (30) | a preallocated pose buffer | none; poses are not retained | W2 |
+| JF7 | `src/client/playerVatRenderer.js:82, 138` | `update` closure, per player per frame | an arrow closure per call | one hoisted closure; the id passed through a variable | none; the call is synchronous | W2 |
+
+### JS per tick (sim, world, netcode)
+
+| ID | file:line | function, frequency | allocation | proposed reuse | behaviour risk | witness |
+|---|---|---|---|---|---|---|
+| JT1 | `src/world/World.js:83-91` (queries at `query.js:88, 118, 131`) | `position` and `velocity`, per body per query | `Array.from(subarray)` | out-parameter variant; queries use scratch | none for internal use | W2 |
+| JT2 | `src/world/query.js:21-36` | `raySphere`, per body per ray | `oc` (22) and `p` (33) on every call; `normal` (35) on a hit | scalar locals | none | W3 |
+| JT3 | `query.js:91-109, 111-137` | `raycast`, `overlapSphere`, `overlapBox`, per query | options default `{}` (91, 111, 125); `forEach` closure (103); `d` (119, 133); `clampToBox` array (132) | one shared frozen empty options object; scalars | none | W2 |
+| JT4 | `src/world/World.js:132-160` | `hash`, `snapshot`, `exportState`, per call | subarray pairs; slice copies; `words` closure (135) | cached views for `hash` | keep the slices for `snapshot` and `exportState`: callers keep those copies | W4 |
+| JT5 | `src/netcode/movement.js:8-9` (called from `Authority.js:36`, `Predictor.js:43`) | `applyMovement`, per player per tick | velocity array read (8); `[dx, vy, dz]` literal (9) | a numeric `vy` read; a module scratch array | none; `setVelocity` copies | W3 |
+| JT6 | `src/netcode/Authority.js:33-39` (`InputBuffer.js:59, 67`) | `step`, per player per tick | `take()` result object | reuse the result object | the consumer must finish before the next `take` | W6 |
+| JT7 | `src/client/PredictionEngine.js:101-103, 531, 555, 591` | `InputHistory` iterator, `_rebaseAndReplay`, `applyChartTransfer`, `_replayInputsAfterChartSwitch`, per correction | a generator object per `for...of` | indexed loop over `history.at(i)` | none, if the history is not mutated mid-loop (only `addInput` mutates it) | W3 |
+| JT8 | `PredictionEngine.js:373` | `_separateFromPeers`, per tick per peer | `[pid, peer]` tuple | indexed iteration | none | W3 |
+| JT9 | `PredictionEngine.js:424-452` | `_rememberWalls`, per snapshot per plane | `find` closure (432); `shift`; `splice` | index loop | none | W3 |
+| JT10 | `src/client/SnapshotTimeline.js:77-87, 89-102, 138, 156-157` | `recordOffset`, `addSnapshot`, `sample`, per snapshot and per frame | `subarray` plus `sort` (84); snapshot object (99); `shift` (100, 138); a Map clear and set per player (156-157) | a cached sorted view; a ring with an index; an indexed map | a snapshot object is retained by reference until consumed: pool only after consumption | W6 |
+| JT11 | `src/netcode/SnapshotPacker.js:97, 104, 120, 123` | `recordBytes`, `packSnapshotBytes`, per snapshot and per cache-miss record | `new Uint8Array(pack(rec))` double copy (`msgpack.js:114` already copies); `rec.slice()` (105); two `pack()` calls per snapshot | drop the wrapper copy; reuse the values array | none for the wrapper; do not skip the -0 walk (JT12) | W3 |
+| JT12 | `src/protocol/msgpack.js:48-61, 72-79` | `assertEncodable`, `countNegativeZero`, per pack call | a full tree walk with `reduce` closures (75, 78); `Map` spread (76); `Object.keys` and `Object.values` | indexed loops; no closures | removing the walk changes -0 encoding; the walk stays | W3 |
+| JT13 | `src/netcode/collisionTileStreamer.js:59-84` | `tick`, per streamed tick | `Set(players.map)` (81) when clients shrink; spread config (76) on join; a view and object per tile (35-36, 53) | reuse the tile message object | `connections.send` may retain it | W6 |
+
+### JS input path
+
+There is no DOM keyboard, pointer or gamepad listener in scope. Input is network-side: the client encodes, the server decodes, canonicalises and buffers.
+
+| ID | file:line | function, frequency | allocation | proposed reuse | behaviour risk | witness |
+|---|---|---|---|---|---|---|
+| JI1 | `src/protocol/input.js:27-42` | `encodeInputs`, per packet and per `canonicalInput` | an `ArrayBuffer` and a `DataView`; `forEach` closure (33) | a scratch `DataView`; a `for` loop | none | W3 |
+| JI2 | `input.js:44-63` | `decodeInputs`, per packet (`Authority.js:26`) | records array (52); one object per record (55) | pooled records | none: `InputBuffer.push` copies before returning | W6 |
+| JI3 | `src/netcode/canonical.js:3` | `canonicalInput`, per input record (`InputBuffer.js:45`) and per predicted tick (`Predictor.js:26`) | `encodeInputs([record])`; the `decodeInputs` array and object | a scratch byte buffer; one returned object | the pending `Map` retains the result: do not pool it there | W6 |
+| JI4 | `src/protocol/inputCodec.js:215-240, 281-307` | `readRecordInto`, `decodeInputPacket`, per packet and per record | `{...recordTemplate}` spread (220); entries array (287); entry object (298) | assign fields into a reused record | a caller that retains the returned entries | W6 |
+| JI5 | `src/netcode/InputBuffer.js:64, 30-32` | `take` (held branch) and the `stats` getter, per held tick and per read | spread `{...last, sequence, buttons: 0}`; spread on `stats` | a scratch record; a cached stats object | aliasing for callers that compare over time | W6 |
+
+### JS per message (transport, wire, client)
+
+| ID | file:line | function, frequency | allocation | proposed reuse | behaviour risk | witness |
+|---|---|---|---|---|---|---|
+| JM1 | `src/transport/workerTransport.js:8, 24-29`; `workerMessages.js:21, 28-31, 37-40` | `send` and `wireBufferOf`, per send | message object and `[buffer]` array; a `slice` when the view is not the whole buffer | reuse the transfer array and the message object (`postMessage` clones synchronously) | keep the slice: a transfer detaches the whole buffer | W8 |
+| JM2 | `src/transport/wireweaveFrame.js:44-68` | `fragment`, per send and per fragment | ArrayBuffer (60); header ArrayBuffer and `DataView` (21-22); three `Uint8Array` views (61-64); header object (61-62); `subarray` (59); out array (55) | one scratch header; one buffer per frame | separate transferable buffers are required | W8 |
+| JM3 | `wireweaveFrame.js:80-86, 97-133` | `sweep` and `feed`, per fragment | `sweep` iterates all sets (82); `DataView` and object in `decodeHeader` (34, 36); `subarray` (118) | sweep on a timer or every N feeds | eviction timing changes | W5 |
+| JM4 | `src/transport/wireweaveRelay.js:15-26, 49-60, 77-82` | `toBase64`, `fromBase64`, `receive`, sign template, per frame sent and received | per-byte string concatenation (17); `atob` string and array (22-23); template object and tags array (77-82) | chunked `fromCharCode`; reused buffers | `feed()` keeps subarrays: copy before reuse | W3 |
+| JM5 | `src/transport/wireweaveFraming.js:12, 16-29, 31-44, 53-57` | `beginsWithBatchPrefix`, `encodeBatch`, `decodeBatch`, `decodeWireFrame`, per frame and per batch | 1-byte view (12, 55); `reduce` closure (17); `DataView` (19, 32); a `Uint8Array` per item (25, 40); items array (33) | pass the caller's `Uint8Array`; reuse the `DataView` | decoded items are returned to callers | W3 |
+| JM6 | `src/transport/transformRing.js:196-217, 219-241` | `#readPose`, `#readSlot`, `#readSlots`, `readCut`, per slot per read, empty slots included | closure (197); three `Array.from` and `subarray` (197); pose object (198); result object (214); a `Map` per attempt (220) | check `playerId` before reading the payload; a scratch `Float64Array`; a caller-owned `Map` | callers that keep pose objects from earlier reads | W6 |
+| JM7 | `src/transport/simTransport.js:79-92, 111-114` | `settle`, `takeReady`, `advance`, per send and per advance | filter and sort per call (80); `splice` per due entry (82); result object per delivery (91) | a sorted queue | tie order must keep `order` | W5 |
+| JM8 | `src/client/SnapshotProcessor.js:317-360` | `processSnapshot`, per snapshot | snapshot object and two arrays (320); a `Map` set per player (327); a tuple per entry (342); `Set` clear and add (323, 326) | keep the existing slot pools (340, 347, 380); drop the tuple | snapshot objects are buffered by reference in `SnapshotTimeline`: do not pool the outer object | W6 |
+| JM9 | `SnapshotProcessor.js:117-131, 171-201` → `src/wire/binSnapshot.js:63, 65, 73-80, 94-103` | `fillPlayerArr`, `applyFieldDelta`, `decodePlayerRecord`, `decodeEntityRecord`, per record per snapshot | a result object and two or three map arrays per record | add `...Into(bytes, out)` variants | the exported decoders have other callers: keep the originals | W3 |
+| JM10 | `src/client/CollisionMirror.js:92-107` | `onTile` and `evictFar`, per `COLLISION_TILE` message | `slice().buffer` copy (98); `Float32Array` and object (98); `tileKey` string (96); a tuple per tile in `evictFar` (105) | take ownership when the sender transfers | a copy is needed if `msg.v` views shared memory; throttling eviction changes eviction timing | W8, W5 |
+| JM11 | `src/protocol/delta.js:26-49, 51-80`; `src/netcode/StateSender.js:19-26`; `StateReceiver.js:20-28` | `encodeDelta`, `decodeDelta`, `send`, `receive`, per state message | `changed` array (29); `forEach` closure (40); ArrayBuffer (33); two `Float64Array.from` (70-71); lookup closure (21); `keys()` iterators (22-26) | hoist the closure; reuse the `changed` array | history copies are needed for later delta bases | W3 |
+| JM12 | `src/client/MessageHandler.js:51-116` | `handleMessage`, per message | literal type-to-callback map (82); `_peerRttTable` literal (87); `{invalidate: true}` (59) | hoist the map | none | W2 |
+| JM13 | `src/client/ClockSync.js:18-27` | `addSample`, per heartbeat | `[t0,t1,t2,t3].every` array (19); sample object (23); `shift` (24) | a ring with an index | none | W2 |
+
+Note on the engine glue rows (G1 to G8). `EngineWorld`, `bridge.js` and `renderer.js` are imported only by `scripts/` and `src/client/resourcePools.js`. `src/netcode/Authority.js` and `Predictor.js` do not import them. Those rows matter once the engine glue is wired into the live path.
+
+Note on the harness rows (JF1 to JF4). `engine-render-browser.js` is the witness page. Its own JS churn perturbs the timings it reports, and its gate reads the engine-side allocation counter, so the harness churn does not fail the gate. Re-baseline the timings after any change to the harness.
+
+### Init-only and content-time sites (not hot)
+
+- C++ init: `engine_core.cpp:120-138` (carve and bind); `world.cpp:162` (`new Factory`), `:200` (placement `Runtime`), `:230-231` (`PlanetShape` and vegetation shape), `:243` (body per slot); `codec.cpp:481`, `planet_frame.cpp:102`, `vegetation.cpp:135` (placement new at bind); `pool_alloc.cpp:93-106` (`prime`); `arena.cpp:24-33`.
+- C++ content-time, outside the arena and outside the witness counter: `world.cpp:265` (`addBox`), `:287` (`configurePlanet`), `:304` (`attachVegetation`), `:317` (`addTrunk`), each with a `CreateAndAddBody` at `:268, 290, 307, 320`. These use global `new`. A content add is not per frame, but the memory is not in the arena, so the witness does not count it.
+- JS init: `EngineWorld.js:30-50, 58, 66-78, 355-382`; `bridge.js:55-89`; `interest.js:9-12`; `materials.js:29-30`; `renderer.js:59-68, 169-181`; `kernel/load.js:5-25` (per `World` construction); `kernel/build.js:12-15`; `World.js:38-58`; `transformRing.js:45-79, 99-112`; `workerTransport.js:13-38`; `SnapshotPacker.js:24-34, 61-70` (one 256 KiB arena); `collisionTileStreamer.js:28-32`; `lagCompensation.js:62`; `inputCodec.js:96-116`; `MessageHandler.js:35-37, 126-174`.
+
+### Clean on the JS side
+
+The kernel (`step.js:5-12`, `integrate.js:1-12`, `collide.js:3-52`, `pairs.js:8-76`, `respond.js:5-16`) allocates nothing per step. `World.js:99-130` (`step`, `advance`), `transformRing.js:131-166` (writer), `renderer.js:76-81, 144-146`, `floatingOrigin.js:26-35` (no-rebase path), `PredictionEngine.js:322-336, 391-402`, `ReconciliationEngine.js:28-51`, `NetworkState.js:70-106` (pooled), and `playerLodRenderer.js:36-50` (scratch vectors) are clean.
+
+### Not swept
+
+These were not read, so this pass makes no claim about them: `src/client/sceneSetup.js`, `resourcePools.js`, `webgpuInstancing.js`, `playerLodRendererWebGPU.js` (`update` at 38), `ssr.js`, the `bloom*.js` files, `fsr1.js`, `src/render/postFxLook.js`, `src/client-pure/playerLodPlanner.js`, `src/motion-pure/*`, `src/snapshot-lod-pure/records.js`, `src/protocol/componentSchema.js`, `state.js`, `snapshot.js`, and `src/client/interpolation.js`. The Dawn and emdawnwebgpu object model is not in the repo, and neither is Jolt's internal allocation frequency. Both are unknown here.
+
+### Reuse that would change behaviour
+
+Each of these is a reuse that the table rows mark. The reason is the lifetime or the order the reuse would change.
+
+1. `InputBuffer` pending `Map` (JI3): retains the `canonicalInput` result. Pool only the scratch bytes, never the retained object.
+2. `SnapshotTimeline` (JT10) and `processSnapshot` (JM8): snapshot objects are retained by reference until consumed. Pool only after consumption, with a ring sized to the buffer depth.
+3. `StateSender` and `StateReceiver` history (JM11): the delta bases are copies kept by tick, 64 states deep. Reusing the copy in place changes which base a delta decodes against.
+4. `transformRing` reader (JM6) and `World.position` and `velocity` (JT1, G3): a scratch pose or array changes what a caller that holds two reads sees.
+5. `workerTransport` and `wireweave` (JM1, JM2): a transfer detaches the buffer, so each send needs a fresh buffer or a copy. Reusing the message object is safe. Reusing the buffer is not, without a copy.
+6. `wireweaveRelay.feed()` (JM4): keeps `subarray` views. Copy before reuse.
+7. `msgpack.js` -0 walk (JT12): removing it changes the -0 encoding. The walk stays, with loops in place of closures.
+8. `EngineWorld` sorted handles (G4, JT5): the order must equal `bySlot`. A stale cache changes the checksum.
+9. `EngineWorld.step` to `tickBatch` (G7): changes semantics, so it is rejected as a reuse.
+10. Render bundles (C-F1): valid only until a pipeline, bind-group or texture-table change. Re-record on those changes. The swapchain view (C-F2) must stay fresh.
+11. Uniform write merge (C-F4): shader offsets and alignment change together.
+12. `resolveMaterials` dirty flag (C-F8): must include the texture-table change (`textures.cpp:117`) and the albedo commit (`exports_render.cpp:196`).
+13. `renderer.stats` (G8): copy on read, or a caller holding `lastStats` sees mutation.
+14. `engine-render-browser.js` `lastCamera` (JF3): copy before the final read at line 277.
+15. `CollisionMirror` (JM10): the slice copy protects against a sender that reuses shared memory. Taking ownership is safe only when the sender transfers. Throttled eviction changes when tiles are evicted.
+16. Content-time `new` (world.cpp:265, 287, 304, 317): moving these into the arena changes when memory is reserved, so the arena must be sized first.
+
+### Witness plan
+
+- W1, host allocation counter. Count `pool::allocate` and `release`, and wrap global `operator new` and `malloc` in the native host build, over 10000 ticks after warm-up at the 64 and 1024 tiers. The current counter (`world.cpp:142-144`, `allocationsSinceWarmup` = `arena::carves()` minus a base) counts arena carves only. It misses freelist reuse (`pool_alloc.cpp:126`) and global `new`, so "zero after warm-up" shows no growth, not no allocation.
+- W2, Node GC witness. A new gate runs N ticks of a JS path after warm-up, with a `PerformanceObserver` on `gc` entries, and reads `process.memoryUsage().heapUsed`. The pass needs zero minor GC entries and a heap delta under a set bound.
+- W3, byte equality. Encoded output (msgpack, input codec, wireweave, delta) equals the bytes from before the change for a fixed seed. The existing fixtures are `scripts/fixtures/spoint/msgpack-cases.json` (56 values) and `replay-sample.bin`.
+- W4, checksum equality. The engine checksum and `World#hash` are unchanged for a seeded run. The 1024 browser witness value is `-3826851758512048142` with visible `[729,746,747,750]`, once defect C is resolved.
+- W5, order equality. The handle order (`bySlot`), the event order and the simulated delivery order (tie order) are unchanged for a seeded run.
+- W6, retention test. A retained result (pending `Map`, `SnapshotTimeline`, `StateReceiver` history, a `transformRing` pose) is unchanged after a later call. This checks copy-on-read.
+- W7, browser heap. In the playwriter page, read the CDP heap usage over 600 frames after warm-up, with `getCDPSession({ page })` (the playwriter rule). The pass needs no per-frame growth of JS objects.
+- W8, transfer witness. After `postMessage` with a transfer, the sender's buffer is detached (`byteLength` 0), and each transferred buffer is distinct.
+
+## Defect A: playwriter MCP connect failure (ledger)
+
+Error, as recorded. `CONNECT_TIMEOUT`, 30 s, in the Phase B entry for "Phase A: sample order witness and frequency runner" (line 1623). This is the ledger's label. No log in this repo or under `/config/.gmnew` or `/config/.gm` contains a raw error line, timestamp, stack or retry count for it.
+
+Timeouts configured. The gm default (`/config/.gmnew/current/defaults/mcp.json`) and the project `.mcp.json` both set `timeoutMs` 300000 and `startupTimeoutMs` 600000. Neither has a 30 s setting, so the timeout that fired is not identified.
+
+Current state. In this run the playwriter server connected: `runs/2026-11-09-19-29-49-314506/log.jsonl`, seq 3, `state: connected`, `tools: 3`, protocol 2025-11-25, 15.0 s after the run started. The server entry denies `reset` (seq 4).
+
+Cause. Not established. The logs show a successful connect, so they do not support a connect timeout. The only related cause on record is the gm-started server lacking `PLAYWRITER_BROWSER_PATH` (lines 680-684). No log ties that to the connect timeout.
+
+Can playwriter do the render witness? Yes, in principle, and it is the project's browser (INVARIANT 11; line 363). The witness needs `navigator.gpu` to return a non-fallback NVIDIA adapter. The profile's labs flags (line 373, `/workspace/.playwriter/browser-profile/Local State`) should supply it. A server that gm starts does not get the `.mcp.json` wrapper (lines 680-684), so that is the one thing to check. Not run in this read-only pass. First step of the next Phase B: `requestAdapter()` with `isFallbackAdapter` false. If that fails, the fallback is `scripts/browser/render-witness.mjs`, and the reason is the connect failure recorded here. Decision: next Phase B uses playwriter.
+
+## Defect B: unpinned and pinned gaps (ledger, OPEN)
+
+All seven gaps are from `build/diag/paired-G/freq2/`.
+
+Unpinned gaps, run `freq-unpinned-2` (sampler not pinned, `freq-unpinned-2.run.json:27`). The gaps are 658, 162 and 177 ms (`freq-unpinned-2.result.json` lines 20, 28, 36). The sampler's counters explain none of them. The sampler wait is 0.006, 0.30 and 0.00 ms, and the sampler gate needs 80% of the excess in wait or work (`scripts/browser/thread-sampling.mjs:135-139`). The `host-cfs-quota` label is a rule: the gap check sets it whenever the window's throttle is above zero (`scripts/browser/sampler-gap-check.mjs:63`). It is not a per-gap measurement. Measured: the cgroup throttle inside each window is 142.2, 354.9 and 177.0 ms, and the group is at its 12-CPU quota (about 11.4 to 11.9 cores, a calculation from `freq-unpinned-2.sampler.txt`, not a ledger value). The throttle counter sums over threads (line 453), so it is a correlation, not a share of wall time. Open: the per-thread cause of each gap. The logs do not record when the sampler thread was woken or switched in. To settle it, record the sampler's wake and switch-in times across each gap (a 1 ms `schedstat` poll), and run a control with 11 burn workers or a higher quota.
+
+Pinned gaps, run `freq-pinned-1` (sampler on CPU 15, `freq-pinned-1.run.json:27`, quota `1200000 100000`, `:25`). The gaps are 140, 174, 172 and 141 ms (`freq-pinned-1.result.json` lines 12, 20, 28, 36). Measured: `threadCause` is `run-queue-wait` in all four, and that wait accounts for almost all of the excess (90.0 of 90, 123.7 of 124, 122.3 of 122, and 90.4 of 91 ms). The cgroup throttle inside the windows is 799.5, 808.1, 793.2 and 758.3 ms, and the usage is about 10.6 to 11.6 cores (a calculation). Open: whether the run-queue wait is the quota throttle or the sampler sharing CPU 15 with a burn worker. The burn workers are unpinned (`scripts/browser/cpu-load.mjs:9-10`), and the sampler is pinned to 15 (`scripts/browser/paired-run.mjs:18-22`). To settle it, sample each sampler and burn worker's processor field (`/proc/<pid>/stat`, field 39) during each gap, and run a control with the burn workers kept off CPU 15.
+
+The r4 pinned run (`build/diag/paired-G/r4-G1-pinned`, line 1577) has no gap over 100 ms, and it has no throttle counters to attach. The decision at line 1647 still stands: pinned is the default, and the owner should confirm it.
+
+## Defect C: 1024-tier checksum 8711882901550134279 with visible [0,0,0,0] (ledger, OPEN)
+
+The defect. Fresh 1024 pages report checksum `8711882901550134279` and visible `[0,0,0,0]`, against the recorded `-3826851758512048142` and `[729,746,747,750]` (lines 1477 and 1489).
+
+Inferred cause. `scripts/browser/engine-render-browser.js` changed in `f2b5c23`: the ground box was removed, and bodies spawned at the planet radius on a 1.2 m grid. The camera orbits at 25 m with a 500 m far plane, and the bodies sit near 6.37e6 m, so none are in the frustum. `2f831f4` restored the page (line 1537).
+
+Result files that support the page cause. `build/diag/render-bisect-A/15fcb7a.json` and `render-bisect-A/f2b5c23.json` (engine f2b5c23, page 15fcb7a): `-3826851758512048142`, `[729,746,747,750]`. `build/diag/render-bisect-B/15fcb7a.json` (engine 15fcb7a, page f2b5c23): `-369654607706150895`, `[0,0,0,0]`. `build/diag/render-bisect-B/f2b5c23.json` and `build/diag/render-bisect/f2b5c23.json`: `8711882901550134279`, `[0,0,0,0]`. `build/diag/render-fixed/c30d3d7.json`: `8711882901550134279`, `[0,0,0,0]`. `build/diag/render-fixed/2f831f4.json`: `-3826851758512048142`, `[729,746,747,750]`.
+
+Why this stays open. The commands for these result files are not recorded. Line 1655 closes the entry by a later value match, and says "I did not re-render the `8711` state to prove the cause." The result files contradict that sentence: `render-fixed/c30d3d7.json` and `render-bisect/f2b5c23.json` are re-renders of the 8711 state. Line 1504 also still says the f2b5c23 old-scene row is "not yet run", but `render-bisect-A/f2b5c23.json` exists. The decision on which value is the witness (line 1477) is not recorded.
+
+The one measured run that would confirm the cause. Run B, re-executed with its command recorded: engine `15fcb7a` with the page from `f2b5c23`, using `--scene=f2b5c23` (the "Cause" paragraph of the 1024 bisect entry). Command: `node scripts/bisect-render-1024.mjs 15fcb7a 15fcb7a --scene=f2b5c23 --out=<dir>`. Expected: checksum `-369654607706150895`, visible `[0,0,0,0]`. Its paired control, run A (engine f2b5c23, page 15fcb7a), must give `[729,746,747,750]` in the same session. Run it through playwriter in Phase B (defect A).
+
+## Phase B order
+
+1. Defect A: confirm the WebGPU adapter in the playwriter browser (`isFallbackAdapter` false). Fall back to `render-witness.mjs` only if that check fails, and say why.
+2. Defect C: run B and its control, with the commands recorded. Decide the witness value.
+3. Defect B: the sampler wake trace and the burn-worker placement control.
+4. The reuse changes (the 59 sites above) in the Phase A pass, each gated by its witness tags W1 to W8.
+
+Nothing in this section is measured by this pass. It is the audit, the defects as recorded, and the plan.
