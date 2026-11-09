@@ -13,13 +13,18 @@ export const summariseSnapshot = (text) => {
   const sizeAt = fields.indexOf('self_size')
   let bytes = 0
   let objects = 0
+  let codeBytes = 0
   for (let i = 0; i < nodes.length; i += width) {
     const type = types[nodes[i + typeAt]]
     if (type === 'native' || type === 'synthetic') continue
+    if (type === 'code') {
+      codeBytes += nodes[i + sizeAt]
+      continue
+    }
     bytes += nodes[i + sizeAt]
     objects += 1
   }
-  return { objects, bytes }
+  return { objects, bytes, codeBytes }
 }
 
 export const liveObjectBytes = async (cdp) => {
