@@ -1104,3 +1104,38 @@ Ranked items folded into this pass. Item 2 (the 1024 WebGPU stalls) is changes 1
 Measurement note. The thread sampler records jiffies at USER_HZ 100, so each frame's main-thread CPU is accurate to about 10 ms.
 
 Witnesses in Phase B are appended below this line.
+
+### Phase B: paired runs under the sleeping build, the P2 verdict and the open cause
+
+Build. The engine variants were rebuilt with `mAllowSleeping = true`, and the pins in `engine/artifacts.json` now name the new local builds: fixed 64 `0690234f…`, fixed 128 `e3f52a62…`, leak 64 `9b6590bd…`. `check:engine-bridge` runs the rotation gate by measured bounds. A sphere dropped straight down ends within 8.7e-4 rad and 0.49 mm at 240 ticks, because float32 contact round-off is amplified by the bounce, so an exact identity claim cannot hold. `check:engine-core` and `check:engine-leak` both PASS.
+
+Paired runs (`scripts/browser/paired-run.mjs`, 240 s window, G1 with 12 burn workers, phase 10 at tier 1024 timed in the project browser). Each run started with 1-minute load below 3 (2.33, 2.88, 2.79 and 2.97).
+
+| Run | Page p99 / median / max (ms) | Frames | Streamer p99 (ms) |
+| --- | --- | --- | --- |
+| r1-G0 | 48.5 / 41.25 / 56.0 | 540 | 0.00053 |
+| r1-G1 | 294.1 / 112.15 / 342.8 | 540 | 0.00069 |
+| r2-G0 | 54.0 / 45.2 / 56.6 | 540 | 0.00047 |
+| r2-G1 | 172.4 / 97.2 / 253.7 | 540 | 0.00070 |
+
+Paired report, `node scripts/browser/paired-report.mjs build/diag/paired-C`: `verdict` `supported`, `starvationRatio` 103.69173018128768. Round 1: G0 has 0 stalls (threshold 61.875 ms from its median 41.25 ms), and G1 has 540 frames over that threshold. Its count against its own median is 110. Round 2: G0 has 0 stalls (threshold 67.8 ms), and G1 has 534 frames over it. Its own-median count is 15. P2, that G1 has more stalls than G0 in every pair, holds under both counts. The common-baseline count saturates, because the G1 median frame is 2.3 to 2.7 times the G0 median, so nearly every G1 frame counts. The own-median count is the one that counts discrete stalls.
+
+Stall probe, `scripts/browser/stall-probe.mjs` on the G1 windows. Round 1: 110 stalls (starved 86, blocked 24, cpu-bound 0), stall tick median 199.6 ms against 106.85 ms in normal frames. Round 2: 15 stalls (blocked 14, starved 1, cpu-bound 0), stall tick median 156.2 ms against 96.3 ms. The tick is the stall, so the cost is the physics step, not the render path.
+
+Active bodies. The timed page's `active` column, from `engine_sim_active_bodies`, is 10240 in every one of the 540 frames of all four runs. So the sleeping change has no measured effect, and no body sleeps. Tick medians: G0 40.9 ms (round 1) and 44.8 ms (round 2), and G1 110.9 ms and 96.5 ms.
+
+Cause, recorded and not resolved. `applyRadialGravity` (`engine/src/world.cpp:399-410`) calls `bodies.AddLinearVelocity` on every live body on every tick. Each body therefore gets a fresh velocity before Jolt's sleep test, and none stays at rest long enough to sleep. The physics step stays proportional to 10240 bodies on every tick, and under the 12-worker burn it takes two to three times as long, which produces the stall frames. Change 1 (`mAllowSleeping = true`, commit 3f5325a) is kept, with no measured effect. The next change, made in Phase A of the next pass, stops the per-tick radial velocity from waking resting bodies (apply it only to bodies that are awake), then reruns the `active` column and the four paired runs. If sleeping still does not remove the cost, ENGINE_THREADS is the next lever.
+
+P2 verdict: `supported` in both pairs. The stall problem is not resolved. G1 stall frames remain in both rounds, and the 1024 long-frame stalls are the same physics-phase cost under host load, so they stay open with the cause above.
+
+Witnesses (Phase B):
+
+- `npm test`: EXIT=0, PASS=4681, FAIL=0, RESULT: PASS 224 (224 gates). Log `build/diag/paired-C/npm-test.log`. Includes `check:stall-probe` and `check:paired-report`.
+- Engine render, phase 10, tier 64, timed, webgpu: 600 frames, errors 0, outliers 0, bodies 512, p99 2.9 ms, median 2.2 ms, checksum -5415737363265412373.
+- Engine render, phase 11, tier 64, timed, webgl2: 600 frames, errors 0, outliers 0, bodies 512, p99 2.6 ms, median 2.0 ms, checksum -5415737363265412373 (the same checksum as the webgpu phase 10 run at tier 64).
+- Engine render, phase 11, tier 1024, timed, webgl2: 600 frames, errors 0, outliers 0, bodies 10240, p99 45.5 ms, median 37.5 ms, max 49.3 ms, checksum -3826851758512048142.
+- `scripts/browser/run-player-webgpu.mjs` with `PLAYWRIGHT_CORE=/data/cache/npm/_npx/7d835fc058142333/node_modules/playwright-core/index.mjs`: EXIT=0, backend webgpu, errors none, 4 of 4 VAT phase checks pass, dot pixels 228 from 3 instances, 5 draws. Log `build/diag/paired-C/player-webgpu.log`.
+- `scripts/browser/client-resource-pools.html` in the project browser: compiledAtLoad 2, compileCountAfterPlay 2, lights, textures and meshes live 8, 8 and 8, baseline p99 0 ms and churned p99 0.2 ms, 600 frames each.
+- Public site `https://anentrypoint.github.io/jayzee/play/` in the project browser: crossOriginIsolated true, SharedArrayBuffer a function, service worker controlling the page.
+
+Still open, not closed by this section: the gravity wake cause above (the sleep change has no measured effect); the phase 5 frame-time p99 against spoint; the `USE_WEBGPU` migration to emdawnwebgpu; the `ENGINE_THREADS` branch, which is not compiled; the launcher-level null adapter after a browser restart; and CI for the pushed commits, which runs on GitHub and was not run here.
