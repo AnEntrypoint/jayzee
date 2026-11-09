@@ -30,6 +30,33 @@ const poll = async (probe, tries, gapMs) => {
   return null
 }
 
+const live = []
+const drop = (child) => {
+  const at = live.indexOf(child)
+  if (at !== -1) live.splice(at, 1)
+}
+const kill = (child) => {
+  try { process.kill(-child.pid, 'SIGKILL') } catch {
+    try { child.kill('SIGKILL') } catch {}
+  }
+  drop(child)
+}
+const original = git(['rev-parse', '--abbrev-ref', 'HEAD'])
+if (original === 'HEAD') throw new Error('the shared checkout is detached; check out a branch before the bisect')
+const restore = () => {
+  try { git(['checkout', '--quiet', original]) } catch (error) { console.error('could not restore ' + original + ': ' + error.message) }
+}
+const stopAll = () => {
+  live.splice(0).forEach((child) => kill(child))
+  restore()
+}
+for (const signal of ['SIGINT', 'SIGTERM']) {
+  process.on(signal, () => {
+    stopAll()
+    process.exit(1)
+  })
+}
+
 const build = (sha) => {
   git(['checkout', '--detach', '--quiet', sha])
   const run = spawnSync('bash', [join(root, 'engine', 'build.sh')], { cwd: root, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, env: { ...process.env, ENGINE_VARIANT: 'timed', ENGINE_TIER_MIB: '128' } })
@@ -39,10 +66,12 @@ const build = (sha) => {
 
 const witness = async () => {
   const server = spawn(process.execPath, [join(root, 'scripts', 'browser', 'serve-root.mjs'), String(port)], { cwd: root, stdio: 'ignore' })
+  live.push(server)
   try {
     const served = await poll(async () => (await fetch('http://127.0.0.1:' + port + '/scripts/browser/engine-render.html')).ok, 60, 200)
     if (!served) return { error: 'static server did not answer on port ' + port }
     const chrome = spawn(join(root, 'scripts', 'browser', 'chromium-webgpu.sh'), ['--user-data-dir=' + profile, '--remote-debugging-port=' + debugPort, '--no-first-run', '--no-default-browser-check', '--no-sandbox', pageUrl], { env: { ...process.env, DISPLAY: process.env.DISPLAY || ':1', WEBGPU_PROJECT_ROOT: root, WEBGPU_CHROMIUM: '/usr/lib/chromium/chromium.real' }, stdio: ['ignore', 'ignore', 'pipe'], detached: true })
+    live.push(chrome)
     try {
       const version = await poll(async () => (await fetch('http://127.0.0.1:' + debugPort + '/json/version')).json(), 120, 500)
       if (!version) return { error: 'no devtools endpoint on port ' + debugPort + ' (profile ' + profile + ')' }
@@ -50,24 +79,24 @@ const witness = async () => {
       const cdp = await chromium.connectOverCDP('http://127.0.0.1:' + debugPort)
       try {
         const context = cdp.contexts()[0]
-        const page = await poll(async () => context.pages().find((p) => p.url().includes('engine-render')), 120, 500)
-        if (!page) return { error: 'the engine-render page never opened' }
+        let page = await poll(async () => context.pages().find((p) => p.url().includes('engine-render')), 20, 500)
+        if (!page) {
+          page = context.pages()[0] || await context.newPage()
+          await page.goto(pageUrl, { waitUntil: 'commit', timeout: 60000 })
+        }
         await page.waitForFunction(() => window.engineRenderResult && window.engineRenderResult.done === true, null, { timeout: 1200000, polling: 2000 })
         return { result: await page.evaluate(() => window.engineRenderResult) }
       } finally {
         await cdp.close().catch(() => {})
       }
     } finally {
-      try { process.kill(-chrome.pid, 'SIGKILL') } catch {}
+      kill(chrome)
     }
   } finally {
-    server.kill()
+    kill(server)
   }
 }
 
-const original = git(['rev-parse', '--abbrev-ref', 'HEAD'])
-if (original === 'HEAD') throw new Error('the shared checkout is detached; check out main before the bisect')
-if (git(['status', '--porcelain', '--untracked-files=no']) !== '') throw new Error('tracked files are modified; commit or stash them before the bisect')
 const control = git(['rev-parse', from + '^'])
 const commits = [control].concat(git(['rev-list', '--reverse', '--first-parent', from + '^..' + to]).split('\n').filter(Boolean))
 mkdirSync(outDir, { recursive: true })
@@ -94,6 +123,6 @@ try {
     console.log(short + ' ' + label + ' | ' + shown)
   }
 } finally {
-  git(['checkout', '--quiet', original])
+  stopAll()
 }
 writeFileSync(join(outDir, 'summary.json'), JSON.stringify(records.map((row) => Object.fromEntries(Object.entries(row).filter(([key]) => key !== 'result'))), null, 1))
