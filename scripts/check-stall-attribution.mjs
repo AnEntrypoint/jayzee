@@ -74,4 +74,15 @@ gate('burn runs the requested number of busy workers for the requested time and 
   assert.ok(record.endMs - record.startMs < 3000, 'window ' + (record.endMs - record.startMs))
 })
 
+gate('a common baseline sets the threshold, so the same frames can count as stalls against a lower median', () => {
+  const samples = [{ t: 0, throttledUs: 0, usageUs: 0, someUs: 0, fullUs: 0 }, { t: 2000, throttledUs: 0, usageUs: 0, someUs: 0, fullUs: 0 }]
+  const frames = []
+  for (let i = 0; i < 10; i++) frames.push({ frame: i, startMs: 100 + i * 40, totalMs: 40 })
+  frames.push({ frame: 10, startMs: 100, totalMs: 100 })
+  assert.equal(attributeStalls(frames, samples).stallCount, 1)
+  const common = attributeStalls(frames, samples, { baseMs: 20 })
+  assert.equal(common.medianMs, 20)
+  assert.equal(common.stallCount, 11)
+})
+
 finish()

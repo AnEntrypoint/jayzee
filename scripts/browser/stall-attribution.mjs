@@ -8,7 +8,7 @@ export function parseThrottleLog(text) {
   })
 }
 
-function fullUsAt(samples, t) {
+function usAt(samples, key, t) {
   let lo = 0
   let hi = samples.length - 1
   while (hi - lo > 1) {
@@ -18,14 +18,18 @@ function fullUsAt(samples, t) {
   }
   const a = samples[lo]
   const b = samples[hi]
-  if (b.t === a.t) return a.fullUs
-  return a.fullUs + ((t - a.t) / (b.t - a.t)) * (b.fullUs - a.fullUs)
+  if (b.t === a.t) return a[key]
+  return a[key] + ((t - a.t) / (b.t - a.t)) * (b[key] - a[key])
+}
+
+export function pressureMsBetween(samples, key, startMs, endMs) {
+  if (samples.length < 2 || !(endMs > startMs)) return null
+  if (startMs < samples[0].t || endMs > samples[samples.length - 1].t) return null
+  return (usAt(samples, key, endMs) - usAt(samples, key, startMs)) / 1000
 }
 
 export function starvedMs(samples, startMs, endMs) {
-  if (samples.length < 2 || !(endMs > startMs)) return null
-  if (startMs < samples[0].t || endMs > samples[samples.length - 1].t) return null
-  return (fullUsAt(samples, endMs) - fullUsAt(samples, startMs)) / 1000
+  return pressureMsBetween(samples, 'fullUs', startMs, endMs)
 }
 
 const median = (values) => {
@@ -34,8 +38,8 @@ const median = (values) => {
   return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2
 }
 
-export function attributeStalls(frames, samples, { factor = 1.5, share = 0.5 } = {}) {
-  const base = median(frames.map((f) => f.totalMs))
+export function attributeStalls(frames, samples, { factor = 1.5, share = 0.5, baseMs = null } = {}) {
+  const base = baseMs ?? median(frames.map((f) => f.totalMs))
   const stalls = []
   for (const f of frames) {
     if (!(f.totalMs > factor * base)) continue

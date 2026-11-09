@@ -134,4 +134,13 @@ gate('the event ring counts dropped events once it is full, and drains in order'
   for (let i = 1; i < events.length; i++) assert.ok(events[i].b > events[i - 1].b)
 })
 
+gate('a sphere dropped straight down keeps the identity rotation, and its quaternion stays unit length', async () => {
+  const module = await boot()
+  for (let i = 0; i < 240; i++) module._engine_tick(1)
+  const transform = new Float32Array(module.HEAPU8.buffer, module._engine_transforms(), BRIDGE.TRANSFORM_WORDS)
+  const [qx, qy, qz, qw] = transform.slice(3, 7)
+  assert.ok(Math.abs(qx * qx + qy * qy + qz * qz + qw * qw - 1) < 1e-5, 'quaternion is not unit length')
+  assert.ok(Math.abs(qx) < 1e-5 && Math.abs(qy) < 1e-5 && Math.abs(qz) < 1e-5 && Math.abs(qw - 1) < 1e-5, 'a straight drop rotated the sphere: ' + [qx, qy, qz, qw].join(','))
+})
+
 finish()

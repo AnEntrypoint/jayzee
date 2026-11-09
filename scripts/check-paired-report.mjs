@@ -56,6 +56,13 @@ gate('summarizeRun takes the throttle and full-pressure deltas over its window a
   assert.equal(summary.streamerP99Ms, 0.02)
 })
 
+gate('summarizeRun with a common baseline counts frames above 1.5 times that baseline and reports the threshold', () => {
+  const summary = summarizeRun(run('g1r1', 'G1', 1), { samples, result, baseMs: 20 })
+  assert.equal(summary.thresholdMs, 30)
+  assert.equal(summary.stallCount, 11)
+  assert.equal(summarizeRun(run('g1r1', 'G1', 1), { samples, result }).thresholdMs, 60)
+})
+
 gate('summarizeRun refuses a window with fewer than two sampler rows', () => {
   assert.throws(() => summarizeRun({ ...run('x', 'G0', 1), sampler: { ...sampler, startMs: 5000, endMs: 6000 } }, { samples, result }), RangeError)
 })

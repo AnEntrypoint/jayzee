@@ -19,14 +19,14 @@ export function pairRounds(runs) {
   })
 }
 
-export function summarizeRun(run, { samples, result }) {
+export function summarizeRun(run, { samples, result, baseMs = null }) {
   const { startMs, endMs } = run.sampler
   const inWindow = samples.filter((s) => s.t >= startMs && s.t <= endMs)
   if (inWindow.length < 2) throw new RangeError(run.label + ': the sampler has fewer than two rows in its window')
   const first = inWindow[0]
   const last = inWindow[inWindow.length - 1]
   const frames = framesFromResult(result).filter((f) => f.startMs >= startMs && f.startMs <= endMs)
-  const attribution = attributeStalls(frames, samples)
+  const attribution = attributeStalls(frames, samples, { baseMs })
   return {
     label: run.label,
     condition: run.condition,
@@ -35,6 +35,7 @@ export function summarizeRun(run, { samples, result }) {
     fullDeltaMs: (last.fullUs - first.fullUs) / 1000,
     frames: frames.length,
     medianFrameMs: attribution.medianMs,
+    thresholdMs: attribution.medianMs * 1.5,
     stallCount: attribution.stallCount,
     counts: attribution.counts,
     streamerP99Ms: run.streamer.p99Ms,
@@ -54,7 +55,7 @@ export function verdict(pairs) {
 export function report(pairs) {
   const starvationRatio = mean(pairs.map((p) => p.g1.fullDeltaMs)) / mean(pairs.map((p) => p.g0.fullDeltaMs))
   return {
-    pairs: pairs.map((p) => ({ round: p.round, g0: p.g0, g1: p.g1 })),
+    pairs: pairs.map((p) => ({ round: p.round, g0: p.g0, g1: p.g1, g1OwnBaseStallCount: p.g1OwnBaseStallCount ?? null })),
     verdict: verdict(pairs),
     starvationRatio: Number.isFinite(starvationRatio) ? starvationRatio : null,
   }
@@ -63,16 +64,12 @@ export function report(pairs) {
 if (process.argv[1] && process.argv[1].endsWith('/browser/paired-report.mjs')) {
   const dir = process.argv[2]
   const runs = readdirSync(dir).filter((f) => f.endsWith('.run.json')).map((f) => JSON.parse(readFileSync(join(dir, f), 'utf8')))
-  const summaries = runs.map((run) => {
-    const samples = parseThrottleLog(readFileSync(run.sampler.file, 'utf8'))
-    const result = JSON.parse(readFileSync(join(dir, run.label + '.page.json'), 'utf8'))
-    return { run, summary: summarizeRun(run, { samples, result }) }
+  const load = (run) => ({ samples: parseThrottleLog(readFileSync(run.sampler.file, 'utf8')), result: JSON.parse(readFileSync(join(dir, run.label + '.page.json'), 'utf8')) })
+  const pairs = pairRounds(runs).map(({ round, g0, g1 }) => {
+    const g0Summary = summarizeRun(g0, load(g0))
+    const g1Own = summarizeRun(g1, load(g1))
+    const g1Common = summarizeRun(g1, { ...load(g1), baseMs: g0Summary.medianFrameMs })
+    return { round, g0: g0Summary, g1: g1Common, g1OwnBaseStallCount: g1Own.stallCount }
   })
-  const byLabel = new Map(summaries.map((s) => [s.run.label, s]))
-  const pairs = pairRounds(runs).map(({ round, g0, g1 }) => ({
-    round,
-    g0: byLabel.get(g0.label).summary,
-    g1: byLabel.get(g1.label).summary,
-  }))
   console.log(JSON.stringify(report(pairs), null, 2))
 }

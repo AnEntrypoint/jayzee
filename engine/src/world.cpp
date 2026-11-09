@@ -238,7 +238,7 @@ Status World::configure(const Config& config) {
                                            JPH::EMotionType::Dynamic, kLayerMoving);
     bodySettings.mRestitution = restitution_;
     bodySettings.mLinearDamping = drag_;
-    bodySettings.mAllowSleeping = false;
+    bodySettings.mAllowSleeping = true;
     JPH::Body* body = runtime_->physics.GetBodyInterface().CreateBody(bodySettings);
     if (body == nullptr) return kFull;
     bodyIds_[slot] = body->GetID().GetIndexAndSequenceNumber();

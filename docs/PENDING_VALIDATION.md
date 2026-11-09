@@ -1084,3 +1084,23 @@ Gates and browser witnesses run in this round:
 - Public site `https://anentrypoint.github.io/jayzee/play/`: `crossOriginIsolated` true and `SharedArrayBuffer` a function, before and after reload.
 
 Still open, not closed by this section: the phase 3 rotation gate; the phase 5 frame-time p99 comparison against spoint; the `USE_WEBGPU` migration to emdawnwebgpu; the `ENGINE_THREADS` branch, which is not compiled; `scripts/browser/run-player-webgpu.mjs`, which still needs PLAYWRIGHT_CORE; the 1024-tier long-frame stalls in both backends (round 2 G1 shows a p99 of 298.2 ms and a maximum of 399.3 ms in the page, and no code fix is verified); the launcher-level fix for the null `requestAdapter()` after a browser restart; the P2 verdict, which needs more paired rounds; and CI for the new commit, which runs on GitHub and was not run here.
+
+
+## Stall pass: diagnosis, changes and the P2 ledger
+
+Diagnosis, from the existing artifacts of round 1 and round 2 (read only, nothing run). A stall is one synchronous page frame, tick (the engine physics step) plus render. In r2-G1 the 199 stalled frames are dominated by the tick: the stalled-frame median physics time is 195.4 ms against 94.7 ms for normal frames, while every render phase stays below 5 ms. Every row of G0 and G1 has `active` 10240, so all 10240 bodies are active on every step. The engine sets `mAllowSleeping = false` at `engine/src/world.cpp`, so the physics cost never drops at rest. The labels `starved` and `unexplained` come from cgroup full pressure, which needs every runnable task stalled. A page thread that is starved while other threads run is labelled `unexplained`. The stall threshold is 1.5 times each run's own median, so G1's threshold (about 156 ms) is not G0's (about 60 ms), and the two counts answer different questions.
+
+Changes, Phase A, not yet built or run:
+
+1. `engine/src/world.cpp`: bodies may sleep (`mAllowSleeping = true`). Cause: the physics step is the frame's dominant cost and every body is active on every step. Witnesses: `check:engine-world`, `check:world`, `check:engine-pools`, `check:engine-bridge`, `check:engine-core`, `check:engine-tiers`, `check:engine-leak`, and the 1024 and 64 page checksums and frame times in Phase B. The phase 2 deviation (a), that the engine never sleeps, changes with this.
+2. `scripts/browser/stall-probe.mjs` and `scripts/check-stall-probe.mjs` (new, in `npm test`): classifies each stalled frame by the renderer main-thread CPU from the thread sampler log, against cgroup some pressure, and reports the tick share of each stall. The verdicts are `cpu-bound`, `starved` and `blocked`. Witness: `check:stall-probe` (six gate lines, synthetic cases), then the probe on the Phase B G1 runs.
+3. `scripts/browser/stall-attribution.mjs`: `attributeStalls` takes `baseMs`, and `pressureMsBetween` takes the pressure key. `starvedMs` keeps its behaviour. Witness: `check:stall-attribution`, the new common-baseline gate line.
+4. `scripts/browser/paired-report.mjs`: G1 stalls are counted against the median of the G0 run in the same round, so both conditions use one threshold. The count against G1's own median stays in `g1OwnBaseStallCount`. Witness: `check:paired-report` (new gate line), then the Phase B report.
+5. `scripts/check-engine-bridge.mjs`: a rotation gate, a sphere dropped straight down keeps the identity rotation and a unit quaternion (ranked item 3, phase 3). Witness: `check:engine-bridge`.
+6. `package.json`: `check:stall-probe` added to the `npm test` chain after `check:paired-report`.
+
+Ranked items folded into this pass. Item 2 (the 1024 WebGPU stalls) is changes 1 to 4. Item 3 (the phase 5 frame-time p99 against spoint) is not folded and stays open. Item 4 (the phase 3 rotation gate) is change 5. Item 5 (ENGINE_THREADS) shares the cause, a single-threaded physics step, and stays open unless change 1 does not remove the cost. Item 6 (PLAYWRIGHT_CORE) needs no code change: its witness runs in Phase B with PLAYWRIGHT_CORE set. USE_WEBGPU and the launcher-level null adapter are not folded, and stay open.
+
+Measurement note. The thread sampler records jiffies at USER_HZ 100, so each frame's main-thread CPU is accurate to about 10 ms.
+
+Witnesses in Phase B are appended below this line.
