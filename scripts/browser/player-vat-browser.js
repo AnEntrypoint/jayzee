@@ -5,6 +5,9 @@ const WIDTH = 200
 const HEIGHT = 200
 const FRAMES = 3
 const PHASES = [0, 0.25, 0.5, 0.75]
+const WARM_FRAMES = 60
+const LOOP_FRAMES = 600
+const LOOP_DOTS = 4
 const result = { ok: false, errors: [], cases: [] }
 const realError = console.error
 console.error = (...args) => {
@@ -18,6 +21,9 @@ const webgl = new THREE.WebGLRenderer({ canvas, antialias: false, preserveDrawin
 webgl.setSize(WIDTH, HEIGHT, false)
 webgl.setClearColor(0x000000, 1)
 const gl = webgl.getContext()
+
+const loop = { warmed: false, done: false, warmFrames: 0, frames: 0, error: null }
+window.playerVatLoop = loop
 
 const makeVat = () => {
   const data = new Float32Array(4 * FRAMES * 4)
@@ -85,3 +91,40 @@ result.cases = PHASES.map(runCase)
 result.draws = webgl.info.render.calls
 result.ok = result.errors.length === 0 && result.cases.every((c) => c.pass)
 window.playerVatResult = result
+
+const loopScene = new THREE.Scene()
+loopScene.add(new THREE.AmbientLight(0xffffff, 1))
+const loopCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 100)
+loopCamera.position.set(0, 0, 5)
+loopCamera.lookAt(0, 0, 0)
+const loopDots = createVATCrowdRenderer(loopScene, new THREE.PlaneGeometry(1, 1, 1, 1), makeVat(), { capacity: LOOP_DOTS, renderer: webgl })
+
+const drawLoopFrame = (n) => {
+  for (let s = 0; s < LOOP_DOTS; s++) {
+    loopDots.update('p' + s, { x: s * 0.2 - 0.3, y: 0, z: 0 }, 0, 0, ((n + s * 7) % 60) / 60 / 0.15)
+  }
+  webgl.render(loopScene, loopCamera)
+}
+
+const stepLoop = () => {
+  try {
+    drawLoopFrame(loop.warmFrames + loop.frames)
+    if (!loop.warmed) {
+      loop.warmFrames += 1
+      loop.warmed = loop.warmFrames >= WARM_FRAMES
+    } else {
+      loop.frames += 1
+      if (loop.frames >= LOOP_FRAMES) {
+        loopDots.dispose()
+        loop.done = true
+        return
+      }
+    }
+  } catch (error) {
+    loop.error = String(error)
+    loop.done = true
+    return
+  }
+  setTimeout(stepLoop, 0)
+}
+setTimeout(stepLoop, 0)
