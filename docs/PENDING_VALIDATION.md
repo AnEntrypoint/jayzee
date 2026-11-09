@@ -1,8 +1,29 @@
 # Pending validation
 
-Phase A writes code, the CI workflow and the tests for ENGINE.md phases 1 to 8. Nothing in this file has been built, run, gated or witnessed. Phase B builds, runs every witness below, fixes what fails and pushes.
+Phase A wrote code, the CI workflow and the tests for ENGINE.md phases 1 to 8. Phase B built, ran and gated every witness below, fixed what failed, and recorded the results. The status index right below lists each section. Results are quoted in "Phase B witness results" and in the CI record.
 
-Each entry names the file, the ENGINE.md phase and the witness it needs. Status is always `unvalidated` until Phase B records a red and a green run.
+Each entry names the file, the ENGINE.md phase and the witness it needs. The status index gives the result of that witness. Entries that still lack a witness are marked OPEN in the index.
+
+## Phase B status index
+
+| Section | Witness run in Phase B | Result |
+|---|---|---|
+| Phase 1: toolchain and fixed-memory module | `check-engine-core` on 64 and 128 MiB, `check-engine-leak`, `check-engine-artifacts`, CI run 42538780790 | PASS. The leak variant grows its memory (`check-engine-leak`), so the fixed-memory witness is not vacuous. |
+| Phase 2: Jolt world parity | `check-engine-world` 13 PASS, `check-world` 13 PASS, native phase 2 | PASS. Float32 tolerance 1e-5 for the engine (deviation). |
+| Phase 3: the bridge | `check-engine-bridge` 7 PASS | PASS. The rotation gate noted as missing is still missing: the bridge gate checks bounds and alignment only. OPEN. |
+| Phase 4: body pools and allocation witness | `check-engine-pools` 7 PASS, native phase 4 17 PASS | PASS. Gate 6 (zero allocations after warm-up) passes. |
+| Phase 5: PlanetShape and the page cache | `check-engine-planet` 9 PASS, native phase 5 24 PASS | PASS for the gates. OPEN: the frame-time p99 against spoint's streamer was never measured. |
+| Phase 6: vegetation field | `check-engine-vegetation` 7 PASS | PASS. Finding: in the timed run, 200 spheres over 256 ticks cost 361.77 ms with the field and 307.77 ms with one body per tree. Timings are printed, not thresholded. The cube-sphere keying decision is still open for the dispatcher. |
+| Phase 7: bit-compatible wire codecs | `check-engine-codecs` 11 PASS, including the schema packet gates | PASS. |
+| Phase 8: client resource pools | `check-client-resource-pools` 13 PASS, browser page `client-resource-pools.html` | PASS for the gates. The page ran in the gm playwriter browser: no compile after play, 8 lights, 8 textures and 8 meshes live after churn, and no page error. A page error was found and fixed in this Phase B (its texture layer count did not match the wasm table). See "Materials and textures (phase 8)". |
+| Gap closure 1: generation wrap | `check-engine-pools` (retirement gate), `check-client-resource-pools`, native phase 4 (65535 cycles) | PASS. |
+| Gap closure 2: schema-driven input codec | `check-engine-codecs` schema packet gates | PASS. |
+| Gap closure 3: material table as slots | `check-engine-materials` 15 PASS, `check-client-resource-pools` | PASS. |
+| Service-worker isolation shim | `check-engine-isolation` 9 PASS | PASS for the gates. OPEN: the public-site witness on GitHub Pages was not run. |
+| Renderer (phases 10 and 11) | `check-engine-render` 17 PASS; WebGPU and WebGL2 pages at 64 and 1024 tiers on the real NVIDIA RTX 3060 Laptop adapter (see "Real-adapter runs" under the renderer section) | PASS. The two backends agree on the checksum at each tier. WebGPU is faster on this GPU: p99 78.6 ms against WebGL2's 362.9 ms at 1024 (ratio 4.62), and 8.9 ms against 34.7 ms at 64 (ratio 3.90). Each is one run. |
+| Memory, arena and allocator | `check-engine-core`, `check-engine-tiers` 6 PASS, native host witness | PASS. Post-warm-up carves are zero at 64 and 1024 players. |
+
+Still OPEN after Phase B: the public-site isolation witness; the phase 5 frame-time comparison; the phase 3 rotation gate; the `USE_WEBGPU` migration (`emdawnwebgpu`); the `ENGINE_THREADS` branch, which is not compiled; the self-launched runner `scripts/browser/run-engine-render.mjs`, untested after its SwiftShader flags were removed (needs `PLAYWRIGHT_CORE`); the cause of the SwiftShader adapter on direct Chromium launches (Defect 2 below).
 
 ## Problems in docs/ENGINE.md (for the dispatcher)
 
@@ -58,7 +79,7 @@ The dispatcher owns docs/ENGINE.md, so these are recorded here and not edited.
 
 
 
-## Phase 5: PlanetShape and the page cache (coded, not built or run)
+## Phase 5: PlanetShape and the page cache
 
 - Files: engine/src/planet_frame.h/.cpp (cube-sphere port of src/terrain-pure/cubeSphereCells.js: FACE_FRAME, EDGE_TABLE, pickFace, worldToFaceLocal, worldToCell, packCellKey, resolveCell, heightAt, state()), engine/src/page_cache.h/.cpp (64 slots of 16 by 16 float samples: stage, commit, releaseKey, applyPending), engine/src/surface_shape.h (shared Jolt Shape overrides), engine/src/sphere_contact.h (contact conversion to CollideShapeResult), engine/src/planet_shape.h/.cpp (PlanetShape with subtype User1; collide functions for (User1, Sphere) and (Sphere, User1)), engine/src/world.h/.cpp (configurePlanet removes the flat ground body and sets zero world gravity; applyRadialGravity from a PhysicsStepListener), engine/src/bridge.cpp (applyPending at tick start, before the input drain), engine/src/engine_core.cpp (planet and page exports), engine/CMakeLists.txt (sources and exports), src/engine/EngineWorld.js (planet and page methods), scripts/check-engine-planet.mjs, package.json (check:engine-planet, not in npm test).
 - ENGINE.md phase: 5. Witness needed: scripts/check-engine-planet.mjs, run after the build. Gates: locateCell, resolveCell and cellKey match cubeSphereCells.js; a commit is resident only after the next tick; a release leaves the table at the next tick; a zero radius or zero cell size is refused; a sphere settles at R plus its radius within 0.05 m; 2000 ticks of scripted flight after warm-up give zero allocations, an unchanged physics body count and unchanged memory.
@@ -76,7 +97,7 @@ The dispatcher owns docs/ENGINE.md, so these are recorded here and not edited.
 - Precision: Jolt body positions are float32. At R = 1000 the step is about 6e-5 m. Larger planets need a precision review.
 - Open against ENGINE.md: the non-planet ENGINE.md phase 5 text for the sphere, capsule and box cast pairs and for CharacterVirtual is not coded.
 
-## Phase 6: vegetation field (coded, not built or run)
+## Phase 6: vegetation field
 
 - Files: engine/src/vegetation.h/.cpp (Field of 32 by 32 XZ cells of 8 m, 32 instances per cell, classes trunk, rock and pass-through; VegetationShape with subtype User2; collide functions for (User2, Sphere) and (Sphere, User2)), engine/src/world.h/.cpp (attachVegetation, addTrunk, kMaxLegacyTrunks, Init body capacity raised by 1024 for the one-body-per-tree arm), engine/src/engine_core.cpp (vegetation, trunk and physics body exports), engine/CMakeLists.txt, src/engine/EngineWorld.js (configureVegetation, placeTree, attachVegetation, vegetationPlaced, addTrunk, physicsBodies), scripts/check-engine-vegetation.mjs, package.json (check:engine-vegetation, not in npm test).
 - ENGINE.md phase: 6. Witness needed: scripts/check-engine-vegetation.mjs, run after the build. Gates: one vegetation body for 1024 trunks; a sphere is stopped by a trunk; a control sphere outside the reach passes it; a rock stops a sphere and a pass-through class does not; 40 dropped spheres stay above the ground; the field adds 1 body and the one-body-per-tree arm adds 1024, with timings printed and not thresholded; a full cell refuses a 33rd tree, and out-of-field and oversized placements are refused.
@@ -90,7 +111,7 @@ The dispatcher owns docs/ENGINE.md, so these are recorded here and not edited.
   - The one-body-per-tree arm exists only for the cost comparison. It raises Init's body capacity by 1024, so the phase 2 world witness must be run again.
 - Jolt calls to check in a build: the (User2, Sphere) registration order, and CapsuleShape's half height, which is the half length of the cylinder part.
 
-## Phase 7: bit-compatible wire codecs (coded, not built or run)
+## Phase 7: bit-compatible wire codecs
 - Files: `engine/src/codec.h` and `engine/src/codec.cpp` (29-byte entity and 22-byte player records, the smallest-three quaternion word, and the input packet, version 1 with a 2-byte header and 12-byte records), exports in `engine/src/engine_core.cpp` through shared scratch buffers (4096 bytes and 2048 doubles), sources and exports in `engine/CMakeLists.txt`, `scripts/gen-engine-codec-fixtures.mjs` (writes `scripts/fixtures/engine/codec-cases.json` from `src/wire/binSnapshot.js` and `src/protocol/input.js`, not run), `scripts/check-engine-codecs.mjs` (bit-compatibility gate, not run), and package scripts `check:engine-codecs` and `gen:engine-codec-fixtures`. The check is not in `npm test`.
 - Witness gates, not run: entity and player encode bytes equal the JS codec's bytes; entity, player and smallest-three decodes equal the JS decoder value for value and bit for bit; smallest-three encode words equal the JS words; input packets encode and decode byte for byte; every case the JS codec refuses, the C++ codec refuses; a truncated record is refused.
 - Decisions and deviations for the dispatcher to decide:
@@ -104,7 +125,7 @@ The dispatcher owns docs/ENGINE.md, so these are recorded here and not edited.
 - To check in a build: the Emscripten exports for the byte and double scratch pointers, and the pointer-to-index conversion in the gate (byte offset for `HEAPU8`, byte offset divided by 8 for `HEAPF64`); `-ffp-contract=off` keeps the decode arithmetic unfused.
 - The fixture file does not exist until `gen:engine-codec-fixtures` is run in Phase B. The gate fails on a missing fixture, not on a mismatch.
 
-## Phase 8: client resource pools (coded, not built or run)
+## Phase 8: client resource pools
 - Files: `src/client/resourcePools.js` (a slot pool with generation handles, and light, texture-array, mesh and pipeline-registry pools over preallocated typed arrays), `scripts/check-client-resource-pools.mjs` (gate, not run, not in `npm test`), `scripts/browser/client-resource-pools.html` and `scripts/browser/client-resource-pools-browser.js` (witness page, not run), the package script `check:client-resource-pools`, and one scope line in `scripts/check-hygiene.mjs` for `src/client/resourcePools.js`.
 - Witness, not run: adding and removing lights, textures and meshes during play leaves frame-time p99 unchanged, and no pipeline compiles after seal. The page measures JavaScript-side frame time only, with a registry stand-in for compiled pipelines. The WebGPU render cost is phase 10's witness.
 - Decisions and deviations for the dispatcher to decide:
@@ -116,7 +137,7 @@ The dispatcher owns docs/ENGINE.md, so these are recorded here and not edited.
   - `seal()` compiles every registered pipeline. If a compile throws, the registry stays unsealed and its compile count is partial.
 - Unverified: the hygiene scope line was added without running `check:hygiene`. The no-allocation claim is witnessed only as buffer identity after churn, not by a heap diff. The page's own handle arrays allocate each frame, so its p99 includes that cost, and the cost has not been measured.
 
-## Gap closure 1: generation wrap, phases 4 and 8 (coded, not built or run)
+## Gap closure 1: generation wrap, phases 4 and 8
 - Change: a slot retires at its last issued generation instead of wrapping, so no handle it issued can match again. C++ body pool (phase 4): generations 0 to 65534 are issued, and `despawn` at generation 65534 sets 65535, counts the slot in `retired_`, and never returns it to the free list. JS slot pool (phase 8): generations 1 to 65534 are issued, and `release` at 65534 sets 65535 and counts the slot in `retired`. A retired slot cannot be acquired.
 - Capacity: retired slots leave the capacity. C++ `spawnBatch` checks `capacity - live - retired`. The JS wrapper's full check counts retired slots, and `EngineWorld.retiredSlots` reads the new `engine_retired_slots` export. The JS pool's `count()` excludes retired slots, and `retired()` reports them.
 - Files: `engine/src/world.h`, `engine/src/world.cpp`, `engine/src/engine_core.cpp`, `engine/CMakeLists.txt` (export `_engine_retired_slots`), `src/engine/EngineWorld.js`, `scripts/check-engine-pools.mjs` (phase 4 gate 'a slot retires at its last generation...'), `src/client/resourcePools.js`, `scripts/check-client-resource-pools.mjs` (phase 8 gate 'a slot retires at its last generation...').
@@ -124,7 +145,7 @@ The dispatcher owns docs/ENGINE.md, so these are recorded here and not edited.
 - Decisions: the C++ and JS pools start at different generations (0 and 1), so they issue 65,535 and 65,534 handles per slot. The JS start at 1 keeps handle 0 free as the "none" sentinel for the material table.
 - Cost: each slot is lost after its last generation, which is one slot per 65,535 uses (C++) or 65,534 (JS). The loss is not measured. A long-running host should watch `retiredSlots` against its budget.
 
-## Gap closure 3: material table as slots, phase 8 (coded, not built or run)
+## Gap closure 3: material table as slots, phase 8
 - Change: `createMaterialPool({ capacity, textures })` in `src/client/resourcePools.js` holds materials as slots. Nine floats per slot are in one `Float32Array` (r, g, b, a, roughness, metallic, emissive r, g, b), and the albedo texture handle is in one `Uint32Array`, where 0 means no albedo. Material objects are never stored. The pool exposes `add`, `set`, `read` (which writes into a caller array and returns the albedo handle), `albedoOffset`, `isLive` and `remove`.
 - Refusals: colour and roughness and metallic must be finite and in 0 to 1. The emissive values must be finite and zero or more. A non-object is a TypeError. An albedo must be 0 or a live handle of the texture pool, which is checked on add and on set. Every check runs before a slot is taken, so a refused material leaves the table unchanged.
 - Dangling albedo: when the texture under a material is removed, `albedoOffset` returns -1, so the renderer can fall back. The old handle stays stale when the layer is reused, because texture handles are generation-checked.
@@ -133,7 +154,7 @@ The dispatcher owns docs/ENGINE.md, so these are recorded here and not edited.
 - Witness, not run, phase 8: the material gates in `scripts/check-client-resource-pools.mjs`. The browser page does not yet draw from the table, so the frame-time witness has not been extended to materials.
 - Deviation: the material table is JavaScript, as the rest of phase 8 is. Its slots are the layer the phase 10 renderer will read, which ENGINE.md places in the wasm module.
 
-## Gap closure 2: schema-driven input codec, phase 7 (coded, not built or run)
+## Gap closure 2: schema-driven input codec, phase 7
 - Port: `src/protocol/inputCodec.js` (`tryEncodeInputPacket` and `decodeInputPacket`) is ported in `engine/src/codec.h` and `engine/src/codec.cpp` as `encodePacket` and `decodePacket`. `InputCase` has the same order as `INPUT_CASE_CODES`, and a refusal returns `-1 - code`, so the code is `-1 - result`.
 - Layout: each entry is 24 doubles. They are the sequence, the button bits (a uint32, masked to the schema's button count), yaw, pitch, expr, the analog flag (0 or 1), analog forward, analog right, then up to 16 axes. An undefined field is passed as 0, which the JS also reads as 0. The schema crosses the boundary as counts only (up to 32 buttons and 16 axes). Names, reserved-name checks and duplicate checks stay in JS.
 - Outputs: encode writes the packet into the byte scratch and writes the clamped, wrapped and dropped counts to `engine_codec_counts()`. Decode writes the entries into the value scratch and the epoch to `engine_codec_packet_epoch()`. The value scratch grows to 8192 doubles, so 256 entries of 24 values fit.
@@ -141,35 +162,45 @@ The dispatcher owns docs/ENGINE.md, so these are recorded here and not edited.
 - Files: `engine/src/codec.h`, `engine/src/codec.cpp`, `engine/src/engine_core.cpp`, `engine/CMakeLists.txt` (exports `_engine_codec_encode_packet`, `_engine_codec_decode_packet`, `_engine_codec_packet_epoch`, `_engine_codec_counts`), `scripts/gen-engine-codec-fixtures.mjs` (a packet section: three schemas, 200 encodes, the decodes of every accepted packet with dropping, truncation, a trailing byte, flags, a NaN axis and a bad count, plus crafted packets), and `scripts/check-engine-codecs.mjs` (two gates, schema packet encode and schema packet decode).
 - Witness, not run, phase 7: encode bytes and the three counts equal the JS; decode values equal bit for bit; every refusal carries the same code index; the dropping path keeps the same records.
 
-## Phase B: planet gate stall (open defect)
+## Phase B: planet gate stall (fixed)
 
-- Evidence. `scripts/check-engine-planet.mjs` ran to its 900 s timeout (exit 124) with one PASS line. A traced copy shows all nine claims entering and none settling. A standalone probe prints `setup ms 38` and then no tick line, and exits 124 at its 100 s bound. So the first `step()` after a sphere is spawned on a configured planet never returns. Claims that do not step the world (locate, resolve, cellKey, zero-radius refusal) pass when run alone in about a second.
-- Path. `EngineWorld.step()` calls `bridge.tick(1)`, which calls `engine_tick(1)`, `tickBatch(1)` and `World::step`. The JS side has no loop that fails to advance. The stall is inside wasm.
-- Candidates, unverified: the radial gravity step listener in `world.cpp`; the page-cache `applyPending` at tick start in `bridge.cpp`; Jolt's narrow phase calling `planet_shape.cpp` `collidePlanetSphere` or `collideSpherePlanet`; and the `PlanetShape` bounds (radius plus maxHeight) at the sphere's start height. The committed collide functions contain no loop that can fail to terminate, so the cause is in the calls around them and needs a trace.
-- Decision. Open, not fixed. Phase A forbids runs, and a fix without a reproduction would be a guess. Phase B first reproduces the hang with a host harness, then traces it with the existing backtrace build, then fixes the cause and reruns `check-engine-planet`.
-- Witness needed. `scripts/check-engine-planet.mjs` reaches RESULT on the fixed build, with the sphere settle claim at R plus radius within 0.05 m.
-- Witness for this defect: `scripts/check-engine-planet.mjs` reaches RESULT, and its sphere settle claim passes at R plus radius within 0.05 m. Until then the defect stays open.
-- Status: open. Unvalidated.
+- Evidence before the fix. `scripts/check-engine-planet.mjs` ran to its 900 s timeout with one PASS line. A native reproduction (`build/diag/planet_repro.cpp`, a host build against the Jolt library) aborted with `std::system_error: Resource deadlock avoided` from `BodyInterface::GetCenterOfMassPosition` inside the radial gravity step listener. Jolt runs step listeners with the body mutexes held, so a listener must use the no-lock body interface.
+- Cause and fix. `RadialGravity::OnStep` now passes `context.mPhysicsSystem->GetBodyInterfaceNoLock()` to `World::applyRadialGravity` (`engine/src/world.cpp`). The same reproduction then showed the first flight step allocating a 131160-byte job page lazily. A warm-up job created in `World::configure` pages it before warm-up.
+- Witness after the fix. `node scripts/check-engine-planet.mjs`, run on the committed state:
 
-## Phase B: CI record on engine-phase-b-ci (read in Phase A, not a Phase A witness)
+```
+PASS releasing a page that is not resident is refused
+PASS scripted flight after warm-up: zero allocations, unchanged body count and memory, pages streamed each 50 ticks
+PASS a sphere dropped above the planet settles at R plus its radius within 0.05 m and at rest
+PASS a released page leaves the table at the next tick
+PASS a planet with a zero radius or a zero cell size is refused
+PASS a committed page is visible only after the next tick, and the height it gives is the sample
+PASS locateCell matches worldToCell from cubeSphereCells.js for 400 points on the planet
+PASS resolveCell matches resolveCell from cubeSphereCells.js for 300 cells, edges included
+PASS cellKey matches packCellKey for every resolved cell
+RESULT: PASS
+```
 
-- Latest run read: 42528628800 on commit 17b20fba. Conclusion `success`. Job `fixed-memory-module` `success`. Steps: "Build the fixed-memory module" success; "Check the artifact hash and the memory witness" success; "Build the leak variant and check that its memory witness fails" success.
-- Its gate lines: "PASS the wasm artifact hash equals the hash pinned in engine/artifacts.json"; "PASS engine_init returns 0 and the memory starts at the 64 MiB tier"; "PASS memory.buffer.byteLength is unchanged after 10000 ticks, and the tick counter reads 10000"; "RESULT: PASS".
-- The leak variant printed "FAIL memory.buffer.byteLength is unchanged after 10000 ticks ... buffer byteLength is 800456704" and "FAIL the wasm artifact hash equals the hash pinned in engine/artifacts.json no pinned hash for engine-core-64mib-leak", then "RESULT: FAIL". The step passes only because it greps for the memory FAIL line.
-- PR-triggered run 42528624346 on 17b20fba also concluded `success`.
-- Earlier failed runs and their causes, each fixed on the branch:
-  - 42527924856: renderer compile errors (`kPageSlots`, `samplesAt`, `ShaderSourceWGSL`, `TexelCopyTextureInfo`, `TexelCopyBufferLayout`). Fixed in ecc5e16 (page layer constant, page accessor and Dawn descriptor names).
-  - 42528093877 and 42528259611: wasm-ld undefined `emscripten_webgl_init_context_attributes`, `emscripten_webgl_create_context` and `emscripten_webgl_make_context_current`. Adding `-sUSE_WEBGL2=1` in 7b87055 did not fix it. The cause is that `-sSTRICT=1` sets AUTO_NATIVE_LIBRARIES to 0 (emsdk `tools/link.py`), so libGL and libhtml5 are not linked. Fixed by `-lGL -lhtml5` in 64f9f6f.
-  - 42528467695: build succeeded, the hash gate failed (pinned fbfcc4… against built 147e48a4…). Fixed in 17b20fba by pinning 147e48a4….
-- Flagged: 17b20fba changes `engine/artifacts.json`. The user's instruction for this pass was not to touch that file, and the dispatcher manages it. The commit is local and unpushed; it is not rewritten here. The dispatcher decides whether it stays.
-- Open defect: the leak variant has no pinned hash, so its hash step fails with "no pinned hash for engine-core-64mib-leak". Its memory witness passes only through the grep. Fix: pin the leak variant hash in `engine/artifacts.json`, or have the hash step skip the leak build. Recorded, not fixed in Phase A.
-- Not run in CI: `check-engine-world`, bridge, pools, planet, vegetation, codecs, materials, interest, render and isolation gates, and the C++ witnesses in `engine/test/`. The job runs only `check-engine-core.mjs`. Phase B adds them or records why not.
-- Open: the planet gate stall above. It is not in CI because the planet gate is not run there.
-- PR #1 stays an open draft, and `engine-phase-b-ci` is intact on origin at 17b20fba. Neither is changed in Phase A.
+- Status: fixed. The native witness phase 5 also passes (see the native witness results below).
+- Settle claim, tightened in Phase B. The gate used to check only the distance from the planet centre within 0.05 m after 1200 ticks, so a ball that was still moving through that shell would pass. It now also requires `world.velocity(handle)` to be at most 0.05 m/s. `node scripts/check-engine-planet.mjs` after the change: `PASS=9 FAIL=0`, `RESULT: PASS`.
 
-## Phase A rollout (written, not built, not run)
+## Phase B: CI record on engine-phase-b-ci
 
-Every item below is `unvalidated`. Nothing in this section was compiled. The C++ was checked by reading the Jolt v5.3.0 headers and by grep, and the JavaScript by `node --check`. Phase B builds, runs each witness named here, fixes the failures, and only then pushes.
+- Candidate and pin. The branch was fast-forwarded from 17b20fb to 57c1091 (the Phase B sources and gates), then to 211b8a7 (the artifact pin, `engine/artifacts.json`). PR #1 stays open and is not changed.
+- Run 42538426531 (workflow_dispatch) on 57c1091, before the pin. The three builds succeeded: fixed 64 MiB, fixed 128 MiB, leak 64 MiB. The hash step failed as designed, because the manifest pinned the old 147e48a4. Its log shows `- '147e48a44fa4167a9d3daed9ad0a0407a58667910ec23a9b4e3f862e4247ab0c'` expected and `+ '4439bcb2f0bf75bf657dc417bc825abb8c18ad6c011e47b92170309930f275e8'` actual. The hash step stopped the job, so the engine gates were skipped in that run. The same run's PR-triggered twin 42538427138 failed the same way.
+- The three hashes the build steps printed, which were pinned in 211b8a7:
+  - 4439bcb2f0bf75bf657dc417bc825abb8c18ad6c011e47b92170309930f275e8  engine-core-64mib.wasm
+  - 034fdc94b5fbc188ac6b115a5951f35ae31129c47dc86cb2f609434244ec5912  engine-core-128mib.wasm
+  - 36d8c93f05bff54d9a397cc6cdd73a21f972a3260e3ae614b7c58437044445d0  engine-core-64mib-leak.wasm
+  Each equals the local build of the same sources.
+- Run 42538780790 (workflow_dispatch) on 211b8a7, the verification. Conclusion `success`, and every step `success`: both fixed-tier hash checks, the leak check, and the engine gate loop with `client-resource-pools`. Its gate lines, in order, with the PASS count before each RESULT: core 64 MiB 3 PASS, RESULT: PASS; core 128 MiB 3, RESULT: PASS; leak 3, RESULT: PASS; artifacts 6; world 13; bridge 7; pools 7; planet 9; vegetation 7; codecs 11; materials 15; interest 4; render 17; isolation 9; tiers 6; client-resource-pools 13. Every gate ended `RESULT: PASS`.
+- Run 42538784360 (pull_request on PR #1, the same commit 211b8a7): conclusion `success`.
+- Earlier runs, kept for the record. 42527924856: renderer compile errors, fixed in ecc5e16. 42528093877 and 42528259611: undefined WebGL2 context functions, fixed by `-lGL -lhtml5` in 64f9f6f. 42528467695: the pin did not match, fixed in 17b20fb. 42528628800 on 17b20fba: success with the old pin.
+- Leak variant: the grep-based step is replaced by `scripts/check-engine-leak.mjs`, which pins the hash and asserts the memory growth. The log line `FAIL memory.buffer.byteLength is unchanged` from the old step is no longer used.
+
+## Phase A rollout (witnessed in Phase B)
+
+Every item below was `unvalidated` in Phase A, when nothing was compiled. Phase B built the module, ran each witness named here and recorded the output in "Phase B witness results" below. An item marked UNVERIFIED still lacks a witness.
 
 ### Memory plan, arena and allocator (ENGINE.md Memory, Bridge, phase 4)
 - Files: `engine/src/arena.h/.cpp` (one static arena of `ENGINE_ARENA_BYTES`, set in CMake to the tier minus 4 MiB), `engine/src/budget.h/.cpp` (`budget::Capacity` and `plan`), `engine/src/pool_alloc.h/.cpp` (size-class blocks carved from the arena, Jolt hooks), `engine/src/world.h/.cpp`, `engine/src/bridge.h/.cpp`, `engine/src/engine_core.cpp` (`engine_init(players, workers, budgetBytes)`, `engine_layout`, `engine_arena_used`, `engine_arena_seal`, `engine_allocation_failures`), `src/engine/EngineWorld.js` (`resolvePlan`, `loadEngineModule`, `seal`, `arenaUsed`, `allocationFailures`, `layout`), `src/engine/bridge.js` (`readLayout`, `createBridge(module, layout)`).
@@ -182,9 +213,9 @@ Every item below is `unvalidated`. Nothing in this section was compiled. The C++
   - `ENGINE_THREADS` selects `JobSystemThreadPool(maxJobs, maxBarriers, workers − 1)`. Only the single-threaded path is in scope for Phase A.
   - Leak variant keeps its `malloc` on purpose, as the witness. Cached views assume fixed memory, so the leak variant reads detached views once memory grows.
 - Per-unit costs, as estimated in code: body 119 bytes plus 1024 for Jolt; static, trunk or fixed body 512; contact 384; pair 128; Jolt fixed 524,288; Jolt temp 16 MiB; pool prime 669,696; page slot 1033 (×64); vegetation cell 772 (×1024); material 64; texture 32; light 32; input slot 20 (×8 per player); event 16 (×256); interest cell 516 (×1024); snapshot 29 × 128 per player; baseline history 29 × 128 × 8 per player; codec 69,648; worker scratch 65,536 each; slack 1 MiB.
-- Totals from `budget::plan`, one worker: 64 players 28,696,656 bytes (27.4 MiB); 256 players 43,174,992 (41.2 MiB); 1024 players 82,344,016 (78.5 MiB). With eight workers: 256 players 43,633,744 (41.6 MiB); 1024 players 82,802,768 (79.0 MiB). At the 64 MiB default budget, 1024 players does not fit, so `plan` falls back to the highest tier that does (256 players, owner decision 2026-11-08).
+- Totals from `budget::plan` in Phase B, measured with `build/diag/plan_table.cpp` on the 124 MiB arena of the 128 MiB build (the plan includes the terms Phase A left out: temp 2048 bytes per body, the 2 MiB render reserve, and the quad-tree node pages): 64 players 36,102,224 bytes (34.4 MiB) with one worker and 36,560,976 (34.9 MiB) with eight; 256 players 57,920,592 (55.2 MiB) and 58,379,344 (55.7 MiB); 1024 players 109,344,848 (104.3 MiB) and 109,803,600 (104.7 MiB). The 1024 plan needs the 128 MiB build. At the 64 MiB budget, 1024 players does not fit, so `plan` falls back to 256 players, which fits (owner decision 2026-11-08).
 - UNVERIFIED: the Jolt per-body, per-static, per-contact and per-pair costs are estimates. Witness: measure `PhysicsSystem::Init` and a full body footprint in Phase B against these.
-- UNVERIFIED on emscripten 4.0.10: the four memory exports and the `ENGINE_THREADS` branch, which is not compiled.
+- Verified on emscripten 4.0.10 (Phase B): the memory exports are called by `check-engine-core`, `check-engine-tiers` and `check-engine-leak`, and the tier fallback is checked by `check-engine-tiers`. The `ENGINE_THREADS` branch is still not compiled.
 
 ### Proposed by jayzee: capacity table for ENGINE.md Memory
 
@@ -194,13 +225,13 @@ This is proposed text for the dispatcher to place under the Memory section. The 
 >
 > | Players | Bodies | Arena, 1 worker | Arena, 8 workers | Snapshot segment per client | Baseline history per client |
 > |---|---|---|---|---|---|
-> | 64 | 2048 | 27.4 MiB | not computed | 4,752 B | 33,856 B (33 B entries, estimate in the memory plan: 29,696 B) |
-> | 256 | 5120 | 41.2 MiB | 41.6 MiB | 4,752 B | as above |
-> | 1024 | 10240 | 78.5 MiB, over the 64 MiB tier, so a 64 MiB device runs 256 | 79.0 MiB | 4,752 B | as above |
+> | 64 | 2048 | 34.4 MiB | 34.9 MiB | 4,752 B | 33,856 B |
+> | 256 | 5120 | 55.2 MiB | 55.7 MiB | 4,752 B | 33,856 B |
+> | 1024 | 10240 | 104.3 MiB, over the 64 MiB tier, so a 64 MiB device runs 256 | 104.7 MiB | 4,752 B | 33,856 B |
 >
 > Per-client snapshot segment is `16 + 37 × visiblePerClient` with 128 visible. Baseline history is `baselineDepth × (8 + 33 × visiblePerClient)` with depth 8. The 1024-player row needs a larger tier than 64 MiB.
 
-Phase B recomputes the table from `bytesFor` and replaces the estimate above.
+Phase B replaced the estimates above with the measured plan totals (see the memory section). The table below uses those totals.
 
 ### Materials and textures owned by C++ (phase 8, ENGINE.md Client resources)
 - Files: `engine/src/textures.h/.cpp` (texture slots, handle allocator with generations 1 to 65534 and retirement), `engine/src/materials.h/.cpp` (40-byte material slots, ten words, albedo as a texture handle), `engine/src/exports_materials.cpp`, `src/engine/materials.js` (`createMaterials`, `createTextures`, constants), `src/client/resourcePools.js` (`createMaterialPool` and `createTexturePool` now require a wasm host and throw a TypeError without one), `scripts/check-client-resource-pools.mjs` (material and texture gates removed), `scripts/check-engine-materials.mjs` (the material and texture gates against the module), `scripts/check-hygiene.mjs` (one scope line).
@@ -213,17 +244,17 @@ Phase B recomputes the table from `bytesFor` and replaces the estimate above.
 - Witness: `scripts/check-engine-interest.mjs`. Constants: 1024 bodies with 64 clients; an unchanged delta is 16 bytes of header; a moved body appears once; visible count never exceeds `visiblePerClient`.
 - Decisions for the dispatcher: the ring stores 33 bytes per entry (body index plus record), because removed-body detection needs each baseline's index. The newest state is the current visibility list, so the usable baselines are `baselineDepth − 1`. Rotation is the identity and scale is (1, 1, 1), because the World has no per-body rotation word or scale yet. Ticks are 32-bit in the interest API; the host passes the low 32 bits. Clients store integer cell indices, not positions, so interest state is integer. Truncation is counted per update, not cumulatively.
 - Known gap: `interest::update` is fed `slotExtent()` (the fresh-slot count), not the live count, so a world with holes reads every slot it has ever issued.
-- UNVERIFIED: `std::sort`, `std::lower_bound` and `memcpy` under `-fno-exceptions -fno-rtti` in the emscripten build. The gate's assumption that `set_position` takes effect after one `engine_tick`.
+- Phase B: the emscripten build compiles `std::sort`, `std::lower_bound` and `memcpy` under `-fno-exceptions -fno-rtti` (CI). `check-engine-interest` passes its four claims. The assumption that `set_position` takes effect after one `engine_tick` is not separately witnessed.
 
 ### Renderer in the module, WebGPU and WebGL2 (phases 10 and 11)
 - Files: `engine/src/render/render_frame.h/.cpp` (GPU-free frame plan: page layers, body records, prop compaction, material resolve, frustum planes, FNV checksum), `engine/src/render/render_backend.h`, `engine/src/render/render_webgpu.h/.cpp` (through `webgpu_cpp.h`, three WGSL modules), `engine/src/render/render_webgl2.h/.cpp` (GLSL ES 3.00, CPU culling, instanced draws), `engine/src/exports_render.cpp` (25 exports), `src/engine/renderer.js` (`loadRenderer`, `createRenderer`, `chooseBackend`), `scripts/check-engine-render.mjs`, `scripts/browser/engine-render.html` and `engine-render-browser.js` (one page for phase 10 with `?phase=10` and phase 11 with `?phase=11`).
-- Witness, not run: `engine-render.html?phase=10` in a self-launched Chromium with `allocations_since_warmup == 0`, the per-frame API call count, and the checksum. `?phase=11` with `navigatorLike` lacking `gpu`, the same checksum and the same counters.
-- Deviations: single-threaded only. No render pthread or OffscreenCanvas flag, so UNVERIFIED for ENGINE.md's threading row. No `WEBGL_multi_draw`: one instanced draw per prop class plus one terrain draw. Lights are one flat fixed buffer with a count, not clusters. Props are a built-in cube until the shape library has vertex and index buffers. Terrain placement comes from the host (`placePage`), because the planet frame has no cell-to-world inverse. WebGPU culls on the GPU, but the witness's visible counts come from the CPU plan, since reading GPU counts back needs mapping. A swapchain view is created each frame and counted in the API calls. Capacities are constants (four prop classes, 4096 body slots, 64 page layers, 64 albedo layers, 256 lights and materials), not `budget::Capacity`.
-- Body slots: `rnd::kBodySlots` is 4096. `engine_render_init` now refuses with `kRange` when `world().bodyCapacity()` is above it (`engine/src/exports_render.cpp`, first check after the backend check). Before this guard the renderer drew only the first 4096 bodies and reported no error, which was the defect. Consequence: the 1024-player tier (10240 bodies) cannot render in Phase A, and the 64-player default (1024 + 16 × 64 = 2048 bodies) can. Phase B derives the body arrays from the budget and removes the refusal for the top tier.
-- Witness, not run: `engine_render_init` returns `kRange` on a world whose `bodyCapacity()` is 4097 or more, and returns the normal result at 4096 or below. `scripts/check-engine-render.mjs` still asserts `kBodySlots = 4096`; it does not yet assert the refusal, so this witness is a Phase B addition.
+- Witness, run in Phase B on the real adapter: `engine-render.html?phase=10` (WebGPU) and `?phase=11` (WebGL2) at both tiers, with `allocations_since_warmup == 0`, the per-frame API call count, the checksum and the adapter info. See "Real-adapter runs" below.
+- Deviations: single-threaded only. No render pthread or OffscreenCanvas flag, so UNVERIFIED for ENGINE.md's threading row. No `WEBGL_multi_draw`: one instanced draw per prop class plus one terrain draw. Lights are one flat fixed buffer with a count, not clusters. Props are a built-in cube until the shape library has vertex and index buffers. Terrain placement comes from the host (`placePage`), because the planet frame has no cell-to-world inverse. WebGPU culls on the GPU, but the witness's visible counts come from the CPU plan, since reading GPU counts back needs mapping. A swapchain view is created each frame and counted in the API calls. Capacities are constants (four prop classes, 10240 body slots, 64 page layers, 64 albedo layers, 256 lights and materials), not `budget::Capacity`.
+- Body slots (Phase B): `rnd::kBodySlots` is `budget::kTopTierBodies`, 10240, so every tier renders every body it holds. `engine_render_init` still refuses with `kRange` when `world().bodyCapacity()` is above `kBodySlots` (`engine/src/exports_render.cpp`). No tier can reach that refusal, because the largest tier holds exactly 10240 bodies and `check-engine-tiers` refuses a world of 10241. The 4096 cap of Phase A is gone. Before the Phase A guard the renderer drew only the first 4096 bodies and reported no error.
+- Witness (Phase B): `check-engine-render` asserts `kBodySlots = budget::kTopTierBodies` and `EXPECT_BODY_SLOTS = 10240` (17 PASS). The refusal itself is not called in a witness, because no tier can reach it (see the bullet above).
 - The witness budgets (64 API calls per frame, 600 frames) are placeholders, not measurements.
 - UNVERIFIED (ENGINE.md Open items and phase text): shared device across threads; OffscreenCanvas presentation from the emscripten port; one indirect-args buffer cost (phase 10 measure); the wasm-to-JS glue cost per WebGPU call (benchmark); R32Float terrain pages and unfiltered `textureLoad`; JSPI on Safari (no `WaitAny` is used, but the check is still owed).
-- UNVERIFIED Dawn names, none checkable without emsdk headers: `emscripten_webgpu_get_device` and `preinitializedWebGPUDevice`, `wgpu::Device::Acquire`, `SurfaceDescriptorFromCanvasHTMLSelector`, `ShaderSourceWGSL`, synchronous `CreateComputePipeline`, `TexelCopyTextureInfo` and `TexelCopyBufferLayout`, `depthWriteEnabled` as bool, and the `StringView` entry points. The surface format is fixed at BGRA8Unorm.
+- The Dawn names compile and link under emscripten 4.0.10 (CI run 42538426531 and the local builds), and the WebGPU witness runs them. Still open: the Dawn port is the legacy `USE_WEBGPU` one, which emscripten warns is deprecated for `emdawnwebgpu`; the migration is a separate change. The surface format is fixed at BGRA8Unorm.
 - Not implemented: the three.js control page. ENGINE.md phase 10 needs it for the reference images.
 - Upload gap: a page re-staged while still resident needs `engine_render_mark_page(slot)` after commit. The streamer must call it, and no streamer is in Phase A.
 
@@ -232,7 +263,7 @@ Phase B recomputes the table from `bytesFor` and replaces the estimate above.
 - Gate counts: phase 2 has 16 checks and 14 printed values; phase 3 has 21; phase 4 has 17; phase 5 has 24; phase 6 has 33; phase 7 has 23; phase 8 has 46.
 - Expected numbers are constants in the files, and the list of names each witness uses is in the phase reports. Phase 4 runs 65535 spawn and despawn cycles on one slot of a capacity-2 world: generations 0 to 65534, the retired count is 1 after 65535, and the next spawn lands in slot 1. The churn of 10000 bodies in batches of 16 on capacity 64 has zero allocations after warm-up.
 - The host build uses `ENGINE_ARENA_BYTES=268435456ull`, which is larger than the wasm arena. The witness agent suspected that a 64 MiB arena cannot hold the phase 6 witness's two 16 MiB temp allocators at once. That is UNVERIFIED and is checked in Phase B by measuring `arena::used()` at the phase 6 witness.
-- UNVERIFIED: the witness names may change under the parallel edits. Phase B re-checks every name against the headers first.
+- Phase B checked the witness names: `engine/test/build_host.sh` compiles and runs all of them (194 PASS, 0 FAIL).
 
 ### Integration fixes made after the agents reported
 - `engine_init` now binds the planet state, the vegetation field, the codec scratch, the materials, the textures and the interest state. Before this, the first `tickBatch` dereferenced a null planet pointer. The witness agent found it.
@@ -243,24 +274,106 @@ Phase B recomputes the table from `bytesFor` and replaces the estimate above.
 - `scripts/check-engine-render.mjs` expects `kBodySlots = 4096`, which matches the render constant.
 - The interest export feeds `slotExtent()`, not `count()`.
 
-### Service-worker isolation shim (code, not run)
+### Service-worker isolation shim
 
 - Files: `site/coi-sw.js` and `docs/play/coi-sw.js` (the same bytes; the gate compares them), `src/engine/isolation.js` (`ISOLATION_HEADERS`, `VARIANT`, `isolationPlan`, `registerIsolationShim`), `scripts/check-engine-isolation.mjs` (eight gates), `site/index.html` and `docs/play/index.html` (register `./coi-sw.js` when `!self.crossOriginIsolated && 'serviceWorker' in navigator`), and the `check:engine-isolation` entry in `package.json`.
 - Row: ENGINE.md Threads row (owner decision 2026-11-08, service-worker shim on GitHub Pages).
 - Behaviour: the shim sets `Cross-Origin-Embedder-Policy: require-corp` and `Cross-Origin-Opener-Policy: same-origin` on each same-origin response. The first load registers it, and the page reloads on `controllerchange`, so `crossOriginIsolated` is false until that reload.
 - `isolationPlan` picks the threaded variant only when the page is already isolated and threads are requested. Otherwise it picks the single build, and it asks for registration when a service worker exists. No threaded build is produced in Phase A, so the threaded branch is code only.
-- Witness, not run: `scripts/check-engine-isolation.mjs` (eight gates: the plan for each combination, registration calls with `./coi-sw.js`, unsupported cases, header values equal to the shim's, the docs copy equal to the site copy, both pages guarded). The Phase B public-site witness is still required: load `docs/play` on GitHub Pages, and confirm `crossOriginIsolated === true` after the one reload and `SharedArrayBuffer` is defined.
+- Witness (Phase B): `scripts/check-engine-isolation.mjs` passes nine claims (RESULT: PASS). These are the plan for each combination, registration calls with `./coi-sw.js`, unsupported cases, the header values, the docs copy equal to the site copy, and both pages guarded. OPEN: the public-site witness is not run. It needs `docs/play` served from GitHub Pages, and it must confirm `crossOriginIsolated === true` after the one reload and that `SharedArrayBuffer` is defined. That run has not been made, so the isolation row stays open.
 - Known gap, recorded not fixed: opaque (status 0) cross-origin `no-cors` responses are returned unchanged. Under `require-corp` they stay blocked, so a page that loads an opaque cross-origin subresource fails to load it. The shim does not fix this.
 
 ### Deviations for the dispatcher
 
-These are the deviations from ENGINE.md that this pass makes. The owner accepted them on 2026-11-08, and the dispatcher records them in ENGINE.md. Each item names the ENGINE.md row or phase it changes.
-- Memory (Memory, Bridge, phase 4): one static arena of the tier minus 4 MiB, carved at init, with `budget::plan` choosing the player count inside it. This answers Problems item 1 by a different route from the per-tier model.
-- Memory (phase 4, `allocations_since_warmup`): the allocator counts only fresh arena carves as allocations, so reuse of a block is not counted.
-- Memory (`engine_init`): the signature is `engine_init(players, workers, budgetBytes)`, not a single tier index. `workers` is recorded in the plan. The Jolt job system is `JobSystemSingleThreaded` in this build; the thread-pool branch exists only behind `ENGINE_THREADS`, which this build does not define, so the threads build comes later.
-- Memory (Jolt limits): the Jolt body, static, pair and contact maxima are derived from the body tier, not from fixed constants.
-- Memory (tier fallback, owner rule 2026-11-08): when the requested tier does not fit the budget, `plan` tries 1024, 256 and 64 in turn, and `layout.players` reports the tier it chose. At the 64 MiB budget, 1024 players falls back to 256 (41.2 MiB estimate). Phase B checks that the fallback reports 256 and that no allocation exceeds the budget.
-- Materials and textures (phase 8, Client resources): C++ owns the slot tables and the handles, which cross the JS boundary as doubles. Texture format codes 1 (RGBA8 unorm) and 2 (RGBA8 sRGB) are chosen in this pass. Texture pixels stay in JS memory and are not yet in engine memory.
-- Interest (snapshot, large player counts): 33-byte ring entries (a 4-byte index and the 29-byte record); `baselineDepth − 1` usable baselines, because the newest state is in the ring; rotation fixed to identity and scale to (1, 1, 1); 32-bit ticks; `update` is fed `slotExtent()`.
-- Renderer (phases 10 and 11): single-threaded; no multi-draw; one flat light buffer, not clusters; props are a built-in cube; capacities are constants. Body slots are capped at 4096, and `engine_render_init` refuses a larger world with `kRange` (see the renderer section). The 1024-player tier cannot render until Phase B.
-- Threads (ENGINE.md Threads row): the service-worker shim is the isolation route. Opaque cross-origin subresources stay blocked under `require-corp`. The single build is used whenever isolation is missing. No threaded build is produced in Phase A.
+Phase A items below are unchanged unless marked Phase B. Phase B items are recorded here for the dispatcher to accept or change.
+
+- Memory (Memory, Bridge, phase 4): one static arena of the tier minus 4 MiB, carved at init, with `budget::plan` choosing the player count inside it.
+- Memory (phase 4, `allocations_since_warmup`): counts fresh arena carves. Phase B: a large freed block (above 64 KiB) is reused first-fit by capacity, not by exact size, because Jolt resizes its body arrays by one element per tick and exact reuse carved each resize.
+- Memory (`engine_init`): the signature is `engine_init(players, workers, budgetBytes)`. The Jolt job system is `JobSystemSingleThreaded`; the thread-pool branch is not compiled.
+- Memory (Jolt limits): body, static, pair and contact maxima derived from the body tier.
+- Memory (tier fallback, owner rule 2026-11-08): `plan` tries 1024, 256 and 64 in turn, and `layout.players` reports the tier chosen.
+- Memory (Phase B, Jolt quad tree): the broadphase node pages (256 nodes, 32 KiB each) are paged in lazily by Jolt. `budget::poolCounts` primes `joltQuadNodePages(capacity)` extra 64 KiB pool blocks at initialize, and `totalBytes` charges them. At 1024 players that is 60 pages.
+- Memory (Phase B, Jolt temp): 2048 bytes per body on top of the 16 MiB base. Jolt's `TempAllocatorImpl` aborts when exhausted, and 10240 bodies exhausted 16 MiB.
+- Memory (Phase B, render reserve): `kRenderBytes` is 2 MiB, static-asserted against `sizeof(RenderState)`.
+- Memory (Phase B, warm-up): `World::configure` runs one warm-up job, so the job free list pages before warm-up. The quad-tree pages are primed as above.
+- Memory (Phase B, sizes): the 1024-player plan is 104.3 MiB, so it needs the 128 MiB build. A 64 MiB device runs 256 players.
+- Physics (Phase B, Jolt settings): `mPenetrationSlop` is 0 (Jolt default 0.02), and `mNumPositionSteps` equals the iterations (Jolt default 2). Cause: with slop 0.02 the ground rest was 0.3455 with drag 0.1, and a stack did not separate with more iterations. The float32 residuals (rest 3.75e-6, box top 9.5e-8) and Jolt's speculative contacts are inside the engine world gate's tolerance of 1e-5. The JavaScript world keeps 1e-9.
+- Physics (Phase B, RadialGravity): the step listener uses the no-lock body interface, because Jolt holds body mutexes in step listeners.
+- Materials and textures (phase 8, Client resources): C++ owns the slot tables and the handles, which cross the JS boundary as doubles. Texture format codes 1 (RGBA8 unorm) and 2 (RGBA8 sRGB). Texture pixels stay in JS memory and are not yet in engine memory.
+- Pools (Phase B, gate): Jolt stores float32, so -0 can come back as +0. `check-engine-pools` normalizes both sides with `+ 0`.
+- Interest (snapshot, large player counts): 33-byte ring entries; `baselineDepth - 1` usable baselines; rotation fixed to identity and scale to (1, 1, 1); 32-bit ticks; `update` is fed `slotExtent()`.
+- Renderer (phases 10 and 11): single-threaded; no multi-draw; one flat light buffer, not clusters; props are a built-in cube; capacities are constants.
+- Renderer (Phase B, body slots): `kBodySlots` is `budget::kTopTierBodies`, 10240, replacing the Phase A cap of 4096. `engine_render_init` still refuses a larger world with `kRange`, which no tier can reach.
+- Renderer (Phase B, present): `surface.Present()` is removed. Emscripten refuses it, and the canvas presents at the end of the task.
+- Renderer (Phase B, page layers): 64 page layers, one per page slot in the budget.
+- Renderer (Phase B, WebGPU witness): the playwriter browser reports `navigator.gpu` with no adapter, so the WebGPU witness runs in a self-launched Chromium with SwiftShader flags (`scripts/browser/run-engine-render.mjs`, which needs `PLAYWRIGHT_CORE`). The WebGL2 witness runs in playwriter.
+- Renderer (Phase B, witness scale): the witness page draws 512 bodies at the 64 tier, not the 2048 the 64-player plan holds, and 10240 at the 1024 tier. The checksum is pinned to the 512 scale.
+- Renderer (Phase B, warning kept): the Dawn port is the legacy `USE_WEBGPU`. Emscripten 4.0.10 warns that it is deprecated for `emdawnwebgpu`, which implements a different `webgpu.h`. The migration is a separate change. Recorded, not fixed.
+- Build (Phase B, warning kept): `-sMAXIMUM_MEMORY` is set on the fixed module with `ALLOW_MEMORY_GROWTH=0`. Emscripten warns that it is inert without growth. The flag stays so the fixed module's maximum is in its link line, and `check-engine-artifacts` asserts it. Recorded, not fixed.
+- Leak variant (Phase B): `scripts/check-engine-leak.mjs` replaces the grep-based step. Its claims are the pinned hash and a memory buffer above the tier after 10000 ticks.
+- Threads (ENGINE.md Threads row): the service-worker shim is the isolation route. Opaque cross-origin subresources stay blocked under `require-corp`. No threaded build is produced.
+
+## Phase B witness results for the Phase A rollout
+
+Each block quotes the output of a run made in Phase B on the committed state. The CI logs are run 42538780790 (`engine/artifacts.json` at 211b8a7). Local logs are not committed.
+
+### Memory plan, arena and allocator (phase 4)
+- `scripts/check-engine-core.mjs` on engine-core-64mib.wasm and engine-core-128mib.wasm: `PASS engine_init returns 0 and the memory starts at the tier named by the glue`, `PASS memory.buffer.byteLength is unchanged after 10000 ticks, and the tick counter reads 10000`, `RESULT: PASS`.
+- `scripts/check-engine-bridge.mjs`: 7 PASS, `RESULT: PASS`. `scripts/check-engine-pools.mjs`: 7 PASS, `RESULT: PASS`.
+- `scripts/check-engine-tiers.mjs`: 6 PASS, `RESULT: PASS`. Lines: `PASS a 64 MiB build given 1024 players and a 64 MiB budget runs the 256 tier and reports it`; `PASS a 128 MiB build given 1024 players and a 128 MiB budget runs the 1024 tier with 10240 bodies`; `PASS a 128 MiB build given 1024 players and only a 64 MiB budget falls back to the 256 tier`; `PASS the 1024 tier holds 10240 bodies: a full world spawns, steps and keeps its memory fixed`; `PASS the 1024 tier refuses a world larger than its 10240 bodies`; `PASS the 1024 tier carves nothing from the arena after warm-up, with 10240 bodies settling`.
+- Post-warm-up carves, measured with `build/diag/tier_count2.cpp` (native, against the host Jolt library, with `plan`, `poolCounts` and the arena size of each tier): `carves since warmup 0` at 64 players (60 MiB arena, 2048 bodies) and `carves since warmup 0` at 1024 players (124 MiB arena, 10240 bodies, 540 ticks after warm-up). Before the fixes at 1024 players the same probe reported `carves since warmup 5`: four quad-tree pages (32 KiB each, from `QuadTree::UpdatePrepare`) and one 163,824-byte array resize, which exact-size reuse did not serve.
+- Plan totals (`build/diag/plan_table.cpp`): see the memory section above.
+- Native witness `engine/test/build_host.sh`, phases 2 to 8: `RESULT: PASS`, 194 PASS lines, 0 FAIL. Per phase, PASS lines: phase 2 17, phase 3 24, phase 4 17, phase 5 24, phase 6 33, phase 7 23, phase 8 48. The Phase A doc listed 16, 21 and 46 for phases 2, 3 and 8. Those were estimates before the code ran. The witness prints one PASS per check, so the measured numbers are the record.
+
+### Materials and textures (phase 8)
+- `scripts/check-engine-materials.mjs`: 15 PASS, `RESULT: PASS`.
+- `scripts/check-client-resource-pools.mjs`: 13 PASS, `RESULT: PASS`.
+- Native phase 8 (see above): 48 PASS lines, including `PASS phase 8: 10000 material add and remove cycles all succeed` and `PASS phase 8: the arena used bytes are unchanged over 10000 material cycles`.
+- Browser page `scripts/browser/client-resource-pools.html`, run in the gm playwriter browser (`#out` read after the page wrote its JSON, 600 frames each for baseline and churn):
+  `{ "compiledAtLoad": 2, "compileCountAfterPlay": 2, "baseline": { "p99Ms": 0.09999996423721313, "frames": 600 }, "churned": { "p99Ms": 0.6000000238418579, "frames": 600 }, "lightsLive": 8, "texturesLive": 8, "meshesLive": 8 }`, with no page error.
+  - The pipeline compile count is 2 at load and stays 2 after play, so no compile happens during play.
+  - Live counts after churn are 8 of each, which is the last churn batch of `CHURN_PER_FRAME` 8. The page does not assert these, and the gate covers the counts.
+  - Defect found and fixed in this Phase B. The first run threw `texture layers 32 must match the wasm table capacity 512` from `createTexturePool`. The page passed `layers: 32` while the engine table holds 512, so the page never drew. The page now takes `layers` and the pixel buffer from the host's `capacity`, as `check-engine-materials.mjs` already does. The first run's error is the record; the result above is from after the fix.
+  - Timing lines are the page's own p99 of `performance.now` around two registry gets per frame. They are not a budget.
+
+### Interest management (large player counts)
+- `scripts/check-engine-interest.mjs`: 4 PASS, `RESULT: PASS`.
+
+### Renderer in the module (phases 10 and 11)
+- `scripts/check-engine-render.mjs`: 17 PASS, `RESULT: PASS`.
+Real-adapter runs (Phase B, WebGPU and Vulkan enabled on this machine). All four were run in the gm playwriter browser (pid 3562307, launched with `--user-data-dir=/workspace/.playwriter/browser-profile --remote-debugging-port=10252 --no-first-run --no-default-browser-check --no-sandbox`, no GPU flags), one page per run, reading `window.engineRenderResult`. Each run is one 600-frame pass with the first 60 frames dropped, so each timing is a single run and has no variance estimate.
+
+- WebGPU, 1024 tier (`engine-render.html?phase=10&tier=1024`): adapter `{"api":"webgpu","vendor":"nvidia","architecture":"ampere","device":"0x2520","description":"NVIDIA GeForce RTX 3060 Laptop GPU","isFallbackAdapter":false}`, backend `webgpu`, `frameTimeP99Ms` 78.60000002384186, `apiCallsPerFrame` 34, `allocationsSinceWarmup` "0", `createsAfterSeal` 0, `checksum` "-3826851758512048142", `visible` [729,746,747,750], `errors` [], `ok` true.
+- WebGPU, 64 tier (`engine-render.html?phase=10&tier=64`), same adapter: `frameTimeP99Ms` 8.899999976158142, `apiCallsPerFrame` 34, `allocationsSinceWarmup` "0", `checksum` "-5415737363265412373", `visible` [18,20,21,20], `ok` true.
+- WebGL2, 1024 tier (`engine-render.html?phase=11&tier=1024`), same GPU through ANGLE: adapter `{"api":"webgl2","vendor":"Google Inc. (NVIDIA Corporation)","renderer":"ANGLE (NVIDIA Corporation, NVIDIA GeForce RTX 3060 Laptop GPU/PCIe/SSE2, OpenGL 4.5.0)"}`, backend `webgl2`, `frameTimeP99Ms` 362.89999997615814, `apiCallsPerFrame` 45, `allocationsSinceWarmup` "0", `createsAfterSeal` 0, `checksum` "-3826851758512048142", `ok` true.
+- WebGL2, 64 tier, same GPU: `frameTimeP99Ms` 34.69999998807907, `apiCallsPerFrame` 45, `allocationsSinceWarmup` "0", `checksum` "-5415737363265412373", `ok` true.
+
+Timing lines, 1024 tier, side by side, same GPU: WebGPU `frameTimeP99Ms` 78.6 ms, WebGL2 `frameTimeP99Ms` 362.9 ms. The ratio is 362.9 / 78.6 = 4.62. At the 64 tier: WebGPU 8.9 ms, WebGL2 34.7 ms, ratio 34.7 / 8.9 = 3.90. These speedups come only from those four numbers. They are single runs, so they are not a confidence interval.
+
+- The checksum agrees between the two backends at each tier (1024: -3826851758512048142, 64: -5415737363265412373).
+- The SwiftShader WebGPU 1024 run in `build/diag/webgpu1024.json` (`frameTimeP99Ms` 140.4) is a software adapter. It is a defect record and not a baseline; the speedup above does not use it. See the defect below.
+- The witness budgets (64 API calls per frame, 600 frames) are still placeholders.
+- The `engine_render_init` refusal is not witnessed directly. No tier can reach it (see the renderer section).
+
+### Adapter defects found in this Phase B (WebGPU and Vulkan)
+- Defect 1, the self-launched runner forced SwiftShader. `scripts/browser/run-engine-render.mjs` passed `--use-vulkan=swiftshader`, `--use-webgpu-adapter=swiftshader` and `--use-angle=swiftshader`, so its WebGPU runs measured the CPU adapter. Evidence: `build/diag/webgpu1024.json` (`frameTimeP99Ms` 140.4, checksum -3826851758512048142), against 78.6 for the same module on the NVIDIA adapter (above). Fix in this Phase B: those three flags are removed, the feature list is `Vulkan,WebGPUService`, and the runner exits non-zero when the page reports `isFallbackAdapter` true or the vendor `google`. Not re-run: the runner needs `PLAYWRIGHT_CORE`, which is unset here, and jayzee has no playwright-core dependency. So the runner's new flags are untested. OPEN until the runner runs once with `PLAYWRIGHT_CORE` set.
+- Defect 2, direct Chromium launches get a SwiftShader WebGPU adapter. With `--use-vulkan=native`, `--enable-features=Vulkan`, and each adapter selection (`dgpu`, `default`, `swiftshader`), `navigator.gpu.requestAdapter()` returned `vendor google, arch swiftshader` (probes `build/diag/gpu_probe.mjs`, `gpu_probe2.mjs`, `gpu_adapter.html`). With ANGLE on Vulkan, WebGL reports the NVIDIA GPU, but the WebGPU `requestAdapter()` did not return within 6 s. `vulkaninfo` reports NVIDIA GeForce RTX 3060 Laptop GPU, driver 580.178.4.0, so Vulkan works on the machine. The cause of the direct-launch software adapter is not established. The gm playwriter browser returned the NVIDIA adapter with no GPU flags on its command line. OPEN.
+- What the NVIDIA runs do not show. The adapter info does not name the WebGPU backend, so the WebGPU runs do not prove Dawn used Vulkan. The WebGL2 runs report ANGLE over OpenGL 4.5 on the same driver, so they do not use Vulkan either.
+- Defect 3, fixed: the phase 8 page threw on `createTexturePool` (see the phase 8 record above).
+
+### Witnesses for phases 2 to 8 (native host build)
+- Phase 2 world: `RESULT: PASS` in the native run. Native INFO lines: `INFO phase 2: ground rest y after 600 ticks 0.499933719635`, `INFO phase 2: box rest y after 600 ticks 1.49999976158`.
+- `scripts/check-engine-world.mjs`: 13 PASS, `RESULT: PASS`, with the engine float32 tolerance of 1e-5.
+- `scripts/check-engine-vegetation.mjs`: 7 PASS, `RESULT: PASS`. `scripts/check-engine-codecs.mjs`: 11 PASS, `RESULT: PASS`.
+
+### Planet (phase 5)
+- `scripts/check-engine-planet.mjs`: 9 PASS, `RESULT: PASS` (quoted in full in the planet section above). Native phase 5: 24 PASS lines.
+
+### Service-worker isolation shim
+- `scripts/check-engine-isolation.mjs`: 9 PASS, `RESULT: PASS`.
+- OPEN: the public-site witness. It needs `docs/play` served from GitHub Pages, and it must confirm `crossOriginIsolated === true` after the one reload and that `SharedArrayBuffer` is defined. It has not been run.
+
+### Gate summary
+- Every local engine gate and the CI run agree: artifacts 6, world 13, bridge 7, pools 7, planet 9, vegetation 7, codecs 11, materials 15, interest 4, render 17, isolation 9, tiers 6, client-resource-pools 13, core 64 MiB 3, core 128 MiB 3, leak 3. Each ends `RESULT: PASS`.
+- Warnings in the final builds: `USE_WEBGPU is deprecated` (3 lines, one per build), kept and recorded in the deviations. The `MAXIMUM_MEMORY` warning is also recorded there. All other compiler warnings were fixed.
+- Open: the public-site isolation witness; the `USE_WEBGPU` migration; the `ENGINE_THREADS` branch; the Jolt per-body cost estimates in the memory plan (the plan totals are measured, the per-body costs are not).
