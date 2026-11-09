@@ -3,7 +3,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { availableParallelism } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { burn } from './cpu-load.mjs'
+import { burn, cpusExcept } from './cpu-load.mjs'
 import { runRenderWitness } from './render-witness.mjs'
 import { flightPath, newStreamerState, percentile, planetWorld, streamerPass } from '../streamer-p99.mjs'
 
@@ -16,6 +16,7 @@ const PAGE_PORT = 8843
 const PAGE_DEBUG_PORT = 9843
 const PAGE_QUERY = 'phase=10&tier=1024&timed=1'
 const SAMPLER_CPUS = process.env.SAMPLER_CPUS ?? '15'
+const GENERATOR_CPUS = SAMPLER_CPUS === '' ? '' : cpusExcept(SAMPLER_CPUS)
 
 function spawnSampler(args) {
   if (SAMPLER_CPUS === '') return spawn(process.execPath, args, { stdio: 'ignore' })
@@ -109,7 +110,7 @@ if (process.argv[1] && process.argv[1].endsWith('/browser/paired-run.mjs')) {
   const samplerDone = exited(sampler)
   const threadSampler = spawnSampler([THREAD_SAMPLER, join(outDir, label + '.threads.txt'), '50', join(ROOT, '.playwriter', 'browser-profile')])
   const threadDone = exited(threadSampler)
-  const generatorDone = condition === 'G1' && workers > 0 ? burn({ workers, durationMs }) : Promise.resolve(null)
+  const generatorDone = condition === 'G1' && workers > 0 ? burn({ workers, durationMs, cpus: GENERATOR_CPUS }) : Promise.resolve(null)
   const streamer = await measureStreamerUntil(path, samplerStart + durationMs)
   await samplerDone
   threadSampler.kill('SIGTERM')
