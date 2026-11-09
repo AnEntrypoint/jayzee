@@ -6,6 +6,7 @@ import { attributeOverLimit, parseCgroupSamples, sampledRows } from './sampler-g
 
 export const LOAD_LIMIT = 0.2
 export const MODES = Object.freeze({ pinned: '15', unpinned: '' })
+export const GENERATORS = Object.freeze(['separate', 'shared'])
 export const CAUSES = Object.freeze(['host-cfs-quota', 'run-queue-wait', 'sampler-work', 'unattributed'])
 export const GATE_READ_MS = 5000
 export const GATE_TRIES = 2880
@@ -78,8 +79,13 @@ const measureBusy = async () => {
   return busyFraction(before, parseProcStatCpu(readStat()))
 }
 
-const runPaired = (label, mode, index, outDir, durationMs, workers, ticks) => new Promise((resolve, reject) => {
-  const env = { ...process.env, SAMPLER_CPUS: MODES[mode] }
+export const generatorEnv = (generator) => {
+  if (!GENERATORS.includes(generator)) throw new TypeError('generator must be separate or shared: ' + generator)
+  return generator === 'shared' ? { GENERATOR_CPUS: '' } : {}
+}
+
+const runPaired = (label, mode, index, outDir, durationMs, workers, ticks, generator) => new Promise((resolve, reject) => {
+  const env = { ...process.env, SAMPLER_CPUS: MODES[mode], ...generatorEnv(generator) }
   const child = spawn(process.execPath, [PAIRED, label, 'G1', String(index), outDir, String(durationMs), String(workers), String(ticks), '0'], { env, stdio: ['ignore', 'pipe', 'pipe'] })
   let out = ''
   let err = ''
@@ -91,12 +97,12 @@ const runPaired = (label, mode, index, outDir, durationMs, workers, ticks) => ne
 
 const gapsOf = (record, ticksText, cgroupText) => attributeOverLimit(sampledRows(ticksText, record.sampler), parseCgroupSamples(cgroupText))
 
-const runSlot = async ({ label, mode, index, outDir, durationMs, workers, ticks, loadLimit, gateTries, read }) => {
+const runSlot = async ({ label, mode, index, outDir, durationMs, workers, ticks, loadLimit, gateTries, read, generator }) => {
   const gate = await awaitLoadGate({ read, limit: loadLimit, tries: gateTries })
   if (!gate.ok) {
     return { label, mode, index, status: 'skipped', reason: 'host busy stayed above ' + loadLimit + ' for ' + gate.reads + ' reads (last ' + gate.busy.toFixed(3) + ')', loadBefore: gate.busy, gaps: [], maxGapMs: 0 }
   }
-  const run = await runPaired(label, mode, index, outDir, durationMs, workers, ticks)
+  const run = await runPaired(label, mode, index, outDir, durationMs, workers, ticks, generator)
   if (run.code !== 0) {
     return { label, mode, index, status: 'error', reason: 'paired-run exit ' + run.code + ': ' + run.err.slice(-300), loadBefore: gate.busy, gaps: [], maxGapMs: 0 }
   }
@@ -110,6 +116,8 @@ const runSlot = async ({ label, mode, index, outDir, durationMs, workers, ticks,
     index,
     status: 'valid',
     reason: null,
+    generator,
+    generatorCpus: record.host ? record.host.generatorCpus ?? null : null,
     loadBefore: gate.busy,
     gateReads: gate.reads,
     gaps: gaps.map((gap) => ({ t0: gap.t0, gapMs: gap.gapMs, cause: gap.cause, threadCause: gap.threadCause, cgroupThrottleMs: gap.cgroupThrottleMs, selfWaitMs: gap.selfWaitMs })),
@@ -118,7 +126,8 @@ const runSlot = async ({ label, mode, index, outDir, durationMs, workers, ticks,
   }
 }
 
-export const runFrequency = async ({ n, outDir, durationMs, workers, ticks, loadLimit = LOAD_LIMIT, gateTries = GATE_TRIES, maxSlots = 2 * n, log = console.log, read = measureBusy }) => {
+export const runFrequency = async ({ n, outDir, durationMs, workers, ticks, loadLimit = LOAD_LIMIT, gateTries = GATE_TRIES, maxSlots = 2 * n, log = console.log, read = measureBusy, generator = 'separate' }) => {
+  generatorEnv(generator)
   mkdirSync(outDir, { recursive: true })
   const modes = Object.keys(MODES)
   const results = []
@@ -130,7 +139,7 @@ export const runFrequency = async ({ n, outDir, durationMs, workers, ticks, load
       slots[mode] += 1
       const index = slots[mode]
       const label = 'freq-' + mode + '-' + index
-      const result = await runSlot({ label, mode, index, outDir, durationMs, workers, ticks, loadLimit, gateTries, read })
+      const result = await runSlot({ label, mode, index, outDir, durationMs, workers, ticks, loadLimit, gateTries, read, generator })
       writeFileSync(join(outDir, label + '.result.json'), JSON.stringify(result, null, 1) + '\n')
       results.push(result)
       if (result.status === 'valid') valid[mode] += 1
@@ -139,7 +148,7 @@ export const runFrequency = async ({ n, outDir, durationMs, workers, ticks, load
   }
   const table = summarizeFrequency(results)
   const text = formatTable(table)
-  writeFileSync(join(outDir, 'summary.json'), JSON.stringify({ table, results }, null, 1) + '\n')
+  writeFileSync(join(outDir, 'summary.json'), JSON.stringify({ generator, table, results }, null, 1) + '\n')
   writeFileSync(join(outDir, 'summary.md'), '```\n' + text + '\n```\n')
   log(text)
   return { table, results }
@@ -148,7 +157,7 @@ export const runFrequency = async ({ n, outDir, durationMs, workers, ticks, load
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const args = Object.fromEntries(process.argv.slice(2).map((arg) => {
     const match = /^--([\w-]+)=(.*)$/.exec(arg)
-    if (!match) throw new TypeError('usage: node scripts/browser/frequency-runs.mjs --n=5 --out=DIR [--duration=240000 --workers=12 --ticks=6000 --load-limit=0.2 --max-wait-ms=14400000]: ' + arg)
+    if (!match) throw new TypeError('usage: node scripts/browser/frequency-runs.mjs --n=5 --out=DIR [--duration=240000 --workers=12 --ticks=6000 --load-limit=0.2 --max-wait-ms=14400000 --generator=separate|shared]: ' + arg)
     return [match[1], match[2]]
   }))
   const n = Number(args.n ?? 5)
@@ -159,6 +168,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     workers: Number(args.workers ?? 12),
     ticks: Number(args.ticks ?? 6000),
     loadLimit: Number(args['load-limit'] ?? LOAD_LIMIT),
+    generator: args.generator ?? 'separate',
     gateTries: Math.max(1, Math.ceil(Number(args['max-wait-ms'] ?? GATE_TRIES * GATE_READ_MS) / GATE_READ_MS)),
   })
 }

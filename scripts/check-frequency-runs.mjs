@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { awaitLoadGate, busyFraction, CAUSES, formatTable, frequencyPlan, loadGate, LOAD_LIMIT, MODES, parseProcStatCpu, summarizeFrequency } from './browser/frequency-runs.mjs'
+import { awaitLoadGate, busyFraction, CAUSES, formatTable, frequencyPlan, generatorEnv, GENERATORS, loadGate, LOAD_LIMIT, MODES, parseProcStatCpu, summarizeFrequency } from './browser/frequency-runs.mjs'
 import { finish, gate } from './lib/gate.mjs'
 
 const stat = (idle, iowait, busy) => 'cpu  ' + busy + ' 0 0 ' + idle + ' ' + iowait + ' 0 0 0 0 0\ncpu0 1 0 0 1 0 0 0 0 0 0\n'
@@ -35,6 +35,13 @@ gate('frequencyPlan alternates pinned and unpinned, n of each, and refuses a bad
 })
 gate('the modes pin the sampler to CPU 15 or leave it unpinned', () => {
   assert.deepEqual(MODES, { pinned: '15', unpinned: '' })
+})
+gate('the separate generator leaves the burn workers on their default CPUs off the sampler, and the shared one unpins them', () => {
+  assert.deepEqual([...GENERATORS], ['separate', 'shared'])
+  assert.deepEqual(generatorEnv('separate'), {})
+  assert.deepEqual(generatorEnv('shared'), { GENERATOR_CPUS: '' })
+  assert.throws(() => generatorEnv('pinned'), TypeError)
+  assert.throws(() => generatorEnv(undefined), TypeError)
 })
 gate('a skipped run is never counted as valid and does not add gaps', () => {
   const table = summarizeFrequency([

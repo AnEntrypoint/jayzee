@@ -16,7 +16,7 @@ const PAGE_PORT = 8843
 const PAGE_DEBUG_PORT = 9843
 const PAGE_QUERY = 'phase=10&tier=1024&timed=1'
 const SAMPLER_CPUS = process.env.SAMPLER_CPUS ?? '15'
-const GENERATOR_CPUS = SAMPLER_CPUS === '' ? '' : cpusExcept(SAMPLER_CPUS)
+const GENERATOR_CPUS = process.env.GENERATOR_CPUS ?? (SAMPLER_CPUS === '' ? '' : cpusExcept(SAMPLER_CPUS))
 
 function spawnSampler(args) {
   if (SAMPLER_CPUS === '') return spawn(process.execPath, args, { stdio: 'ignore' })
@@ -36,7 +36,7 @@ export function hostRecord(readText = (path) => readFileSync(path, 'utf8'), npro
   } catch {
     cpuMax = null
   }
-  return { cpuMax, nproc, samplerCpus: SAMPLER_CPUS === '' ? null : SAMPLER_CPUS }
+  return { cpuMax, nproc, samplerCpus: SAMPLER_CPUS === '' ? null : SAMPLER_CPUS, generatorCpus: GENERATOR_CPUS === '' ? null : GENERATOR_CPUS }
 }
 
 export function runRecord({ label, condition, round, sampler, generator = null, streamer, host = null, page = null }) {
@@ -63,7 +63,7 @@ export function runRecord({ label, condition, round, sampler, generator = null, 
     sampler: { file: sampler.file, startMs: sampler.startMs, endMs: sampler.endMs },
     generator: generator ? { workers: generator.workers, requestedDurationMs: generator.requestedDurationMs, startMs: generator.startMs, endMs: generator.endMs } : null,
     streamer: { startMs: streamer.startMs, endMs: streamer.endMs, samples: streamer.samples, p50Ms: streamer.p50Ms, p99Ms: streamer.p99Ms, maxMs: streamer.maxMs },
-    host: host ? { cpuMax: host.cpuMax ?? null, nproc: host.nproc ?? null, samplerCpus: host.samplerCpus ?? null } : null,
+    host: host ? { cpuMax: host.cpuMax ?? null, nproc: host.nproc ?? null, samplerCpus: host.samplerCpus ?? null, generatorCpus: host.generatorCpus ?? null } : null,
     page: page ? { file: page.file, error: page.error ?? null } : null,
   }
 }
