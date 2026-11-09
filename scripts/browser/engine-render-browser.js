@@ -8,8 +8,9 @@ const TIMED = QUERY.get('timed') === '1'
 const DRAW = QUERY.get('draw') !== '0'
 const TIER_GLUE = (TIER === 1024 ? '../../engine/out/engine-core-128mib' : '../../engine/out/engine-core-64mib') + (TIMED ? '-timed' : '') + '.mjs'
 const TIER_BUDGET = TIER === 1024 ? 128 * 1024 * 1024 : 64 * 1024 * 1024
-const FRAMES = 600
 const WARMUP_FRAMES = 60
+const FRAMES = QUERY.has('frames') ? Number(QUERY.get('frames')) : 600
+if (!Number.isInteger(FRAMES) || FRAMES <= WARMUP_FRAMES) throw new RangeError('frames must be a whole number above the warm-up frames')
 const BODIES = TIER === 1024 ? 10240 : 512
 const LIGHTS = 8
 const ALBEDO_SIDE = 16
@@ -24,7 +25,7 @@ const WORLD = { capacity: TIER === 1024 ? 10240 : 2048, tickRate: 60, gravity: -
 const PLANET = { radius: 6371000, cellSize: planetCellSize(6371000), gravity: 9.8, maxHeight: 8000 }
 const CLASS_MATERIALS = [0, 1, 2, 3]
 
-const result = { phase: PHASE, errors: [], done: false }
+const result = { phase: PHASE, errors: [], done: false, warmAt: null }
 const report = (line) => {
   const el = document.getElementById('result')
   if (el) el.textContent += line + '\n'
@@ -296,7 +297,7 @@ const run = async () => {
         rows[at + 6] = TIMED ? module._engine_sim_active_bodies() : NaN
         for (let i = 0; i < phaseCount; i++) rows[at + ROW_FIELDS + i] = phasesAfter[i] - phasesBefore[i]
         lastStarted = started
-        if (frame === WARMUP_FRAMES) renderer.markWarmup()
+        if (frame === WARMUP_FRAMES) { renderer.markWarmup(); result.warmAt = frame }
         if (frame >= WARMUP_FRAMES) lastStats = renderer.stats()
         frame += 1
         if (frame < FRAMES) requestAnimationFrame(step)

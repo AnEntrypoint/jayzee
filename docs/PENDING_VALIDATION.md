@@ -2068,3 +2068,22 @@ Open items.
 - W7: find what retains about 70 to 90 KB over the post-warm-up window, or show it is code growth, then rerun. The window also needs a warm-up mark: the page's `markWarmup()` at frame `WARMUP_FRAMES` is not visible to the sampler.
 - Pins: `engine/artifacts.json` still pins the fixed-64, fixed-128 and leak-64 binaries built before the reuse pass's C++ edits. Those binaries are not rebuilt, so the pins are stale against the sources. A rebuild needs a re-pin.
 - W2 covers `World` only. The other W2 rows (G2, JF5, JF6, JF7, JM12, JM13) still need their own runs.
+
+## CI engine glue and the W7 warm-up mark (Phase A, committed before the Phase B run)
+
+### CI: `test (24)` failed on `engine/out/engine-core-64mib.mjs`
+
+Cause. `engine/out/` is git-ignored and built locally. The `test` job in `.github/workflows/ci.yml` ran `npm test` without building it, so the flight-path tests could not import the glue.
+
+Change. `ci.yml`, job `test`: the emsdk cache, fetch and install steps (the same pinned commit as `engine-core.yml`, `62a853cd…`, version 4.0.10), then the step "Build the engine glue the tests import", which runs before `npm ci` and `npm test`. It builds five variants: fixed-64, fixed-128, leak-64, timed-64 and timed-128. The test chain reads these: `check-engine-sleep.mjs:8` reads timed-64, `check-sample-order.mjs:11` reads timed-128, and the others are read by the engine gates.
+
+Witness. `scripts/check-ci-engine-glue.mjs`, in `npm test`: the real workflow builds every required variant before `npm test`; a workflow without the timed 128 build is refused; a workflow whose build step runs after `npm test` is refused. The CI run's conclusion is recorded after the push.
+
+### W7: the sampler now starts after warm-up
+
+Cause. The earlier window started at page load, before frame 1, so its baseline included start-up allocation (731 KB, then 1174 KB one sample later). The sampler also could not see `markWarmup()`.
+
+Change.
+- `scripts/browser/engine-render-browser.js`: `result.warmAt` is set to frame 60 where `markWarmup()` is called. The page also takes `?frames=N` (default 600). The default is unchanged, so the render witness's 600-frame checksum still holds. The heap run uses `frames=660` so that 600 frames run after warm-up.
+- `scripts/browser/heap-witness.mjs`: `sampleWindow` takes `isStarted`, waits for it, and returns `warmed`.
+- `scripts/check-browser-heap.mjs`: `judgeHeap` refuses `warmed !== true`. Witness: the gate "a window that starts before warm-up is refused". The existing gates now carry `warmed: true`, and the bound (65536 bytes) and the 600-frame minimum are unchanged.

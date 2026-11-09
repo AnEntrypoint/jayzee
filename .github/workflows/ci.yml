@@ -15,6 +15,29 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
           cache: npm
+      - uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: build/emsdk
+          key: emsdk-4.0.10-62a853cd3b3134398ce85cde8bb5cbb2ef0194cb-${{ runner.os }}
+      - name: Fetch emsdk at the pinned commit
+        run: |
+          set -euo pipefail
+          if [ ! -d build/emsdk/.git ]; then git clone https://github.com/emscripten-core/emsdk.git build/emsdk; fi
+          git -C build/emsdk fetch --tags origin
+          git -C build/emsdk checkout --detach 62a853cd3b3134398ce85cde8bb5cbb2ef0194cb
+          test "$(git -C build/emsdk rev-parse HEAD)" = 62a853cd3b3134398ce85cde8bb5cbb2ef0194cb
+      - name: Install and activate emsdk 4.0.10
+        run: |
+          build/emsdk/emsdk install 4.0.10
+          build/emsdk/emsdk activate 4.0.10
+      - name: Build the engine glue the tests import
+        run: |
+          set -euo pipefail
+          bash engine/build.sh
+          ENGINE_TIER_MIB=128 bash engine/build.sh
+          ENGINE_VARIANT=leak bash engine/build.sh
+          ENGINE_VARIANT=timed bash engine/build.sh
+          ENGINE_VARIANT=timed ENGINE_TIER_MIB=128 bash engine/build.sh
       - run: npm ci
       - run: npm test
       - run: npm run bench -- 500 120
