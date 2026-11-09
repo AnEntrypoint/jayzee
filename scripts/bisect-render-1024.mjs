@@ -15,6 +15,8 @@ const port = Number(flag('port', '8843'))
 const debugPort = Number(flag('debug-port', '9843'))
 const profile = flag('profile', join(root, '.playwriter', 'browser-profile'))
 const outDir = flag('out', join(root, 'build', 'diag', 'render-bisect'))
+const scene = flag('scene', '')
+const SCENE_FILE = 'scripts/browser/engine-render-browser.js'
 const playwrightCore = process.env.PLAYWRIGHT_CORE
 if (!playwrightCore) throw new TypeError('PLAYWRIGHT_CORE must name the playwright-core index.mjs')
 const pageUrl = 'http://127.0.0.1:' + port + '/scripts/browser/engine-render.html?phase=10&tier=1024&timed=1'
@@ -44,7 +46,12 @@ const kill = (child) => {
 const original = git(['rev-parse', '--abbrev-ref', 'HEAD'])
 if (original === 'HEAD') throw new Error('the shared checkout is detached; check out a branch before the bisect')
 const restore = () => {
-  try { git(['checkout', '--quiet', original]) } catch (error) { console.error('could not restore ' + original + ': ' + error.message) }
+  try {
+    git(['checkout', 'HEAD', '--', SCENE_FILE])
+    git(['checkout', '--quiet', original])
+  } catch (error) {
+    console.error('could not restore ' + original + ': ' + error.message)
+  }
 }
 const stopAll = () => {
   live.splice(0).forEach((child) => kill(child))
@@ -58,7 +65,9 @@ for (const signal of ['SIGINT', 'SIGTERM']) {
 }
 
 const build = (sha) => {
+  git(['checkout', 'HEAD', '--', SCENE_FILE])
   git(['checkout', '--detach', '--quiet', sha])
+  if (scene) git(['checkout', scene, '--', SCENE_FILE])
   const run = spawnSync('bash', [join(root, 'engine', 'build.sh')], { cwd: root, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, env: { ...process.env, ENGINE_VARIANT: 'timed', ENGINE_TIER_MIB: '128' } })
   if (run.status !== 0) return { error: 'engine build exit ' + run.status, tail: (run.stderr + run.stdout).slice(-800) }
   return { wasmSha256: run.stdout.trim().split('\n').pop().split(/\s+/)[0] }
@@ -116,7 +125,7 @@ try {
         ? { wasmSha256: built.wasmSha256, error: run.error }
         : { wasmSha256: built.wasmSha256, tier: run.result.tier, checksum: run.result.checksum, visible: run.result.visible, ok: run.result.ok, errors: run.result.errors, backend: run.result.backend, frameTimeMedianMs: run.result.frameTimeMedianMs, frameTimeP99Ms: run.result.frameTimeP99Ms, result: run.result }
     }
-    const row = Object.assign({ sha, short, label }, record)
+    const row = Object.assign({ sha, short, label, scene: scene || null }, record)
     records.push(row)
     writeFileSync(join(outDir, short + '.json'), JSON.stringify(row, null, 1))
     const shown = row.error ? 'ERROR ' + row.error : 'checksum=' + row.checksum + ' visible=' + JSON.stringify(row.visible) + ' ok=' + row.ok + ' backend=' + row.backend
