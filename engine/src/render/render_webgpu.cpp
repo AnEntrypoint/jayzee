@@ -553,12 +553,12 @@ int frame(const SceneView& scene, const FramePlan& plan, const Camera& camera) {
   if (!ready) return engine::kNotConfigured;
 
   writeBuffer(cameraBuf, 0, &camera, kCameraBytes);
-  writeBuffer(bodyBuf, 0, plan.bodyRecords, kBodyBytes);
+  writeBuffer(bodyBuf, 0, plan.bodyRecords, static_cast<std::uint64_t>(scene.bodyCount) * kRecordBytes);
   static const std::uint32_t zeroCounters[4] = {0, 0, 0, 0};
   writeBuffer(counterBuf, 0, zeroCounters, sizeof zeroCounters);
   const std::uint32_t terrainArgs[4] = {kPageVertices, plan.pageCount, 0, 0};
   writeBuffer(argsBuf, kArgsTerrainWord * 4, terrainArgs, sizeof terrainArgs);
-  const std::uint32_t groups = (kBodySlots + kCullGroupSize - 1) / kCullGroupSize;
+  const std::uint32_t groups = (scene.bodyCount + kCullGroupSize - 1) / kCullGroupSize;
   const std::uint32_t dispatchArgs[3] = {groups, 1, 1};
   writeBuffer(argsBuf, kArgsDispatchWord * 4, dispatchArgs, sizeof dispatchArgs);
   writeBuffer(lightBuf, 0, scene.lights, kLightBytes);
