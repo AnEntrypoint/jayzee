@@ -1508,3 +1508,44 @@ Candidate causes. Each line names the file, the commit and the witness it needs.
 Controls, not candidates: 42b902f, 858d271, e7418fc, f913ac3 and 378c109 change only docs, the stall probe and the thread sampler. Their rows should match f2b5c23 if the harness is deterministic.
 
 The gate: `scripts/check-render-1024-visible.mjs` fails when a 1024-tier witness has all-zero visible counts. Its pure gates run in npm test as `check:render-1024-visible`. Its file mode reads bisect rows, for example `node scripts/check-render-1024-visible.mjs build/diag/render-bisect/<sha>.json`.
+
+## Phase B: 1024-tier render regression, bisect and fix
+
+Run 2026-11-09 (UTC). Bisect: `node scripts/bisect-render-1024.mjs f2b5c23 dbc869b`, with the parent of f2b5c23 as control. The witness is `engine-render.html?phase=10&tier=1024&timed=1`, run through `scripts/browser/chromium-webgpu.sh` and Playwright `connectOverCDP` on DISPLAY :1, not through the project playwriter browser, which has no `navigator.gpu`. Rows are in `build/diag/render-bisect/<sha>.json` and `summary.json`. Every row has `ok` true, no errors and backend `webgpu`.
+
+| Commit | Subject | Checksum | Visible |
+|---|---|---|---|
+| 15fcb7a (control) | PENDING_VALIDATION: gravity wake cause and the Phase A changes | -3826851758512048142 | [729,746,747,750] |
+| f2b5c23 | Sleep only under 0.5 m/s and keep the sleep timer running, skip inactive bodies in radial gravity, wake live bodies on planet reconfigure, spawn the render scene on the surface on a 1.2 m grid, and rewrite the sleep gate | 8711882901550134279 | [0,0,0,0] |
+| 42b902f | PENDING_VALIDATION: gravity wake round 2 pass, Phase A changes and the ranked remaining work | 8711882901550134279 | [0,0,0,0] |
+| 858d271 | Stall probe reads the renderer that ran inside the window and interpolates its CPU between samples | 8711882901550134279 | [0,0,0,0] |
+| e7418fc | Stall classification for round 2 G1: per-stall rows, categories and the Phase B witnesses | 8711882901550134279 | [0,0,0,0] |
+| f913ac3 | Thread sampler reads renderer threads every tick, and the wait sites and physics cost are recorded | 8711882901550134279 | [0,0,0,0] |
+| 378c109 | Withdraw the thread sampler change and record the measured row spacing | 8711882901550134279 | [0,0,0,0] |
+| dbc869b | Remove the planet sleep threshold and re-pin the engine artifacts to the rebuilt binaries | 8711882901550134279 | [0,0,0,0] |
+
+First commit where the render changes: f2b5c23.
+
+Cause. Two experiments at the same two commits separate the engine from the page. `--scene=<rev>` takes the witness page from another revision for every commit.
+- A: engine f2b5c23, page from 15fcb7a. Checksum -3826851758512048142, visible [729,746,747,750]. The sleep gate change alone changes nothing the witness reads.
+- B: engine 15fcb7a, page from f2b5c23. Checksum -369654607706150895, visible [0,0,0,0]. The page change alone gives the zero count.
+
+The cause is the witness page, `scripts/browser/engine-render-browser.js`, which f2b5c23 changed. It removed the ground box and spawned each body at `PLANET.radius + engine_planet_height + lift` on a 1.2 m grid. The camera orbits the origin at 25 m with a 500 m far plane, and the bodies sit at about 6.37e6 m, so none is in the frustum. The same page places its terrain pages at y = 0, so the frame was not planet-relative either. Under the new page, the sleep gate moves the checksum (-369654607706150895 to 8711882901550134279) but not the visible counts.
+
+dbc869b, which removes the planet sleep threshold and re-pins the engine artifacts, changes no row. The re-pinned pins are `engine-core-64mib`, `engine-core-128mib` and `engine-core-64mib-leak`. The witness loads the timed 128 MiB build, which has no pin, so the re-pin does not reach it.
+
+Fix, commit 2f831f4. `scripts/browser/engine-render-browser.js` returns to its 15fcb7a version, and the f2b5c23 sleep gate stays. Verified with `node scripts/bisect-render-1024.mjs 2f831f4 2f831f4 --out=build/diag/render-fixed`: c30d3d7, before the fix, gives 8711882901550134279 with [0,0,0,0]. 2f831f4, after the fix, gives -3826851758512048142 with [729,746,747,750] and `ok` true. The checksum is the recorded one, so nothing was re-recorded.
+
+Open. The surface spawn is withdrawn from the witness. A render frame placed relative to the planet surface, with the camera and terrain pages on the surface, would need a new witness value, recorded then with its own reason.
+
+Gate. `scripts/check-render-1024-visible.mjs` fails when a 1024-tier witness has all-zero visible counts. Its pure gates run in npm test as `check:render-1024-visible`. In file mode, `build/diag/render-bisect/f2b5c23.json`, `dbc869b.json` and `build/diag/render-fixed/c30d3d7.json` FAIL with [0,0,0,0], and `render-bisect/15fcb7a.json` and `render-fixed/2f831f4.json` PASS.
+
+This resolves the OPEN "Witness discrepancy" in "Phase B: fresh round 1 and round 2 G1 pairs, for commit 02fdbfc".
+
+Sampler gap checks. `scripts/browser/sampler-gap-check.mjs <run.json> <threads.txt.ticks>` reports the ticks, the median, p99 and max gap, and the gaps over 100 ms, over the run's sampler window. It reproduces the recorded figures for the paired-G runs:
+- `r1-G1-fix4`: PASS, 4741 ticks, median 50, p99 69, max 80 ms, 0 gaps over 100 ms.
+- `r2-G1-fix4`: FAIL, 4700 ticks, median 50, p99 75, max 157 ms, 2 gaps over 100 ms, as recorded above.
+
+These are the recorded pairs, not new runs, and they predate the page fix. A fresh G1 pair with the fixed page is still needed to witness the render under G1. None was run here.
+
+npm test: `npm test`, exit 0, PASS 4713, FAIL 0 (log `build/diag/phase-b3-npm-test.log`).
