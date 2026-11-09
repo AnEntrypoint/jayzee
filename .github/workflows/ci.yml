@@ -38,6 +38,16 @@ jobs:
           ENGINE_VARIANT=leak bash engine/build.sh
           ENGINE_VARIANT=timed bash engine/build.sh
           ENGINE_VARIANT=timed ENGINE_TIER_MIB=128 bash engine/build.sh
+      - name: Fetch JoltPhysics at the pinned commit
+        run: |
+          set -euo pipefail
+          if [ ! -d build/jolt/.git ]; then git clone --depth 1 --branch v5.3.0 https://github.com/jrouwe/JoltPhysics.git build/jolt; fi
+          test "$(git -C build/jolt rev-parse HEAD)" = 0373ec0dd762e4bc2f6acdb08371ee84fa23c6db
+      - name: Build the Jolt host library the native witness links
+        run: |
+          set -euo pipefail
+          cmake -S build/jolt/Build -B build/host-jolt -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCROSS_PLATFORM_DETERMINISTIC=ON -DENABLE_OBJECT_STREAM=OFF -DINTERPROCEDURAL_OPTIMIZATION=OFF -DENABLE_ALL_WARNINGS=OFF -DTARGET_UNIT_TESTS=OFF -DTARGET_HELLO_WORLD=OFF -DTARGET_PERFORMANCE_TEST=OFF -DTARGET_SAMPLES=OFF -DTARGET_VIEWER=OFF
+          cmake --build build/host-jolt --target Jolt --parallel
       - run: npm ci
       - run: npm test
       - run: npm run bench -- 500 120

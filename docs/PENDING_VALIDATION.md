@@ -2135,6 +2135,14 @@ An earlier snapshot pair (frames=660, no hold, taken at the warm mark and at don
 - Items 1 and 2 of the Phase A list (CI and warm-up) are in commit 953dc2b. The CI conclusion for the push is not recorded in this file; it is read from GitHub after the push.
 - The W2 gate covers `World` only. The other W2 rows (G2, JF5, JF6, JF7, JM12, JM13) still need their own runs.
 
-### Push
+### Push of the reuse pass (efbd45d..9b3d726)
 
-Not pushed. `git push origin main` failed twice with `Could not resolve host: github.com`, once directly and once after a 30 s wait, as the instruction allows. A `getent hosts github.com` check made after the second attempt resolved to 20.87.245.0, so the failure may be transient or specific to the git process. No third attempt was made. Six commits are waiting locally: 77149a5, 23932db, f1a70fa, 93ecdaa, 953dc2b and 353d554. The CI run for the push, and its `test (24)` conclusion, cannot be read until the push succeeds.
+The earlier DNS failure is gone. `git push origin main` ran once as lanmower with no trailer, and was a fast-forward: `efbd45d..9b3d726  main -> main`. HEAD was 9b3d726 and the tree was clean before the push.
+
+CI for 9b3d726, read from GitHub:
+
+- `ci` run 42703177582: failure. `test (22)` failed in `Run npm test` at `check:engine-host-witness` (`bash engine/test/build_host.sh`) with `fatal error: Jolt/Jolt.h: No such file or directory`. Cause: CI never configured the Jolt library that the native host witness includes and links (`build/jolt`, the JoltPhysics v5.3.0 source at 0373ec0d, and `build/host-jolt/libJolt.a`). Both are git-ignored and were built only on the development machine, so a fresh checkout has neither. `test (24)` ended `cancelled` because fail-fast stopped it after `test (22)` failed, so its own result is not known from this run.
+- `engine-core` run 42703175156: success.
+- `pages build and deployment` run 42703171583: success.
+
+Fix, in `.github/workflows/ci.yml` (test job, before `npm ci`): a step clones JoltPhysics at tag v5.3.0 and checks that HEAD is 0373ec0dd762e4bc2f6acdb08371ee84fa23c6db, which is the pin in `engine/CMakeLists.txt`. A second step configures `build/jolt/Build` into `build/host-jolt` with the options the local library was built with (`CROSS_PLATFORM_DETERMINISTIC=ON`, `RelWithDebInfo`, `ENABLE_OBJECT_STREAM=OFF`, `INTERPROCEDURAL_OPTIMIZATION=OFF`, the `TARGET_*` targets off) and builds the `Jolt` target. `ENABLE_ALL_WARNINGS=OFF` is set so that a newer or older GCC cannot fail the build on a warning. Witness before the push: the same configure and build into `build/host-jolt-ci` exited 0 and produced `libJolt.a`, and `engine/test/build_host.sh` linked against it with `RESULT: PASS` and no FAIL lines (`build/diag/bh-ci.log`).
