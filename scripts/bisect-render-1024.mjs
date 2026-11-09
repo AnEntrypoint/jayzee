@@ -6,13 +6,13 @@ import { fileURLToPath } from 'node:url'
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)))
 const args = process.argv.slice(2)
 const [from, to] = args.filter((arg) => !arg.startsWith('--'))
-if (!from || !to) throw new TypeError('usage: node scripts/bisect-render-1024.mjs <from> <to> [--port=8766] [--debug-port=9766] [--profile=DIR] [--out=DIR]')
+if (!from || !to) throw new TypeError('usage: node scripts/bisect-render-1024.mjs <from> <to> [--port=8790] [--debug-port=9790] [--profile=DIR] [--out=DIR]')
 const flag = (name, fallback) => {
   const hit = args.find((arg) => arg.startsWith('--' + name + '='))
   return hit ? hit.slice(name.length + 3) : fallback
 }
-const port = Number(flag('port', '8766'))
-const debugPort = Number(flag('debug-port', '9766'))
+const port = Number(flag('port', '8790'))
+const debugPort = Number(flag('debug-port', '9790'))
 const profile = flag('profile', join(root, '.playwriter', 'browser-profile'))
 const outDir = flag('out', join(root, 'build', 'diag', 'render-bisect'))
 const playwrightCore = process.env.PLAYWRIGHT_CORE
@@ -68,8 +68,8 @@ const witness = async () => {
   const server = spawn(process.execPath, [join(root, 'scripts', 'browser', 'serve-root.mjs'), String(port)], { cwd: root, stdio: 'ignore' })
   live.push(server)
   try {
-    const served = await poll(async () => (await fetch('http://127.0.0.1:' + port + '/scripts/browser/engine-render.html')).ok, 60, 200)
-    if (!served) return { error: 'static server did not answer on port ' + port }
+    const served = await poll(async () => server.exitCode === null && (await fetch('http://127.0.0.1:' + port + '/scripts/browser/engine-render.html')).status === 200, 60, 200)
+    if (!served) return { error: 'the bisect static server did not answer 200 on port ' + port + ' (is another process using it?)' }
     const chrome = spawn(join(root, 'scripts', 'browser', 'chromium-webgpu.sh'), ['--user-data-dir=' + profile, '--remote-debugging-port=' + debugPort, '--no-first-run', '--no-default-browser-check', '--no-sandbox'], { env: { ...process.env, DISPLAY: process.env.DISPLAY || ':1', WEBGPU_PROJECT_ROOT: root, WEBGPU_CHROMIUM: '/usr/lib/chromium/chromium.real' }, stdio: ['ignore', 'ignore', 'pipe'], detached: true })
     live.push(chrome)
     try {
