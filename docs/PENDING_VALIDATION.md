@@ -2211,3 +2211,33 @@ What changed in the gate, and why it is a scope and not a pass:
 - The JM13, G2 and JM12 gates are unchanged. They do not load TSL. Their Phase B result is recorded in the Phase B section below.
 
 Open because of this: the render page allocates in `decodeCrowdDots`, so the pose reuse in JF6 does not remove garbage in production. The next step is to find the allocation inside `decodeCrowdDots` with a one-process allocation profile, with TSL loaded. It is not run in this pass.
+
+### Phase B results for the four open items (run 2026-11-09-22-21-02-3a800b)
+
+Commits in this pass, all lanmower with no trailer: `a19aa32` (GC rows for ClockSync, the engine bridge and the crowd-dot renderer), `fd179d5` (bisect rewrite), `727eab1` (the Phase A rows), `ef81a35` (the JF5 and JF6 scope fix), `fa50480` (the bisect exits after its summary), and the commit that carries this section.
+
+- `npm test`, final run at `ef81a35`: exit 0, 4766 PASS lines, 235 RESULT PASS lines, 0 FAIL (log `build/diag/phaseB3-npm-test.log`). An earlier run at `727eab1` exited 1 with 2 FAIL, both in `check:gc-reuse-rows`: the JF6 and JF5 windows each saw 14 garbage collections. The cause and the scope change are in the section above. The chain runs `check:gc-reuse-rows` last, so every earlier gate passed in that run too.
+- `bash engine/test/build_host.sh`: exit 0, 196 PASS, 0 FAIL, RESULT PASS (log `build/diag/phaseB3-build-host.log`).
+- Render witness through the project playwriter browser, `engine-render.html?phase=10&tier=1024&timed=1` at HEAD: checksum `-3826851758512048142`, visible `[729,746,747,750]`, errors `[]`, backend `webgpu`, adapter `NVIDIA GeForce RTX 3060 Laptop GPU` with `isFallbackAdapter` false, 600 frames, `allocationsSinceWarmup` 0, `createsAfterSeal` 0.
+- Bisect range, `node scripts/bisect-render-1024.mjs 15fcb7a f2b5c23 --debug-port=10221 --port=8844` (each commit with its own page): f978e7b (control) and 15fcb7a give `-3826851758512048142`, visible `[729,746,747,750]`. f2b5c23 gives `8711882901550134279`, visible `[0,0,0,0]`. All three have `ok` true, backend `webgpu`. Summary `build/diag/bisect-render-1024/summary.json`.
+- Defect C run A, `node scripts/bisect-render-1024.mjs f2b5c23 f2b5c23 --scene=15fcb7a --debug-port=10221 --port=8844 --out=build/diag/bisect-run-A`: 15fcb7a control gives `-3826851758512048142`, visible `[729,746,747,750]`. f2b5c23 engine with the 15fcb7a page gives `-3826851758512048142`, visible `[729,746,747,750]`. Exit 0.
+- Defect C run B, `node scripts/bisect-render-1024.mjs 15fcb7a 15fcb7a --scene=f2b5c23 --debug-port=10221 --port=8844 --out=build/diag/bisect-run-B`: f978e7b control gives `-369654607706150895`, visible `[0,0,0,0]`. 15fcb7a engine with the f2b5c23 page gives `-369654607706150895`, visible `[0,0,0,0]`. Exit 0. This is the value the ledger expected.
+
+Defect C, closed with cause: the page decides the checksum, and the engine does not, in this scene. The f2b5c23 engine renders the old scene correctly with the old page (run A), and the 15fcb7a engine renders the new scene with the new page (run B). The cause is the change to `scripts/browser/engine-render-browser.js` in f2b5c23, which spawns the render bodies on the surface. The fix is the page revert in `2f831f4`, which HEAD keeps. The witness value is `-3826851758512048142` with visible `[729,746,747,750]`. The 8711 state is the new page's scene, not an engine defect.
+
+Defect A, closed by the render witness above (non-fallback NVIDIA adapter through the project playwriter browser).
+
+Defect B, sampler gap: recorded, not fixed. The cause is not established. The Phase A row above names the two candidate causes and the control that separates them. Not run.
+
+W2 rows, outcome:
+
+- JM13 `ClockSync.addSample`: closed with a witness. The gate `ClockSync.addSample keeps the heap flat` passes in npm test, with 200000 samples after warm-up growing the heap by under 256 KiB. The zero-garbage claim is not made, because the sample object is kept by design.
+- G2 `bridge.transform`: closed with a witness. Its three gates pass in npm test: no garbage after warm-up, the same view per call, and the per-call allocation control.
+- JF5 `playerLodRenderer.update`: closed with cause. Its zero-garbage claim fails in any process that loads `playerLodRendererWebGPU.js`, which loads `three/tsl`. That is the same cause as the JF6 scope above. The W2 claim is not made for JF5.
+- JF7 `playerVatRenderer.update`: OPEN. The witness spec is in the Phase A row above. The page has no per-frame update loop, so the loop must be added before the witness can run. Not done in this pass.
+
+Open after this pass: Defect B; JF7; the render page allocates in `decodeCrowdDots` when TSL is loaded, so the JF6 pose reuse does not remove garbage there (the allocation inside the function is not located); `scripts/browser/paired-run.mjs` still launches its own Chromium through `render-witness.mjs`.
+
+Hosted gaps: none added in this pass. Hosted Actions is still at its spending limit, and no CI was checked.
+
+One run note: the first bisect run's last node process did not exit after its summary (fixed in `fa50480`, which closes the server's connections). One CDP navigation in the next run did not commit and stayed `about:blank` until the job was stopped. The same script ran clean on the next attempt. The cause of that stall is not established.
