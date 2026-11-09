@@ -68,25 +68,30 @@ export function probeStalls(result, samples, threadRows) {
   const columns = result.rowColumns
   const tickAt = columns.indexOf('tickMs')
   const frameAt = columns.indexOf('frame')
+  const activeAt = columns.indexOf('active')
   const rowOf = new Map(result.rows.map((row) => [row[frameAt], row]))
+  const activeOf = (frame) => (activeAt < 0 ? null : rowOf.get(frame)[activeAt])
   const stalls = attribution.stalls.map((stall) => {
     const endMs = stall.startMs + stall.totalMs
     const cpuMs = cpuMsBetween(series, stall.startMs, endMs)
     const someMs = pressureMsBetween(samples, 'someUs', stall.startMs, endMs)
     const tickMs = rowOf.get(stall.frame)[tickAt]
     const verdict = cpuMs === null || someMs === null ? 'uncovered' : classifyStall({ totalMs: stall.totalMs, cpuMs, someMs })
-    return { frame: stall.frame, startMs: stall.startMs, totalMs: stall.totalMs, excessMs: stall.excessMs, tickMs, cpuMs, someMs, fullMs: stall.starvedMs, verdict }
+    return { frame: stall.frame, startMs: stall.startMs, totalMs: stall.totalMs, excessMs: stall.excessMs, tickMs, cpuMs, someMs, fullMs: stall.starvedMs, active: activeOf(stall.frame), verdict }
   })
   const counts = {}
   for (const stall of stalls) counts[stall.verdict] = (counts[stall.verdict] ?? 0) + 1
   const stallIds = new Set(stalls.map((stall) => stall.frame))
   const normalTick = frames.filter((f) => !stallIds.has(f.frame)).map((f) => rowOf.get(f.frame)[tickAt])
+  const activeCounts = activeAt < 0 ? [] : frames.map((f) => activeOf(f.frame))
   return {
     baseMs: attribution.medianMs,
     stallCount: stalls.length,
     counts,
     stallTickMedianMs: stalls.length ? median(stalls.map((s) => s.tickMs)) : null,
     normalTickMedianMs: normalTick.length ? median(normalTick) : null,
+    activeMin: activeCounts.length ? Math.min(...activeCounts) : null,
+    activeMax: activeCounts.length ? Math.max(...activeCounts) : null,
     stalls,
   }
 }

@@ -57,4 +57,21 @@ gate('probeStalls labels three synthetic stalls cpu-bound, starved and blocked, 
   assert.equal(report.normalTickMedianMs, 30)
 })
 
+gate('probeStalls gives the active-body range over the frames and the active count of each stall, and null without an active column', () => {
+  const samples = []
+  for (let t = 0; t <= 2000; t += 10) samples.push(t + ' 0 0 0 0')
+  const threads = ['100 100 renderer 100 0 Chrome', '200 100 renderer 100 10 Chrome', '1500 100 renderer 100 10 Chrome', '1600 100 renderer 100 10 Chrome']
+  const throttle = parseThrottleLog(samples.join('\n') + '\n')
+  const rows = parseThreadLog(threads.join('\n') + '\n')
+  const withActive = { rowColumns: ['frame', 'startMs', 'tickMs', 'renderMs', 'active'], rows: [[0, 100, 30, 10, 10240], [1, 140, 30, 10, 10240], [2, 1500, 90, 10, 0], [3, 1600, 30, 10, 0]] }
+  const report = probeStalls(withActive, throttle, rows)
+  assert.equal(report.activeMin, 0)
+  assert.equal(report.activeMax, 10240)
+  assert.deepEqual(report.stalls.map((s) => [s.frame, s.active]), [[2, 0]])
+  const without = { rowColumns: ['frame', 'startMs', 'tickMs', 'renderMs'], rows: [[0, 100, 30, 10], [1, 140, 30, 10]] }
+  const plain = probeStalls(without, throttle, rows)
+  assert.equal(plain.activeMin, null)
+  assert.equal(plain.activeMax, null)
+})
+
 finish()
