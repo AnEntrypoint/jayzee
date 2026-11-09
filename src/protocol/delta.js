@@ -23,10 +23,14 @@ const checkState = (state) => {
   }
 }
 
+const changedScratch = []
+const noBase = () => null
+
 export const encodeDelta = (state, base = null) => {
   checkState(state)
   const usable = base !== null && base.count === state.count && base.tick < state.tick
-  const changed = []
+  const changed = changedScratch
+  changed.length = 0
   for (let body = 0; body < state.count; body++) {
     if (!usable || bodyChanged(state, base, body)) changed.push(body)
   }
@@ -37,18 +41,19 @@ export const encodeDelta = (state, base = null) => {
   view.setUint32(6, usable ? base.tick : 0, true)
   view.setUint16(10, state.count, true)
   view.setUint16(12, changed.length, true)
-  changed.forEach((body, n) => {
+  for (let n = 0; n < changed.length; n++) {
+    const body = changed[n]
     const at = HEADER_BYTES + n * RECORD_BYTES
     view.setUint16(at, body, true)
     for (let k = 0; k < 3; k++) {
       view.setFloat64(at + 2 + k * WORD_BYTES, state.positions[body * 3 + k], true)
       view.setFloat64(at + 2 + (3 + k) * WORD_BYTES, state.velocities[body * 3 + k], true)
     }
-  })
+  }
   return view.buffer
 }
 
-export const decodeDelta = (buffer, lookup = () => null) => {
+export const decodeDelta = (buffer, lookup = noBase) => {
   if (!(buffer instanceof ArrayBuffer)) throw new TypeError('delta must be an ArrayBuffer')
   if (buffer.byteLength < HEADER_BYTES) throw new RangeError('delta is truncated')
   const view = new DataView(buffer)

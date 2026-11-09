@@ -28,6 +28,7 @@ export function createCollisionTileStreamer({
 }) {
   if (typeof now !== 'function') throw new TypeError('createCollisionTileStreamer needs options.now as a function returning milliseconds')
   const clients = new Map()
+  const liveIds = new Set()
   const stats = { tilesSent: 0, bytesSent: 0 }
   let index = null, lastSweepAt = 0
 
@@ -78,8 +79,9 @@ export function createCollisionTileStreamer({
       streamTo(player, c, nowMs)
     }
     if (clients.size > players.length) {
-      const live = new Set(players.map((p) => p.id))
-      for (const id of clients.keys()) if (!live.has(id)) clients.delete(id)
+      liveIds.clear()
+      for (const player of players) liveIds.add(player.id)
+      for (const id of clients.keys()) if (!liveIds.has(id)) clients.delete(id)
     }
   }
 

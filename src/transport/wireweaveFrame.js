@@ -17,27 +17,29 @@ const toUint8 = (payload) => {
   throw new Error('frame: payload must be an ArrayBuffer or a TypedArray')
 }
 
-export const encodeHeader = ({ messageId, fragmentIndex, fragmentCount, totalPayloadLength }) => {
-  const buf = new ArrayBuffer(HEADER_BYTES)
-  const dv = new DataView(buf)
+const writeHeader = (dv, messageId, fragmentIndex, fragmentCount, totalPayloadLength) => {
   dv.setUint8(0, MAGIC)
   dv.setUint16(1, messageId, true)
   dv.setUint16(3, fragmentIndex, true)
   dv.setUint16(5, fragmentCount, true)
   dv.setUint32(7, totalPayloadLength, true)
+}
+
+export const encodeHeader = ({ messageId, fragmentIndex, fragmentCount, totalPayloadLength }) => {
+  const buf = new ArrayBuffer(HEADER_BYTES)
+  writeHeader(new DataView(buf), messageId, fragmentIndex, fragmentCount, totalPayloadLength)
   return buf
 }
 
 export const decodeHeader = (bytes) => {
   const u8 = toUint8(bytes)
   if (u8.byteLength < HEADER_BYTES) return null
-  const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength)
-  if (dv.getUint8(0) !== MAGIC) return null
+  if (u8[0] !== MAGIC) return null
   return {
-    messageId: dv.getUint16(1, true),
-    fragmentIndex: dv.getUint16(3, true),
-    fragmentCount: dv.getUint16(5, true),
-    totalPayloadLength: dv.getUint32(7, true),
+    messageId: u8[1] | (u8[2] << 8),
+    fragmentIndex: u8[3] | (u8[4] << 8),
+    fragmentCount: u8[5] | (u8[6] << 8),
+    totalPayloadLength: (u8[7] | (u8[8] << 8) | (u8[9] << 16)) + u8[10] * 0x1000000,
   }
 }
 
@@ -58,9 +60,7 @@ export const fragment = (payload, { messageId, mtu = MTU_DEFAULT }) => {
     const end = Math.min(start + perFragment, totalPayloadLength)
     const slice = u8.subarray(start, end)
     const frameBuf = new ArrayBuffer(HEADER_BYTES + slice.byteLength)
-    new Uint8Array(frameBuf, 0, HEADER_BYTES).set(new Uint8Array(encodeHeader({
-      messageId, fragmentIndex: i, fragmentCount, totalPayloadLength
-    })))
+    writeHeader(new DataView(frameBuf), messageId, i, fragmentCount, totalPayloadLength)
     new Uint8Array(frameBuf, HEADER_BYTES).set(slice)
     out[i] = frameBuf
   }

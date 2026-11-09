@@ -60,9 +60,20 @@ const writeKinematics = (bytes, position, velocity, rotationWord) => {
   writeUint32(bytes, ROTATION_AT, quatWord(rotationWord))
 }
 
-const readPosition = (bytes) => POSITION_AT.map((at) => readInt32(bytes, at) / WIRE_UNITS_PER_METER)
+const readPositionInto = (bytes, out) => {
+  for (let axis = 0; axis < 3; axis++) out[axis] = readInt32(bytes, POSITION_AT[axis]) / WIRE_UNITS_PER_METER
+  return out
+}
 
-const readVelocity = (bytes) => VELOCITY_AT.map((at) => readInt16(bytes, at) / WIRE_UNITS_PER_METER)
+const readVelocityInto = (bytes, out) => {
+  for (let axis = 0; axis < 3; axis++) out[axis] = readInt16(bytes, VELOCITY_AT[axis]) / WIRE_UNITS_PER_METER
+  return out
+}
+
+const readScaleInto = (bytes, out) => {
+  for (let axis = 0; axis < 3; axis++) out[axis] = readUint16(bytes, SCALE_AT[axis]) / WIRE_UNITS_PER_METER
+  return out
+}
 
 export const encodePlayerRecord = ({ position, rotationWord, velocity }, into = new Uint8Array(PLAYER_RECORD_BYTES)) => {
   const bytes = recordBytesOf(into, PLAYER_RECORD_BYTES)
@@ -70,14 +81,15 @@ export const encodePlayerRecord = ({ position, rotationWord, velocity }, into = 
   return bytes
 }
 
-export const decodePlayerRecord = (input) => {
+export const decodePlayerRecordInto = (input, out) => {
   const bytes = recordBytesOf(input, PLAYER_RECORD_BYTES)
-  return {
-    position: readPosition(bytes),
-    rotationWord: readUint32(bytes, ROTATION_AT),
-    velocity: readVelocity(bytes)
-  }
+  readPositionInto(bytes, out.position)
+  out.rotationWord = readUint32(bytes, ROTATION_AT)
+  readVelocityInto(bytes, out.velocity)
+  return out
 }
+
+export const decodePlayerRecord = (input) => decodePlayerRecordInto(input, { position: [0, 0, 0], rotationWord: 0, velocity: [0, 0, 0] })
 
 export const encodeEntityRecord = ({ position, rotationWord, velocity, scale, flags }, into = new Uint8Array(ENTITY_RECORD_BYTES)) => {
   const bytes = recordBytesOf(into, ENTITY_RECORD_BYTES)
@@ -91,16 +103,17 @@ export const encodeEntityRecord = ({ position, rotationWord, velocity, scale, fl
   return bytes
 }
 
-export const decodeEntityRecord = (input) => {
+export const decodeEntityRecordInto = (input, out) => {
   const bytes = recordBytesOf(input, ENTITY_RECORD_BYTES)
-  return {
-    position: readPosition(bytes),
-    rotationWord: readUint32(bytes, ROTATION_AT),
-    velocity: readVelocity(bytes),
-    scale: SCALE_AT.map((at) => readUint16(bytes, at) / WIRE_UNITS_PER_METER),
-    flags: bytes[FLAGS_AT]
-  }
+  readPositionInto(bytes, out.position)
+  out.rotationWord = readUint32(bytes, ROTATION_AT)
+  readVelocityInto(bytes, out.velocity)
+  readScaleInto(bytes, out.scale)
+  out.flags = bytes[FLAGS_AT]
+  return out
 }
+
+export const decodeEntityRecord = (input) => decodeEntityRecordInto(input, { position: [0, 0, 0], rotationWord: 0, velocity: [0, 0, 0], scale: [0, 0, 0], flags: 0 })
 
 const quantizeSmallestThreeField = (value) => {
   const level = Math.round((value + Math.SQRT1_2) * SMALLEST_THREE_STEPS_PER_UNIT)

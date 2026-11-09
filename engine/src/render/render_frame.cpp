@@ -147,6 +147,18 @@ void resetPlan(FramePlan& plan) {
   for (std::uint32_t c = 0; c < kPropClasses; ++c) plan.propCount[c] = 0;
 }
 
+std::uint32_t uploadRunEnd(const FramePlan& plan, std::uint32_t start) {
+  std::uint32_t end = start + 1;
+  while (end < plan.uploadCount && plan.uploadSlot[end] == plan.uploadSlot[end - 1] + 1 && plan.uploadLayer[end] == plan.uploadLayer[end - 1] + 1) end += 1;
+  return end;
+}
+
+std::uint32_t albedoRunEnd(const FramePlan& plan, std::uint32_t start) {
+  std::uint32_t end = start + 1;
+  while (end < kAlbedoLayers && plan.albedoPending[end] != 0) end += 1;
+  return end;
+}
+
 void resolveMaterials(const MaterialSlot* table, std::uint32_t count, const std::uint8_t* albedoReady, std::int32_t (*albedoLayerOf)(double handle), std::uint32_t* words) {
   const MaterialSlot fallback = defaultMaterial();
   for (std::uint32_t m = 0; m < kMaterialSlots; ++m) {

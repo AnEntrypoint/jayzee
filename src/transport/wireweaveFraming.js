@@ -9,12 +9,15 @@ export const toArrayBuffer = (data) => {
   throw new TypeError(`[wireweave] payload must be an ArrayBuffer or a view of bytes, got ${Object.prototype.toString.call(data).slice(8, -1)}`)
 }
 
-export const beginsWithBatchPrefix = (buffer) => buffer.byteLength > 0 && new Uint8Array(buffer)[0] === WIRE_BATCH_PREFIX
+const bytesBeginWithBatchPrefix = (bytes) => bytes.byteLength > 0 && bytes[0] === WIRE_BATCH_PREFIX
+
+export const beginsWithBatchPrefix = (buffer) => bytesBeginWithBatchPrefix(new Uint8Array(buffer))
 
 export const isLargeWirePayload = (buffer) => buffer.byteLength >= WIRE_BATCH_THRESHOLD
 
 export const encodeBatch = (items) => {
-  const totalLength = items.reduce((sum, item) => sum + LENGTH_BYTES + item.byteLength, 0)
+  let totalLength = 0
+  for (const item of items) totalLength += LENGTH_BYTES + item.byteLength
   const frame = new Uint8Array(1 + totalLength)
   const view = new DataView(frame.buffer)
   frame[0] = WIRE_BATCH_PREFIX
@@ -29,12 +32,11 @@ export const encodeBatch = (items) => {
 }
 
 export const decodeBatch = (bytes) => {
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
   const items = []
   let offset = 0
   while (offset < bytes.byteLength) {
     if (offset + LENGTH_BYTES > bytes.byteLength) return null
-    const length = view.getUint32(offset)
+    const length = ((bytes[offset] << 24) | (bytes[offset + 1] << 16) | (bytes[offset + 2] << 8) | bytes[offset + 3]) >>> 0
     offset += LENGTH_BYTES
     if (offset + length > bytes.byteLength) return null
     items.push(bytes.subarray(offset, offset + length))
@@ -51,7 +53,8 @@ export const frameForQueue = (items) => {
 }
 
 export const decodeWireFrame = (buffer) => {
-  if (!beginsWithBatchPrefix(buffer)) return [buffer]
-  const items = decodeBatch(new Uint8Array(buffer, 1))
+  const bytes = new Uint8Array(buffer)
+  if (!bytesBeginWithBatchPrefix(bytes)) return [buffer]
+  const items = decodeBatch(bytes.subarray(1))
   return items === null ? [buffer] : items
 }

@@ -9,25 +9,41 @@ const CROWD_SCALE_PER_ROOT = 0.35
 export const crowdDotScale = (count, dotSize = CROWD_DOT_SIZE) =>
   dotSize * Math.min(CROWD_SCALE_CAP, CROWD_SCALE_BASE + Math.sqrt(count) * CROWD_SCALE_PER_ROOT)
 
-const bucketPose = (record, cellM, dotSize, viewerY, groundHeightFn) => {
+const writeBucketPose = (pose, record, cellM, dotSize, viewerY, groundHeightFn) => {
   const x = (record[0] + 0.5) * cellM
   const z = (record[1] + 0.5) * cellM
   const y = groundHeightFn ? groundHeightFn(x, z) : viewerY
-  return { x, y: y + CROWD_DOT_LIFT, z, scale: crowdDotScale(record[2], dotSize) }
+  pose.x = x
+  pose.y = y + CROWD_DOT_LIFT
+  pose.z = z
+  pose.scale = crowdDotScale(record[2], dotSize)
+  return pose
 }
 
-const flatPose = (record, dotSize, groundHeightFn) => {
+const writeFlatPose = (pose, record, dotSize, groundHeightFn) => {
   const y = groundHeightFn ? groundHeightFn(record.x, record.z) : record.y
-  return { x: record.x, y: y + CROWD_DOT_LIFT, z: record.z, scale: dotSize }
+  pose.x = record.x
+  pose.y = y + CROWD_DOT_LIFT
+  pose.z = record.z
+  pose.scale = dotSize
+  return pose
 }
 
-export const decodeCrowdDots = (dots, options = {}) => {
-  if (!dots || dots.length === 0) return []
+export const decodeCrowdDots = (dots, options = {}, out = []) => {
+  if (!dots || dots.length === 0) {
+    out.length = 0
+    return out
+  }
+  const count = dots.length
+  out.length = count
   const cellM = options.dotCellM || CROWD_DOT_CELL_M
   const dotSize = options.dotSize || CROWD_DOT_SIZE
   const { viewerY, groundHeightFn } = options
   const buckets = Array.isArray(dots[0])
-  return dots.map((record) => (buckets
-    ? bucketPose(record, cellM, dotSize, viewerY, groundHeightFn)
-    : flatPose(record, dotSize, groundHeightFn)))
+  for (let i = 0; i < count; i++) {
+    const pose = out[i] || (out[i] = { x: 0, y: 0, z: 0, scale: 0 })
+    if (buckets) writeBucketPose(pose, dots[i], cellM, dotSize, viewerY, groundHeightFn)
+    else writeFlatPose(pose, dots[i], dotSize, groundHeightFn)
+  }
+  return out
 }

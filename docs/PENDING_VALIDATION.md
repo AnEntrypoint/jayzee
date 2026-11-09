@@ -1652,7 +1652,7 @@ Decision (step 3). Pinned has over-limit gaps in one of its five valid runs, so 
 - 600 frames, `errors` empty, `ok` true, `bodies` 10240, `allocationsSinceWarmup` "0", `apiCallsPerFrame` 29.
 - frame time: p99 48.5 ms, median 42.6 ms, max 50 ms.
 
-These values match the Phase B witness (`-3826851758512048142`, visible `[729,746,747,750]`). The `8711882901550134279` checksum with visible `[0,0,0,0]` recorded above for `paired-E`, `paired-F` and the fresh `paired-G` pairs is consistent with the replaced witness scene. The commit messages say `f2b5c23` replaced that scene and `2f831f4` restored it, and the current render matches the recorded value. I did not re-render the `8711` state to prove the cause, so the earlier open entry is closed by the current match, not by a measured cause. The fresh runs were made at `f16e62f`, before `2f831f4`. A fresh profile (`build/diag/witness/render-profile`) returned `thrown WebGPU returned no adapter`, because `scripts/browser/webgpu-profile.mjs` seeds the WebGPU labs only into the project profile.
+These values match the Phase B witness (`-3826851758512048142`, visible `[729,746,747,750]`). The `8711882901550134279` checksum with visible `[0,0,0,0]` recorded above for `paired-E`, `paired-F` and the fresh `paired-G` pairs is consistent with the replaced witness scene. The commit messages say `f2b5c23` replaced that scene and `2f831f4` restored it, and the current render matches the recorded value. That closure was wrong. The 8711 state was re-rendered: `build/diag/render-fixed/c30d3d7.json` (engine c30d3d7, checksum `8711882901550134279`, visible `[0,0,0,0]`) and `build/diag/render-bisect/f2b5c23.json` (checksum `8711882901550134279`, visible `[0,0,0,0]`). Runs A and B (`build/diag/render-bisect-A/`, `build/diag/render-bisect-B/`) separate the page from the engine, and `build/diag/render-fixed/2f831f4.json` gives the recorded value. Defect C stays OPEN, not closed by a value match: those result files have no command recorded in this ledger, and the witness-value decision above is not recorded. The run that settles it, with its command recorded, is run B: `node scripts/bisect-render-1024.mjs 15fcb7a 15fcb7a --scene=f2b5c23 --out=<dir>`, expected checksum `-369654607706150895` and visible `[0,0,0,0]`, with run A (`--scene=15fcb7a` at f2b5c23, expected `[729,746,747,750]`) as its control in the same session. The fresh runs were made at `f16e62f`, before `2f831f4`. A fresh profile (`build/diag/witness/render-profile`) returned `thrown WebGPU returned no adapter`, because `scripts/browser/webgpu-profile.mjs` seeds the WebGPU labs only into the project profile.
 
 4. npm test: `build/diag/phase-b3-npm-test.log`, `done exit 0`, `PASS=4741 FAIL=0`. The sample-order gate (`check:sample-order`) and the frequency gate (`check:frequency-runs`, which now includes the three `awaitLoadGate` gates) both ran and passed.
 
@@ -1834,6 +1834,144 @@ Each of these is a reuse that the table rows mark. The reason is the lifetime or
 - W7, browser heap. In the playwriter page, read the CDP heap usage over 600 frames after warm-up, with `getCDPSession({ page })` (the playwriter rule). The pass needs no per-frame growth of JS objects.
 - W8, transfer witness. After `postMessage` with a transfer, the sender's buffer is detached (`byteLength` 0), and each transferred buffer is distinct.
 
+### Phase A pass: changes made from the audit (77149a5)
+
+Status of this pass. Edits only: nothing was built, tested, gated, witnessed or pushed. Each change was checked by reading the diff, by grep of call sites, and by a read-only review (two reviewers; the C++ render review found no defect, and the JS review found no defect). The witnesses below are what Phase B must run. Witness tags:
+
+- W1 host allocation counter (native build): count `pool::allocate`, `release`, global `operator new` and `malloc` over 10000 ticks after warm-up at 64 and 1024 tiers. Gates: `check:engine-pools`, `check:engine-tiers`, `check:engine-leak`.
+- W2 Node GC witness (new gate, Phase B): run N ticks after warm-up with a `PerformanceObserver` on `gc` entries; zero minor GC entries and a bounded heap delta.
+- W3 byte or value equality with HEAD for a fixed seed. Gates: `check:msgpackr-compat`, `check:negative-zero`, `check:protocol-codecs`, `check:bin-snapshot`, `check:replay-file`, `check:transport-framing`, `check:netcode`, `check:snapshots`, `check:snapshot-packer`, `check:msgpack-packer` (see the table for the gate per row).
+- W4 checksum and visible equality: the 1024 browser witness at the current value `-3826851758512048142`, visible `[729,746,747,750]`, and the engine hash in `check:engine-world`. Gates: `check:engine-render`, `check:engine-world`, `check:world`.
+- W5 order equality (handle order, event order, tie order): `check:engine-bridge`, `check:engine-world`, `check:transport`, `check:worker-bridge`.
+- W6 retention: a result kept by a caller is unchanged after a later call. Gates: `check:netcode`, `check:prediction-engine`, `check:snapshot-processor`.
+- W7 browser heap: CDP heap usage over 600 frames after warm-up in the playwriter page (Phase B; see defect A check).
+- W8 transfer witness: after `postMessage` with a transfer, the sender's buffer is detached, and each transferred buffer is distinct. Gates: `check:worker-bridge`, `check:transport-framing`.
+- W9 query and movement equality for a seeded world (positions, velocities, raycast, overlap results bit for bit against HEAD). Gates: `check:world-query`, `check:world`, `check:movement`.
+
+Site count. 59 hot sites: 40 changed, 19 kept. The witness-only site C-T6 is kept.
+
+| Category | Changed | Kept | Sites |
+|---|---|---|---|
+| C++ per tick | 0 | 5 | C-T1 to C-T5 |
+| C++ per frame | 2 | 6 | C-F1 to C-F8 |
+| Engine glue (src/engine) | 6 | 2 | G1 to G8 |
+| JS frame loop | 7 | 0 | JF1 to JF7 |
+| JS per tick | 12 | 1 | JT1 to JT13 |
+| JS input | 2 | 3 | JI1 to JI5 |
+| JS per message | 11 | 2 | JM1 to JM13 |
+
+Changed sites. Each row gives the file and line in the working tree, what changed, and the witness it needs.
+
+| ID | File and line (working tree) | Change | Witness |
+|---|---|---|---|
+| C-F5 | `engine/src/render/render_webgpu.cpp:297-307, 470-483`; `render_frame.cpp:150-160`; `render_frame.h:127-128` | Page and albedo layer uploads merge into runs (`uploadRunEnd`, `albedoRunEnd`; `writeLayer` becomes `writeLayers` with a layer count). Source and destination strides are the same 1024 bytes, checked by reading `page_cache.cpp:69-71`. The API-call counter drops; `check:engine-render` asserts only `<=`. | W4 at 1024 (WebGPU, phase 10), `check:engine-render` |
+| C-F7 | `engine/src/render/render_webgl2.cpp:351-364` | The same run merge in the WebGL2 loops (`glTexSubImage3D` depth = run length). | W4 at 1024 (WebGL2, phase 11) |
+| G1 | `src/engine/bridge.js:126-137` | `drainEvents` returns one reused array and reused event objects. The only caller, `scripts/check-engine-bridge.mjs:105, 131`, reads each result before the next drain. A caller that keeps a result would see it overwritten. | W5, `check:engine-bridge` |
+| G2 | `src/engine/bridge.js:118-121` | `transform` returns one cached subarray per body, built in `createBridge`. Out-of-range ids keep the old empty view. | W2, `check:engine-bridge` |
+| G3 | `src/engine/EngineWorld.js:140-156` | `position` and `velocity` take an optional `out` argument. With no argument they return a new array as before. No internal call site switched. | W9, `check:engine-world` |
+| G4 | `src/engine/EngineWorld.js:182-203, 333-357` | `#sortedHandles` caches the bySlot order, cleared on every spawn, `spawnMany` and despawn. `hash()` gathers into `#hashFloats` and hashes through `#hashWords`, both reallocated only when the body count changes. | W4 (engine hash), W5, `check:engine-world` |
+| G5 | `src/engine/EngineWorld.js:236-241` | `importState` reads the state arrays by index instead of two `slice` calls per body. | W3, `check:engine-world` |
+| G6 | `src/engine/EngineWorld.js:115-141` | `spawnMany` validates every row first, then writes into `#stageRows`. Edge change: a sparse `rows` array now throws a TypeError at `rows[row].position`, where it was skipped silently. The returned `spawned` array stays fresh. | W5, `check:engine-world` |
+| JF1 | `scripts/browser/engine-render-browser.js:34-102, 221-231` | `normalise`, `cross`, `perspective`, `lookAt`, `multiply` write into module-level arrays (`VIEW`, `PROJ`, `CAMERA`). Arithmetic and order unchanged. | W4, `check:engine-render` (reads this page's text) |
+| JF2 | `engine-render-browser.js:267-286` | `readPhases(out)` fills one run-level `Float64Array`. | W4 |
+| JF3 | `engine-render-browser.js:271, 281, 310-311, 352` | D14: one `CAMERA` object per run; `lastCamera` is copied once, before `sceneDigest` reads it. | W4 |
+| JF4 | `engine-render-browser.js:262-346` | The per-frame row objects become one `Float64Array(FRAMES * ROW_WIDTH)`. `null` is stored as `NaN` and mapped back at serialisation by `nullIfNaN`. The `outliers`, `phaseMedianMs`, `phaseMaxMs`, `rowColumns` and `rows` keys and their order are rebuilt with the same expressions. `frameTimes` is kept. | W4 and W3 (JSON keys, `check:engine-render`) |
+| JF5 | `src/client/playerLodRenderer.js:73-84` | `decodeOptions` built once per renderer and updated in place; `forEach` becomes a `for` loop. | W2, `check:player-lod-renderer` |
+| JF6 | `src/client/crowdDots.js:16-33` | `decodeCrowdDots(dots, options, out = [])` reuses pose objects in `out`. The default still returns fresh poses. `playerLodRendererWebGPU.js:43` uses the default and is unchanged. | W2, `check:crowd-dot-cells-spoint` |
+| JF7 | `src/client/playerVatRenderer.js:82, 138` | One hoisted setter per renderer (`_setUniform`, `_setAttribute`) reads `_updateId`. `advanceVatPhase` calls it synchronously and does not keep it. | W2, `check:player-vat-spoint` |
+| JT1 | `src/world/World.js:83-91`; `src/world/query.js:88` | `position(id, out = [])` and `velocity(id, out = [])` write into `out`. `bodyPosition` uses a module scratch that no query returns. `movement.js` (JT5) passes `out`; no other caller does. | W9, `check:world-query`, `check:world` |
+| JT2 | `src/world/query.js:23-42` | `raySphere` uses scalar locals, same arithmetic order. The normal array on a hit is kept. | W9 |
+| JT3 | `src/world/query.js:10-11, 91, 102-107, 111-137` | A shared frozen `NO_OPTIONS` replaces the `{}` defaults. `forEach` becomes an index loop with `index in boxes`, which skips holes as before. `clampToBox` removed; the result `ids` arrays are kept. | W9 |
+| JT4 | `src/world/World.js:132-137` (hash) | Partly changed. The words closure and the subarray pairs are removed, and a `Uint32Array` is built over the full views. Views are not cached: `mem.grow` detaches cached views. `snapshot` and `exportState` keep their slice copies. | W4, `check:world` |
+| JT5 | `src/netcode/movement.js:8-9` | `VELOCITY_SCRATCH` is filled by `world.velocity(id, out)`. `setVelocity` copies its input, so the scratch is safe. | W9, `check:movement` |
+| JT7 | `src/client/PredictionEngine.js:531, 555, 591` | The `InputHistory` iterator becomes an index loop over `history.at(i)`. Nothing in these loops mutates the history. | W6, `check:prediction-engine` |
+| JT8 | `src/client/PredictionEngine.js:373` | `peers.keys()` with `peers.get(pid)` instead of a `[pid, peer]` tuple. `setPeers` takes a Map only. | W6, `check:prediction-engine` |
+| JT9 | `src/client/PredictionEngine.js:432` | `walls.find` becomes a loop with `break`. `shift` and `splice` kept, because `slideAlongWalls` reads `env.walls` in order. | W6, `check:prediction-engine` |
+| JT10 | `src/client/SnapshotTimeline.js:84` | Partly changed: the sorted `subarray` view is cached in `#sortedView`, rebuilt only when `count` changes. Kept: the snapshot objects (D2), `snaps[0]` and `snaps[1]` reads, and the `#byIdA` Map (see deviations). | W2, `check:snapshot-processor` |
+| JT11 | `src/netcode/SnapshotPacker.js:97-112` | The `new Uint8Array(pack(...))` wrapper is dropped, because `pack` already returns a fresh `Uint8Array` (`src/protocol/msgpack.js:112-114`, which copies through `new Uint8Array`). A cache miss on an existing id copies into the cached `values` in place. The `-0` walk is unchanged. | W3, `check:snapshot-packer`, `check:msgpack-packer` |
+| JT12 | `src/protocol/msgpack.js:48-61, 72-79` | `assertEncodable` and `countNegativeZero` become indexed loops; `Object.keys` becomes `for...in` with `Object.hasOwn`. Edge change: a Map's keys are checked before its values, where they were interleaved. The result and the thrown message are the same for one bad entry. | W3, `check:negative-zero`, `check:msgpackr-compat` |
+| JT13 | `src/netcode/collisionTileStreamer.js:59-84` | Partly changed: the shrink path reuses a closure-level `liveIds` Set. The tile message object is kept, because the host `connections` object is not in this repo. | W2 (no named gate; Phase B) |
+| JM2 | `src/transport/wireweaveFrame.js:44-68` | `writeHeader(dv, ...)` writes the header straight into each frame buffer, shared with `encodeHeader`. The per-fragment header buffer, its view, the header object and two views are removed. | W8, W3, `check:transport-framing` |
+| JM3 | `src/transport/wireweaveFrame.js:31-42` | `decodeHeader` reads bytes directly. A reused DataView cannot be rebound to another buffer, so the DataView is removed. The sweep schedule is unchanged (eviction timing). | W3, `check:transport-framing` |
+| JM4 | `src/transport/wireweaveRelay.js:15-19` | `toBase64` encodes in 32 KiB chunks with `String.fromCharCode.apply` (D6). `fromBase64` and the sign template are kept. | W3, `check:wireweave-relay` |
+| JM5 | `src/transport/wireweaveFraming.js:9-57` | The 1-byte view and the reduce closure are removed. `decodeBatch` reads four bytes directly. `decodeWireFrame` now honours a typed array's byte offset (it builds `new Uint8Array(buffer)` and takes `subarray(1)`). The old `new Uint8Array(buffer, 1)` ignored the offset of a typed array, so this is a correctness fix as well as reuse. | W3, `check:transport-framing` (lines 184-186 use a typed array) |
+| JM6 | `src/transport/transformRing.js:196-221` | Partly changed: `#readPose` uses indexed reads, `#readSlot` reads `playerId` first and skips the payload for an empty slot. The pose objects and the `readCut` Map are kept (`check:transport-framing` holds `before` across reads). | W5, W6, `check:transport` |
+| JM7 | `src/transport/simTransport.js:79-85` | `settle` moves due entries into one `due` array and compacts `inFlight` in place. Order is still `(deliverAt, order)`. `takeReady`'s result objects are kept. | W5, `check:transport` |
+| JM8 | `src/client/SnapshotProcessor.js:320-342` | The `#seenPlayers` Set becomes `#lastSeenCall.get(pid) === #callCount`; the `[pid, track]` tuple becomes `keys()` plus `get`. Snapshot objects and the slot pools are kept (D2). | W6, `check:snapshot-processor` |
+| JM9 | `src/wire/binSnapshot.js:63-116`; `src/client/SnapshotProcessor.js:121, 177, 195` | `*Into` variants added (`readPositionInto`, `readVelocityInto`, `readScaleInto`, `decodePlayerRecordInto`, `decodeEntityRecordInto`). The originals stay as wrappers that return fresh objects. Callers decode into module scratch records that are consumed by `copy3` or `unpackQuat` before the next decode. | W3, `check:bin-snapshot`, `check:snapshot-processor` |
+| JM11 | `src/protocol/delta.js:26-80`; `src/netcode/StateReceiver.js:20-28` | `changed` is a module scratch that never escapes. `forEach` becomes a loop. The default base closure is hoisted to `noBase`. `StateReceiver`'s lookup closure is a class field. The 64-state history copies are kept (D3), and `StateSender` is unchanged. | W3, `check:netcode`, `check:snapshots` |
+| JM12 | `src/client/MessageHandler.js:82` | The type-to-callback literal is hoisted to `HOT_CALLBACK_BY_TYPE`. Callbacks are still read from `this._callbacks` at call time. `{ invalidate: true }` (line 59) and `_peerRttTable` (line 87) are kept, because the host keeps them. | W2, `check:client-message-handler` |
+| JM13 | `src/client/ClockSync.js:19` | The `[t0,t1,t2,t3].every` array becomes four `Number.isFinite` checks in the same order. The sample array is kept: a ring would change behaviour for NaN, zero and fractional `maxSamples` (the constructor accepts them). | W3 (no named gate; Phase B) |
+| JI3 | `src/netcode/canonical.js:1-11` | D1: the encode writes into a module scratch buffer, view and records through a new `writeInputRecords` export of `src/protocol/input.js`. The returned record is still a fresh object from `decodeInputs`. `scratchRecords` keeps the last input object alive, which affects memory only. | W3, `check:netcode`, `check:protocol-codecs`; W6 |
+| JI4 | `src/protocol/inputCodec.js:215-240` | The `{...recordTemplate}` spread becomes `{}` with the same key order. `RECORD_TEMPLATES` and `recordTemplate` are removed; no references remain (grep). The entry objects are kept (`check:protocol-codecs` retains them). | W3, `check:protocol-codecs` |
+
+Kept sites, with reasons from the code. Each is checked again in Phase B only if its code changes.
+
+| ID | File and line | Reason kept |
+|---|---|---|
+| C-T1 | `engine/src/pool_alloc.cpp:70-77` | No measured Jolt peak in the repo; `docs/ENGINE.md:220` marks the per-unit Jolt costs UNVERIFIED. |
+| C-T2 | `engine/src/pool_alloc.cpp:116-130`; `pool_alloc.h:14` | Raising `kPrimeCounts` changes the tier footprint. Current `{64, 64, 64, 64, 64, 16, 16, 16, 4, 4, 4, 4}`. |
+| C-T3 | `engine/src/world.cpp:121, 429`; `budget.cpp:44-45, 126` | The temp size is an estimate (`kTempBytes` 16 MiB plus `bodies * 2048`), not a measured peak. |
+| C-T4 | `engine/src/world.cpp:351-352` | `spawnBatch` builds no container (it uses `batch_` and stack rows); the allocation is inside Jolt. |
+| C-T5 | `engine/src/planet_shape.cpp:33-63`; `vegetation.cpp:96-117`; `sphere_contact.h:9-19` | Each hit is one stack `CollideShapeResult` passed by value to Jolt's collector; hit order is contact order. |
+| C-T6 | `engine/src/engine_core.cpp:25` | The leak witness build (`ENGINE_LEAK_ON_TICK`). Must stay. |
+| C-F1, C-F3 | `render_webgpu.cpp:479, 504, 515, 518` | D10: a recorded bundle needs a re-record key over pipeline, bind group and texture table, which the code does not expose as one counter. |
+| C-F2 | `render_webgpu.cpp:485-486` | The swapchain texture is new each frame, so its view must be created each frame. |
+| C-F4 | `render_webgpu.cpp:293-295, 452-476` | D11: a merged staging write changes the shader offsets and alignment, which must move together. |
+| C-F6 | `render_webgl2.cpp:341-346, 377, 388` | The four prop-class writes cannot merge (a single call writes the unused tail of each class range). Emscripten's per-call copy is not in the repo. |
+| C-F8 | `render_frame.cpp:190-191` | D12 fails: `src/engine/renderer.js:124-134` (`setMaterial`) writes the material table through `HEAPF32`/`HEAPU32`, and `engine_render_bind_materials` binds caller memory. Engine code cannot see those writes, so a dirty flag would be wrong. |
+| G7 | `src/engine/EngineWorld.js:165, 172-178` | D9: `tickBatch` drains inputs and applies pages once per call, so batching changes semantics. |
+| G8 | `src/engine/renderer.js:151-159` | D13: `stats()` keeps its fresh frozen object. `renderer.js` is unchanged. |
+| JT6 | `src/netcode/Authority.js:33-39`; `InputBuffer.js:59, 67` | `scripts/check-netcode.mjs:69-70, 90-93` holds `take()` results across later takes. |
+| JI1 | `src/protocol/input.js:27-42` | `encodeInputs` returns a buffer that callers keep (`scripts/check-netcode.mjs:157`), so it must be fresh; `forEach` is kept, because it skips sparse holes and a loop would throw. |
+| JI2 | `src/protocol/input.js:44-63` | `decodeInputs` is exported (`src/index.js:2`), and `canonicalInput` returns one of its records, which the pending Map retains. |
+| JI5 | `src/netcode/InputBuffer.js:30-32, 64` | The `take()` results are held across takes (see JT6), and the stats getter is not per tick. |
+| JM1 | `src/transport/workerTransport.js:8, 24-29`; `workerMessages.js:21, 28-31, 37-40` | Overrides D5, see the deviations below. The message object and transfer array are kept. |
+| JM10 | `src/client/CollisionMirror.js:92-107` | D15: the slice copy and the eviction timing are kept. |
+| JM11 (history) | `src/netcode/StateSender.js:19-26` | D3: the history copies stay, and `send` has no closure to hoist. |
+
+The 16 behaviour-changing items, each decided from the code.
+
+| # | Item | Decision | Reason |
+|---|---|---|---|
+| 1 | JI3 canonicalInput result (D1) | Changed: the scratch bytes only | The returned object is retained by the pending Map, so it stays fresh. |
+| 2 | JT10 and JM8 snapshot objects (D2) | Partly changed: tuple and Set removed; the snapshot object kept; the `#byIdA` Map kept | Snapshot objects are buffered by reference. The Map is private, so the rule would change it, but the replacement is an O(n) scan per sample. A `Map` clear reuses its storage, so the Map is kept as a deliberate deviation (item 2 is listed below). |
+| 3 | JM11 history copies (D3) | Changed: the closure is hoisted and the changed array is a scratch that does not escape; the 64-state history copies are kept | The copies are the delta bases. |
+| 4 | JT1 and JM6 returned objects (D4) | Changed: `out` argument added; `playerId` is read first | The default path still returns a fresh object, so existing callers are unchanged. |
+| 5 | JM1 workerTransport (D5) | Kept. Deviation from D5 | `scripts/check-worker-bridge.mjs` and `scripts/check-transport-framing.mjs` retain `{ message, transfer }` in-process through a recording postFn. Reuse would change what those gates see. The decision's premise (postMessage is the only consumer) is not true for the gates. |
+| 6 | JM4 wireweave feed (D6) | Changed: chunked base64 encode; the subarray copy in `feed` is kept | The chunked encode retains nothing. |
+| 7 | JT12 msgpack walk (D7) | Changed: indexed loops | The walk and its results are unchanged, except the Map key and value order noted in JT12. |
+| 8 | G4 EngineWorld sorted handles (D8) | Changed: cached and cleared on every spawn and despawn | The order is still `bySlot`. |
+| 9 | G7 tickBatch (D9) | Kept | A batch changes when inputs drain and pages apply. |
+| 10 | C-F1 and C-F3 render bundles (D10) | Kept | No re-record key is exposed. |
+| 11 | C-F4 uniform write merge (D11) | Kept | The shader offsets and alignment must move together. |
+| 12 | C-F8 resolveMaterials dirty flag (D12) | Kept | The material table is written by JS, which the engine cannot observe. |
+| 13 | G8 renderer.stats (D13) | Kept | The fresh object stays. |
+| 14 | JF3 lastCamera (D14) | Changed: one camera object, copied into `lastCamera` at the end | As decided. |
+| 15 | JM10 CollisionMirror (D15) | Kept | The slice copy and the eviction timing stay. |
+| 16 | D16 content-time `new` in world.cpp | Kept | The arena size is not measured; moving the allocation changes the memory it reserves. |
+
+Deviations from the decisions. Two items differ from the rule the decision gave, and the owner may overrule either.
+
+- Item 2 (SnapshotTimeline `#byIdA` Map). The rule said change it, because the Map is private. It is kept, because the replacement is a linear scan per sample.
+- Item 5 (workerTransport, D5). The rule said reuse the transfer array and the message object. They are kept, because two gate scripts retain the objects in-process.
+
+Behaviour notes the coordinator must weigh.
+
+- G1 `drainEvents` and G2 `transform` return shared objects. No in-tree caller keeps them.
+- G6 throws on a sparse `rows` array where it was silently skipped.
+- JM5 `decodeWireFrame` honours a typed array's byte offset. The old code did not.
+- JT12 checks a Map's keys before its values.
+- C-F5 and C-F7 lower the per-frame API-call counter. `check:engine-render` (lines 183-184) asserts only `<=`, so it still passes.
+
+Phase B, in this order.
+
+1. Defect A check: `navigator.gpu.requestAdapter()` must return a non-fallback adapter (`isFallbackAdapter` false, vendor nvidia) on a playwriter server started through gm. The witness is a JSON file written by a `playwriter` execute call, containing the adapter's `isFallbackAdapter`, vendor, architecture, description, the browser process id from `playwriter` `browsers` list, and a timestamp, saved to `build/diag/witness/playwriter-adapter.json`. If the adapter is a fallback or null, the playwriter route fails and the reason is recorded.
+2. Defect C: run B and its control, with the commands recorded, and the witness value decided.
+3. `npm run build:kernel`, then `npm test`, then the named gates in the witness tags above, then the 1024 browser witness (W4) through playwriter, and the native host witnesses (W1).
+4. Rebuild the site (`scripts/build-site.mjs`) and check it (`scripts/check-site.mjs`). `docs/play` holds build copies of `World.js` and the physics settler, so it is stale until the rebuild.
+5. The new gates W2 and W7 are written and run before the single push.
+
 ## Defect A: playwriter MCP connect failure (ledger)
 
 Error, as recorded. `CONNECT_TIMEOUT`, 30 s, in the Phase B entry for "Phase A: sample order witness and frequency runner" (line 1623). This is the ledger's label. No log in this repo or under `/config/.gmnew` or `/config/.gm` contains a raw error line, timestamp, stack or retry count for it.
@@ -1850,7 +1988,7 @@ Can playwriter do the render witness? Yes, in principle, and it is the project's
 
 All seven gaps are from `build/diag/paired-G/freq2/`.
 
-Unpinned gaps, run `freq-unpinned-2` (sampler not pinned, `freq-unpinned-2.run.json:27`). The gaps are 658, 162 and 177 ms (`freq-unpinned-2.result.json` lines 20, 28, 36). The sampler's counters explain none of them. The sampler wait is 0.006, 0.30 and 0.00 ms, and the sampler gate needs 80% of the excess in wait or work (`scripts/browser/thread-sampling.mjs:135-139`). The `host-cfs-quota` label is a rule: the gap check sets it whenever the window's throttle is above zero (`scripts/browser/sampler-gap-check.mjs:63`). It is not a per-gap measurement. Measured: the cgroup throttle inside each window is 142.2, 354.9 and 177.0 ms, and the group is at its 12-CPU quota (about 11.4 to 11.9 cores, a calculation from `freq-unpinned-2.sampler.txt`, not a ledger value). The throttle counter sums over threads (line 453), so it is a correlation, not a share of wall time. Open: the per-thread cause of each gap. The logs do not record when the sampler thread was woken or switched in. To settle it, record the sampler's wake and switch-in times across each gap (a 1 ms `schedstat` poll), and run a control with 11 burn workers or a higher quota.
+Unpinned gaps, run `freq-unpinned-2` (sampler not pinned, `freq-unpinned-2.run.json:27`). The gaps are 658, 162 and 177 ms (`freq-unpinned-2.result.json` lines 20, 28, 36). The same result file lists seven gaps of 100 ms or more (119, 658, 162, 177, 109, 104 and 175 ms). The three named here are the ones whose `threadCause` is unattributed. The 109 ms and 175 ms gaps are run-queue-wait with 1304.9 ms and 1123.2 ms of throttle, and the 119 ms and 104 ms gaps have no throttle; the earlier text did not name them. The sampler's counters explain none of them. The sampler wait is 0.006, 0.30 and 0.00 ms, and `gapCauses` in `scripts/browser/thread-sampling.mjs` assigns `run-queue-wait` only when the wait is at least 80% of the excess over the 50 ms interval. The `host-cfs-quota` label is a rule: the gap check sets it whenever the window's throttle is above zero (`scripts/browser/sampler-gap-check.mjs:63`). It is not a per-gap measurement. Measured: the cgroup throttle inside each window is 142.2, 354.9 and 177.0 ms, and the group uses 11.4 to 11.9 of its 12 CPUs. Re-checked in Phase A by reading the raw files: each window is `[t0, t0 + gapMs]`, cgroup values are the last sample at or before each end (`freq-unpinned-2.sampler.txt` columns: time, throttled µs, usage µs, some µs, full µs), and the throttle is 142.248, 354.861 and 177.001 ms, with usage of 11.89, 11.43 and 11.73 cores. All three match the result file and the earlier figures. The throttle counter sums over threads (line 453), so it is a correlation, not a share of wall time. Open: the per-thread cause of each gap. The logs do not record when the sampler thread was woken or switched in. To settle it, record the sampler's wake and switch-in times across each gap (a 1 ms `schedstat` poll), and run a control with 11 burn workers or a higher quota.
 
 Pinned gaps, run `freq-pinned-1` (sampler on CPU 15, `freq-pinned-1.run.json:27`, quota `1200000 100000`, `:25`). The gaps are 140, 174, 172 and 141 ms (`freq-pinned-1.result.json` lines 12, 20, 28, 36). Measured: `threadCause` is `run-queue-wait` in all four, and that wait accounts for almost all of the excess (90.0 of 90, 123.7 of 124, 122.3 of 122, and 90.4 of 91 ms). The cgroup throttle inside the windows is 799.5, 808.1, 793.2 and 758.3 ms, and the usage is about 10.6 to 11.6 cores (a calculation). Open: whether the run-queue wait is the quota throttle or the sampler sharing CPU 15 with a burn worker. The burn workers are unpinned (`scripts/browser/cpu-load.mjs:9-10`), and the sampler is pinned to 15 (`scripts/browser/paired-run.mjs:18-22`). To settle it, sample each sampler and burn worker's processor field (`/proc/<pid>/stat`, field 39) during each gap, and run a control with the burn workers kept off CPU 15.
 

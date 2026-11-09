@@ -194,11 +194,11 @@ export class TransformRingReader {
   }
 
   #readPose(payloadBase) {
-    const floats = (offset, length) => Array.from(this.#payload.subarray(payloadBase + offset, payloadBase + offset + length))
+    const payload = this.#payload
     return {
-      position: floats(POSITION_AT, POSITION_LENGTH),
-      rotation: floats(ROTATION_AT, ROTATION_LENGTH),
-      velocity: floats(VELOCITY_AT, VELOCITY_LENGTH),
+      position: [payload[payloadBase + POSITION_AT], payload[payloadBase + POSITION_AT + 1], payload[payloadBase + POSITION_AT + 2]],
+      rotation: [payload[payloadBase + ROTATION_AT], payload[payloadBase + ROTATION_AT + 1], payload[payloadBase + ROTATION_AT + 2], payload[payloadBase + ROTATION_AT + 3]],
+      velocity: [payload[payloadBase + VELOCITY_AT], payload[payloadBase + VELOCITY_AT + 1], payload[payloadBase + VELOCITY_AT + 2]],
       stale: false
     }
   }
@@ -209,9 +209,13 @@ export class TransformRingReader {
       const before = Atomics.load(this.#control, base + SLOT_GENERATION)
       if (isLocked(before)) continue
       const playerId = Atomics.load(this.#control, base + SLOT_PLAYER)
+      if (playerId === EMPTY_PLAYER) {
+        if (Atomics.load(this.#control, base + SLOT_GENERATION) === before) return null
+        continue
+      }
       const pose = this.#readPose(slot * PAYLOAD_FLOATS_PER_SLOT)
       if (Atomics.load(this.#control, base + SLOT_GENERATION) !== before) continue
-      return playerId === EMPTY_PLAYER ? null : { playerId, pose }
+      return { playerId, pose }
     }
     return null
   }

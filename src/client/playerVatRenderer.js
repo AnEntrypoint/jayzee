@@ -47,6 +47,8 @@ function _createVATCrowdRendererWebGL(scene, geo, idleData, moveData, opts, capa
   scene.add(im)
 
   const _bySlot = new Map()
+  let _updateId = -1
+  const _setUniform = (name, value) => { try { im.setUniformAt(_updateId, name, value) } catch (_) {} }
 
   function ensureCapacity(n) {
     if (n <= im.capacity) return
@@ -79,7 +81,8 @@ function _createVATCrowdRendererWebGL(scene, geo, idleData, moveData, opts, capa
   function update(playerId, position, rotY, speed, dt) {
     const id = acquire(playerId)
     const slot = _bySlot.get(playerId)
-    advanceVatPhase(slot, moveData, idleData, opts, speed || 0, dt, (name, value) => { try { im.setUniformAt(id, name, value) } catch (_) {} })
+    _updateId = id
+    advanceVatPhase(slot, moveData, idleData, opts, speed || 0, dt, _setUniform)
     im.setMatrixAt(id, _composeMatrix(position, rotY))
   }
 
@@ -108,6 +111,8 @@ function _createVATCrowdRendererWebGPU(scene, geo, idleData, moveData, opts, cap
   scene.add(rec.mesh)
 
   const _bySlot = new Map()
+  let _updateId = -1
+  const _setAttribute = (name, value) => rec.setAttributeAt(_updateId, name, value)
 
   function acquire(playerId) {
     let slot = _bySlot.get(playerId)
@@ -135,7 +140,8 @@ function _createVATCrowdRendererWebGPU(scene, geo, idleData, moveData, opts, cap
     const id = acquire(playerId)
     if (id < 0) return
     const slot = _bySlot.get(playerId)
-    advanceVatPhase(slot, moveData, idleData, opts, speed || 0, dt, (name, value) => rec.setAttributeAt(id, name, value))
+    _updateId = id
+    advanceVatPhase(slot, moveData, idleData, opts, speed || 0, dt, _setAttribute)
     rec.setMatrixAt(id, _composeMatrix(position, rotY))
   }
 

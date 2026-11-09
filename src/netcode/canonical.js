@@ -1,3 +1,11 @@
-import { encodeInputs, decodeInputs } from '../protocol/input.js'
+import { decodeInputs, inputPacketBytes, writeInputRecords } from '../protocol/input.js'
 
-export const canonicalInput = (record) => decodeInputs(encodeInputs([record]))[0]
+const scratchBuffer = new ArrayBuffer(inputPacketBytes(1))
+const scratchView = new DataView(scratchBuffer)
+const scratchRecords = [null]
+
+export const canonicalInput = (record) => {
+  scratchRecords[0] = record
+  writeInputRecords(scratchView, scratchRecords)
+  return decodeInputs(scratchBuffer)[0]
+}

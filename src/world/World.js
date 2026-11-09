@@ -80,14 +80,14 @@ export class World {
     return id
   }
 
-  position(id) {
+  position(id, out = []) {
     this.#checkId(id)
-    return Array.from(this.#view(this.#position).subarray(id * 3, id * 3 + 3))
+    return this.#copyBody(this.#position, id, out)
   }
 
-  velocity(id) {
+  velocity(id, out = []) {
     this.#checkId(id)
-    return Array.from(this.#view(this.#velocity).subarray(id * 3, id * 3 + 3))
+    return this.#copyBody(this.#velocity, id, out)
   }
 
   setVelocity(id, velocity) {
@@ -130,10 +130,12 @@ export class World {
   }
 
   hash() {
-    const positions = this.#view(this.#position).subarray(0, this.#count * 3)
-    const velocities = this.#view(this.#velocity).subarray(0, this.#count * 3)
-    const words = (view) => new Uint32Array(view.buffer, view.byteOffset, view.length * 2)
-    return fnvWords(fnvWords(FNV_OFFSET, words(positions)), words(velocities)) >>> 0
+    const positions = this.#view(this.#position)
+    const velocities = this.#view(this.#velocity)
+    const wordCount = this.#count * 6
+    const positionWords = new Uint32Array(positions.buffer, positions.byteOffset, wordCount)
+    const velocityWords = new Uint32Array(velocities.buffer, velocities.byteOffset, wordCount)
+    return fnvWords(fnvWords(FNV_OFFSET, positionWords), velocityWords) >>> 0
   }
 
   snapshot() {
@@ -173,6 +175,15 @@ export class World {
 
   #view(handle) {
     return this.#memory.read(handle)
+  }
+
+  #copyBody(handle, id, out) {
+    const view = this.#view(handle)
+    const base = id * 3
+    out[0] = view[base]
+    out[1] = view[base + 1]
+    out[2] = view[base + 2]
+    return out
   }
 
   #checkId(id) {

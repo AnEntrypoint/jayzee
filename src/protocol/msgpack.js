@@ -49,14 +49,12 @@ const assertEncodable = (value) => {
   if (typeof value === 'function') throw new TypeError('[msgpack] cannot encode a value of type function')
   if (value === null || typeof value !== 'object' || value instanceof Uint8Array) return
   if (Array.isArray(value)) {
-    for (const item of value) assertEncodable(item)
+    for (let i = 0; i < value.length; i++) assertEncodable(value[i])
   } else if (value instanceof Map) {
-    for (const [key, item] of value) {
-      assertEncodable(key)
-      assertEncodable(item)
-    }
+    for (const key of value.keys()) assertEncodable(key)
+    for (const item of value.values()) assertEncodable(item)
   } else {
-    for (const key of Object.keys(value)) assertEncodable(value[key])
+    for (const key in value) if (Object.hasOwn(value, key)) assertEncodable(value[key])
   }
 }
 
@@ -72,10 +70,15 @@ const isPlainContainer = (value) => {
 const countNegativeZero = (value) => {
   if (Object.is(value, -0)) return 1
   if (value === null || typeof value !== 'object' || ArrayBuffer.isView(value)) return 0
-  if (Array.isArray(value)) return value.reduce((count, item) => count + countNegativeZero(item), 0)
-  if (value instanceof Map) return [...value.values()].reduce((count, item) => count + countNegativeZero(item), 0)
-  if (!isPlainContainer(value)) return 0
-  return Object.values(value).reduce((count, item) => count + countNegativeZero(item), 0)
+  let count = 0
+  if (Array.isArray(value)) {
+    for (let i = 0; i < value.length; i++) count += countNegativeZero(value[i])
+  } else if (value instanceof Map) {
+    for (const item of value.values()) count += countNegativeZero(item)
+  } else if (isPlainContainer(value)) {
+    for (const key in value) if (Object.hasOwn(value, key)) count += countNegativeZero(value[key])
+  }
+  return count
 }
 
 const replaceNegativeZero = (value, sentinel) => {

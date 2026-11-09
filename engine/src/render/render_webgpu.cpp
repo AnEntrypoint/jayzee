@@ -294,15 +294,15 @@ void writeBuffer(wgpu::Buffer buffer, std::uint64_t offset, const void* data, st
   ENGINE_RENDER_CALL(queue.WriteBuffer(buffer, offset, data, size));
 }
 
-void writeLayer(wgpu::Texture texture, std::uint32_t layer, const void* pixels, std::uint32_t side, std::uint32_t bytesPerTexel) {
+void writeLayers(wgpu::Texture texture, std::uint32_t firstLayer, std::uint32_t layers, const void* pixels, std::uint32_t side, std::uint32_t bytesPerTexel) {
   wgpu::ImageCopyTexture destination{};
   destination.texture = texture;
-  destination.origin = wgpu::Origin3D{0, 0, layer};
+  destination.origin = wgpu::Origin3D{0, 0, firstLayer};
   wgpu::TextureDataLayout layout{};
   layout.bytesPerRow = side * bytesPerTexel;
   layout.rowsPerImage = side;
-  const wgpu::Extent3D size{side, side, 1};
-  const std::size_t bytes = static_cast<std::size_t>(side) * side * bytesPerTexel;
+  const wgpu::Extent3D size{side, side, layers};
+  const std::size_t bytes = static_cast<std::size_t>(side) * side * bytesPerTexel * layers;
   ENGINE_RENDER_CALL(queue.WriteTexture(&destination, pixels, bytes, &layout, &size));
 }
 
@@ -435,7 +435,7 @@ int init(const char* selector, std::uint32_t width, std::uint32_t height) {
   depthView = depthTex.CreateView();
 
   for (std::uint32_t i = 0; i < kAlbedoBytes; ++i) whitePixels[i] = 0xff;
-  writeLayer(albedoTex, 0, whitePixels, kAlbedoSide, 4);
+  writeLayers(albedoTex, 0, 1, whitePixels, kAlbedoSide, 4);
 
   if (buildPipelines() != engine::kOk) return engine::kNotConfigured;
 
@@ -467,12 +467,19 @@ int frame(const SceneView& scene, const FramePlan& plan, const Camera& camera) {
     writeBuffer(materialBuf, 0, plan.materialWords, kMaterialBytes);
     writeBuffer(pageBuf, 0, plan.pageRecords, kPageBytes);
 
-    for (std::uint32_t u = 0; u < plan.uploadCount; ++u) {
-      writeLayer(heightTex, plan.uploadLayer[u], scene.pages->pageSamples(static_cast<int>(plan.uploadSlot[u])), kPageSide, 4);
+    for (std::uint32_t u = 0; u < plan.uploadCount;) {
+      const std::uint32_t end = uploadRunEnd(plan, u);
+      writeLayers(heightTex, plan.uploadLayer[u], end - u, scene.pages->pageSamples(static_cast<int>(plan.uploadSlot[u])), kPageSide, 4);
+      u = end;
     }
-    for (std::uint32_t layer = 0; layer < kAlbedoLayers; ++layer) {
-      if (plan.albedoPending[layer] == 0) continue;
-      writeLayer(albedoTex, layer, scene.albedoPixels + layer * kAlbedoBytes, kAlbedoSide, 4);
+    for (std::uint32_t layer = 0; layer < kAlbedoLayers;) {
+      if (plan.albedoPending[layer] == 0) {
+        layer += 1;
+        continue;
+      }
+      const std::uint32_t end = albedoRunEnd(plan, layer);
+      writeLayers(albedoTex, layer, end - layer, scene.albedoPixels + layer * kAlbedoBytes, kAlbedoSide, 4);
+      layer = end;
     }
   }
 

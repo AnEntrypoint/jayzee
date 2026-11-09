@@ -88,21 +88,28 @@ function sameScalars(values, rec) {
   return true
 }
 
+function copyScalars(values, rec) {
+  values.length = rec.length
+  for (let i = 0; i < rec.length; i++) values[i] = rec[i]
+  return values
+}
+
 function recordBytes(rec, memo) {
   const known = memo.byRef.get(rec)
   if (known !== undefined) { if (known !== null) snapshotPackCounts.recordShares++; return known }
   const kind = recordKind(rec)
   if (kind === KIND_UNSHAREABLE) { memo.byRef.set(rec, null); return null }
   if (kind === KIND_WITH_BINS) {
-    const bytes = new Uint8Array(pack(rec))
+    const bytes = pack(rec)
     memo.byRef.set(rec, bytes)
     snapshotPackCounts.recordPacks++
     return bytes
   }
   const cached = memo.byId.get(rec[0])
   if (cached !== undefined && sameScalars(cached.values, rec)) { snapshotPackCounts.recordShares++; return cached.bytes }
-  const bytes = new Uint8Array(pack(rec))
-  memo.byId.set(rec[0], { values: rec.slice(), bytes })
+  const bytes = pack(rec)
+  if (cached === undefined) memo.byId.set(rec[0], { values: rec.slice(), bytes })
+  else { copyScalars(cached.values, rec); cached.bytes = bytes }
   snapshotPackCounts.recordPacks++
   return bytes
 }

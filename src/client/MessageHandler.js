@@ -9,6 +9,7 @@ import { playerDefault } from '../player-defaults-pure/playerDefaults.js'
 const PRE_HANDSHAKE_TICK_RATE = 60
 const RTT_EMA_ALPHA = 0.25
 const RTT_OUTLIER_FACTOR = 5
+const HOT_CALLBACK_BY_TYPE = { [MSG.HOT_RELOAD]: 'onHotReload', [MSG.APP_MODULE]: 'onAppModule', [MSG.ASSET_UPDATE]: 'onAssetUpdate' }
 
 export class MessageHandler {
   constructor(config = {}) {
@@ -79,8 +80,7 @@ export class MessageHandler {
     } else if (type === MSG.APP_EVENT) {
       this._callbacks.onAppEvent?.(payload)
     } else if (type === MSG.HOT_RELOAD || type === MSG.APP_MODULE || type === MSG.ASSET_UPDATE) {
-      const cb = { [MSG.HOT_RELOAD]: 'onHotReload', [MSG.APP_MODULE]: 'onAppModule', [MSG.ASSET_UPDATE]: 'onAssetUpdate' }[type]
-      this._callbacks[cb]?.(payload)
+      this._callbacks[HOT_CALLBACK_BY_TYPE[type]]?.(payload)
     } else if (type === MSG.HEARTBEAT_ACK) {
       this._handleHeartbeat(payload)
     } else if (type === MSG.PEER_RTT_TABLE) {

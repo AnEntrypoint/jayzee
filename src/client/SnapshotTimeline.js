@@ -57,6 +57,7 @@ export class SnapshotTimeline {
   #offsetCount = 0
   #offsetIndex = 0
   #sorted = new Float64Array(OFFSET_WINDOW)
+  #sortedView = null
   #baseOffsetMs = 0
   #jitterMs = 0
   #intervalMs = 0
@@ -81,7 +82,8 @@ export class SnapshotTimeline {
     const count = this.#offsetCount
     const sorted = this.#sorted
     for (let i = 0; i < count; i++) sorted[i] = this.#offsets[i]
-    const view = sorted.subarray(0, count).sort()
+    if (!this.#sortedView || this.#sortedView.length !== count) this.#sortedView = sorted.subarray(0, count)
+    const view = this.#sortedView.sort()
     this.#baseOffsetMs = view[0]
     this.#jitterMs = view[Math.min(count - 1, Math.ceil(count * JITTER_PERCENTILE) - 1)] - view[0]
   }

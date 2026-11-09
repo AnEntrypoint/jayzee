@@ -12,9 +12,13 @@ const toBytes = (payload) => {
   throw new TypeError('wireweave send takes an ArrayBuffer or a view of bytes')
 }
 
+const BASE64_CHUNK_BYTES = 0x8000
+
 const toBase64 = (bytes) => {
   let binary = ''
-  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i])
+  for (let i = 0; i < bytes.length; i += BASE64_CHUNK_BYTES) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + BASE64_CHUNK_BYTES))
+  }
   return btoa(binary)
 }
 

@@ -179,25 +179,6 @@ function writeRecord(view, off, schema, sequence, input, cases) {
   return off
 }
 
-const RECORD_TEMPLATES = new WeakMap()
-
-function recordTemplate(schema, analog) {
-  let pair = RECORD_TEMPLATES.get(schema)
-  if (!pair) { pair = []; RECORD_TEMPLATES.set(schema, pair) }
-  const slot = analog ? 1 : 0
-  if (!pair[slot]) {
-    const t = {}
-    for (const b of schema.buttons) t[b] = false
-    t.yaw = 0
-    t.pitch = 0
-    t.expr = 0
-    if (analog) { t.analogForward = 0; t.analogRight = 0 }
-    for (const a of schema.axes) t[a] = 0
-    pair[slot] = t
-  }
-  return pair[slot]
-}
-
 function recordSpan(view, off, schema, end) {
   if (off + RECORD_FIXED_BYTES > end) throw throwableRejection(INPUT_CASE.TRUNCATED_RECORD, { offset: off, end })
   const flags = view.getUint8(off + 13)
@@ -217,7 +198,7 @@ function readRecordInto(record, view, off, schema, end) {
   const sequence = view.getUint32(off, true)
   const bits = view.getUint32(off + 4, true)
   const analog = (view.getUint8(off + 13) & FLAG_ANALOG) !== 0
-  const input = { ...recordTemplate(schema, analog) }
+  const input = {}
   const { buttons, axes } = schema
   for (let i = 0; i < buttons.length; i++) input[buttons[i]] = (bits & (1 << i)) !== 0
   input.yaw = view.getUint16(off + 8, true) / YAW_STEPS * TAU

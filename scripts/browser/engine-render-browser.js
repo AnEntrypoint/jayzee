@@ -31,28 +31,66 @@ const report = (line) => {
 }
 window.addEventListener('error', (event) => result.errors.push('uncaught ' + event.message))
 
-const normalise = (v) => {
+const normalise = (v, out) => {
   const l = Math.hypot(v[0], v[1], v[2]) || 1
-  return [v[0] / l, v[1] / l, v[2] / l]
+  out[0] = v[0] / l
+  out[1] = v[1] / l
+  out[2] = v[2] / l
+  return out
 }
-const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
+const cross = (a, b, out) => {
+  out[0] = a[1] * b[2] - a[2] * b[1]
+  out[1] = a[2] * b[0] - a[0] * b[2]
+  out[2] = a[0] * b[1] - a[1] * b[0]
+  return out
+}
 const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
 
-const perspective = (fovY, aspect, near, far) => {
+const DIRECTION = new Float64Array(3)
+const AXIS_X = new Float64Array(3)
+const AXIS_Y = new Float64Array(3)
+const AXIS_Z = new Float64Array(3)
+
+const perspective = (fovY, aspect, near, far, out) => {
   const f = 1 / Math.tan(fovY / 2)
   const nf = 1 / (near - far)
-  return [f / aspect, 0, 0, 0, 0, f, 0, 0, 0, 0, (far + near) * nf, -1, 0, 0, 2 * far * near * nf, 0]
+  out.fill(0)
+  out[0] = f / aspect
+  out[5] = f
+  out[10] = (far + near) * nf
+  out[11] = -1
+  out[14] = 2 * far * near * nf
+  return out
 }
 
-const lookAt = (eye, target, up) => {
-  const z = normalise([eye[0] - target[0], eye[1] - target[1], eye[2] - target[2]])
-  const x = normalise(cross(up, z))
-  const y = cross(z, x)
-  return [x[0], y[0], z[0], 0, x[1], y[1], z[1], 0, x[2], y[2], z[2], 0, -dot(x, eye), -dot(y, eye), -dot(z, eye), 1]
+const lookAt = (eye, target, up, out) => {
+  DIRECTION[0] = eye[0] - target[0]
+  DIRECTION[1] = eye[1] - target[1]
+  DIRECTION[2] = eye[2] - target[2]
+  normalise(DIRECTION, AXIS_Z)
+  cross(up, AXIS_Z, AXIS_X)
+  normalise(AXIS_X, AXIS_X)
+  cross(AXIS_Z, AXIS_X, AXIS_Y)
+  out[0] = AXIS_X[0]
+  out[1] = AXIS_Y[0]
+  out[2] = AXIS_Z[0]
+  out[3] = 0
+  out[4] = AXIS_X[1]
+  out[5] = AXIS_Y[1]
+  out[6] = AXIS_Z[1]
+  out[7] = 0
+  out[8] = AXIS_X[2]
+  out[9] = AXIS_Y[2]
+  out[10] = AXIS_Z[2]
+  out[11] = 0
+  out[12] = -dot(AXIS_X, eye)
+  out[13] = -dot(AXIS_Y, eye)
+  out[14] = -dot(AXIS_Z, eye)
+  out[15] = 1
+  return out
 }
 
-const multiply = (p, v) => {
-  const out = new Array(16)
+const multiply = (p, v, out) => {
   for (let c = 0; c < 4; c++) {
     for (let r = 0; r < 4; r++) {
       let sum = 0
@@ -174,14 +212,23 @@ const setupScene = (module, renderer, placed) => {
   return surface
 }
 
+const ORIGIN = [0, 0, 0]
+const UP = [0, 1, 0]
+const VIEW = new Float64Array(16)
+const PROJ = new Float64Array(16)
+const CAMERA = { viewProj: new Float64Array(16), eye: new Float64Array(3) }
+
 const orbitCamera = (frame, aspect, surface) => {
   const angle = frame * 0.01
   const ex = Math.sin(angle) * CAMERA_RADIUS
   const ez = Math.cos(angle) * CAMERA_RADIUS
-  const eye = [ex, surface(ex, ez) + CAMERA_HEIGHT, ez]
-  const view = lookAt(eye, [0, 0, 0], [0, 1, 0])
-  const proj = perspective(CAMERA_FOV, aspect, NEAR, FAR)
-  return { viewProj: multiply(proj, view), eye }
+  CAMERA.eye[0] = ex
+  CAMERA.eye[1] = surface(ex, ez) + CAMERA_HEIGHT
+  CAMERA.eye[2] = ez
+  lookAt(CAMERA.eye, ORIGIN, UP, VIEW)
+  perspective(CAMERA_FOV, aspect, NEAR, FAR, PROJ)
+  multiply(PROJ, VIEW, CAMERA.viewProj)
+  return CAMERA
 }
 
 const adapterInfo = async () => {
@@ -210,32 +257,44 @@ const run = async () => {
 
   const aspect = canvas.width / canvas.height
   const frameTimes = []
-  const frameRows = []
   const PHASE_NAMES = ['pages', 'inputs', 'physics', 'readback', 'plan', 'backend', 'acquire', 'upload', 'submit']
   const phaseCount = TIMED && module._engine_phase_count ? module._engine_phase_count() : 0
-  const readPhases = () => Array.from({ length: phaseCount }, (_, i) => module._engine_phase_total_ms(i))
+  const ROW_FIELDS = 7
+  const ROW_WIDTH = ROW_FIELDS + phaseCount
+  const rows = new Float64Array(FRAMES * ROW_WIDTH)
+  const phasesBefore = new Float64Array(phaseCount)
+  const phasesAfter = new Float64Array(phaseCount)
+  const readPhases = (out) => {
+    for (let i = 0; i < phaseCount; i++) out[i] = module._engine_phase_total_ms(i)
+  }
   let lastStats = null
-  let lastCamera = null
+  const lastCamera = { viewProj: new Float64Array(16), eye: new Float64Array(3) }
   await new Promise((resolve, reject) => {
     let frame = 0
     let lastStarted = null
     const step = () => {
       try {
         const started = performance.now()
-        const phasesBefore = readPhases()
+        readPhases(phasesBefore)
         module._engine_tick(TICK_STEPS)
         const tickEnd = performance.now()
-        const { viewProj, eye } = orbitCamera(frame, aspect, surface)
-        renderer.setCamera({ viewProj, eye })
-        lastCamera = { viewProj, eye }
+        renderer.setCamera(orbitCamera(frame, aspect, surface))
         if (DRAW) {
           const status = renderer.frame()
           if (status !== 0) throw new Error('engine_render_frame status ' + status)
         }
-        const phasesAfter = readPhases()
+        readPhases(phasesAfter)
         const totalMs = performance.now() - started
         frameTimes.push(totalMs)
-        frameRows.push({ frame, started, tickMs: tickEnd - started, renderMs: totalMs - (tickEnd - started), totalMs, gapMs: lastStarted === null ? null : started - lastStarted, active: TIMED ? module._engine_sim_active_bodies() : null, phases: phasesAfter.map((v, i) => v - phasesBefore[i]) })
+        const at = frame * ROW_WIDTH
+        rows[at] = frame
+        rows[at + 1] = started
+        rows[at + 2] = tickEnd - started
+        rows[at + 3] = totalMs - (tickEnd - started)
+        rows[at + 4] = totalMs
+        rows[at + 5] = lastStarted === null ? NaN : started - lastStarted
+        rows[at + 6] = TIMED ? module._engine_sim_active_bodies() : NaN
+        for (let i = 0; i < phaseCount; i++) rows[at + ROW_FIELDS + i] = phasesAfter[i] - phasesBefore[i]
         lastStarted = started
         if (frame === WARMUP_FRAMES) renderer.markWarmup()
         if (frame >= WARMUP_FRAMES) lastStats = renderer.stats()
@@ -248,8 +307,18 @@ const run = async () => {
     }
     requestAnimationFrame(step)
   })
+  lastCamera.viewProj.set(CAMERA.viewProj)
+  lastCamera.eye.set(CAMERA.eye)
 
   const timed = frameTimes.slice(WARMUP_FRAMES)
+  const timedCount = FRAMES - WARMUP_FRAMES
+  const timedRows = rows.subarray(WARMUP_FRAMES * ROW_WIDTH)
+  const column = (c) => {
+    const values = new Float64Array(timedCount)
+    for (let r = 0; r < timedCount; r++) values[r] = timedRows[r * ROW_WIDTH + c]
+    return values
+  }
+  const nullIfNaN = (v, map = (x) => x) => (Number.isNaN(v) ? null : map(v))
   result.backend = renderer.backendName
   result.draw = DRAW ? 1 : 0
   result.tier = TIER
@@ -260,15 +329,21 @@ const run = async () => {
   result.frameTimeMedianMs = median(timed)
   result.frameTimeMaxMs = Math.max(...timed)
   const round2 = (v) => Math.round(v * 100) / 100
-  const timedRows = frameRows.slice(WARMUP_FRAMES)
   result.timed = TIMED
-  result.tickMedianMs = round2(median(timedRows.map((row) => row.tickMs)))
+  result.tickMedianMs = round2(median(column(2)))
   result.outlierThresholdMs = round2(2 * result.frameTimeMedianMs)
-  result.outliers = timedRows.filter((row) => row.totalMs > 2 * result.frameTimeMedianMs).map((row) => ({ frame: row.frame, wallMs: Math.round(performance.timeOrigin + row.started), totalMs: round2(row.totalMs), tickMs: round2(row.tickMs), renderMs: round2(row.renderMs), gapMs: row.gapMs === null ? null : round2(row.gapMs), phasesMs: Object.fromEntries(row.phases.map((v, i) => [PHASE_NAMES[i], round2(v)])) }))
-  result.phaseMedianMs = Object.fromEntries(PHASE_NAMES.slice(0, phaseCount).map((name, i) => [name, round2(median(timedRows.map((row) => row.phases[i])))]))
-  result.phaseMaxMs = Object.fromEntries(PHASE_NAMES.slice(0, phaseCount).map((name, i) => [name, round2(Math.max(...timedRows.map((row) => row.phases[i])))]))
+  result.outliers = []
+  for (let r = 0; r < timedCount; r++) {
+    const at = r * ROW_WIDTH
+    if (timedRows[at + 4] > 2 * result.frameTimeMedianMs) result.outliers.push({ frame: timedRows[at], wallMs: Math.round(performance.timeOrigin + timedRows[at + 1]), totalMs: round2(timedRows[at + 4]), tickMs: round2(timedRows[at + 2]), renderMs: round2(timedRows[at + 3]), gapMs: nullIfNaN(timedRows[at + 5], round2), phasesMs: Object.fromEntries(Array.from({ length: phaseCount }, (_, i) => [PHASE_NAMES[i], round2(timedRows[at + ROW_FIELDS + i])])) })
+  }
+  result.phaseMedianMs = Object.fromEntries(PHASE_NAMES.slice(0, phaseCount).map((name, i) => [name, round2(median(column(ROW_FIELDS + i)))]))
+  result.phaseMaxMs = Object.fromEntries(PHASE_NAMES.slice(0, phaseCount).map((name, i) => [name, round2(Math.max(...column(ROW_FIELDS + i)))]))
   result.rowColumns = ['frame', 'startMs', 'tickMs', 'renderMs', 'gapMs', 'active', ...PHASE_NAMES.slice(0, phaseCount)]
-  result.rows = timedRows.map((row) => [row.frame, round2(performance.timeOrigin + row.started), round2(row.tickMs), round2(row.renderMs), row.gapMs === null ? null : round2(row.gapMs), row.active, ...row.phases.map((v) => round2(v))])
+  result.rows = Array.from({ length: timedCount }, (_, r) => {
+    const at = r * ROW_WIDTH
+    return [timedRows[at], round2(performance.timeOrigin + timedRows[at + 1]), round2(timedRows[at + 2]), round2(timedRows[at + 3]), nullIfNaN(timedRows[at + 5], round2), nullIfNaN(timedRows[at + 6]), ...Array.from({ length: phaseCount }, (_, i) => round2(timedRows[at + ROW_FIELDS + i]))]
+  })
   if (DRAW) {
     result.apiCallsPerFrame = lastStats.apiCallsLastFrame
     result.allocationsSinceWarmup = String(lastStats.allocationsSinceWarmup)

@@ -370,7 +370,8 @@ export class PredictionEngine {
     const v = ls.velocity
     const out = this._pushOut
     const lead = Math.max(ticksPastSnapshot, 0) * dt
-    for (const [pid, peer] of peers) {
+    for (const pid of peers.keys()) {
+      const peer = peers.get(pid)
       if (pid === this.localPlayerId || !isFiniteVec(peer.position, 3)) continue
       const q = peer.position
       const w = isFiniteVec(peer.velocity, 3) ? peer.velocity : ZERO_VELOCITY
@@ -429,7 +430,14 @@ export class PredictionEngine {
       const nx = planes[i]
       const nz = planes[i + 1]
       const d = planes[i + 2]
-      let w = walls.find((x) => Math.abs(x.nx - nx) < WALL_MATCH_NORMAL && Math.abs(x.nz - nz) < WALL_MATCH_NORMAL && Math.abs(x.d - d) < WALL_MATCH_OFFSET_M)
+      let w = null
+      for (let j = 0; j < walls.length; j++) {
+        const x = walls[j]
+        if (Math.abs(x.nx - nx) < WALL_MATCH_NORMAL && Math.abs(x.nz - nz) < WALL_MATCH_NORMAL && Math.abs(x.d - d) < WALL_MATCH_OFFSET_M) {
+          w = x
+          break
+        }
+      }
       const t = nx * sp[2] - nz * sp[0]
       if (!w) {
         if (walls.length >= WALL_CACHE_SIZE) walls.shift()
@@ -528,7 +536,9 @@ export class PredictionEngine {
     ls.onGround = server.onGround
     ls.groundY = server.onGround || this.verticallyBlocked ? sp[1] : NaN
     if (predictedAtAck) for (const k of MOVE_STATE_KEYS) ls[k] = predictedAtAck.move[k]
-    for (const e of this.inputHistory) {
+    const history = this.inputHistory
+    for (let i = 0; i < history.length; i++) {
+      const e = history.at(i)
       this._step(e.data, e.sequence)
       saveEntry(e, ls)
     }
@@ -552,7 +562,9 @@ export class PredictionEngine {
     reexpressMotionState(pass, this.lastServerState)
     reexpressMotionState(pass, this._renderState)
     reexpressMotionState(pass, this._lastAckedPrediction)
-    for (const e of this.inputHistory) {
+    const history = this.inputHistory
+    for (let i = 0; i < history.length; i++) {
+      const e = history.at(i)
       reexpressMotionState(pass, e)
       if (e.hasNormal) pass.vector(e.normal)
       pass.look(e.data)
@@ -588,7 +600,8 @@ export class PredictionEngine {
     ls.onGround = base.onGround
     ls.groundY = base.onGround ? base.position[1] : (entry ? entry.groundY : NaN)
     if (entry) for (const k of MOVE_STATE_KEYS) ls[k] = entry.move[k]
-    for (const e of history) {
+    for (let i = 0; i < history.length; i++) {
+      const e = history.at(i)
       if (e.sequence <= ackSeq) continue
       this._step(e.data, e.sequence, e.hasNormal ? e.normal : null)
       saveEntry(e, ls)

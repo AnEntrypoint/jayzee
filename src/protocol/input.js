@@ -24,10 +24,9 @@ const yawToSteps = (yaw) => {
   return Math.round((wrapped / TWO_PI) * YAW_STEPS) % YAW_STEPS
 }
 
-export const encodeInputs = (records) => {
-  if (!Array.isArray(records)) throw new TypeError('records must be an array')
-  if (records.length === 0 || records.length > MAX_INPUT_RECORDS) throw new RangeError('a packet holds 1..' + MAX_INPUT_RECORDS + ' records')
-  const view = new DataView(new ArrayBuffer(HEADER_BYTES + records.length * RECORD_BYTES))
+export const inputPacketBytes = (count) => HEADER_BYTES + count * RECORD_BYTES
+
+export const writeInputRecords = (view, records) => {
   view.setUint8(0, INPUT_VERSION)
   view.setUint8(1, records.length)
   records.forEach((record, index) => {
@@ -38,6 +37,13 @@ export const encodeInputs = (records) => {
     view.setUint16(at + 6, yawToSteps(record.yaw), true)
     view.setUint32(at + 8, checkUint32(record.buttons, 'buttons'), true)
   })
+}
+
+export const encodeInputs = (records) => {
+  if (!Array.isArray(records)) throw new TypeError('records must be an array')
+  if (records.length === 0 || records.length > MAX_INPUT_RECORDS) throw new RangeError('a packet holds 1..' + MAX_INPUT_RECORDS + ' records')
+  const view = new DataView(new ArrayBuffer(inputPacketBytes(records.length)))
+  writeInputRecords(view, records)
   return view.buffer
 }
 

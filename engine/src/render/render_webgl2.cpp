@@ -348,16 +348,23 @@ int frame(const SceneView& scene, const FramePlan& plan, const Camera& camera) {
     ENGINE_RENDER_CALL(glPixelStorei(GL_UNPACK_ALIGNMENT, 4));
     ENGINE_RENDER_CALL(glActiveTexture(GL_TEXTURE1));
     ENGINE_RENDER_CALL(glBindTexture(GL_TEXTURE_2D_ARRAY, heightTex));
-    for (std::uint32_t u = 0; u < plan.uploadCount; ++u) {
-      ENGINE_RENDER_CALL(glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, static_cast<GLint>(plan.uploadLayer[u]), kPageSide, kPageSide, 1, GL_RED, GL_FLOAT,
-                                         scene.pages->pageSamples(static_cast<int>(plan.uploadSlot[u]))));
+    for (std::uint32_t u = 0; u < plan.uploadCount;) {
+      const std::uint32_t end = uploadRunEnd(plan, u);
+      ENGINE_RENDER_CALL(glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, static_cast<GLint>(plan.uploadLayer[u]), kPageSide, kPageSide, static_cast<GLsizei>(end - u),
+                                         GL_RED, GL_FLOAT, scene.pages->pageSamples(static_cast<int>(plan.uploadSlot[u]))));
+      u = end;
     }
     ENGINE_RENDER_CALL(glActiveTexture(GL_TEXTURE0));
     ENGINE_RENDER_CALL(glBindTexture(GL_TEXTURE_2D_ARRAY, albedoTex));
-    for (std::uint32_t layer = 0; layer < kAlbedoLayers; ++layer) {
-      if (plan.albedoPending[layer] == 0) continue;
-      ENGINE_RENDER_CALL(glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, static_cast<GLint>(layer), kAlbedoSide, kAlbedoSide, 1, GL_RGBA, GL_UNSIGNED_BYTE,
-                                         scene.albedoPixels + layer * kAlbedoBytes));
+    for (std::uint32_t layer = 0; layer < kAlbedoLayers;) {
+      if (plan.albedoPending[layer] == 0) {
+        layer += 1;
+        continue;
+      }
+      const std::uint32_t end = albedoRunEnd(plan, layer);
+      ENGINE_RENDER_CALL(glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, static_cast<GLint>(layer), kAlbedoSide, kAlbedoSide, static_cast<GLsizei>(end - layer),
+                                         GL_RGBA, GL_UNSIGNED_BYTE, scene.albedoPixels + layer * kAlbedoBytes));
+      layer = end;
     }
   }
 

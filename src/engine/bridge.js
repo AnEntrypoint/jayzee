@@ -86,6 +86,11 @@ export const createBridge = (module, layout = readLayout(module)) => {
   const inputFloats = new Float32Array(buffer, layout.regions.inputs, layout.inputSlots * BRIDGE.INPUT_WORDS)
   const eventWords = new Uint32Array(buffer, layout.regions.events, layout.eventSlots * BRIDGE.EVENT_WORDS)
   const transformFloats = new Float32Array(buffer, layout.regions.transforms, layout.bodies * BRIDGE.TRANSFORM_WORDS)
+  const transformViews = []
+  for (let body = 0; body < layout.bodies; body++) {
+    transformViews.push(transformFloats.subarray(body * BRIDGE.TRANSFORM_WORDS, (body + 1) * BRIDGE.TRANSFORM_WORDS))
+  }
+  const drained = []
 
   return Object.freeze({
     pushInput(body, velocity) {
@@ -126,19 +131,28 @@ export const createBridge = (module, layout = readLayout(module)) => {
     drainEvents() {
       const head = control[C.EVENT_HEAD]
       let tail = control[C.EVENT_TAIL]
-      const drained = []
+      let count = 0
       while (tail !== head) {
         const slot = (tail % layout.eventSlots) * BRIDGE.EVENT_WORDS
-        drained.push({ kind: eventWords[slot], a: eventWords[slot + 1], b: eventWords[slot + 2] })
+        let event = drained[count]
+        if (event === undefined) {
+          event = { kind: 0, a: 0, b: 0 }
+          drained[count] = event
+        }
+        event.kind = eventWords[slot]
+        event.a = eventWords[slot + 1]
+        event.b = eventWords[slot + 2]
+        count += 1
         tail += 1
       }
+      drained.length = count
       control[C.EVENT_TAIL] = tail
       return drained
     },
 
     transform(id) {
       const start = id * BRIDGE.TRANSFORM_WORDS
-      return transformFloats.subarray(start, start + BRIDGE.TRANSFORM_WORDS)
+      return transformViews[id] ?? transformFloats.subarray(start, start + BRIDGE.TRANSFORM_WORDS)
     },
   })
 }

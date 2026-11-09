@@ -49,6 +49,8 @@ export function createCrowdDotRendererWebGL(scene, opts = {}) {
   const quaternion = new THREE.Quaternion()
   const matrix = new THREE.Matrix4()
   let activeCount = 0
+  const decodeOptions = { dotCellM, dotSize, viewerY: 0, groundHeightFn: null }
+  const poseBuffer = []
 
   const newMesh = (n) => {
     const mesh = new THREE.InstancedMesh(geo, mat, n)
@@ -71,13 +73,16 @@ export function createCrowdDotRendererWebGL(scene, opts = {}) {
   }
 
   const update = (dots, viewerY, groundHeightFn) => {
-    const poses = decodeCrowdDots(dots, { dotCellM, dotSize, viewerY, groundHeightFn })
+    decodeOptions.viewerY = viewerY
+    decodeOptions.groundHeightFn = groundHeightFn
+    const poses = decodeCrowdDots(dots, decodeOptions, poseBuffer)
     ensureCapacity(poses.length)
-    poses.forEach((pose, i) => {
+    for (let i = 0; i < poses.length; i++) {
+      const pose = poses[i]
       position.set(pose.x, pose.y, pose.z)
       scale.set(pose.scale, pose.scale, pose.scale)
       im.setMatrixAt(i, matrix.compose(position, quaternion, scale))
-    })
+    }
     im.count = poses.length
     im.instanceMatrix.needsUpdate = true
     activeCount = poses.length

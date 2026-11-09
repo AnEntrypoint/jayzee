@@ -7,6 +7,7 @@ export class StateReceiver {
   #depth
   #received = new Map()
   #latest = null
+  #lookup = (tick) => this.#received.get(tick) ?? null
 
   constructor({ depth = DEFAULT_DEPTH } = {}) {
     if (!Number.isInteger(depth) || depth < 1) throw new RangeError('depth must be a positive integer')
@@ -18,7 +19,7 @@ export class StateReceiver {
   }
 
   receive(buffer) {
-    const state = decodeDelta(buffer, (tick) => this.#received.get(tick) ?? null)
+    const state = decodeDelta(buffer, this.#lookup)
     this.#received.set(state.tick, state)
     if (this.#latest === null || state.tick > this.#latest) this.#latest = state.tick
     for (const tick of this.#received.keys()) {

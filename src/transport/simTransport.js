@@ -69,6 +69,7 @@ export const createSimLink = ({ seed = 1, profile: partial = {} } = {}) => {
   let lastDeliveredIndex = 0
   const inFlight = []
   const ready = []
+  const due = []
   const stats = { sent: 0, dropped: 0, delivered: 0, reordered: 0 }
 
   const drawDelay = () => {
@@ -77,11 +78,16 @@ export const createSimLink = ({ seed = 1, profile: partial = {} } = {}) => {
   }
 
   const settle = (now) => {
-    const due = inFlight.filter((entry) => entry.deliverAt <= now).sort(byDeliveryOrder)
-    for (const entry of due) {
-      inFlight.splice(inFlight.indexOf(entry), 1)
-      ready.push(entry)
+    let kept = 0
+    for (let i = 0; i < inFlight.length; i++) {
+      const entry = inFlight[i]
+      if (entry.deliverAt <= now) due.push(entry)
+      else inFlight[kept++] = entry
     }
+    inFlight.length = kept
+    due.sort(byDeliveryOrder)
+    for (const entry of due) ready.push(entry)
+    due.length = 0
   }
 
   const takeReady = () => ready.splice(0).map((entry) => {

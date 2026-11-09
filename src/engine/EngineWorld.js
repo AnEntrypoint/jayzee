@@ -18,6 +18,7 @@ const DEFAULT_BUDGET_BYTES = 64 * 1024 * 1024
 const MAX_PLAYERS = 1024
 const MAX_WORKERS = 8
 const DEFAULT_GLUE = new URL('../../engine/out/engine-core-64mib.mjs', import.meta.url).href
+const NO_VELOCITY = Object.freeze([0, 0, 0])
 
 export const TREE_CLASS = { trunk: 0, rock: 1, pass: 2 }
 
@@ -56,12 +57,15 @@ export class EngineWorld {
   #capacity
   #tickRate
   #alive = new Set()
+  #sortedHandles = null
   #accumulator = 0
   #positions
   #velocities
   #stageRows
   #stageHandles
   #scratch
+  #hashFloats = new Float64Array(0)
+  #hashWords = new Uint32Array(0)
 
   constructor(module, settings, layout) {
     this.#module = module
@@ -104,6 +108,7 @@ export class EngineWorld {
     const handle = this.#module._engine_spawn(position[0], position[1], position[2], velocity[0], velocity[1], velocity[2])
     if (handle < 0) throw engineError(handle, 'engine refused the spawn')
     this.#alive.add(handle)
+    this.#sortedHandles = null
     return handle
   }
 
@@ -112,14 +117,21 @@ export class EngineWorld {
     if (rows.length > this.#capacity - this.#alive.size) {
       throw new RangeError('world has room for ' + (this.#capacity - this.#alive.size) + ' more bodies')
     }
-    const staged = rows.map((row) => {
-      checkVector(row.position, 'position')
-      checkVector(row.velocity ?? [0, 0, 0], 'velocity')
-      return [...row.position, ...(row.velocity ?? [0, 0, 0])]
-    })
-    staged.forEach((values, row) => {
-      for (let k = 0; k < BATCH_WORDS; k++) this.#stageRows[row * BATCH_WORDS + k] = values[k]
-    })
+    for (let row = 0; row < rows.length; row++) {
+      checkVector(rows[row].position, 'position')
+      checkVector(rows[row].velocity ?? NO_VELOCITY, 'velocity')
+    }
+    for (let row = 0; row < rows.length; row++) {
+      const position = rows[row].position
+      const velocity = rows[row].velocity ?? NO_VELOCITY
+      const base = row * BATCH_WORDS
+      this.#stageRows[base] = position[0]
+      this.#stageRows[base + 1] = position[1]
+      this.#stageRows[base + 2] = position[2]
+      this.#stageRows[base + 3] = velocity[0]
+      this.#stageRows[base + 4] = velocity[1]
+      this.#stageRows[base + 5] = velocity[2]
+    }
     const status = this.#module._engine_spawn_batch(rows.length)
     if (status < 0) throw engineError(status, 'engine refused the batch')
     const spawned = []
@@ -128,6 +140,7 @@ export class EngineWorld {
       this.#alive.add(handle)
       spawned.push(handle)
     }
+    this.#sortedHandles = null
     return spawned
   }
 
@@ -135,18 +148,25 @@ export class EngineWorld {
     this.#checkHandle(handle)
     this.#write(this.#module._engine_despawn(handle), 'despawn')
     this.#alive.delete(handle)
+    this.#sortedHandles = null
   }
 
-  position(handle) {
+  position(handle, out = [0, 0, 0]) {
     this.#checkHandle(handle)
     const base = (handle & SLOT_MASK) * 3
-    return [this.#positions[base], this.#positions[base + 1], this.#positions[base + 2]]
+    out[0] = this.#positions[base]
+    out[1] = this.#positions[base + 1]
+    out[2] = this.#positions[base + 2]
+    return out
   }
 
-  velocity(handle) {
+  velocity(handle, out = [0, 0, 0]) {
     this.#checkHandle(handle)
     const base = (handle & SLOT_MASK) * 3
-    return [this.#velocities[base], this.#velocities[base + 1], this.#velocities[base + 2]]
+    out[0] = this.#velocities[base]
+    out[1] = this.#velocities[base + 1]
+    out[2] = this.#velocities[base + 2]
+    return out
   }
 
   setVelocity(handle, velocity) {
@@ -179,10 +199,15 @@ export class EngineWorld {
   }
 
   hash() {
-    const positions = this.#gather(this.#positions)
-    const velocities = this.#gather(this.#velocities)
-    const words = (view) => new Uint32Array(view.buffer, view.byteOffset, view.length * 2)
-    return fnvWords(fnvWords(FNV_OFFSET, words(positions)), words(velocities)) >>> 0
+    const size = this.#alive.size * 3
+    if (this.#hashFloats.length !== size) {
+      this.#hashFloats = new Float64Array(size)
+      this.#hashWords = new Uint32Array(this.#hashFloats.buffer)
+    }
+    this.#gather(this.#positions, this.#hashFloats)
+    const positionHash = fnvWords(FNV_OFFSET, this.#hashWords)
+    this.#gather(this.#velocities, this.#hashFloats)
+    return fnvWords(positionHash, this.#hashWords) >>> 0
   }
 
   snapshot() {
@@ -209,10 +234,9 @@ export class EngineWorld {
       throw new RangeError('state arrays do not match the body count')
     }
     this.#handles().forEach((handle, index) => {
-      const p = state.positions.slice(index * 3, index * 3 + 3)
-      const v = state.velocities.slice(index * 3, index * 3 + 3)
-      this.#write(this.#module._engine_set_position(handle, p[0], p[1], p[2]), 'position')
-      this.#write(this.#module._engine_set_velocity(handle, v[0], v[1], v[2]), 'velocity')
+      const at = index * 3
+      this.#write(this.#module._engine_set_position(handle, state.positions[at], state.positions[at + 1], state.positions[at + 2]), 'position')
+      this.#write(this.#module._engine_set_velocity(handle, state.velocities[at], state.velocities[at + 1], state.velocities[at + 2]), 'velocity')
     })
     this.#module._engine_set_tick(BigInt(state.tick))
     this.#accumulator = 0
@@ -327,12 +351,12 @@ export class EngineWorld {
   }
 
   #handles() {
-    return [...this.#alive].sort(bySlot)
+    if (this.#sortedHandles === null) this.#sortedHandles = [...this.#alive].sort(bySlot)
+    return this.#sortedHandles
   }
 
-  #gather(source) {
+  #gather(source, out = new Float64Array(this.#alive.size * 3)) {
     const handles = this.#handles()
-    const out = new Float64Array(handles.length * 3)
     handles.forEach((handle, index) => {
       const from = (handle & SLOT_MASK) * 3
       const to = index * 3

@@ -16,7 +16,7 @@ export class ClockSync {
   }
 
   addSample(t0, t2, t3, t1 = t2) {
-    if (![t0, t1, t2, t3].every(Number.isFinite)) return false
+    if (!Number.isFinite(t0) || !Number.isFinite(t1) || !Number.isFinite(t2) || !Number.isFinite(t3)) return false
     const rtt = (t3 - t0) - (t2 - t1)
     if (!(rtt >= 0)) return false
     const offset = ((t1 - t0) + (t2 - t3)) / 2

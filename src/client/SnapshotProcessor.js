@@ -1,7 +1,7 @@
 import { unpackGroundNormal } from '../wire/groundNormalWire.js'
 import { inputDepthFromWire, NO_INPUT_DEPTH } from '../wire/inputDepthWire.js'
 import { unpackWallPlanes } from '../wire/wallPlaneWire.js'
-import { decodeEntityRecord, decodePlayerRecord, WIRE_UNITS_PER_METER } from '../wire/index.js'
+import { decodeEntityRecordInto, decodePlayerRecordInto, WIRE_UNITS_PER_METER } from '../wire/index.js'
 import { PLAYER_TIER_FULL, PLAYER_TIER_REDUCED, unpackQuat } from '../snapshot-lod-pure/records.js'
 import { reexpressPlayerRecord, reexpressEntityRecord } from './reexpressRecords.js'
 
@@ -104,6 +104,8 @@ const makeEntitySlot = () => ({
 })
 
 const reducedPose = makeReducedPlayerPose()
+const playerRecord = { position: [0, 0, 0], rotationWord: 0, velocity: [0, 0, 0] }
+const entityRecord = { position: [0, 0, 0], rotationWord: 0, velocity: [0, 0, 0], scale: [0, 0, 0], flags: 0 }
 
 const fillPlayerArrReduced = (s, p) => {
   const pose = unpackReducedPlayerPose(p, reducedPose)
@@ -116,7 +118,7 @@ const fillPlayerArrReduced = (s, p) => {
 
 const fillPlayerArr = (s, p) => {
   s.id = p[0]
-  const record = decodePlayerRecord(p[1])
+  const record = decodePlayerRecordInto(p[1], playerRecord)
   copy3(s.position, record.position)
   s.heightAbsent = false
   unpackQuat(record.rotationWord, s.rotation)
@@ -172,7 +174,7 @@ const applyFieldDelta = (s, mask, fields, start) => {
   let fi = start
   if (mask & FIELD_MODEL) s.model = fields[fi++]
   if (mask & KINEMATIC_FIELDS) {
-    const record = decodeEntityRecord(fields[fi++])
+    const record = decodeEntityRecordInto(fields[fi++], entityRecord)
     if (mask & FIELD_POS) copy3(s.position, record.position)
     if (mask & FIELD_ROT) unpackQuat(record.rotationWord, s.rotation)
     if (mask & FIELD_VEL) copy3(s.velocity, record.velocity)
@@ -190,7 +192,7 @@ const fillEntityArr = (s, e) => {
   }
   s.id = e[0]
   s.model = e[1]
-  const record = decodeEntityRecord(e[2])
+  const record = decodeEntityRecordInto(e[2], entityRecord)
   copy3(s.position, record.position)
   unpackQuat(record.rotationWord, s.rotation)
   copy3(s.velocity, record.velocity)
@@ -276,7 +278,6 @@ export class SnapshotProcessor {
   #entityStates = new Map()
   #callbacks
   #now
-  #seenPlayers = new Set()
   #seenEntities = new Set()
   #deltaFailures = 0
   #deltaFailureIds = new Set()
@@ -320,10 +321,8 @@ export class SnapshotProcessor {
     const snapshotForBuffer = { tick: data.tick || 0, timestamp: this.#timestampOf(data), players: [], entities: [] }
     if (data.dots) snapshotForBuffer.dots = data.dots
 
-    this.#seenPlayers.clear()
     for (const p of data.players || []) {
       const pid = Array.isArray(p) ? p[0] : (p.id || p.i)
-      this.#seenPlayers.add(pid)
       this.#lastSeenCall.set(pid, this.#callCount)
       let track = this.#playerStates.get(pid)
       if (track) fillPlayer(track, p)
@@ -339,8 +338,9 @@ export class SnapshotProcessor {
       if (pid === selfId && Array.isArray(data.me)) applySelfBlock(track, data.me)
       snapshotForBuffer.players.push(copyPlayerStateInto(this.#playerSlotPool.acquire(), track))
     }
-    for (const [pid, track] of this.#playerStates) {
-      if (this.#seenPlayers.has(pid)) continue
+    for (const pid of this.#playerStates.keys()) {
+      if (this.#lastSeenCall.get(pid) === this.#callCount) continue
+      const track = this.#playerStates.get(pid)
       if (track.tier === PLAYER_TIER_REDUCED) {
         const lastSeen = this.#lastSeenCall.get(pid) || 0
         if (this.#callCount - lastSeen < REDUCED_TIER_ABSENCE_GRACE_SNAPSHOTS) {

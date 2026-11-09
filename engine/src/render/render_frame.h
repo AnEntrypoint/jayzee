@@ -124,6 +124,8 @@ bool acceptCreate();
 void resetPlan(FramePlan& plan);
 void planFrame(const SceneView& scene, Camera& camera, FramePlan& plan);
 void resolveMaterials(const MaterialSlot* table, std::uint32_t count, const std::uint8_t* albedoReady, std::int32_t (*albedoLayerOf)(double handle), std::uint32_t* words);
+std::uint32_t uploadRunEnd(const FramePlan& plan, std::uint32_t start);
+std::uint32_t albedoRunEnd(const FramePlan& plan, std::uint32_t start);
 
 }
 
