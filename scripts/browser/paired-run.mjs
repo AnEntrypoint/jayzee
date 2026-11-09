@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { burn } from './cpu-load.mjs'
-import { flightPath, percentile, streamerSteps } from '../streamer-p99.mjs'
+import { flightPath, newStreamerState, percentile, planetWorld, streamerPass } from '../streamer-p99.mjs'
 
 export const CONDITIONS = ['G0', 'G1']
 const SAMPLER = new URL('./cgroup-sampler.mjs', import.meta.url).pathname
@@ -44,11 +44,21 @@ function exited(child) {
 }
 
 async function measureStreamerUntil(path, untilMs) {
-  const steps = []
+  const world = await planetWorld()
+  const state = newStreamerState()
   const startMs = Date.now()
+  const passes = []
+  let count = 0
   while (Date.now() < untilMs) {
-    const { steps: pass } = await streamerSteps(path)
-    for (const ms of pass) steps.push(ms)
+    const pass = streamerPass(world, path, state)
+    passes.push(Float64Array.from(pass))
+    count += pass.length
+  }
+  const steps = new Float64Array(count)
+  let offset = 0
+  for (const pass of passes) {
+    steps.set(pass, offset)
+    offset += pass.length
   }
   return { startMs, endMs: Date.now(), steps }
 }
@@ -83,7 +93,7 @@ if (process.argv[1] && process.argv[1].endsWith('/browser/paired-run.mjs')) {
       samples: streamer.steps.length,
       p50Ms: percentile(streamer.steps, 0.5),
       p99Ms: percentile(streamer.steps, 0.99),
-      maxMs: Math.max(...streamer.steps),
+      maxMs: streamer.steps.reduce((m, v) => (v > m ? v : m), -Infinity),
     },
   })
   writeFileSync(join(outDir, label + '.run.json'), JSON.stringify(record, null, 2) + '\n')

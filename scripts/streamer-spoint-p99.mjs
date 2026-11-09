@@ -56,7 +56,7 @@ export async function coverSteps(path, { heightFn = analyticHeight, physics = st
   const logs = silenced()
   const steps = []
   let fieldsAtEnd = 0
-  let bodiesAtEnd = 0
+  let bodies = []
   try {
     for (const p of path) {
       current = [p[0], p[2]]
@@ -65,7 +65,7 @@ export async function coverSteps(path, { heightFn = analyticHeight, physics = st
       steps.push(performance.now() - started)
     }
     fieldsAtEnd = streamer.fields.length
-    bodiesAtEnd = physics.bodies.size
+    bodies = [...physics.bodies.values()]
   } finally {
     logs.restore()
     streamer.stop()
@@ -74,11 +74,10 @@ export async function coverSteps(path, { heightFn = analyticHeight, physics = st
     steps,
     builds: streamer.rebuildCount,
     fieldsAtEnd,
-    bodiesAtEnd,
+    bodies,
     refusals: streamer.refusalCount,
     lastError: streamer.lastError ? streamer.lastError.message : null,
     consoleLines: logs.counts,
-    physics,
   }
 }
 

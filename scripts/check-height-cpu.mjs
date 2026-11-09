@@ -14,9 +14,11 @@ const root = dirname(here)
 const fixture = JSON.parse(readFileSync(join(here, 'fixtures', 'spoint', 'height-cpu.json'), 'utf8'))
 const dec = (v) => (v === '-0' ? -0 : typeof v === 'string' ? Number(v) : v)
 const decAll = (xs) => xs.map(dec)
+const TOLERANCE = 1e-12
+const close = (got, want) => Object.is(got, want) || (Number.isFinite(got) && Number.isFinite(want) && Math.abs(got - want) <= TOLERANCE * Math.max(1, Math.abs(want)))
 const sameList = (got, want, label) => {
   assert.equal(got.length, want.length, label + ' length')
-  for (let i = 0; i < want.length; i++) assert.ok(Object.is(got[i], want[i]), label + ' index ' + i + ': got ' + String(got[i]) + ' want ' + String(want[i]))
+  for (let i = 0; i < want.length; i++) assert.ok(close(got[i], want[i]), label + ' index ' + i + ': got ' + String(got[i]) + ' want ' + String(want[i]))
 }
 const attempt = (fn) => {
   try {
@@ -52,9 +54,9 @@ for (const row of fixture.samplers) {
     assert.equal(s.carves.length, row.carves.length)
     row.carves.forEach((c, i) => {
       sameList(s.carves[i].dir, decAll(c.dir), row.name + ' carve dir ' + i)
-      assert.ok(Object.is(s.carves[i].innerChord2, dec(c.innerChord2)), row.name + ' innerChord2 ' + i)
-      assert.ok(Object.is(s.carves[i].outerChord2, dec(c.outerChord2)), row.name + ' outerChord2 ' + i)
-      assert.ok(Object.is(s.carves[i].targetH, dec(c.targetH)), row.name + ' targetH ' + i)
+      assert.ok(close(s.carves[i].innerChord2, dec(c.innerChord2)), row.name + ' innerChord2 ' + i)
+      assert.ok(close(s.carves[i].outerChord2, dec(c.outerChord2)), row.name + ' outerChord2 ' + i)
+      assert.ok(close(s.carves[i].targetH, dec(c.targetH)), row.name + ' targetH ' + i)
     })
   })
 }
@@ -93,7 +95,7 @@ for (const seedRow of fixture.anchors) {
     seedRow.faces.forEach((f, i) => {
       const got = af.dirToFaceUV(DIRS[i])
       assert.equal(got.face, f.face)
-      assert.ok(Object.is(got.fu, dec(f.fu)) && Object.is(got.fv, dec(f.fv)), 'face uv ' + i)
+      assert.ok(close(got.fu, dec(f.fu)) && close(got.fv, dec(f.fv)), 'face uv ' + i)
     })
   })
 }

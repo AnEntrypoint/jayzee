@@ -32,25 +32,30 @@ export async function flightPath(ticks) {
   return path
 }
 
-export async function streamerSteps(path) {
-  const world = await planetWorld()
-  const page = new Float32Array(PAGE_FLOATS)
+export function newStreamerState() {
+  return { page: new Float32Array(PAGE_FLOATS), resident: [], lastKey: null }
+}
+
+export function streamerPass(world, path, state) {
   const steps = []
-  const resident = []
-  let lastKey = null
   for (const p of path) {
     const started = performance.now()
     const cell = world.locateCell(p)
     const key = world.cellKey(cell.face, cell.cx, cell.cy)
-    if (key !== lastKey) {
-      world.writePage(key, page)
-      resident.push(key)
-      if (resident.length > RESIDENT_PAGES) world.releasePage(resident.shift())
-      lastKey = key
+    if (key !== state.lastKey) {
+      world.writePage(key, state.page)
+      state.resident.push(key)
+      if (state.resident.length > RESIDENT_PAGES) world.releasePage(state.resident.shift())
+      state.lastKey = key
     }
     steps.push(performance.now() - started)
   }
-  return { steps }
+  return steps
+}
+
+export async function streamerSteps(path) {
+  const world = await planetWorld()
+  return { steps: streamerPass(world, path, newStreamerState()) }
 }
 
 if (process.argv[1] && process.argv[1].endsWith('/scripts/streamer-p99.mjs')) {
