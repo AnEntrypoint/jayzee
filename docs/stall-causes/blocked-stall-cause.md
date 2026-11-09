@@ -44,4 +44,39 @@ What would settle the open part: sample `/proc/<pid>/task/<tid>/schedstat` for t
 
 ## Status
 
-REPORT: finished for the sampler change and the two G1 runs; open for the cause of r1's off-CPU blocked time.
+## Round 3: r1 G1 with the scheduler instrument (`r1-G1-sched`)
+
+Run: round 1 paired G1, 12 burn workers, 240 s, behind the load gate. Thread sampler at a 50 ms period with the Phase A instrument (commit `f646318`): renderer main-thread `schedstat`, `wchan` and fault counts per tick, and the cgroup memory and IO pressure totals and the sampler's own scheduler stats per tick. Files: `build/diag/paired-F/r1-G1-sched.*` (git-ignored). Per-stall rows: `docs/stall-causes/round2-r1-G1-sched.tsv` (115 stalls).
+
+### Sampler gap check
+
+4921 ticks, median gap 51 ms, p99 78 ms, max 106 ms, one gap over 100 ms (tick 2800, 106 ms). The check FAILS by 6 ms. The sampler's own scheduler stats for that tick show 34.0 ms of run-queue wait and 7.5 ms of run time, so the late tick was the sampler waiting for a CPU during the burn. This is the same cause as the earlier r1 failures, with a smaller margin.
+
+### Stall counts by category
+
+blocked 60, starved 50, cpu-bound 5 (115 stalls).
+
+### The blocked stalls: what the renderer main thread was doing
+
+Shares of each category's total stall time, from the per-stall `schedstat` run and wait deltas (sleep is the stall time minus run and wait, clamped at zero):
+
+| verdict | stall time | run share | runnable-wait share | sleep share |
+|---|---|---|---|---|
+| blocked | 2937.7 ms | 0.56 | 0.42 (about 1234 ms) | 0.03 (about 100 ms) |
+| starved | 1870.1 ms | 0.25 | 0.62 (about 1159 ms) | 0.13 (about 245 ms) |
+| cpu-bound | 154.8 ms | 0.80 | 0.43 | 0 |
+
+The 44% off-CPU share in the earlier round is confirmed as the same time. It is 42% runnable and waiting for a CPU, and 3% sleeping. It was labelled blocked, not starved, because the cgroup pressure share for each stall was under 0.5, while the same stalls were waiting for a CPU for about 0.42 of their time. So `blocked` in this classifier means "contention below the pressure threshold", not "no contention".
+
+The sampled wait categories inside the blocked stalls agree. Of the 73 samples in blocked stall windows, 72 read `wchan` 0 (running at the sample) and 1 read `futex_do_wait`. Twelve blocked stalls had no sample inside their window, so they are judged from the nearest sample before them. The one futex sample is in frame 84, which has 12 ms of sleep. No other blocked stall has a sleep above 1 ms in its window that a sample confirms.
+
+### The off-CPU wait site
+
+- The wait is the scheduler's run queue. The renderer main thread is runnable and is not running. It is not a call in the engine or in the page.
+- Measured duration: about 1234 ms of runnable wait across the 60 blocked stalls (median 0.43 of each stall's time). The starved stalls wait about 1159 ms the same way.
+- Why it is inherent to this condition: the G1 burn runs 12 workers on the host's 12 CPUs, all in one root cgroup. The renderer and the sampler compete for those CPUs by design. Removing the wait means changing the burn, which changes the condition under test.
+- Limit: run and wait are interpolated between 50 ms ticks, so for a stall shorter than one tick the split is the average over the ticks around it. The blocked stalls have a median of about 26 ms, so the split is roughly right for most of them and coarse for the shortest.
+
+### Status
+
+REPORT: open. The sampler gap check failed again on r1, by 6 ms, with the sampler's own run-queue wait measured on that tick. The blocked-stall off-CPU time is named as run-queue wait (CPU contention under G1), inherent to the condition, with the measured duration above. The r2 sub-20 ms stalls remain a measurement limit as recorded.

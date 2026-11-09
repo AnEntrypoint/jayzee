@@ -1370,3 +1370,17 @@ What the engine code shows: `engine/CMakeLists.txt` and `engine/build.sh` have n
 - The r1 sampling gap check passes, or its late ticks are shown to be the sampler's own run-queue wait (`selfWaitNs` rising over the late tick).
 - Each r1 blocked stall's sleep time, its `wchan` categories, and its fault and memory-pressure deltas. The wait is named when one category covers most of the sleep time, with the wchan symbol and the fault counts as the witness. If the only evidence is `futex` with no code path, the call stays unnamed and the limit (no user-space stack on this host) is recorded.
 - Nothing above is claimed as a fix. Any code defect that Phase B names is recorded as a finding for the next pass, since the wait can only be named once the measurement exists.
+
+### Phase B: the r1 G1 rerun with the scheduler instrument
+
+No code changed in this pass. The load gate (1-minute load below 3) passed before the start. Run `r1-G1-sched`: paired G1, 12 burn workers, 240 s, with the sampler from `f646318` and one page render. Files in `build/diag/paired-F` (git-ignored).
+
+Sampler gap check: 4921 ticks, median 51 ms, p99 78 ms, max 106 ms, one gap over 100 ms (tick 2800). FAIL, by 6 ms. On that tick the sampler's own scheduler stats show 34.0 ms of run-queue wait and 7.5 ms of run time. So the late tick is the sampler waiting for a CPU during the burn, which is the cause recorded in Phase A.
+
+Stall counts by category: blocked 60, starved 50, cpu-bound 5 (115 stalls). Per-stall rows in `docs/stall-causes/round2-r1-G1-sched.tsv`.
+
+Off-CPU wait site: the blocked stalls' stall time splits into 56% running, 42% runnable and waiting for a CPU (about 1234 ms over 60 stalls), and 3% sleeping (about 100 ms). The earlier 44% off-CPU figure is this same time. The wait is the scheduler's run queue under the 12-worker G1 burn on 12 CPUs. No engine or page call makes it, so it is inherent to the condition and is not a code defect. The blocked label means contention below the pressure threshold, not no contention. The interpolation between 50 ms ticks bounds the split for stalls shorter than one tick.
+
+`npm test`: EXIT 0, 4698 PASS and 0 FAIL, log `build/diag/phase-b4-npm-test.log`, including `check:stall-off-cpu` and `check:thread-sampler`.
+
+Open: the r1 sampling gap check fails by 6 ms. The gate threshold is not changed, and the late tick is recorded as the sampler's own run-queue wait under the burn.
