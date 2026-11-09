@@ -1139,3 +1139,26 @@ Witnesses (Phase B):
 - Public site `https://anentrypoint.github.io/jayzee/play/` in the project browser: crossOriginIsolated true, SharedArrayBuffer a function, service worker controlling the page.
 
 Still open, not closed by this section: the gravity wake cause above (the sleep change has no measured effect); the phase 5 frame-time p99 against spoint; the `USE_WEBGPU` migration to emdawnwebgpu; the `ENGINE_THREADS` branch, which is not compiled; the launcher-level null adapter after a browser restart; and CI for the pushed commits, which runs on GitHub and was not run here.
+
+### Gravity wake: cause, and the Phase A changes of this pass
+
+Cause, read from the Jolt source (`/tmp/jolt-src`, `Jolt/Physics/Body/BodyInterface.cpp` lines 624 to 636). `applyRadialGravity` (`engine/src/world.cpp`, called from the step listener at line 98) adds the planet pull to every live body on every tick through `BodyInterface::AddLinearVelocity`. That call activates an inactive body whenever the new velocity is not near zero (lines 634 and 635). Every body is therefore woken on every tick, resting or not, and the sleep test never completes. The 10240 in the `active` column of the page is this wake, and change 1 of the stall pass (`mAllowSleeping = true`) cannot take effect while it lasts. The stall frames are the physics step of bodies that never sleep.
+
+Changes (Phase A, not built or run when written):
+
+1. `engine/src/world.cpp`, `applyRadialGravity`: a body that is not active is skipped, so a resting body gets no velocity and keeps sleeping. Witness: `check:engine-sleep`, gates 1 and 2 (bodies sleep at radius height within 1200 ticks, and a sleeping body does not move or wake over 120 ticks), then the `active` column of the Phase B paired runs.
+2. `engine/src/world.cpp`, `configurePlanet`: after the planet body is replaced, every live body is activated, so each one re-tests its support. Witness: `check:engine-sleep`, gate 4 (a reconfigure gives 64 active bodies).
+3. `scripts/check-engine-sleep.mjs` (new, `npm run check:engine-sleep`). It builds the render page's scene: a 2048-capacity world at 60 ticks per second, a ground box, 64 bodies on a grid and the planet. It has four gates: the settle, the still sleeper, the moved body that wakes and settles again, and the planet reconfigure. It needs the built engine glue, so like `check:engine-bridge` it runs with the engine gates and not in `npm test`. Witness: its RESULT line in Phase B, first against the pre-fix build (expected to fail on gate 1), then against the rebuilt build.
+4. `scripts/browser/stall-probe.mjs`, `probeStalls`: reports `activeMin` and `activeMax` over the run's frames, and each stall's `active` count, so the wake shows beside the stall verdicts. It is null when the run has no `active` column. Witness: `check:stall-probe`, the new gate line "probeStalls gives the active-body range over the frames…" (in `npm test`).
+
+Ranked remaining work, at the start of this pass:
+
+1. Gravity wake (this pass). Cause found and recorded above. Changes 1 to 4 are Phase A, and their Phase B witnesses follow below. Status: fixed in source, witnessed in Phase B.
+2. P2 stall verdict. The last report gave `supported` with `starvationRatio` 103.69173018128768. Round 2 alone: G1 534 frames over the G0 threshold against 0 (G0 threshold 67.8 ms). G1 own-median stalls 15 against 0. Status: open until the Phase B paired runs show the `active` column falling and the stalls fall with it.
+3. Phase 5 frame-time p99 against spoint. Open, not folded: it needs spoint's own page run in the browser, which is not this probe. It shares no probe with the stall pass, so it is not measured here.
+4. `ENGINE_THREADS`. Open and recorded. It becomes the next lever only if the wake fix leaves the physics step above its budget.
+5. `USE_WEBGPU` migration to emdawnwebgpu. Recorded, not unblocked by this pass.
+6. Launcher-level null adapter after a browser restart. Recorded, not unblocked.
+7. CI for pushed commits. Recorded; it runs on GitHub after the push.
+
+Witnesses in Phase B are appended below this line.
