@@ -169,7 +169,7 @@ const run = async () => {
   const aspect = canvas.width / canvas.height
   const frameTimes = []
   const frameRows = []
-  const PHASE_NAMES = ['pages', 'inputs', 'physics', 'readback']
+  const PHASE_NAMES = ['pages', 'inputs', 'physics', 'readback', 'plan', 'backend']
   const phaseCount = TIMED && module._engine_phase_count ? module._engine_phase_count() : 0
   const readPhases = () => Array.from({ length: phaseCount }, (_, i) => module._engine_phase_total_ms(i))
   let lastStats = null
@@ -219,6 +219,8 @@ const run = async () => {
   result.outliers = timedRows.filter((row) => row.totalMs > 2 * result.frameTimeMedianMs).map((row) => ({ frame: row.frame, wallMs: Math.round(performance.timeOrigin + row.started), totalMs: round2(row.totalMs), tickMs: round2(row.tickMs), renderMs: round2(row.renderMs), gapMs: row.gapMs === null ? null : round2(row.gapMs), phasesMs: Object.fromEntries(row.phases.map((v, i) => [PHASE_NAMES[i], round2(v)])) }))
   result.phaseMedianMs = Object.fromEntries(PHASE_NAMES.slice(0, phaseCount).map((name, i) => [name, round2(median(timedRows.map((row) => row.phases[i])))]))
   result.phaseMaxMs = Object.fromEntries(PHASE_NAMES.slice(0, phaseCount).map((name, i) => [name, round2(Math.max(...timedRows.map((row) => row.phases[i])))]))
+  result.rowColumns = ['frame', 'tickMs', 'renderMs', 'gapMs', ...PHASE_NAMES.slice(0, phaseCount)]
+  result.rows = timedRows.map((row) => [row.frame, round2(row.tickMs), round2(row.renderMs), row.gapMs === null ? null : round2(row.gapMs), ...row.phases.map((v) => round2(v))])
   result.apiCallsPerFrame = lastStats.apiCallsLastFrame
   result.allocationsSinceWarmup = String(lastStats.allocationsSinceWarmup)
   result.createsAfterSeal = lastStats.createsAfterSeal

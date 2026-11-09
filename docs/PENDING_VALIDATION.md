@@ -683,3 +683,27 @@ Corrections to the earlier text. The 03:33 UTC browser (pid 4095457) did run thr
 Defect in gm, not edited here. A gate that gm starts never gets the wrapper. The owner has two options: (a) make gm read the project `.mcp.json` `env` for the playwriter entry, or (b) set `PLAYWRITER_BROWSER_PATH` in gm's shipped defaults. Option (b) applies to every project, and the path is specific to this machine. This is the owner's decision.
 
 Current state. Gate 101717 is running, and its browser 122269 is open on the project profile and holds a lease. The page server (`scripts/browser/serve-root.mjs 8765`, pid 20303) is stopped. No timed run is active.
+
+## Physics phase at 1024, WebGPU against WebGL2: trace and Phase A changes
+
+Trace, from the code.
+
+- `tickBatch` (`engine/src/bridge.cpp`) runs `pages`, then `inputs`, then `World::step`. Only `physics.Update` is inside the physics scope (`engine/src/world.cpp`, `World::step`). `Update` runs on `JobSystemSingleThreaded` unless `ENGINE_THREADS` is set, so the window is one thread of wasm code with no GPU call inside it.
+- The render side runs after the tick, in the same rAF step (`scripts/browser/engine-render-browser.js`): `engine_render_frame`, then `planFrame`, then `frameBackend`. `frameBackend` is the only backend-dependent code, and it runs after the physics window of the same frame.
+- Both backends run the same module on the same inputs, and the checksum is equal (`-3826851758512048142` at 1024). So the physics code and its data are the same for both backends. A physics-phase difference can come only from what the previous frame left in memory and caches, or from other work on the CPU during the window.
+- In our code: `planFrame` wrote each body's 32-byte record into `plan.bodyRecords` every frame (10240 bodies, about 327 KB). Nothing reads that array. The hash reads the same words from a local, and the visible records are copied from the local words. It is dead storage that both backends pay for each frame, and it pushes the physics working set out of cache.
+- Not in our code: backend-specific cost inside the physics window. WebGPU's extra work (queue writes, encoder, pass) runs after the window. Any CPU use by the GPU process or by driver threads is outside the wasm code and is not measured by any counter in the repo before Phase B.
+
+Phase A changes. Local commit, not pushed.
+
+1. `engine/src/render/render_frame.cpp`, `engine/src/render/render_frame.h`: `planFrame` computes each body's record in a local array, and `FramePlan::bodyRecords` is removed. Witness: `engine/test/witness_phase10_plan.cpp` (new) pins the checksum `0x3fb5a6de438de68e` and the visible counts `2489, 2489, 2487, 2483` for a fixed 10240-body scene at frame 599. The witness printed exactly those values on the unchanged code, and it passes after the change (`engine/test/build_host.sh`: `RESULT: PASS`).
+2. `engine/src/phase_timer.h`, `engine/src/exports_render.cpp`: two phases, `kPlan` (around `planFrame`) and `kBackend` (around `frameBackend`), under the existing `Scope`. The enum count goes from 4 to 6. The fixed build has no timers, so the scopes compile to nothing. Witness: the Phase B rows carry `plan` and `backend`.
+3. `engine/artifacts.json`: pins for the rebuilt fixed 64 MiB (`c678dd95…`), fixed 128 MiB (`bbcb9361…`) and leak 64 MiB (`c411d496…`). The timed 128 MiB build (`2b28cd23…`) is not pinned. Witness: `check:engine-artifacts` 6 PASS, `check:engine-core` 3 PASS, `check:engine-leak` 3 PASS, `check:engine-tiers` 6 PASS, `check:engine-render` 17 PASS.
+4. `scripts/browser/engine-render-browser.js`: `PHASE_NAMES` includes `plan` and `backend`. The result gains `rowColumns` and `rows`, one compact row per timed frame (tick, render, gap, and each phase). Witness: Phase B results.
+5. `scripts/browser/timed-result.mjs` (new): `stampLoad` reads `/proc/loadavg` (1, 5 and 15 minute averages, runnable and total threads), the CPU count and the wall time. `mergeLoad` adds `load.before` and `load.after` and refuses a missing stamp. Witness: `check:timed-result`, 6 PASS.
+6. `scripts/check-timed-result.mjs` (new gate) and `package.json`: `check:timed-result` is in the `npm test` chain.
+7. `scripts/browser/timed-run.mjs`: stamps load before the spawn and after the wait, and writes `load` into the result file. Witness: not run. This driver starts its own Chromium, and the Phase B runs went through the project's playwriter browser.
+8. `scripts/browser/summarise-timed.mjs` (new): prints the medians, p99s, load before and after each run, the phase medians, and the correlation between each frame's physics time and the previous frame's render time. Witness: Phase B output.
+9. `engine/test/witness_phase10_plan.cpp`, `engine/test/main_all.cpp`, `engine/test/build_host.sh`: the native witness is wired in. `build_host.sh` compiles `render_frame.cpp`. `package.json` adds `check:engine-host-witness` to the `npm test` chain.
+
+What Phase A does not establish: that change 1 closes the WebGPU gap. It removes per-frame memory traffic that both backends share. Phase B shows whether the physics phase moves, and whether the gap moves with the render time of the previous frame.

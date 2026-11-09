@@ -6,6 +6,7 @@
 
 #include "arena.h"
 #include "page_cache.h"
+#include "phase_timer.h"
 #include "planet_frame.h"
 #include "render/render_backend.h"
 #include "render/render_frame.h"
@@ -135,8 +136,15 @@ EMSCRIPTEN_KEEPALIVE int engine_render_frame() {
   scene.albedoReady = state.albedoReady;
   scene.albedoPixels = state.albedoPixels;
   scene.albedoLayerOf = rnd::albedoLayerOfHandle;
-  rnd::planFrame(scene, state.camera, state.plan);
-  const int status = rnd::frameBackend(scene, state.plan, state.camera);
+  {
+    engine::phase::Scope scope(engine::phase::kPlan);
+    rnd::planFrame(scene, state.camera, state.plan);
+  }
+  int status = engine::kOk;
+  {
+    engine::phase::Scope scope(engine::phase::kBackend);
+    status = rnd::frameBackend(scene, state.plan, state.camera);
+  }
   if (status == engine::kOk) std::memset(state.plan.albedoPending, 0, sizeof state.plan.albedoPending);
   rnd::counters().apiCallsLast = rnd::counters().apiCalls;
   rnd::counters().frames += 1;

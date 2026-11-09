@@ -171,7 +171,7 @@ void planFrame(const SceneView& scene, Camera& camera, FramePlan& plan) {
   for (std::uint32_t c = 0; c < kPropClasses; ++c) plan.propCount[c] = 0;
   std::uint64_t hash = kFnvOffset;
   for (std::uint32_t i = 0; i < scene.bodyCount; ++i) {
-    std::uint32_t* out = plan.bodyRecords + i * kRecordWords;
+    std::uint32_t out[kRecordWords];
     const Transform& t = scene.transforms[i];
     const float words[kRecordWords - 1] = {t.x, t.y, t.z, t.qx, t.qy, t.qz, t.qw};
     for (std::uint32_t k = 0; k < kRecordWords - 1; ++k) out[k] = bitsOf(words[k]);

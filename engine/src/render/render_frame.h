@@ -82,7 +82,6 @@ struct FramePlan {
   std::uint32_t uploadCount;
   std::uint32_t pageRecords[kPageLayers * kPageRecordWords];
   std::uint32_t pageCount;
-  std::uint32_t bodyRecords[kBodySlots * kRecordWords];
   std::uint32_t propRecords[kPropClasses * kBodySlots * kRecordWords];
   std::uint32_t propCount[kPropClasses];
   std::uint32_t materialWords[kMaterialSlots * kMaterialWords];
