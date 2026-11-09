@@ -811,3 +811,52 @@ Phase A changes (code and docs only, no wasm change, so the build stays `2b28cd2
 3. `scripts/browser/summarise-timed.mjs`: the table gains `draw`, CPU MHz before and after, GPU utilisation and power before and after, and the SM clock after. A file without these fields prints `null`.
 
 Phase B plan. Rebuild is not needed, because no C++ changed. Confirm the wasm sha. Run the alternating WebGPU and WebGL2 1024 pairs (three rounds), then the same pair with `draw=0` (two rounds). Quote the medians and p99s side by side, and state the physics phase for each.
+
+## Physics phase, WebGPU against WebGL2 at 1024: Phase B result
+
+Conditions. The machine is shared. Other lanes ran gm C++ builds (`cc1plus`), an oscraft `cargo` test binary and an oscraft renderer during these runs. Load is the 1-minute `/proc/loadavg` before and after each run. A run is kept only when both stamps are under 8, its checksum and visible counts match the control, and it reports no errors. The wasm is `2b28cd23…` in every run, and no C++ changed in Phase B.
+
+Kept draw-on pairs, WebGPU first in each round. Four pairs meet the rule: Phase C rounds 1 to 3 (`build/diag/phaseC-*`, loads 2.2 to 4.1) and Phase D round 1 (`build/diag/phaseD-*-r1`, loads 7.8 to 8.0).
+
+| Round | Backend | Median ms | p99 ms | Physics ms | Tick ms | Load before→after |
+|---|---|---|---|---|---|---|
+| C1 | WebGPU | 42.15 | 51.3 | 40.3 | 41.9 | 4.10→3.64 |
+| C1 | WebGL2 | 41.40 | 48.7 | 39.7 | 41.2 | 3.64→3.18 |
+| C2 | WebGPU | 40.00 | 49.2 | 38.2 | 39.7 | 3.00→2.62 |
+| C2 | WebGL2 | 39.80 | 47.8 | 38.1 | 39.5 | 2.49→2.23 |
+| C3 | WebGPU | 41.25 | 50.3 | 39.5 | 41.0 | 2.23→2.43 |
+| C3 | WebGL2 | 40.90 | 56.0 | 39.2 | 40.65 | 2.64→3.42 |
+| D1 | WebGPU | 47.30 | 65.8 | 45.25 | 46.9 | 7.78→7.96 |
+| D1 | WebGL2 | 49.60 | 59.3 | 47.6 | 49.4 | 7.96→7.86 |
+
+Paired differences, WebGPU minus WebGL2, within each round:
+
+| Round | Median ms | p99 ms | Physics ms |
+|---|---|---|---|
+| C1 | +0.75 | +2.6 | +0.60 |
+| C2 | +0.20 | +1.4 | +0.10 |
+| C3 | +0.35 | −5.7 | +0.30 |
+| D1 | −2.30 | +6.5 | −2.35 |
+
+Pooled over the four kept pairs: mean of medians WebGPU 42.68 ms and WebGL2 42.93 ms, so WebGL2 divided by WebGPU is 1.006. Median of medians WebGPU 41.70 and WebGL2 41.15. Median of p99s WebGPU 50.8 and WebGL2 52.4. Mean physics WebGPU 40.81 and WebGL2 41.15, mean paired physics difference −0.34. Median paired physics difference +0.20. These numbers are from four pairs, so they do not separate the backends beyond noise.
+
+Runs not kept, recorded with their load and not used. All eight are from Phase D rounds 2 to 5, where load rose past 8 and stayed there. Every one has a matching checksum, so the load rule is the only failure.
+
+| Run | Median ms | p99 ms | Physics ms | Load before→after |
+|---|---|---|---|---|
+| D2 WebGL2 | 50.60 | 67.7 | 48.6 | 8.82→8.07 |
+| D2 WebGPU | 52.30 | 71.2 | 49.95 | 8.07→8.84 |
+| D3 WebGPU | 52.80 | 68.6 | 50.55 | 8.53→8.89 |
+| D3 WebGL2 | 56.85 | 103.2 | 54.55 | 8.89→10.15 |
+| D4 WebGL2 | 56.10 | 123.3 | 54.05 | 11.90→17.91 |
+| D4 WebGPU | 51.60 | 112.4 | 49.40 | 17.91→15.69 |
+| D5 WebGPU | 48.35 | 67.2 | 46.40 | 15.69→11.78 |
+| D5 WebGL2 | 48.00 | 62.0 | 46.10 | 11.78→9.24 |
+
+Draw-off pair, not kept. The two runs are WebGPU draw0 r1 (`build/diag/phaseC-webgpu-draw0-r1.json`, median 44.00, p99 60.20, physics 42.30, load 3.42→3.90) and WebGL2 draw0 r1 (`build/diag/phaseC-webgl2-draw0-r1.json`, median 104.25, p99 241.60, physics 101.50, load 3.90→6.54). `draw=0` skips the backend frame and the stats, so neither run records a checksum and neither can pass the checksum rule. The WebGL2 physics value, 101.5 ms, is above every draw-on run and about 2.5 times the clean draw-on physics values, and it is not usable. No kept draw-off pair exists, so the power hypothesis from the Phase A plan is not decided.
+
+Verdict on the physics gap. The round-1 gap from the Vulkan Phase B run (41.8 ms WebGPU against 38.3 ms WebGL2) is not reproduced. In the four kept pairs the paired physics difference has no consistent sign: +0.60, +0.10, +0.30 and −2.35 ms. Only the first and last exceed 0.5 ms, and they point in opposite directions. The three WebGPU-slower rounds are not larger than the round-to-round spread of WebGL2 itself.
+
+Cause, and the fix decision. The audit above found no WebGPU submit, readback or sync inside the physics scope, and the timer boundaries are the same for both backends. A gap that changes sign under the same build and the same wasm therefore has no code cause to fix. The Phase A commit `b41aed2` is unchanged by this Phase B result, and no code change is made for it.
+
+Remaining open item. The power hypothesis (GPU work lowers the CPU clock during the physics window) is untested, because the draw-off pair has no kept run. Settling it needs a clean WebGPU and WebGL2 `draw=0` pair with a checksum-equivalent control and load under 8 for both runs. That is not available while the other lanes hold load near 8 to 18.
