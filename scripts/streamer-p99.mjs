@@ -11,7 +11,7 @@ export const RESIDENT_PAGES = 4
 export function percentile(values, q) {
   if (values.length === 0) throw new RangeError('percentile needs at least one value')
   if (!(q >= 0 && q <= 1)) throw new RangeError('q must be between 0 and 1')
-  const sorted = values.slice().sort((a, b) => a - b)
+  const sorted = Float64Array.from(values).sort()
   return sorted[Math.min(sorted.length - 1, Math.max(0, Math.ceil(q * sorted.length) - 1))]
 }
 
@@ -39,6 +39,7 @@ export function newStreamerState() {
 export function streamerPass(world, path, state) {
   const steps = []
   for (const p of path) {
+    world.step()
     const started = performance.now()
     const cell = world.locateCell(p)
     const key = world.cellKey(cell.face, cell.cx, cell.cy)
