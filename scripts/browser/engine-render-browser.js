@@ -182,11 +182,11 @@ const run = async () => {
         const phasesBefore = readPhases()
         module._engine_tick(TICK_STEPS)
         const tickEnd = performance.now()
-        const phasesAfter = readPhases()
         const { viewProj, eye } = orbitCamera(frame, aspect)
         renderer.setCamera({ viewProj, eye })
         const status = renderer.frame()
         if (status !== 0) throw new Error('engine_render_frame status ' + status)
+        const phasesAfter = readPhases()
         const totalMs = performance.now() - started
         frameTimes.push(totalMs)
         frameRows.push({ frame, started, tickMs: tickEnd - started, renderMs: totalMs - (tickEnd - started), totalMs, gapMs: lastStarted === null ? null : started - lastStarted, phases: phasesAfter.map((v, i) => v - phasesBefore[i]) })

@@ -707,3 +707,34 @@ Phase A changes. Local commit, not pushed.
 9. `engine/test/witness_phase10_plan.cpp`, `engine/test/main_all.cpp`, `engine/test/build_host.sh`: the native witness is wired in. `build_host.sh` compiles `render_frame.cpp`. `package.json` adds `check:engine-host-witness` to the `npm test` chain.
 
 What Phase A does not establish: that change 1 closes the WebGPU gap. It removes per-frame memory traffic that both backends share. Phase B shows whether the physics phase moves, and whether the gap moves with the render time of the previous frame.
+
+Page fix, found in Phase B and committed with it. The first Phase B attempt read the phase totals before the render call, so the `plan` and `backend` deltas were always 0 (540 of 540 values). The page now reads them after `renderer.frame()`. That attempt was run under foreign load and is not used. Its file was overwritten by the re-run of round 1.
+
+## Phase B: timed WebGPU and WebGL2 at 1024, alternating, load per run
+
+Build: `engine/out/engine-core-128mib-timed.wasm`, sha256 `2b28cd2381f4385b4226d2c0e3a9f55090024b9b2ed0f56d1212613715c044d3`, the Phase A commit. Three rounds, each WebGPU (phase 10) then WebGL2 (phase 11), one run at a time, in the project's playwriter browser. Each file is `build/diag/phaseB-{webgpu,webgl2}-r{1,2,3}.json` and holds `load.before` and `load.after` from `/proc/loadavg`, and `top` (the six busiest processes before and after).
+
+Conditions, not hidden. Round 1 started while a foreign Chromium (profile `/tmp/playwright_chromiumdev_profile-2IZOJL`, another lane's, GPU process at about 950% CPU) was still running. Its load was 14.0 before and 10.3 after. The foreign browser exited during that run. Rounds 2 and 3 ran with load 7.0 to 3.6. The machine was not idle for any run.
+
+| Run | Median ms | p99 ms | Max ms | Tick median | Physics median | Physics p99 | Plan median | Backend median | Readback median | Outliers | API calls | Load before to after | Physics vs previous render, r |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| r1 WebGPU | 39.65 | 50.4 | 55.0 | 39.3 | 38.00 | 48.3 | 0.1 | 0.2 | 1.3 | 0 | 29 | 14.03 to 10.27 | 0.24 |
+| r1 WebGL2 | 39.35 | 46.9 | 49.3 | 39.1 | 37.70 | 44.9 | 0.1 | 0.1 | 1.4 | 0 | 45 | 9.60 to 7.34 | 0.18 |
+| r2 WebGPU | 39.50 | 45.7 | 48.1 | 39.15 | 37.80 | 44.1 | 0.1 | 0.2 | 1.3 | 0 | 29 | 6.99 to 5.78 | 0.17 |
+| r2 WebGL2 | 39.30 | 46.1 | 48.5 | 39.1 | 37.80 | 44.2 | 0.1 | 0.1 | 1.3 | 0 | 45 | 5.48 to 4.31 | 0.08 |
+| r3 WebGPU | 39.60 | 50.5 | 55.8 | 39.3 | 38.05 | 48.3 | 0.1 | 0.2 | 1.3 | 0 | 29 | 4.31 to 3.82 | 0.41 |
+| r3 WebGL2 | 37.20 | 44.8 | 51.9 | 36.9 | 35.80 | 42.9 | 0.1 | 0.1 | 1.0 | 0 | 45 | 3.59 to 3.13 | 0.08 |
+
+Every run has checksum `-3826851758512048142`, visible `[729,746,747,750]`, allocations after warm-up `0`, `ok` true and no errors.
+
+Summary, from the rows above.
+
+- Median, WebGPU against WebGL2: means 39.58 and 38.62, so WebGPU is 0.97 times WebGL2. Round by round the gap is 0.30, 0.20 and 2.40 ms, with WebGPU slower in all three rounds.
+- p99: medians 50.4 (WebGPU) and 46.1 (WebGL2). WebGPU's p99 is higher in rounds 1 and 3 and lower in round 2.
+- Physics: means 37.95 (WebGPU) and 37.10 (WebGL2). The gap is 0.3, 0.0 and 2.25 ms by round. The 0.6 ms gap of the earlier A/B does not come back as a steady value. Round 3 is the largest, and its WebGL2 run had the lowest load of any run.
+- Plan is 0.1 ms per frame in both backends. The dead store that Phase A removed is therefore cheap, and it cannot account for the gap.
+- Correlation of each frame's physics time with the previous frame's render time is positive in every round for WebGPU (0.24, 0.17, 0.41) and smaller for WebGL2 (0.18, 0.08, 0.08). This is weak coupling, measured over 539 frames per run, and it does not establish a cause. It is consistent with the previous frame's WebGPU render (cache or memory effects) touching the physics window, but nothing here shows that.
+
+Verdict. WebGPU is not faster than WebGL2 at 1024 after the Phase A change, and it is slower in every round (0.97 times on the means). The cause of the remaining gap is not established. The one candidate that is in our code and was measurable (the plan's per-frame store) costs 0.1 ms, so removing it cannot close the gap. The weak WebGPU coupling to the previous frame's render is the only signal in this run, and the load on this machine changed between rounds.
+
+Not done: the load-recording change was made to the repo driver (`scripts/browser/timed-run.mjs`), but the runs above went through the project's playwriter browser, which the driver does not use. The stamp module, the merge and the summariser are the same code in both paths.
