@@ -13,7 +13,6 @@ const THREAD_SAMPLER = new URL('./thread-cpu-sampler.mjs', import.meta.url).path
 const ROOT = fileURLToPath(new URL('../..', import.meta.url))
 const CPU_MAX = '/sys/fs/cgroup/cpu.max'
 const PAGE_PORT = 8843
-const PAGE_DEBUG_PORT = 9843
 const PAGE_QUERY = 'phase=10&tier=1024&timed=1'
 const SAMPLER_CPUS = process.env.SAMPLER_CPUS ?? '15'
 const GENERATOR_CPUS = process.env.GENERATOR_CPUS ?? (SAMPLER_CPUS === '' ? '' : cpusExcept(SAMPLER_CPUS))
@@ -98,8 +97,6 @@ if (process.argv[1] && process.argv[1].endsWith('/browser/paired-run.mjs')) {
   const workers = Number(workersArg)
   const round = Number(roundArg)
   const withPage = pageArg === '1'
-  const playwrightCore = process.env.PLAYWRIGHT_CORE
-  if (withPage && !playwrightCore) throw new TypeError('PLAYWRIGHT_CORE must name the playwright-core index.mjs to take the page witness')
   mkdirSync(outDir, { recursive: true })
   const host = hostRecord()
   const samplerFile = join(outDir, label + '.sampler.txt')
@@ -121,7 +118,7 @@ if (process.argv[1] && process.argv[1].endsWith('/browser/paired-run.mjs')) {
   let page = null
   if (withPage) {
     const pageFile = join(outDir, label + '.page.json')
-    const witness = await runRenderWitness({ root: ROOT, port: PAGE_PORT, debugPort: PAGE_DEBUG_PORT, profile: join(ROOT, '.playwriter', 'browser-profile'), pageUrl: 'http://127.0.0.1:' + PAGE_PORT + '/scripts/browser/engine-render.html?' + PAGE_QUERY, playwrightCore, live: [] })
+    const witness = await runRenderWitness({ root: ROOT, port: PAGE_PORT, pageUrl: 'http://127.0.0.1:' + PAGE_PORT + '/scripts/browser/engine-render.html?' + PAGE_QUERY, live: [] })
     writeFileSync(pageFile, JSON.stringify(witness.result ?? { error: witness.error }, null, 1) + '\n')
     page = { file: pageFile, error: witness.error ?? null }
   }
