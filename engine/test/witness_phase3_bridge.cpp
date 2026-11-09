@@ -104,6 +104,7 @@ void oneTickedEventPerBatch() {
   std::uint32_t* control = bridge::controlWords();
   check(world().configure(batchConfig()) == kOk, "phase 3: the event world configures");
   drainEvents();
+  const std::uint32_t droppedBefore = control[bridge::kEventDropped];
   std::uint32_t wrongCounts = 0;
   for (std::uint32_t b = 0; b < kBatches; ++b) {
     const std::uint32_t head0 = control[bridge::kEventHead];
@@ -117,7 +118,7 @@ void oneTickedEventPerBatch() {
     drainEvents();
   }
   check(wrongCounts == 0, "phase 3: exactly one TICKED event per batch, over 1000 batches");
-  check(control[bridge::kEventDropped] == 0, "phase 3: no event is dropped when the host drains each batch");
+  check(control[bridge::kEventDropped] == droppedBefore, "phase 3: no event is dropped when the host drains each batch");
 }
 
 void regionLayout() {

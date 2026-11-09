@@ -5,6 +5,10 @@
 
 #include "budget.h"
 
+namespace JPH {
+class BodyInterface;
+}
+
 namespace engine {
 
 constexpr std::uint32_t kMaxIterations = 32;
@@ -17,6 +21,14 @@ constexpr std::uint32_t kFixedJoltBodies = 3;
 
 constexpr std::uint32_t joltBodyCapacity(const budget::Capacity& c) {
   return c.bodies + c.statics + c.trunks + kFixedJoltBodies;
+}
+
+constexpr std::uint32_t kQuadNodesPerPage = 256;
+
+constexpr std::uint32_t joltQuadNodePages(const budget::Capacity& c) {
+  const std::uint32_t leaves = (joltBodyCapacity(c) + 1) / 2;
+  const std::uint32_t nodes = 2 * (leaves + (leaves + 2) / 3);
+  return (nodes + kQuadNodesPerPage - 1) / kQuadNodesPerPage;
 }
 
 constexpr std::uint32_t joltPairCapacity(const budget::Capacity& c) {
@@ -86,7 +98,7 @@ class World {
   Status setVelocity(std::uint32_t handle, const float* velocity);
   void step(std::uint32_t steps);
   void setTick(std::uint64_t tick);
-  void applyRadialGravity(float dt);
+  void applyRadialGravity(JPH::BodyInterface& bodies, float dt);
 
   std::uint32_t count() const { return live_; }
   std::uint32_t slotExtent() const { return fresh_; }

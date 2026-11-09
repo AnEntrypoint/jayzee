@@ -89,6 +89,8 @@ int frameBackend(const SceneView& scene, const FramePlan& plan, const Camera& ca
 
 namespace rnd = engine::render;
 
+static_assert(sizeof(rnd::RenderState) <= engine::budget::kRenderBytes);
+
 extern "C" {
 
 EMSCRIPTEN_KEEPALIVE int engine_render_init(std::uint32_t backend) {
@@ -122,6 +124,7 @@ EMSCRIPTEN_KEEPALIVE int engine_render_frame() {
   rnd::counters().apiCalls = 0;
   rnd::SceneView scene{};
   scene.transforms = engine::world().transforms();
+  scene.bodyCount = engine::world().bodyCapacity();
   scene.bodyClass = state.bodyClass;
   scene.pages = &engine::planet::state().pages;
   scene.placements = state.placements;

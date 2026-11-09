@@ -3,13 +3,14 @@
 
 #include <cstdint>
 
+#include "../budget.h"
 #include "../page_cache.h"
 #include "../world.h"
 
 namespace engine::render {
 
 constexpr std::uint32_t kPropClasses = 4;
-constexpr std::uint32_t kBodySlots = 4096;
+constexpr std::uint32_t kBodySlots = budget::kTopTierBodies;
 constexpr std::uint32_t kRecordWords = 8;
 constexpr std::uint32_t kRecordBytes = kRecordWords * 4;
 constexpr std::uint32_t kPropVertices = 36;
@@ -92,6 +93,7 @@ struct FramePlan {
 
 struct SceneView {
   const Transform* transforms;
+  std::uint32_t bodyCount;
   const std::uint8_t* bodyClass;
   const planet::PageCache* pages;
   const PagePlacement* placements;

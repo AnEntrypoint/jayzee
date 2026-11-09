@@ -164,13 +164,13 @@ void planFrame(const SceneView& scene, Camera& camera, FramePlan& plan) {
   for (std::uint32_t c = 0; c < kPropClasses; ++c) camera.classRadius[c] = kPropRadius;
   const std::uint32_t lights = scene.lightCount < kLightSlots ? scene.lightCount : kLightSlots;
   camera.counts[0] = lights;
-  camera.counts[1] = kBodySlots;
+  camera.counts[1] = scene.bodyCount;
   camera.counts[2] = 0;
   camera.counts[3] = 0;
 
   for (std::uint32_t c = 0; c < kPropClasses; ++c) plan.propCount[c] = 0;
   std::uint64_t hash = kFnvOffset;
-  for (std::uint32_t i = 0; i < kBodySlots; ++i) {
+  for (std::uint32_t i = 0; i < scene.bodyCount; ++i) {
     std::uint32_t* out = plan.bodyRecords + i * kRecordWords;
     const Transform& t = scene.transforms[i];
     const float words[kRecordWords - 1] = {t.x, t.y, t.z, t.qx, t.qy, t.qz, t.qw};

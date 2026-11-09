@@ -12,6 +12,8 @@ constexpr std::uint32_t kClasses = kMaxClass - kMinClass + 1;
 constexpr std::size_t kBlockHeaderBytes = 16;
 
 constexpr std::uint32_t kPrimeCounts[kClasses] = {64, 64, 64, 64, 64, 16, 16, 16, 4, 4, 4, 4};
+constexpr std::uint32_t kLargestIndex = kClasses - 1;
+constexpr std::uint64_t kLargestClassBytes = std::uint64_t(1) << kMaxClass;
 
 constexpr std::uint64_t primedBytes() {
   std::uint64_t total = 0;

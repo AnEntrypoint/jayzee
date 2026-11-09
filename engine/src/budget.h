@@ -3,6 +3,8 @@
 
 #include <cstdint>
 
+#include "pool_alloc.h"
+
 namespace engine::budget {
 
 struct Capacity {
@@ -26,7 +28,12 @@ struct Capacity {
   std::uint64_t arenaBytes;
 };
 
+constexpr std::uint32_t kMaxPlayers = 1024;
+constexpr std::uint32_t kTopTierBodies = 10240;
+constexpr std::uint64_t kRenderBytes = 2ull * 1024ull * 1024ull;
+
 bool plan(std::uint64_t budgetBytes, std::uint32_t players, std::uint32_t workers, Capacity& out);
+void poolCounts(const Capacity& c, std::uint32_t (&out)[pool::kClasses]);
 
 }
 

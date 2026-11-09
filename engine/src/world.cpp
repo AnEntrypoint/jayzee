@@ -94,7 +94,7 @@ class RadialGravity final : public JPH::PhysicsStepListener {
   explicit RadialGravity(World& owner) : owner_(owner) {}
 
   void OnStep(const JPH::PhysicsStepListenerContext& context) override {
-    owner_.applyRadialGravity(context.mDeltaTime);
+    owner_.applyRadialGravity(context.mPhysicsSystem->GetBodyInterfaceNoLock(), context.mDeltaTime);
   }
 
  private:
@@ -196,6 +196,7 @@ Status World::configure(const Config& config) {
   void* raw = pool::allocateAligned(sizeof(Runtime), alignof(Runtime));
   if (raw == nullptr) return kFull;
   runtime_ = new (raw) Runtime(*this, limits_.tempBytes, limits_.workers);
+  runtime_->jobs.CreateJob("warm", JPH::Color::sGreen, [] {}, 0);
   capacity_ = config.capacity;
   statics_ = 0;
   live_ = 0;
@@ -219,6 +220,8 @@ Status World::configure(const Config& config) {
   runtime_->physics.SetGravity(JPH::Vec3(0.0f, config.gravity, 0.0f));
   JPH::PhysicsSettings settings = runtime_->physics.GetPhysicsSettings();
   settings.mNumVelocitySteps = config.iterations;
+  settings.mNumPositionSteps = config.iterations;
+  settings.mPenetrationSlop = 0.0f;
   runtime_->physics.SetPhysicsSettings(settings);
   runtime_->physics.AddStepListener(&runtime_->gravity);
 
@@ -392,9 +395,8 @@ Status World::setVelocity(std::uint32_t handle, const float* velocity) {
   return kOk;
 }
 
-void World::applyRadialGravity(float dt) {
+void World::applyRadialGravity(JPH::BodyInterface& bodies, float dt) {
   if (runtime_ == nullptr || planetBody_ == kNoBody) return;
-  JPH::BodyInterface& bodies = runtime_->physics.GetBodyInterface();
   for (std::uint32_t slot = 0; slot < fresh_; ++slot) {
     if (alive_[slot] == 0) continue;
     const JPH::BodyID id(bodyIds_[slot]);

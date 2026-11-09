@@ -54,7 +54,7 @@ char* takeLarge(std::size_t total) {
   void** link = &largeHead;
   while (*link != nullptr) {
     char* raw = static_cast<char*>(*link);
-    if (capacityField(raw) == total) {
+    if (capacityField(raw) >= total) {
       *link = linkField(raw);
       return raw;
     }
@@ -120,6 +120,7 @@ void* allocate(std::size_t bytes) {
   std::size_t capacity = total;
   if (c == kLargeClass) {
     raw = takeLarge(total);
+    if (raw != nullptr) capacity = capacityField(raw);
   } else {
     capacity = std::size_t(1) << c;
     raw = popFree(c - kMinClass);

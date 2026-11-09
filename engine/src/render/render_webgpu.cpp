@@ -614,7 +614,6 @@ int frame(const SceneView& scene, const FramePlan& plan, const Camera& camera) {
 
   wgpu::CommandBuffer commands = ENGINE_RENDER_CALL(encoder.Finish());
   ENGINE_RENDER_CALL(queue.Submit(1, &commands));
-  ENGINE_RENDER_CALL(surface.Present());
   return engine::kOk;
 }
 

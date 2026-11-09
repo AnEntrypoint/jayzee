@@ -13,7 +13,6 @@ namespace engine::budget {
 namespace {
 
 constexpr std::uint32_t kMinPlayers = 1;
-constexpr std::uint32_t kMaxPlayers = 1024;
 constexpr std::uint32_t kMinWorkers = 1;
 constexpr std::uint32_t kMaxWorkers = 8;
 
@@ -43,6 +42,7 @@ constexpr std::uint32_t kVisiblePerClient = 128;
 constexpr std::uint32_t kBaselineDepth = 8;
 constexpr std::uint32_t kInterestCellsPerSide = 32;
 constexpr std::uint64_t kTempBytes = 16ull * 1024ull * 1024ull;
+constexpr std::uint64_t kTempBytesPerBody = 2048;
 
 constexpr std::uint64_t kJoltBodyBytes = 1024;
 constexpr std::uint64_t kJoltStaticBytes = 512;
@@ -58,12 +58,14 @@ constexpr std::uint64_t kSlackBytes = 1024ull * 1024ull;
 constexpr std::uint64_t kBodyRowBytes = 2 * sizeof(std::uint32_t) + sizeof(std::uint16_t) + sizeof(std::uint8_t) + 6 * sizeof(double) +
                                         sizeof(Transform) + sizeof(std::uint32_t) + kBatchFloats * sizeof(float) + sizeof(std::uint32_t);
 
-std::uint32_t bodiesFor(std::uint32_t players) {
+constexpr std::uint32_t bodiesFor(std::uint32_t players) {
   for (const Tier& tier : kTiers) {
     if (players <= tier.maxPlayers) return tier.baseBodies + tier.bodiesPerPlayer * players;
   }
   return 0;
 }
+
+static_assert(bodiesFor(kMaxPlayers) == kTopTierBodies);
 
 std::uint64_t totalBytes(const Capacity& c) {
   const std::uint64_t bodies = c.bodies;
@@ -83,11 +85,13 @@ std::uint64_t totalBytes(const Capacity& c) {
   total += c.tempBytes;
   total += kJoltFixedBytes;
   total += pool::primedBytes();
+  total += static_cast<std::uint64_t>(joltQuadNodePages(c)) * pool::kLargestClassBytes;
   total += static_cast<std::uint64_t>(c.pageSlots) * (planet::kPageSamples * sizeof(float) + sizeof(std::int64_t) + sizeof(std::uint8_t));
   total += vegetationCells * (sizeof(std::uint32_t) + static_cast<std::uint64_t>(c.instancesPerCell) * sizeof(vegetation::Instance));
   total += static_cast<std::uint64_t>(c.materials) * kMaterialBytes;
   total += static_cast<std::uint64_t>(c.textures) * kTextureBytes;
   total += static_cast<std::uint64_t>(c.lights) * kLightBytes;
+  total += kRenderBytes;
   total += players * c.inputDepth * sizeof(bridge::InputSlot);
   total += static_cast<std::uint64_t>(c.eventSlots) * sizeof(bridge::EventSlot);
   total += interestCells * (sizeof(std::uint32_t) + visible * sizeof(std::uint32_t));
@@ -119,10 +123,15 @@ bool fitsTier(std::uint64_t budgetBytes, std::uint32_t players, std::uint32_t wo
   next.baselineDepth = kBaselineDepth;
   next.interestCellsPerSide = kInterestCellsPerSide;
   next.workers = workers;
-  next.tempBytes = kTempBytes;
+  next.tempBytes = kTempBytes + static_cast<std::uint64_t>(next.bodies) * kTempBytesPerBody;
   next.arenaBytes = totalBytes(next);
   out = next;
   return next.arenaBytes <= budgetBytes && next.arenaBytes <= arena::kBytes;
+}
+
+void poolCounts(const Capacity& c, std::uint32_t (&out)[pool::kClasses]) {
+  for (std::uint32_t i = 0; i < pool::kClasses; ++i) out[i] = pool::kPrimeCounts[i];
+  out[pool::kLargestIndex] += joltQuadNodePages(c);
 }
 
 constexpr std::uint32_t kFallbackTiers[] = {1024, 256, 64};

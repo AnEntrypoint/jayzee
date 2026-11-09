@@ -45,6 +45,8 @@ enum LayoutWord : std::uint32_t {
   kWordRegions,
 };
 
+constexpr std::uint32_t kRegionWord0 = kWordRegions;
+
 enum Region : std::uint32_t {
   kRegionControl,
   kRegionInputs,
@@ -61,7 +63,7 @@ enum Region : std::uint32_t {
   kRegionCount,
 };
 
-constexpr std::uint32_t kLayoutWords = kWordRegions + kRegionCount;
+constexpr std::uint32_t kLayoutWords = kRegionWord0 + kRegionCount;
 
 std::uint32_t layoutWords[kLayoutWords];
 engine::budget::Capacity capacity{};
@@ -89,25 +91,27 @@ void fillLayout() {
   layoutWords[kWordInputSlots] = engine::bridge::inputSlotCount();
   layoutWords[kWordEventSlots] = engine::bridge::eventSlotCount();
   layoutWords[kWordRegionCount] = kRegionCount;
-  layoutWords[kWordRegions + kRegionControl] = addressOf(engine::bridge::controlWords());
-  layoutWords[kWordRegions + kRegionInputs] = addressOf(engine::bridge::inputSlots());
-  layoutWords[kWordRegions + kRegionEvents] = addressOf(engine::bridge::eventSlots());
-  layoutWords[kWordRegions + kRegionTransforms] = addressOf(engine::world().transforms());
-  layoutWords[kWordRegions + kRegionPositions] = addressOf(engine::world().positions());
-  layoutWords[kWordRegions + kRegionVelocities] = addressOf(engine::world().velocities());
-  layoutWords[kWordRegions + kRegionStageRows] = addressOf(stageRows);
-  layoutWords[kWordRegions + kRegionStageHandles] = addressOf(stageHandles);
-  layoutWords[kWordRegions + kRegionPlanetScratch] = addressOf(planetScratch);
-  layoutWords[kWordRegions + kRegionCodecBytes] = addressOf(codecScratch->bytes);
-  layoutWords[kWordRegions + kRegionCodecValues] = addressOf(codecScratch->values);
-  layoutWords[kWordRegions + kRegionCodecCounts] = addressOf(codecScratch->counts);
+  layoutWords[kRegionWord0 + kRegionControl] = addressOf(engine::bridge::controlWords());
+  layoutWords[kRegionWord0 + kRegionInputs] = addressOf(engine::bridge::inputSlots());
+  layoutWords[kRegionWord0 + kRegionEvents] = addressOf(engine::bridge::eventSlots());
+  layoutWords[kRegionWord0 + kRegionTransforms] = addressOf(engine::world().transforms());
+  layoutWords[kRegionWord0 + kRegionPositions] = addressOf(engine::world().positions());
+  layoutWords[kRegionWord0 + kRegionVelocities] = addressOf(engine::world().velocities());
+  layoutWords[kRegionWord0 + kRegionStageRows] = addressOf(stageRows);
+  layoutWords[kRegionWord0 + kRegionStageHandles] = addressOf(stageHandles);
+  layoutWords[kRegionWord0 + kRegionPlanetScratch] = addressOf(planetScratch);
+  layoutWords[kRegionWord0 + kRegionCodecBytes] = addressOf(codecScratch->bytes);
+  layoutWords[kRegionWord0 + kRegionCodecValues] = addressOf(codecScratch->values);
+  layoutWords[kRegionWord0 + kRegionCodecCounts] = addressOf(codecScratch->counts);
 }
 
 int initialize(std::uint32_t players, std::uint32_t workers, double budgetBytes) {
   if (!(budgetBytes >= 0.0) || budgetBytes > kMaxBudgetBytes) return engine::kRange;
   if (engine::arena::sealed() || engine::arena::used() != 0) return engine::kAlreadyInitialized;
   if (!engine::budget::plan(static_cast<std::uint64_t>(budgetBytes), players, workers, capacity)) return engine::kRange;
-  if (!engine::pool::prime(engine::pool::kPrimeCounts)) return engine::kFull;
+  std::uint32_t primeCounts[engine::pool::kClasses];
+  engine::budget::poolCounts(capacity, primeCounts);
+  if (!engine::pool::prime(primeCounts)) return engine::kFull;
   const engine::Status joltStatus = engine::World::initialize();
   if (joltStatus != engine::kOk) return joltStatus;
   if (engine::world().bind(capacity) != engine::kOk) return engine::kFull;
