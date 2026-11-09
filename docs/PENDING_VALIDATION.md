@@ -1482,3 +1482,29 @@ Witnesses of this pass:
 - `node scripts/check-frame-stall-cause.mjs`: RESULT PASS, 9 gates.
 
 Invalid run, kept under `build/diag/paired-G/invalid-r2-G1-fix4/` and not a witness. The first attempt at `r2-G1-fix4` stopped its sampler about 2 minutes into the 240 s window, while the paired job was still running. The paired job then finished normally (its `run.json` is there), but the sampler log covers only the first part of the window, and load reached 17 during the run.
+## Phase A: 1024-tier render regression, bisect over f2b5c23..dbc869b
+
+Phase A only: the bisect and the gate are written, and nothing below has been run yet. Phase B runs them.
+
+The defect. Fresh pages from `paired-E` onward report checksum `8711882901550134279` and visible `[0,0,0,0]`. The ledger's witness is checksum `-3826851758512048142` and visible `[729,746,747,750]` (`paired-B`, and the Phase A A/B runs). The change falls in f2b5c23..dbc869b, as recorded under "Phase B: fresh round 1 and round 2 G1 pairs, for commit 02fdbfc".
+
+Two facts from the range that bear on the cause:
+
+- f2b5c23 changes the witness page as well as the engine. `scripts/browser/engine-render-browser.js` drops the GROUND box and spawns each body on the planet surface on a 1.2 m grid. A scene change moves the bodies the render sees, so it can change the checksum and visible counts without any engine change.
+- The re-pin in dbc869b covers `engine-core-64mib`, `engine-core-128mib` and `engine-core-64mib-leak` in `engine/artifacts.json`. The 1024-tier witness loads `engine-core-128mib-timed`, which has no pin, so the re-pin does not change the binary the witness runs.
+
+The bisect: `node scripts/bisect-render-1024.mjs f2b5c23 dbc869b` builds the timed 128 MiB engine at each commit, from f2b5c23^ (control) through dbc869b. It runs the 1024-tier WebGPU witness (`engine-render.html?phase=10&tier=1024&timed=1`) at each, writes `build/diag/render-bisect/<sha>.json` and `summary.json`, and returns the shared checkout to its branch. It needs `PLAYWRIGHT_CORE` set to a playwright-core `index.mjs`.
+
+Candidate causes. Each line names the file, the commit and the witness it needs.
+
+- f2b5c23, `engine/src/world.cpp`: the sleep gate rewrite (sleep only under 0.5 m/s, sleep timer kept running). A sleep-threshold change. Witness: the bisect rows for f2b5c23^ and f2b5c23.
+- f2b5c23, `engine/src/world.cpp`: radial gravity skips inactive bodies. An engine change, not a threshold. Witness: the same rows.
+- f2b5c23, `engine/src/world.cpp`: wakes live bodies on planet reconfigure. Witness: the same rows.
+- f2b5c23, `engine/src/world.h`: sleep gate declaration. Witness: the same rows.
+- f2b5c23, `scripts/browser/engine-render-browser.js`: witness scene change (GROUND removed, spawn on the planet surface). Not an engine change. Witness: the f2b5c23 row with the old scene, which is not yet run.
+- dbc869b, `engine/src/world.cpp`: removes the planet sleep threshold (`mPointVelocitySleepThreshold = 2.0`). A sleep-threshold change. Witness: the bisect rows for 378c109 and dbc869b.
+- dbc869b, `engine/artifacts.json`: re-pins engine-core-64mib (`0690234f` to `2e5ca6f2`), engine-core-128mib (`e3f52a62` to `63d96697`) and engine-core-64mib-leak (`9b6590bd` to `4fe2b969`). An engine-artifact change that does not reach the timed build. Witness: `npm run check:engine-artifacts`, and the bisect row for dbc869b.
+
+Controls, not candidates: 42b902f, 858d271, e7418fc, f913ac3 and 378c109 change only docs, the stall probe and the thread sampler. Their rows should match f2b5c23 if the harness is deterministic.
+
+The gate: `scripts/check-render-1024-visible.mjs` fails when a 1024-tier witness has all-zero visible counts. Its pure gates run in npm test as `check:render-1024-visible`. Its file mode reads bisect rows, for example `node scripts/check-render-1024-visible.mjs build/diag/render-bisect/<sha>.json`.
