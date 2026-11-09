@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { busyFraction, CAUSES, formatTable, frequencyPlan, loadGate, LOAD_LIMIT, MODES, parseProcStatCpu, summarizeFrequency } from './browser/frequency-runs.mjs'
+import { awaitLoadGate, busyFraction, CAUSES, formatTable, frequencyPlan, loadGate, LOAD_LIMIT, MODES, parseProcStatCpu, summarizeFrequency } from './browser/frequency-runs.mjs'
 import { finish, gate } from './lib/gate.mjs'
 
 const stat = (idle, iowait, busy) => 'cpu  ' + busy + ' 0 0 ' + idle + ' ' + iowait + ' 0 0 0 0 0\ncpu0 1 0 0 1 0 0 0 0 0 0\n'
@@ -69,6 +69,20 @@ gate('formatTable prints a header and one row per mode', () => {
   assert.equal(lines.length, 3)
   assert.ok(lines[0].startsWith('mode | requested'))
   assert.ok(lines[1].startsWith('pinned | 1 | 1'))
+})
+
+gate('awaitLoadGate waits through readings above the limit and passes on the first reading at or below it', async () => {
+  const readings = [0.6, 0.4, 0.19, 0.05]
+  const gate = await awaitLoadGate({ read: async () => readings.shift(), limit: LOAD_LIMIT, tries: 10 })
+  assert.deepEqual(gate, { ok: true, busy: 0.19, reads: 3 })
+})
+gate('awaitLoadGate refuses after its tries are used up, with the last reading', async () => {
+  const readings = [0.5, 0.45]
+  const gate = await awaitLoadGate({ read: async () => readings.shift(), limit: LOAD_LIMIT, tries: 2 })
+  assert.deepEqual(gate, { ok: false, busy: 0.45, reads: 2 })
+})
+gate('awaitLoadGate refuses a tries count below one', async () => {
+  await assert.rejects(awaitLoadGate({ read: async () => 0, tries: 0 }), RangeError)
 })
 
 finish()

@@ -1617,3 +1617,43 @@ Changed in `scripts/check-sample-order.mjs` (Phase A, committed locally, not wit
 - The mirrored-terrain control uses the same probe with each row reversed. It must fail on every interior sample.
 
 Witness needed: `node scripts/check-sample-order.mjs` must print `sample order: checked 3136 interior samples, mismatches 0`, and `mirrored-terrain control: checked 3136 interior samples, mismatches 3136`, with RESULT PASS. It is in `npm test` as `check:sample-order`. The glue it loads is a build output under `engine/out`, so the gate needs `engine/out/engine-core-128mib-timed.mjs` to exist (see the git check in the commit message).
+
+## Phase B: sample-order witness, five valid frequency runs per mode, 1024 witness re-recorded
+
+Commits in this pass: `839394a` (sample-order witness, Phase A, witness below), the runner change (frequency runner waits for the load gate and retries errored slots), and this ledger entry. Nothing else changed. The page renders go through the repo driver, `scripts/browser/render-witness.mjs`, because the `playwriter` MCP server failed to connect (`CONNECT_TIMEOUT`, 30 s) during this pass. Its `PLAYWRIGHT_CORE` is `/data/cache/npm-global/lib/node_modules/playwriter/node_modules/@xmorse/playwright-core/index.mjs` (playwright-core 1.59.14).
+
+1. Sample-order witness, `node scripts/check-sample-order.mjs` on `839394a` and the final tree:
+
+```
+sample order: checked 3136 interior samples, mismatches 0
+mirrored-terrain control: checked 3136 interior samples, mismatches 3136
+RESULT: PASS
+```
+
+2. Frequency batch, `scripts/browser/frequency-runs.mjs --n=5`, detached under `setsid`, status `done exit 0` (`build/diag/paired-G/freq2/status`, log `run.log`, `summary.md`). Each slot waits for the host-busy gate (busy fraction at most 0.2, read over 5 s) and runs only after it passes. A skipped run is not counted. Gate reads per valid run: pinned 1, 1, 15, 11 and 1; unpinned 3, 1, 1, 1 and 1. Summary table, as printed by the batch:
+
+```
+mode | requested | valid | skipped | error | runs with gap | gaps | max gap ms | host-cfs-quota | run-queue-wait | sampler-work | unattributed
+pinned | 5 | 5 | 0 | 0 | 1 | 4 | 174 | 4 | 0 | 0 | 0
+unpinned | 5 | 5 | 0 | 0 | 2 | 8 | 658 | 6 | 2 | 0 | 0
+```
+
+Each over-limit gap, with its cause (`cause` is the cgroup attribution, `threadCause` is the sampler's own attribution):
+
+- pinned run 1 (`freq-pinned-1`): four gaps. 140 ms, 174 ms, 172 ms and 141 ms. Each has about 760 to 810 ms of cgroup throttle in its window and 90 to 124 ms of sampler run-queue wait. Cause `host-cfs-quota`.
+- unpinned run 2 (`freq-unpinned-2`): seven gaps. 119 ms (run-queue-wait, no throttle), 658 ms (throttle 142 ms, thread cause unattributed), 162 ms (throttle 355 ms, unattributed), 177 ms (throttle 177 ms, unattributed), 109 ms (throttle 1305 ms, run-queue-wait), 104 ms (run-queue-wait, no throttle) and 175 ms (throttle 1123 ms, run-queue-wait).
+- unpinned run 4 (`freq-unpinned-4`): one gap. 345 ms, throttle 1126 ms, cause `host-cfs-quota`.
+
+Decision (step 3). Pinned has over-limit gaps in one of its five valid runs, so the rule does not set a default from it. The committed default in `scripts/browser/paired-run.mjs` is already pinned: `const SAMPLER_CPUS = process.env.SAMPLER_CPUS ?? '15'` (commit `c29c820`). Leaving the default unchanged therefore keeps pinned as the default. That is not the change the instruction expected, and the owner should confirm it. Pinned has fewer gaps (4 against 8). Both modes show host CFS throttling in their gap windows. Three of the unpinned run 2 gaps (658, 162 and 177 ms) have no cause from the sampler's own counters, so the attribution is not complete for those.
+
+3. The 1024 witness after the layout change, on the final tree (`839394a`), through `render-witness.mjs` on the project profile (`build/diag/witness/render-1024-layout.json`):
+
+- checksum `-3826851758512048142`, visible `[729,746,747,750]`, backend `webgpu`, adapter NVIDIA GeForce RTX 3060 Laptop GPU, `isFallbackAdapter` false.
+- 600 frames, `errors` empty, `ok` true, `bodies` 10240, `allocationsSinceWarmup` "0", `apiCallsPerFrame` 29.
+- frame time: p99 48.5 ms, median 42.6 ms, max 50 ms.
+
+These values match the Phase B witness (`-3826851758512048142`, visible `[729,746,747,750]`). The `8711882901550134279` checksum with visible `[0,0,0,0]` recorded above for `paired-E`, `paired-F` and the fresh `paired-G` pairs is consistent with the replaced witness scene. The commit messages say `f2b5c23` replaced that scene and `2f831f4` restored it, and the current render matches the recorded value. I did not re-render the `8711` state to prove the cause, so the earlier open entry is closed by the current match, not by a measured cause. The fresh runs were made at `f16e62f`, before `2f831f4`. A fresh profile (`build/diag/witness/render-profile`) returned `thrown WebGPU returned no adapter`, because `scripts/browser/webgpu-profile.mjs` seeds the WebGPU labs only into the project profile.
+
+4. npm test: `build/diag/phase-b3-npm-test.log`, `done exit 0`, `PASS=4741 FAIL=0`. The sample-order gate (`check:sample-order`) and the frequency gate (`check:frequency-runs`, which now includes the three `awaitLoadGate` gates) both ran and passed.
+
+Dependency to note. `engine/out/` is git-ignored, so `check:sample-order` depends on a local build of `engine/out/engine-core-128mib-timed.mjs`. A clean checkout needs that build before `npm test`.

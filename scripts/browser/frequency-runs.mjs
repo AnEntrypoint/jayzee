@@ -7,6 +7,8 @@ import { attributeOverLimit, parseCgroupSamples, sampledRows } from './sampler-g
 export const LOAD_LIMIT = 0.2
 export const MODES = Object.freeze({ pinned: '15', unpinned: '' })
 export const CAUSES = Object.freeze(['host-cfs-quota', 'run-queue-wait', 'sampler-work', 'unattributed'])
+export const GATE_READ_MS = 5000
+export const GATE_TRIES = 2880
 const PAIRED = fileURLToPath(new URL('./paired-run.mjs', import.meta.url))
 
 export const parseProcStatCpu = (text) => {
@@ -26,6 +28,16 @@ export const busyFraction = (before, after) => {
 export const loadGate = (busy, limit = LOAD_LIMIT) => (busy <= limit
   ? { ok: true, reason: null }
   : { ok: false, reason: 'host busy ' + busy.toFixed(3) + ' is above the load limit ' + limit })
+
+export const awaitLoadGate = async ({ read, limit = LOAD_LIMIT, tries = GATE_TRIES }) => {
+  if (!(tries >= 1)) throw new RangeError('tries must be a whole number from 1: ' + tries)
+  let busy = null
+  for (let reads = 1; reads <= tries; reads += 1) {
+    busy = await read()
+    if (busy <= limit) return { ok: true, busy, reads }
+  }
+  return { ok: false, busy, reads: tries }
+}
 
 export const frequencyPlan = (n) => {
   if (!Number.isInteger(n) || n < 1) throw new RangeError('n must be a whole number from 1: ' + n)
@@ -60,6 +72,12 @@ export const formatTable = (table) => {
 const sleep = (ms) => new Promise((done) => setTimeout(done, ms))
 const readStat = () => readFileSync('/proc/stat', 'utf8')
 
+const measureBusy = async () => {
+  const before = parseProcStatCpu(readStat())
+  await sleep(GATE_READ_MS)
+  return busyFraction(before, parseProcStatCpu(readStat()))
+}
+
 const runPaired = (label, mode, index, outDir, durationMs, workers, ticks) => new Promise((resolve, reject) => {
   const env = { ...process.env, SAMPLER_CPUS: MODES[mode] }
   const child = spawn(process.execPath, [PAIRED, label, 'G1', String(index), outDir, String(durationMs), String(workers), String(ticks), '0'], { env, stdio: ['ignore', 'pipe', 'pipe'] })
@@ -73,43 +91,51 @@ const runPaired = (label, mode, index, outDir, durationMs, workers, ticks) => ne
 
 const gapsOf = (record, ticksText, cgroupText) => attributeOverLimit(sampledRows(ticksText, record.sampler), parseCgroupSamples(cgroupText))
 
-export const runFrequency = async ({ n, outDir, durationMs, workers, ticks, loadLimit = LOAD_LIMIT, log = console.log }) => {
+const runSlot = async ({ label, mode, index, outDir, durationMs, workers, ticks, loadLimit, gateTries, read }) => {
+  const gate = await awaitLoadGate({ read, limit: loadLimit, tries: gateTries })
+  if (!gate.ok) {
+    return { label, mode, index, status: 'skipped', reason: 'host busy stayed above ' + loadLimit + ' for ' + gate.reads + ' reads (last ' + gate.busy.toFixed(3) + ')', loadBefore: gate.busy, gaps: [], maxGapMs: 0 }
+  }
+  const run = await runPaired(label, mode, index, outDir, durationMs, workers, ticks)
+  if (run.code !== 0) {
+    return { label, mode, index, status: 'error', reason: 'paired-run exit ' + run.code + ': ' + run.err.slice(-300), loadBefore: gate.busy, gaps: [], maxGapMs: 0 }
+  }
+  const runPath = join(outDir, label + '.run.json')
+  const record = JSON.parse(readFileSync(runPath, 'utf8'))
+  const samplerPath = existsSync(record.sampler.file) ? record.sampler.file : join(outDir, basename(record.sampler.file))
+  const gaps = gapsOf(record, readFileSync(join(outDir, label + '.threads.txt.ticks'), 'utf8'), readFileSync(samplerPath, 'utf8'))
+  return {
+    label,
+    mode,
+    index,
+    status: 'valid',
+    reason: null,
+    loadBefore: gate.busy,
+    gateReads: gate.reads,
+    gaps: gaps.map((gap) => ({ t0: gap.t0, gapMs: gap.gapMs, cause: gap.cause, threadCause: gap.threadCause, cgroupThrottleMs: gap.cgroupThrottleMs, selfWaitMs: gap.selfWaitMs })),
+    maxGapMs: gaps.reduce((max, gap) => Math.max(max, gap.gapMs), 0),
+    runJson: runPath,
+  }
+}
+
+export const runFrequency = async ({ n, outDir, durationMs, workers, ticks, loadLimit = LOAD_LIMIT, gateTries = GATE_TRIES, maxSlots = 2 * n, log = console.log, read = measureBusy }) => {
   mkdirSync(outDir, { recursive: true })
+  const modes = Object.keys(MODES)
   const results = []
-  for (const { mode, index } of frequencyPlan(n)) {
-    const label = 'freq-' + mode + '-' + index
-    const before = parseProcStatCpu(readStat())
-    await sleep(5000)
-    const busy = busyFraction(before, parseProcStatCpu(readStat()))
-    const load = loadGate(busy, loadLimit)
-    let result
-    if (!load.ok) {
-      result = { label, mode, index, status: 'skipped', reason: load.reason, loadBefore: busy, gaps: [], maxGapMs: 0 }
-    } else {
-      const run = await runPaired(label, mode, index, outDir, durationMs, workers, ticks)
-      if (run.code !== 0) {
-        result = { label, mode, index, status: 'error', reason: 'paired-run exit ' + run.code + ': ' + run.err.slice(-300), loadBefore: busy, gaps: [], maxGapMs: 0 }
-      } else {
-        const runPath = join(outDir, label + '.run.json')
-        const record = JSON.parse(readFileSync(runPath, 'utf8'))
-        const samplerPath = existsSync(record.sampler.file) ? record.sampler.file : join(outDir, basename(record.sampler.file))
-        const gaps = gapsOf(record, readFileSync(join(outDir, label + '.threads.txt.ticks'), 'utf8'), readFileSync(samplerPath, 'utf8'))
-        result = {
-          label,
-          mode,
-          index,
-          status: 'valid',
-          reason: null,
-          loadBefore: busy,
-          gaps: gaps.map((gap) => ({ t0: gap.t0, gapMs: gap.gapMs, cause: gap.cause, threadCause: gap.threadCause, cgroupThrottleMs: gap.cgroupThrottleMs, selfWaitMs: gap.selfWaitMs })),
-          maxGapMs: gaps.reduce((max, gap) => Math.max(max, gap.gapMs), 0),
-          runJson: runPath,
-        }
-      }
+  const valid = Object.fromEntries(modes.map((mode) => [mode, 0]))
+  const slots = Object.fromEntries(modes.map((mode) => [mode, 0]))
+  while (modes.some((mode) => valid[mode] < n && slots[mode] < maxSlots)) {
+    for (const mode of modes) {
+      if (valid[mode] >= n || slots[mode] >= maxSlots) continue
+      slots[mode] += 1
+      const index = slots[mode]
+      const label = 'freq-' + mode + '-' + index
+      const result = await runSlot({ label, mode, index, outDir, durationMs, workers, ticks, loadLimit, gateTries, read })
+      writeFileSync(join(outDir, label + '.result.json'), JSON.stringify(result, null, 1) + '\n')
+      results.push(result)
+      if (result.status === 'valid') valid[mode] += 1
+      log(label + ' ' + result.status + (result.reason ? ' (' + result.reason + ')' : '') + ' gaps=' + result.gaps.length)
     }
-    writeFileSync(join(outDir, label + '.result.json'), JSON.stringify(result, null, 1) + '\n')
-    results.push(result)
-    log(label + ' ' + result.status + (result.reason ? ' (' + result.reason + ')' : '') + ' gaps=' + result.gaps.length)
   }
   const table = summarizeFrequency(results)
   const text = formatTable(table)
@@ -122,15 +148,17 @@ export const runFrequency = async ({ n, outDir, durationMs, workers, ticks, load
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const args = Object.fromEntries(process.argv.slice(2).map((arg) => {
     const match = /^--([\w-]+)=(.*)$/.exec(arg)
-    if (!match) throw new TypeError('usage: node scripts/browser/frequency-runs.mjs --n=5 --out=DIR [--duration=240000 --workers=12 --ticks=6000 --load-limit=0.2]: ' + arg)
+    if (!match) throw new TypeError('usage: node scripts/browser/frequency-runs.mjs --n=5 --out=DIR [--duration=240000 --workers=12 --ticks=6000 --load-limit=0.2 --max-wait-ms=14400000]: ' + arg)
     return [match[1], match[2]]
   }))
+  const n = Number(args.n ?? 5)
   await runFrequency({
-    n: Number(args.n ?? 5),
+    n,
     outDir: args.out ?? 'build/diag/paired-G/freq',
     durationMs: Number(args.duration ?? 240000),
     workers: Number(args.workers ?? 12),
     ticks: Number(args.ticks ?? 6000),
     loadLimit: Number(args['load-limit'] ?? LOAD_LIMIT),
+    gateTries: Math.max(1, Math.ceil(Number(args['max-wait-ms'] ?? GATE_TRIES * GATE_READ_MS) / GATE_READ_MS)),
   })
 }
