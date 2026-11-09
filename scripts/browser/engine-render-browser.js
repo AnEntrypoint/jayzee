@@ -4,6 +4,7 @@ const QUERY = new URLSearchParams(location.search)
 const PHASE = QUERY.get('phase') === '11' ? 11 : 10
 const TIER = QUERY.get('tier') === '1024' ? 1024 : 64
 const TIMED = QUERY.get('timed') === '1'
+const DRAW = QUERY.get('draw') !== '0'
 const TIER_GLUE = (TIER === 1024 ? '../../engine/out/engine-core-128mib' : '../../engine/out/engine-core-64mib') + (TIMED ? '-timed' : '') + '.mjs'
 const TIER_BUDGET = TIER === 1024 ? 128 * 1024 * 1024 : 64 * 1024 * 1024
 const FRAMES = 600
@@ -184,8 +185,10 @@ const run = async () => {
         const tickEnd = performance.now()
         const { viewProj, eye } = orbitCamera(frame, aspect)
         renderer.setCamera({ viewProj, eye })
-        const status = renderer.frame()
-        if (status !== 0) throw new Error('engine_render_frame status ' + status)
+        if (DRAW) {
+          const status = renderer.frame()
+          if (status !== 0) throw new Error('engine_render_frame status ' + status)
+        }
         const phasesAfter = readPhases()
         const totalMs = performance.now() - started
         frameTimes.push(totalMs)
@@ -205,6 +208,7 @@ const run = async () => {
 
   const timed = frameTimes.slice(WARMUP_FRAMES)
   result.backend = renderer.backendName
+  result.draw = DRAW ? 1 : 0
   result.tier = TIER
   result.bodies = BODIES
   result.frames = FRAMES
@@ -221,15 +225,19 @@ const run = async () => {
   result.phaseMaxMs = Object.fromEntries(PHASE_NAMES.slice(0, phaseCount).map((name, i) => [name, round2(Math.max(...timedRows.map((row) => row.phases[i])))]))
   result.rowColumns = ['frame', 'tickMs', 'renderMs', 'gapMs', ...PHASE_NAMES.slice(0, phaseCount)]
   result.rows = timedRows.map((row) => [row.frame, round2(row.tickMs), round2(row.renderMs), row.gapMs === null ? null : round2(row.gapMs), ...row.phases.map((v) => round2(v))])
-  result.apiCallsPerFrame = lastStats.apiCallsLastFrame
-  result.allocationsSinceWarmup = String(lastStats.allocationsSinceWarmup)
-  result.createsAfterSeal = lastStats.createsAfterSeal
-  result.checksum = String(lastStats.checksum)
-  result.visible = lastStats.visible
-  result.pages = lastStats.pages
-  result.uploads = lastStats.uploads
-  result.lights = lastStats.lights
-  result.ok = result.errors.length === 0 && result.allocationsSinceWarmup === '0'
+  if (DRAW) {
+    result.apiCallsPerFrame = lastStats.apiCallsLastFrame
+    result.allocationsSinceWarmup = String(lastStats.allocationsSinceWarmup)
+    result.createsAfterSeal = lastStats.createsAfterSeal
+    result.checksum = String(lastStats.checksum)
+    result.visible = lastStats.visible
+    result.pages = lastStats.pages
+    result.uploads = lastStats.uploads
+    result.lights = lastStats.lights
+    result.ok = result.errors.length === 0 && result.allocationsSinceWarmup === '0'
+  } else {
+    result.ok = result.errors.length === 0
+  }
 }
 
 run()

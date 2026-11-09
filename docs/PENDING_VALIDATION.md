@@ -786,3 +786,28 @@ Speedup, from the mean medians only: WebGL2 divided by WebGPU is 39.40 / 41.23 =
 Consistency with the earlier re-run. The earlier 1024 runs in this doc (round 1 of the Phase B table, 39.65 ms against 39.35 ms) were on the same build and gave a smaller gap. The round-1 gap here is larger and comes with a larger WebGPU physics p99. The machine state was different (other lanes), and I have not separated those causes.
 
 Verdict. The Vulkan-enabled WebGPU adapter works, and the WebGPU witnesses pass (checksum, visible counts, zero allocations, `ok`). WebGPU is not faster than WebGL2 at 1024 in this run. The result is 0.956 times WebGL2, slower in all three rounds.
+
+## Physics phase, WebGPU against WebGL2 at 1024: audit and cause (Phase A)
+
+Question. Round 1 of the Vulkan run puts the physics phase at 41.8 ms for WebGPU and 38.3 ms for WebGL2. Physics is backend-independent code, so the question is whether a submit, readback or sync lands inside the physics timer, or whether the timer boundaries differ between backends.
+
+Audit, from the code.
+
+- The physics scope wraps only `runtime_->physics.Update(dt, 1, &temp, &jobs)` (`engine/src/world.cpp`, `World::step`). The readback scope wraps the sync loop after it. Nothing else is in either scope.
+- `tickBatch` (`engine/src/bridge.cpp`) runs `pages`, `inputs`, then `World::step`. It makes no render call and no GPU call.
+- The render frame is a separate export, `engine_render_frame` (`engine/src/exports_render.cpp`). It runs `planFrame`, then `frameBackend`, and `webgpu::frame` ends in `queue.Submit`. The page calls `engine_tick` and then `renderer.frame()` in the same `requestAnimationFrame` step, so every submit comes after the previous tick has returned and before the next tick begins.
+- The job system is `JobSystemSingleThreaded` when `ENGINE_THREADS` is off (`engine/src/world.cpp`, the single-threaded branch), so `Update` runs on the calling thread and nowhere else.
+- Jolt's trace is `silentTrace` (`engine/src/world.cpp`, `JPH::Trace = silentTrace`). No `printf`, `fputs` or emscripten import is reached from the physics path. A grep of `world.cpp`, `planet_shape.cpp`, `vegetation.cpp`, `pool_alloc.cpp`, `arena.cpp` and `bridge.cpp` finds no `printf`, `fputs`, `emscripten` or `EM_ASM` call. The only callback inside `Update` is `RadialGravity::OnStep` (`engine/src/world.cpp`), which is wasm code.
+- Timer boundaries are the same for both backends. They are the same wasm and the same scope code, and the per-frame phase sums match the tick in both backends (WebGPU round 1: tick 43.4, physics 41.8 + readback 1.5 = 43.3; WebGL2 round 1: tick 39.6, physics 38.3 + readback 1.3 = 39.6).
+
+Conclusion from the audit. No submit, readback or sync is inside the physics timer, and the timer boundaries are identical. The physics window is the same wasm instructions on the same state for both backends, so the gap must come from the environment the window runs in.
+
+Hypothesis, to test. The GPU's work changes its power draw, and on this laptop the CPU and the discrete GPU share a package power budget. A higher GPU draw can lower the CPU clock during the physics window. If that is the cause, the gap should disappear when the backend frame is skipped, because the GPU then receives no per-frame work. If the gap stays with the frame skipped, the cause is not the GPU work, and I will look for something else.
+
+Phase A changes (code and docs only, no wasm change, so the build stays `2b28cd23…`).
+
+1. `scripts/browser/timed-result.mjs`: `stampLoad` also records `cpuFreqKhz` (the mean of `scaling_cur_freq` over the cpus) and `gpu` (`nvidia-smi` utilisation, power, SM clock and temperature). Both are `null` when the source is unavailable. Witness: `check:timed-result`, 10 PASS, including the parsers, the sysfs reader over a temporary tree, and the `nvidia-smi` reader with a failing query.
+2. `scripts/browser/engine-render-browser.js`: the `draw=0` query skips `renderer.frame()`, so the backend frame and its submit are not run, while the tick and the phase timers run as before. The result records `draw`. With `draw=0` the stats fields are not read, and `ok` means no errors. Witness: the Phase B runs with `draw=0`, whose files record `draw` 0 and `ok` true.
+3. `scripts/browser/summarise-timed.mjs`: the table gains `draw`, CPU MHz before and after, GPU utilisation and power before and after, and the SM clock after. A file without these fields prints `null`.
+
+Phase B plan. Rebuild is not needed, because no C++ changed. Confirm the wasm sha. Run the alternating WebGPU and WebGL2 1024 pairs (three rounds), then the same pair with `draw=0` (two rounds). Quote the medians and p99s side by side, and state the physics phase for each.
