@@ -980,3 +980,30 @@ Engine side of the Phase 5 p99. `scripts/streamer-p99.mjs` runs the engine's pla
 Spoint side of the Phase 5 p99. Not measured in this pass. Spoint's `src/terrain/HeightfieldStreamer.js` does its work in its own `setTimeout` and promise chain, and `cover(points)` only enqueues. There is no per-step entry point to time from outside without patching spoint. The engine's frame-time p99 on a planet path is also not measured: the browser harness orbits a fixed scene and stages its 16 pages once. The ENGINE.md witness (frame-time p99 against spoint's streamer on the same path) therefore stays OPEN, with these two causes.
 
 Phase A changes. `scripts/browser/engine-render-browser.js` (row column `startMs`); `scripts/browser/stall-attribution.mjs`, `scripts/browser/cgroup-sampler.mjs`, `scripts/browser/cpu-load.mjs`; `scripts/streamer-p99.mjs`; `scripts/check-stall-attribution.mjs` and `scripts/check-streamer-p99.mjs`, both in the `npm test` chain before `check:engine-host-witness`.
+
+Deviation, recorded after the first two runs. The starvation signal in the pre-registration was summed `throttled_usec`. That counter adds the throttled time of every CPU in the group, so a 168 ms frame read 707 ms of it (`build/diag/phaseF-*` analysis of G1 r1). It is not a wall-clock state and cannot test H. From the third run the sampler also logs `cpu.pressure` `full` (`fullUs`), the wall time in which every runnable task of the group was stalled, and the verdicts use it as `starved`. The prediction is unchanged: P1 to P3 and the coverage rule apply to `starved` time as they did to throttled time.
+
+Phase B result (WebGPU, draw on, timed 1024, one run at a time on a shared host).
+
+| Run | Condition | Median ms | p99 ms | Max ms | Physics median ms | Load before→after | Stalls over 1.5× median | Starved, wall (full PSI) | Summed throttled_usec over window |
+|---|---|---|---|---|---|---|---|---|---|
+| G0 r1 | no generator | 52.60 | 65.10 | 86.20 | 50.30 | 13.93→10.99 | 1: frame 567, 86.2 ms | not sampled | 0 ms over 227–347 s (see caveat) |
+| G1 r1 | 12 workers, 120 s | 109.50 | 166.50 | 184.20 | 105.75 | 8.07→10.87 | 7: frames 68, 310, 393, 486, 534, 537, 538 | not sampled | 359,475 ms over 120 s |
+| G0 r2 | no generator | 71.30 | 98.70 | 102.40 | 68.15 | 11.20→11.86 | 0 | 0.40 ms mean per normal frame (518.6 ms in window) | 0 ms over 120 s |
+| G1 r2 | 12 workers, 120 s | 83.00 | 94.90 | 97.30 | 79.80 | 8.87→13.48 | 0 | 9.03 ms mean per normal frame (10,164.6 ms in window) | 128,282 ms over 120 s |
+
+Caveat on G0 r1. Two samplers wrote `build/diag/throttle-g0r1.log`. The first (227.1 to 347.1 s, which covers the run's rows at 236.9 to 268.2 s) gave the attribution above, with summed throttled time flat at 49,838,212,654 µs from first sample to last. The second, started from a shell call I read as failed, overwrote the same path with 280.1 to 400.1 s. The file on disk now is the second. The evidence for G0 r1 is the attribution output recorded at the time, not the file.
+
+Frame 567 of G0 r1. Tick 57.6 ms (physics 55.8 ms). Render 28.6 ms, of which the backend scope accounts for 0.1 ms. So that stall has about 28 ms outside every timed scope. It is a JavaScript or emscripten glue cost, not the GPU submit. It is not yet attributed.
+
+What the runs show.
+
+- P1 (every stall is starved): cannot be tested. G0 r1 has one stall with no starvation sample, and throttled time was flat over its window. That disproves cgroup quota throttling for that stall. It does not rule out other CPU contention, since no PSI was taken in that run.
+- P2 (generator raises stalls): one pair supports it (7 against 1), and the other pair shows none (0 against 0). Two runs per condition are not enough, and the no-generator runs were themselves at background load 11 to 14, so the comparison is confounded.
+- P3 (no stall without starvation): the generator raises wall-clock starvation about 22 times (0.40 to 9.03 ms per normal frame), and r2 did not produce a stall. So starvation alone did not produce stalls in r2.
+
+Verdict on H. Not proven. Partly ruled out: cgroup quota throttling for the G0 r1 stall, from the flat throttled counter. The generator raises starvation a lot, but two runs per condition do not show that it raises stalls. No fix is made in our process, since none is supported. The cause of the physics-phase freezes and of the 28 ms outside the scopes in frame 567 is not identified.
+
+Engine streamer p99 (the engine side of the Phase 5 witness, Node, 6000 steps on the planet flight). Phase A run: p50 0.000571 ms, p99 0.003937 ms, max 30.524 ms. Phase B run with load 12.52 before and after: p50 0.000361 ms, p99 0.002825 ms, max 0.563 ms. The 30.5 ms maximum did not recur, and no sample was taken for it. Spoint's streamer side is not measured, and the frame-time p99 on a planet path remains OPEN (see the Phase A section above).
+
+Witnesses. `check:stall-attribution` 7 PASS (`RESULT: PASS`). `check:streamer-p99` 3 PASS (`RESULT: PASS`). No wasm changed in this pass, so no rebuild and no pin change.
