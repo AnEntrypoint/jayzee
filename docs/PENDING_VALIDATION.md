@@ -1337,3 +1337,36 @@ Blocked-stall cause, written to `docs/stall-causes/blocked-stall-cause.md`:
 Physics at 10240 awake is kept as recorded, not a defect, as in the Phase A decision above.
 
 `npm test`: EXIT 0, 4687 PASS and 0 FAIL, log `build/diag/phase-b3-npm-test.log`. The count is 4682 before this round plus the five `check:thread-sampler` lines.
+
+## Two open defects from r1 G1: the sampler gap and the off-CPU wait (Phase A: code, tests and docs, not built or run)
+
+### The sampler gap on r1: measured cause and margin, not a fix
+
+Measured on the existing `build/diag/paired-F/r1-G1-fixed` files, without a new run. The two ticks over 100 ms are at tick index 501 (142 ms gap) and index 1616 (131 ms gap). Neither index is on the 100-tick scan, so the `/proc` scan is not the cause. In the 250 ms window that contains each gap, the root cgroup's `cpu.pressure` some total rose by 107 ms and 112 ms. The host has 12 CPUs (`nproc`), and the G1 burn runs 12 workers, so the sampler waited for a CPU, which is the same kind of wait the probe measures on the renderer. The sampler is in the same root cgroup (`/proc/self/cgroup` is `0::/`).
+
+A fix by priority is not available here: `CapEff` is 0 and `NoNewPrivs` is 1, so a negative nice value is refused. Lowering the burn workers' priority would change the G1 condition, so it is not used. The sampler's own run-queue wait is now recorded per tick (below), so a Phase B run will show whether each late tick was the sampler's own wait.
+
+Margin: no stall in r1 overlaps either late gap (checked against `probe-r1-G1-fixed.json`), so the two gaps changed no stall's category. The worst gap is 142 ms, and the r1 sampling gap check still fails on those two ticks. That result is kept as recorded.
+
+### The off-CPU wait on r1: the instrument, and what the host refuses
+
+The r1 blocked stalls were off the CPU with no cgroup pressure, inside physics and readback. Phase A adds the readings that can name that wait, and Phase B takes them on a new r1 run.
+
+What the host refuses, measured here: `/proc/<tid>/syscall` is `Operation not permitted` for a renderer main thread (Yama `ptrace_scope` is 1, and this user has no capability). `gdb`, `perf` and `strace` are not installed. So the syscall number and a user-space stack cannot be read, and the wait is named from the kernel side: `wchan`, the scheduler's run and wait time, the fault counts, and the memory and IO pressure files. `wchan` is readable: `futex_do_wait` was read on a renderer main thread (an idle one) in this pass.
+
+What the engine code shows: `engine/CMakeLists.txt` and `engine/build.sh` have no pthread flags, and Jolt's mutex on wasm is `std::mutex` in a single-threaded build (`Jolt/Core/Core.h` and `Mutex.h`). So the engine has no lock wait that can block the renderer main thread. A kernel wait inside physics or readback has to come from a page fault, memory reclaim, or the renderer's own runtime (V8 or Blink) running inside the wasm call. The memory pressure file on this host has an `avg300` of 9.79 at one read, so memory stalls are present.
+
+### Changes in Phase A
+
+1. `scripts/browser/thread-sampling.mjs` adds the helpers. `parseStat` now also returns `minflt` and `majflt` (fields 10 and 12 of the thread's `stat`). New: `parseSchedStat`, `parsePressureTotal`, `categoryOfWchan` (`futex`, `epoll`, `page-io`, `reclaim`, `sleep-or-poll`, `socket`, `child`, `running` for `0`, `other`), `parseSchedLog`, `parseTicksLog`, `interpolateAt` (null past the data), `stepAt`, `offCpuWindow` (run and wait time by interpolation, the wait categories of the samples in the window, and the fault deltas) and `pressureMsBetweenTicks` (null outside the data).
+2. `scripts/browser/thread-cpu-sampler.mjs` writes three things per tick. `<out>.ticks` now has `ts memSomeUs ioSomeUs selfRunNs selfWaitNs` (it had `ts` only), with the cgroup memory and IO pressure totals and the sampler's own scheduler stats (`-1` for a pressure file that is missing). `<out>.sched` has one row per renderer main thread per tick: `ts pid runNs waitNs slices minflt majflt wchan`, from `/proc/<pid>/task/<pid>/schedstat`, `stat` and `wchan`. The thread log (`<out>`) is unchanged. The sampler no longer reads `/proc/<tid>/syscall`, since the host refuses it.
+3. `scripts/browser/stall-probe.mjs` exports `rendererMainPid`, which is the renderer pick from `rendererMainSeries`. `rendererMainSeries` now calls it and returns the same series, so the gate's existing expectations hold.
+4. `scripts/browser/stall-off-cpu.mjs` is new. For each stall it gives the run time, the runnable-wait time, the sleep time (the stall time minus run and wait), the wait categories, the major and minor fault deltas, and the memory and IO pressure milliseconds of the stall window. It also summarises the categories by verdict. The CLI takes the page JSON, the cgroup sampler file, the thread log, the sched file and the ticks file, and prints JSON.
+5. `scripts/check-stall-off-cpu.mjs` is new. Its pure gates cover the parsers, the wchan categories, the interpolation and its null outside the data, the sleep arithmetic, the summary, and the pressure conversion. `package.json` gains `check:stall-off-cpu`, which runs in `npm test` between `check:thread-sampler` and `check:engine-host-witness`.
+6. `scripts/check-thread-sampler.mjs` reads the new ticks format and asserts that the sched file holds at least 10 rows for the stand-in renderer's pid. Its `parseStat` gate checks `comm` and `jiffies` separately, since `parseStat` now also returns the fault counts.
+
+### What Phase B must show
+
+- The r1 sampling gap check passes, or its late ticks are shown to be the sampler's own run-queue wait (`selfWaitNs` rising over the late tick).
+- Each r1 blocked stall's sleep time, its `wchan` categories, and its fault and memory-pressure deltas. The wait is named when one category covers most of the sleep time, with the wchan symbol and the fault counts as the witness. If the only evidence is `futex` with no code path, the call stays unnamed and the limit (no user-space stack on this host) is recorded.
+- Nothing above is claimed as a fix. Any code defect that Phase B names is recorded as a finding for the next pass, since the wait can only be named once the measurement exists.

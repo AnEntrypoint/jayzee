@@ -47,13 +47,17 @@ function gainInWindow(series, startMs, endMs) {
   return (cumulativeAt(series, endMs) ?? first) - (cumulativeAt(series, startMs) ?? first)
 }
 
-export function rendererMainSeries(rows, startMs, endMs) {
-  if (!(endMs > startMs)) throw new TypeError('rendererMainSeries needs a window with startMs before endMs')
+export function rendererMainPid(rows, startMs, endMs) {
+  if (!(endMs > startMs)) throw new TypeError('rendererMainPid needs a window with startMs before endMs')
   const byPid = mainThreadSeries(rows)
   if (byPid.size === 0) throw new RangeError('no renderer main thread in the thread log')
   const ranked = [...byPid.entries()].map(([pid, series]) => ({ pid, gain: gainInWindow(series, startMs, endMs), last: series[series.length - 1].jiffies }))
   ranked.sort((a, b) => b.gain - a.gain || b.last - a.last)
-  return byPid.get(ranked[0].pid)
+  return ranked[0].pid
+}
+
+export function rendererMainSeries(rows, startMs, endMs) {
+  return mainThreadSeries(rows).get(rendererMainPid(rows, startMs, endMs))
 }
 
 export function cpuMsBetween(series, startMs, endMs) {

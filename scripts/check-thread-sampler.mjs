@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { gate, finish } from './lib/gate.mjs'
-import { gapsOverLimit, parseStat, processType, samplingGaps } from './browser/thread-sampling.mjs'
+import { gapsOverLimit, parseSchedLog, parseStat, parseTicksLog, processType, samplingGaps } from './browser/thread-sampling.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const sampler = join(here, 'browser', 'thread-cpu-sampler.mjs')
@@ -19,7 +19,9 @@ gate('processType reads the Chromium --type flag and defaults to browser', () =>
 
 gate('parseStat reads utime plus stime and keeps a comm with brackets and spaces', () => {
   const fields = ['S', ...Array(10).fill(1), 7, 3, 0].join(' ')
-  assert.deepEqual(parseStat('42 (Chrome (x) render) ' + fields), { comm: 'Chrome (x) render', jiffies: 10 })
+  const parsed = parseStat('42 (Chrome (x) render) ' + fields)
+  assert.equal(parsed.comm, 'Chrome (x) render')
+  assert.equal(parsed.jiffies, 10)
 })
 
 gate('samplingGaps gives the gap between consecutive stamps and none for a single stamp', () => {
@@ -47,10 +49,13 @@ gate('the sampler ticks at least every twice its interval while a renderer proce
     run.kill('SIGTERM')
     renderer.kill('SIGTERM')
     await exited
-    const stamps = readFileSync(outFile + '.ticks', 'utf8').split('\n').filter((line) => line !== '').map(Number)
+    const ticks = parseTicksLog(readFileSync(outFile + '.ticks', 'utf8'))
+    const stamps = ticks.map((row) => row.t)
     assert.ok(stamps.length >= 10, 'the sampler wrote ' + stamps.length + ' ticks in ' + RUN_MS + ' ms')
     const late = gapsOverLimit(stamps, PERIOD_MS)
     assert.deepEqual(late, [], 'sampling gaps over ' + 2 * PERIOD_MS + ' ms: ' + late.join(', '))
+    const sched = parseSchedLog(readFileSync(outFile + '.sched', 'utf8')).filter((row) => row.pid === renderer.pid)
+    assert.ok(sched.length >= 10, 'the sampler wrote ' + sched.length + ' sched rows for the renderer main thread')
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
