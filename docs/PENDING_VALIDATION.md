@@ -2146,3 +2146,20 @@ CI for 9b3d726, read from GitHub:
 - `pages build and deployment` run 42703171583: success.
 
 Fix, in `.github/workflows/ci.yml` (test job, before `npm ci`): a step clones JoltPhysics at tag v5.3.0 and checks that HEAD is 0373ec0dd762e4bc2f6acdb08371ee84fa23c6db, which is the pin in `engine/CMakeLists.txt`. A second step configures `build/jolt/Build` into `build/host-jolt` with the options the local library was built with (`CROSS_PLATFORM_DETERMINISTIC=ON`, `RelWithDebInfo`, `ENABLE_OBJECT_STREAM=OFF`, `INTERPROCEDURAL_OPTIMIZATION=OFF`, the `TARGET_*` targets off) and builds the `Jolt` target. `ENABLE_ALL_WARNINGS=OFF` is set so that a newer or older GCC cannot fail the build on a warning. Witness before the push: the same configure and build into `build/host-jolt-ci` exited 0 and produced `libJolt.a`, and `engine/test/build_host.sh` linked against it with `RESULT: PASS` and no FAIL lines (`build/diag/bh-ci.log`).
+
+## Phase A pass: local close-out, hosted CI unavailable (run 2026-11-09-22-13-02-d298cd)
+
+Hosted Actions is at its spending limit, so no hosted result exists for 76f26db or for any later commit. Every witness in this section is local and runs in Phase B. Nothing here is pushed until Phase B is green.
+
+| Row | File | Witness | State at the end of Phase A |
+|---|---|---|---|
+| Hosted CI for 76f26db: Jolt host library step | `.github/workflows/ci.yml` | `check:ci-engine-glue` in npm test; `cmake` configure and build into `build/host-jolt-ci`; `bash engine/test/build_host.sh` links it | Hosted-only gap. Cause: Actions spending limit, so the runner's result for 76f26db is unavailable. The local equivalent is the Phase B run. |
+| W2, JF6 `decodeCrowdDots` with a reused `out` | `src/client/crowdDots.js` | `check:gc-reuse-rows`, first gate: no garbage collection in 20000 ticks after warm-up, and the allocating control is seen | Written in Phase A (`scripts/check-gc-reuse-rows.mjs`). Phase B runs it. |
+| W2, JM12 `handleMessage` for snapshot and player leave | `src/client/MessageHandler.js` | `check:gc-reuse-rows`, second and third gates: no garbage collection after warm-up, the invalid-session control is seen, and the return values are pinned | Written in Phase A. Phase B runs it. |
+| W2, JM13 `ClockSync.addSample` | `src/client/ClockSync.js` | none written | OPEN. The sample object is kept by design (the JM13 row), so a zero-garbage witness would fail. The witness needed is a bounded-heap check over many samples. Not written in this pass. |
+| W2, G2 `bridge.transform` | `src/engine/bridge.js` | none written | OPEN. Needs a built engine module inside the gate. Not written in this pass. |
+| W2 and W7 browser rows, JF5 and JF7 | `src/client/playerLodRenderer.js`, `src/client/playerVatRenderer.js` | none written | OPEN. Needs a browser page with the heap sampler. Not written in this pass. |
+| Defect C, 1024-tier checksum with visible [0,0,0,0] | `scripts/bisect-render-1024.mjs` | run B (engine 15fcb7a, page from f2b5c23, `--scene=f2b5c23`) and its paired control (engine f2b5c23, page 15fcb7a), commands as recorded in the Defect C entry | Phase B. |
+| Defect B, sampler gap and off-CPU wait | `scripts/browser/thread-sampling.mjs`, `scripts/browser/cpu-load.mjs` | sampler wake trace and burn-worker placement control, as recorded in the Defect B entry | OPEN. Needs a measurement that this pass does not run. |
+
+Phase B order for this section: `npm run check:gc-reuse-rows`, `npm run check:gc-witness`, `npm run check:browser-heap`, `npm run check:ci-engine-glue`, the engine builds in the CI order, `bash engine/test/build_host.sh`, then one `npm test`, then the Defect C pair. Defect A (the WebGPU adapter in the playwriter browser) was already witnessed in the 9b3d726 record and is rerun only if the browser is needed for Defect C.
