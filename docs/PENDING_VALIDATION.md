@@ -21,6 +21,7 @@ Each entry names the file, the ENGINE.md phase and the witness it needs. The sta
 | Gap closure 3: material table as slots | `check-engine-materials` 15 PASS, `check-client-resource-pools` | PASS. |
 | Service-worker isolation shim | `check-engine-isolation` 9 PASS; public site `anentrypoint.github.io/jayzee/play/` in the gm playwriter browser | PASS. The public site reports `crossOriginIsolated` true and `SharedArrayBuffer` defined, before and after the reload (profile caveat in the section below). |
 | Renderer (phases 10 and 11) | `check-engine-render` 17 PASS; WebGPU and WebGL2 pages at 64 and 1024 tiers on the real NVIDIA RTX 3060 Laptop adapter (see "Real-adapter runs" under the renderer section) | PASS. The two backends agree on the checksum at each tier, and every run has zero allocations after warm-up. The 64-tier WebGPU slowdown was a top-tier upload in the frame and is fixed: in the clean replicate (set 2) the 64-tier p99 medians are equal, 3.1 ms each. At 1024 the median frame is equal across backends (47.0 ms against 47.1 ms over six runs), and the p99 is dominated by long-frame stalls that appear in both backends. The earlier 4.62 and 3.90 speedups are withdrawn. See "WebGPU and WebGL2 repeats after the 64-tier fix". |
+| Renderer re-run with the adapter (this pass) | `engine-render.html` phases 10 and 11 at the 64 and 1024 tiers on the NVIDIA RTX 3060 Laptop adapter (WebGPU backend `webgpu`, WebGL2 backend `webgl2`); two timed 1024 pairs | PASS for the witnesses: the checksums agree across backends at each tier, `ok` is true, and allocations after warm-up are zero. At 1024 the timed median is WebGPU 39.5 ms and WebGL2 37.6 ms, so WebGPU is 0.95x WebGL2 (no speedup). The `.mcp.json` route is still not witnessed. See "Phase B re-run: WebGPU witnesses and the 1024 tier". |
 | Memory, arena and allocator | `check-engine-core`, `check-engine-tiers` 6 PASS, native host witness | PASS. Post-warm-up carves are zero at 64 and 1024 players. |
 
 Still OPEN after Phase B: the phase 5 frame-time comparison; the phase 3 rotation gate; the `USE_WEBGPU` migration (`emdawnwebgpu`); the `ENGINE_THREADS` branch, which is not compiled; `scripts/browser/run-player-webgpu.mjs`, which still needs `PLAYWRIGHT_CORE`; the 1024-tier long-frame stalls in both backends (up to 705 ms in WebGPU, not reproduced; the largest of six diagnosed runs was 251 ms): the cause is recorded in "Stalls at 1024, Phase B diagnosis", with no code fix verified; the 362.9 ms WebGL2 outlier is not reproduced and is covered by the same section; the `requestAdapter()` null after a browser restart: the cause is recorded in "Null adapter after the browser restart", and the flag fix is verified, while a launcher-level fix is still open.
@@ -560,3 +561,57 @@ Both runs used `scripts/browser/engine-render.html?tier=1024&timed=1`, with WebG
 
 - `npm test`: exit 0. `RESULT: PASS` 218 times, `RESULT: FAIL` 0 times. Lines beginning `PASS ` 4451, lines beginning `FAIL ` 0. One PASS label contains the word `FAILED` (`MODEL_LOAD_FAILED sets the failure label…`); it is a label, not a failure. Log in `/tmp/npm-test.log` (outside the repo).
 - Commits in this round: `67e8ade` (earlier doc commit), `f38d704` (Phase A), and the commit that carries this section, the sampler fix, `.mcp.json`, and the two witness drivers. The push is one `git push origin main` covering all of them.
+
+## Phase B re-run: WebGPU witnesses and the 1024 tier
+
+Run on 2026-11-09 (UTC) on the project browser: gate pid 4041849, port 9721; browser pid 4095457, debug port 10221, profile `/workspace/jayzee/.playwriter/browser-profile`. The profile's `Local State` has `browser.enabled_labs_experiments` = `enable-unsafe-webgpu`, `enable-vulkan@1`, `enable-webgpu-developer-features`. Pages were served by `scripts/browser/serve-root.mjs 8765`. Each run was one page load in one tab, and the runs were one after another. No timed run overlapped another, and no thread sampler ran during these runs.
+
+### Adapter
+
+- WebGPU (phase 10, backend `webgpu`): `{"api":"webgpu","vendor":"nvidia","architecture":"ampere","device":"0x2520","description":"NVIDIA GeForce RTX 3060 Laptop GPU","isFallbackAdapter":false}`. The probe `scripts/browser/adapter-probe.html` returned this adapter on 5 of 5 `requestAdapter()` calls. The first call was 27 ms after the page started, in a tab opened after the browser start at 03:33:13 UTC.
+- WebGL2 (phase 11, backend `webgl2`): `{"api":"webgl2","vendor":"Google Inc. (NVIDIA Corporation)","renderer":"ANGLE (NVIDIA Corporation, NVIDIA GeForce RTX 3060 Laptop GPU/PCIe/SSE2, OpenGL 4.5.0)"}`.
+- No adapter was unavailable in this pass, so no adapter defect was fixed.
+
+### Witnesses
+
+Every run has `ok` true and `errors` empty. Allocations after warm-up are `"0"`, and `createsAfterSeal` is 0 in all four.
+
+| Run | Backend | Checksum | `visible` | `apiCallsPerFrame` |
+|---|---|---|---|---|
+| 64 tier, untimed | webgpu | -5415737363265412373 | [18,20,21,20] | 34 |
+| 64 tier, untimed | webgl2 | -5415737363265412373 | [18,20,21,20] | 45 |
+| 1024 tier, timed | webgpu | -3826851758512048142 | [729,746,747,750] | 34 |
+| 1024 tier, timed | webgl2 | -3826851758512048142 | [729,746,747,750] | 45 |
+
+At 64, WebGPU median 2.1 ms, p99 2.9 ms, max 3.5 ms. WebGL2 median 2.0 ms, p99 2.9 ms, max 3.1 ms.
+
+### 1024 tier timings, side by side
+
+Milliseconds, 600 frames per run, timed.
+
+| Source | Backend | Median | p99 | Max | Tick median | Outliers | Physics median / max | Readback median / max |
+|---|---|---|---|---|---|---|---|---|
+| `build/diag/webgpu1024.json` (refreshed this pass; the 02:04 copy is `webgpu1024.prev.json`) | webgpu | 39.5 | 47.10 | 51.70 | 39.1 | 0 | 37.7 / 49.1 | 1.4 / 2.1 |
+| `build/diag/timed-webgl2-1024-r3.json` | webgl2 | 37.60 | 42.70 | 43.90 | 37.35 | 0 | 36.0 / 42.3 | 1.3 / 2.1 |
+| Earlier pair in this pass, console only, not saved | webgpu | 38.2 | 44.6 | 47.2 | 37.8 | 0 | n/a | n/a |
+| Earlier pair in this pass, console only, not saved | webgl2 | 36.45 | 40.7 | 42.5 | 36.2 | 0 | n/a | n/a |
+
+The previous `webgpu1024.json` from 02:04 UTC has p99 140.4 ms, and it has no median or phase fields and no `timed` flag. Its timing is not comparable with these rows.
+
+### Speedup
+
+Speedup is WebGL2 median divided by WebGPU median. Both pairs give about 0.95, so WebGPU is slower and there is no speedup at 1024 on this adapter.
+
+- File pair: 37.60 / 39.50 = 0.95, WebGPU 5.0% slower at the median.
+- Earlier pair: 36.45 / 38.20 = 0.95, WebGPU 4.8% slower at the median.
+- p99: WebGPU is 10% higher in the file pair (47.10 against 42.70) and 9.6% higher in the earlier pair (44.6 against 40.7).
+
+There are two pairs and one run each, so there is no variance estimate.
+
+The earlier timed medians in this file (WebGPU r2 83.85 ms, WebGL2 83.15 ms) were measured with the thread sampler running. This pass ran without it, and its medians are about half those values. The cause is not recorded, so this pass's numbers are not compared with those.
+
+### Defects and open items
+
+- Null adapter, from "Null adapter after the browser restart": did not recur. The first `requestAdapter()` after the 03:33 browser start returned the NVIDIA adapter. The launcher-level fix stays OPEN.
+- `.mcp.json` route from ee68993: NOT witnessed. The browser pid 4095457 was started by `/bin/bash /usr/bin/chromium --user-data-dir=/workspace/jayzee/.playwriter/browser-profile --remote-debugging-port=10221 ...`, not by `scripts/browser/chromium-webgpu.sh`. The gate (pid 4041849) started at 03:09:47 UTC, before ee68993 landed at 03:33 UTC (05:33 +0200), so its environment has no `PLAYWRITER_BROWSER_PATH`. The adapter here came from the profile's labs, not from the wrapper. Witnessing the route needs the gate restarted. That was not done in this pass, because the gate holds this run's browser lease. OPEN.
+- No new WebGPU defect in this pass: no errors in either backend, no outlier at 1024 in either backend, and the largest frame was 51.7 ms (WebGPU). The 705 ms long-frame stall from the "Stalls at 1024" section did not reproduce.
