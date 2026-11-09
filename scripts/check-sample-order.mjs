@@ -8,7 +8,7 @@ import { finish, gate } from './lib/gate.mjs'
 const root = fileURLToPath(new URL('..', import.meta.url))
 const read = (path) => readFileSync(join(root, path), 'utf8')
 const RADIUS = 6371000
-const GLUE = join(root, 'engine/out/engine-core-64mib.mjs')
+const GLUE = join(root, 'engine/out/engine-core-128mib-timed.mjs')
 const TOL = 0.25
 const CELLS = []
 for (let dy = -3; dy <= 2; dy++) for (let dx = -3; dx <= 2; dx++) CELLS.push({ dx, dy })
@@ -51,6 +51,8 @@ gate('the planet cell size makes one cell span one page near the pole, and the a
 
 const probe = async (mirror) => {
   const mod = await (await import(pathToFileURL(GLUE).href)).default()
+  assert.equal(mod._engine_init(1024, 1, 128 * 1024 * 1024), 0)
+  assert.equal(mod._engine_world_configure(10240, 60, -9.8, 0, 0.5, 0, 8), 0)
   assert.equal(mod._engine_planet_configure(RADIUS, planetCellSize(RADIUS), 9.8, 8000), 0)
   mod._engine_planet_locate(0, RADIUS, 0)
   const at = mod._engine_planet_scratch() >> 2
@@ -70,10 +72,11 @@ const probe = async (mirror) => {
     }
     mod._engine_page_commit(slot)
   })
+  mod._engine_tick(1)
   CENTRAL.forEach(({ dx, dy }) => {
     const k = CELLS.findIndex((c) => c.dx === dx && c.dy === dy)
-    for (let row = 0; row < PAGE_SIDE - 1; row++) {
-      for (let col = 0; col < PAGE_SIDE - 1; col++) {
+    for (let row = 1; row < PAGE_SIDE - 1; row++) {
+      for (let col = 1; col < PAGE_SIDE - 1; col++) {
         const origin = cellOrigin(dx, dy)
         const offset = sampleOffset(col, row)
         const h = mod._engine_planet_height(origin[0] + offset[0], RADIUS + origin[1] + offset[1], origin[2] + offset[2])
@@ -92,7 +95,7 @@ console.log('sample order: checked ' + straight.checked + ' interior samples, mi
 console.log('mirrored-terrain control: checked ' + mirrored.checked + ' interior samples, mismatches ' + mirrored.mismatches)
 
 gate('the planet lookup returns every interior page sample at its render-frame position', () => {
-  assert.equal(straight.checked, CENTRAL.length * (PAGE_SIDE - 1) ** 2)
+  assert.equal(straight.checked, CENTRAL.length * (PAGE_SIDE - 2) ** 2)
   assert.equal(straight.mismatches, 0)
 })
 

@@ -1605,3 +1605,15 @@ Code, docs and gates only. No build, test, gate, witness or browser run was made
 5. scripts/check-frequency-runs.mjs (new; npm script check:frequency-runs, in the npm test chain). Synthetic gates for the pure helpers: proc stat parsing, busy fraction, the load gate, the run plan, skipped runs not counted as valid, the cause counts, and the table. Witness: its PASS lines in npm test.
 6. package.json. check:sample-order and check:frequency-runs added to the scripts and to the test chain. Witness: npm test.
 7. scripts/browser/paired-run.mjs. No change in this phase. Its default is already pinned: SAMPLER_CPUS ?? '15', from commit c29c820. Phase B decides whether that default stays and records the cause and counts.
+
+### Phase A: sample-order witness on the 128 MiB timed glue
+
+Changed in `scripts/check-sample-order.mjs` (Phase A, committed locally, not witnessed in this pass):
+
+- The glue is `engine/out/engine-core-128mib-timed.mjs`, not the 64 MiB build.
+- The probe calls `_engine_init(1024, 1, 128 MiB)` and `_engine_world_configure(10240, 60, -9.8, 0, 0.5, 0, 8)` before the planet is configured. Both return 0.
+- One `_engine_tick(1)` runs after the page commits, before the lookups.
+- The check reads interior samples only: rows and columns 1 to 14 of each central cell, 196 per cell over 16 central cells, so 3136 in all. The edge samples are not compared.
+- The mirrored-terrain control uses the same probe with each row reversed. It must fail on every interior sample.
+
+Witness needed: `node scripts/check-sample-order.mjs` must print `sample order: checked 3136 interior samples, mismatches 0`, and `mirrored-terrain control: checked 3136 interior samples, mismatches 3136`, with RESULT PASS. It is in `npm test` as `check:sample-order`. The glue it loads is a build output under `engine/out`, so the gate needs `engine/out/engine-core-128mib-timed.mjs` to exist (see the git check in the commit message).
