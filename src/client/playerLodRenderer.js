@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { createPlayerLodPlanner } from '../client-pure/playerLodPlanner.js'
 import { TIER_DOT } from '../client-pure/playerTierSplit.js'
-import { CROWD_DOT_SIZE, decodeCrowdDots } from './crowdDots.js'
+import { CROWD_DOT_SIZE, CROWD_POSE_STRIDE, crowdPoseBuffer, crowdPoseBufferFor, decodeCrowdDotPoses } from './crowdDots.js'
 import { CROWD_DOT_CELL_M } from '../snapshot-lod-pure/constants.js'
 import { createCrowdDotRendererWebGPU } from './playerLodRendererWebGPU.js'
 import { isWebGPUInstancingSupported } from './webgpuInstancing.js'
@@ -50,7 +50,7 @@ export function createCrowdDotRendererWebGL(scene, opts = {}) {
   const matrix = new THREE.Matrix4()
   let activeCount = 0
   const decodeOptions = { dotCellM, dotSize, viewerY: 0, groundHeightFn: null }
-  const poseBuffer = []
+  let poses = crowdPoseBuffer(capacity)
 
   const newMesh = (n) => {
     const mesh = new THREE.InstancedMesh(geo, mat, n)
@@ -75,17 +75,19 @@ export function createCrowdDotRendererWebGL(scene, opts = {}) {
   const update = (dots, viewerY, groundHeightFn) => {
     decodeOptions.viewerY = viewerY
     decodeOptions.groundHeightFn = groundHeightFn
-    const poses = decodeCrowdDots(dots, decodeOptions, poseBuffer)
-    ensureCapacity(poses.length)
-    for (let i = 0; i < poses.length; i++) {
-      const pose = poses[i]
-      position.set(pose.x, pose.y, pose.z)
-      scale.set(pose.scale, pose.scale, pose.scale)
+    poses = crowdPoseBufferFor(poses, dots ? dots.length : 0)
+    const count = decodeCrowdDotPoses(dots, decodeOptions, poses)
+    ensureCapacity(count)
+    for (let i = 0; i < count; i++) {
+      const at = i * CROWD_POSE_STRIDE
+      const size = poses[at + 3]
+      position.set(poses[at], poses[at + 1], poses[at + 2])
+      scale.set(size, size, size)
       im.setMatrixAt(i, matrix.compose(position, quaternion, scale))
     }
-    im.count = poses.length
+    im.count = count
     im.instanceMatrix.needsUpdate = true
-    activeCount = poses.length
+    activeCount = count
   }
 
   const dispose = () => {

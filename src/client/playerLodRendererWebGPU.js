@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { CROWD_DOT_CELL_M } from '../snapshot-lod-pure/constants.js'
-import { CROWD_DOT_SIZE, decodeCrowdDots } from './crowdDots.js'
+import { CROWD_DOT_SIZE, CROWD_POSE_STRIDE, crowdPoseBuffer, crowdPoseBufferFor, decodeCrowdDotPoses } from './crowdDots.js'
 import { makeDotGeometry } from './dotGeometry.js'
 import { createDotMaterialTSL } from './playerLodDotTSL.js'
 import { createWebGPUInstancedMesh } from './webgpuInstancing.js'
@@ -19,6 +19,8 @@ export function createCrowdDotRendererWebGPU(scene, opts = {}) {
   const matrix = new THREE.Matrix4()
   let inst = buildInstance(capacity)
   let activeCount = 0
+  const decodeOptions = { dotCellM, dotSize, viewerY: 0, groundHeightFn: null }
+  let poses = crowdPoseBuffer(capacity)
 
   function buildInstance(cap) {
     const rec = createWebGPUInstancedMesh(geo, createDotMaterialTSL(), cap)
@@ -40,16 +42,21 @@ export function createCrowdDotRendererWebGPU(scene, opts = {}) {
       if (activeCount > 0) { inst.clear(); activeCount = 0 }
       return
     }
-    const poses = decodeCrowdDots(dots, { dotCellM, dotSize, viewerY, groundHeightFn })
-    ensureCapacity(poses.length)
+    decodeOptions.viewerY = viewerY
+    decodeOptions.groundHeightFn = groundHeightFn
+    poses = crowdPoseBufferFor(poses, dots.length)
+    const count = decodeCrowdDotPoses(dots, decodeOptions, poses)
+    ensureCapacity(count)
     inst.clear()
-    poses.forEach((pose) => {
+    for (let i = 0; i < count; i++) {
+      const at = i * CROWD_POSE_STRIDE
+      const size = poses[at + 3]
       const id = inst.acquireId()
-      position.set(pose.x, pose.y, pose.z)
-      scale.set(pose.scale, pose.scale, pose.scale)
+      position.set(poses[at], poses[at + 1], poses[at + 2])
+      scale.set(size, size, size)
       inst.setMatrixAt(id, matrix.compose(position, quaternion, scale))
-    })
-    activeCount = poses.length
+    }
+    activeCount = count
   }
 
   function dispose() {
