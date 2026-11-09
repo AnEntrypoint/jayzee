@@ -5,7 +5,7 @@ import { gate, finish } from './lib/gate.mjs'
 import { loadEngineModule } from '../src/engine/EngineWorld.js'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const glue = pathToFileURL(join(root, 'engine/out/engine-core-64mib.mjs')).href
+const glue = pathToFileURL(join(root, 'engine/out/engine-core-64mib-timed.mjs')).href
 const BODIES = 64
 const SETTLE_TICKS = 1200
 const RADIUS = 0.5
@@ -15,12 +15,14 @@ const TRANSFORM_WORDS = 7
 const boot = async () => {
   const module = await loadEngineModule(glue)
   assert.equal(module._engine_world_configure(2048, 60, -9.8, 0, RADIUS, 0, 8), 0)
-  assert.equal(module._engine_world_add_box(-200, -1, -200, 200, 0, 200), 0)
-  for (let i = 0; i < BODIES; i++) {
-    const at = [(i % 32) * 2 - 32, 2 + (i % 5), Math.floor(i / 32) * 2 - 16]
-    assert.equal(module._engine_spawn(at[0], at[1], at[2], 0, 0, 0), i)
-  }
   assert.equal(module._engine_planet_configure(PLANET.radius, PLANET.cellSize, PLANET.gravity, PLANET.maxHeight), 0)
+  for (let i = 0; i < BODIES; i++) {
+    const x = (i % 32) * 2 - 32
+    const z = Math.floor(i / 32) * 2 - 16
+    const lift = 2 + (i % 5)
+    const y = PLANET.radius + module._engine_planet_height(x, PLANET.radius, z) + lift
+    assert.equal(module._engine_spawn(x, y, z, 0, 0, 0), i)
+  }
   return module
 }
 
@@ -35,15 +37,17 @@ const tickUntilAsleep = (module, limit) => {
   return ticks
 }
 
-gate('bodies dropped onto the ground under radial gravity fall asleep within 1200 ticks, resting at radius height', async () => {
+gate('bodies released above the planet stay awake while they fall, then rest on the surface and sleep within 1200 ticks', async () => {
   const module = await boot()
   assert.equal(module._engine_sim_active_bodies(), BODIES)
+  for (let i = 0; i < 60; i++) module._engine_tick(1)
+  assert.equal(module._engine_sim_active_bodies(), BODIES, 'a falling body slept before it reached the surface')
   const ticks = tickUntilAsleep(module, SETTLE_TICKS)
   assert.equal(module._engine_sim_active_bodies(), 0, 'after ' + ticks + ' ticks ' + module._engine_sim_active_bodies() + ' bodies are still awake')
   const pose = poses(module)
   for (let i = 0; i < BODIES; i++) {
-    const y = pose[i * TRANSFORM_WORDS + 1]
-    assert.ok(Math.abs(y - RADIUS) < 0.05, 'body ' + i + ' sleeps at y ' + y + ', not at rest on the ground')
+    const height = Math.hypot(pose[i * TRANSFORM_WORDS], pose[i * TRANSFORM_WORDS + 1], pose[i * TRANSFORM_WORDS + 2]) - PLANET.radius
+    assert.ok(Math.abs(height - RADIUS) < 0.05, 'body ' + i + ' sleeps ' + height + ' m above the surface, not at rest')
   }
 })
 
@@ -59,7 +63,7 @@ gate('a sleeping body is not pulled: no body wakes and no pose moves over 120 mo
   assert.ok(drift < 1e-4, 'a sleeping pose drifted by ' + drift)
 })
 
-gate('a sleeping body wakes when it is moved, and settles on the ground again', async () => {
+gate('a sleeping body wakes when it is moved, and settles on the surface again', async () => {
   const module = await boot()
   tickUntilAsleep(module, SETTLE_TICKS)
   const start = poses(module)
@@ -67,8 +71,9 @@ gate('a sleeping body wakes when it is moved, and settles on the ground again', 
   assert.ok(module._engine_sim_active_bodies() >= 1, 'a moved body did not wake')
   tickUntilAsleep(module, SETTLE_TICKS)
   assert.equal(module._engine_sim_active_bodies(), 0, 'the moved body did not sleep again')
-  const landed = poses(module)[1]
-  assert.ok(Math.abs(landed - RADIUS) < 0.05, 'the moved body rests at y ' + landed)
+  const landed = poses(module)
+  const height = Math.hypot(landed[0], landed[1], landed[2]) - PLANET.radius
+  assert.ok(Math.abs(height - RADIUS) < 0.05, 'the moved body rests ' + height + ' m above the surface')
 })
 
 gate('reconfiguring the planet wakes every live body so each one tests its new support', async () => {

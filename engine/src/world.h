@@ -7,6 +7,7 @@
 
 namespace JPH {
 class BodyInterface;
+class PhysicsSystem;
 }
 
 namespace engine {
@@ -98,7 +99,7 @@ class World {
   Status setVelocity(std::uint32_t handle, const float* velocity);
   void step(std::uint32_t steps);
   void setTick(std::uint64_t tick);
-  void applyRadialGravity(JPH::BodyInterface& bodies, float dt);
+  void applyRadialGravity(JPH::PhysicsSystem& system, float dt);
 
   std::uint32_t count() const { return live_; }
   std::uint32_t slotExtent() const { return fresh_; }

@@ -8,6 +8,7 @@
 #endif
 #include <Jolt/Core/TempAllocator.h>
 #include <Jolt/Physics/Body/BodyCreationSettings.h>
+#include <Jolt/Physics/Body/Body.h>
 #include <Jolt/Physics/Body/BodyInterface.h>
 #include <Jolt/Physics/Collision/BroadPhase/BroadPhaseLayer.h>
 #include <Jolt/Physics/Collision/Shape/BoxShape.h>
@@ -95,7 +96,7 @@ class RadialGravity final : public JPH::PhysicsStepListener {
   explicit RadialGravity(World& owner) : owner_(owner) {}
 
   void OnStep(const JPH::PhysicsStepListenerContext& context) override {
-    owner_.applyRadialGravity(context.mPhysicsSystem->GetBodyInterfaceNoLock(), context.mDeltaTime);
+    owner_.applyRadialGravity(*context.mPhysicsSystem, context.mDeltaTime);
   }
 
  private:
@@ -290,6 +291,10 @@ Status World::configurePlanet(double radius, double cellSize, double gravity, do
   if (id.IsInvalid()) return kFull;
   planetBody_ = id.GetIndexAndSequenceNumber();
   planetGravity_ = static_cast<float>(gravity);
+  constexpr float kPlanetSleepPointSpeed = 2.0f;
+  JPH::PhysicsSettings physicsSettings = runtime_->physics.GetPhysicsSettings();
+  physicsSettings.mPointVelocitySleepThreshold = kPlanetSleepPointSpeed;
+  runtime_->physics.SetPhysicsSettings(physicsSettings);
   for (std::uint32_t slot = 0; slot < fresh_; ++slot) {
     if (alive_[slot] != 0) runtime_->physics.GetBodyInterface().ActivateBody(JPH::BodyID(bodyIds_[slot]));
   }
@@ -399,8 +404,11 @@ Status World::setVelocity(std::uint32_t handle, const float* velocity) {
   return kOk;
 }
 
-void World::applyRadialGravity(JPH::BodyInterface& bodies, float dt) {
+void World::applyRadialGravity(JPH::PhysicsSystem& system, float dt) {
   if (runtime_ == nullptr || planetBody_ == kNoBody) return;
+  constexpr float kSleepSpeed = 0.5f;
+  JPH::BodyInterface& bodies = system.GetBodyInterfaceNoLock();
+  const JPH::BodyLockInterfaceNoLock& locks = system.GetBodyLockInterfaceNoLock();
   for (std::uint32_t slot = 0; slot < fresh_; ++slot) {
     if (alive_[slot] == 0) continue;
     const JPH::BodyID id(bodyIds_[slot]);
@@ -410,6 +418,9 @@ void World::applyRadialGravity(JPH::BodyInterface& bodies, float dt) {
     if (!(distance > 0.0f)) continue;
     const float scale = -planetGravity_ * dt / distance;
     bodies.AddLinearVelocity(id, JPH::Vec3(position.GetX() * scale, position.GetY() * scale, position.GetZ() * scale));
+    const bool mayRest = bodies.GetLinearVelocity(id).Length() < kSleepSpeed;
+    JPH::Body* body = locks.TryGetBody(id);
+    if (body != nullptr && body->GetAllowSleeping() != mayRest) body->SetAllowSleeping(mayRest);
   }
 }
 
