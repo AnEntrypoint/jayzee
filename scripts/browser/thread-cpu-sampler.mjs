@@ -24,9 +24,8 @@ const scan = () => {
   }
 }
 
-const sampleOnce = (ts, tick) => {
+const sampleOnce = (ts) => {
   for (const [pid, type] of pids) {
-    if (type !== 'renderer' && tick % 20 !== 0) continue
     let tids
     try {
       tids = readdirSync('/proc/' + pid + '/task')
@@ -57,5 +56,5 @@ scan()
 setInterval(() => {
   if (ticks % 100 === 0) scan()
   ticks += 1
-  sampleOnce(Date.now(), ticks)
+  sampleOnce(Date.now())
 }, period)
