@@ -290,6 +290,9 @@ Status World::configurePlanet(double radius, double cellSize, double gravity, do
   if (id.IsInvalid()) return kFull;
   planetBody_ = id.GetIndexAndSequenceNumber();
   planetGravity_ = static_cast<float>(gravity);
+  for (std::uint32_t slot = 0; slot < fresh_; ++slot) {
+    if (alive_[slot] != 0) runtime_->physics.GetBodyInterface().ActivateBody(JPH::BodyID(bodyIds_[slot]));
+  }
   return kOk;
 }
 
@@ -401,6 +404,7 @@ void World::applyRadialGravity(JPH::BodyInterface& bodies, float dt) {
   for (std::uint32_t slot = 0; slot < fresh_; ++slot) {
     if (alive_[slot] == 0) continue;
     const JPH::BodyID id(bodyIds_[slot]);
+    if (!bodies.IsActive(id)) continue;
     const JPH::RVec3 position = bodies.GetCenterOfMassPosition(id);
     const float distance = position.Length();
     if (!(distance > 0.0f)) continue;
