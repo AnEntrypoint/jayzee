@@ -484,3 +484,31 @@ Each run is a fresh page in the gm playwriter browser on the NVIDIA RTX 3060 Lap
 - Every local engine gate and the CI run agree: artifacts 6, world 13, bridge 7, pools 7, planet 9, vegetation 7, codecs 11, materials 15, interest 4, render 17, isolation 9, tiers 6, client-resource-pools 13, core 64 MiB 3, core 128 MiB 3, leak 3. Each ends `RESULT: PASS`.
 - Warnings in the final builds: `USE_WEBGPU is deprecated` (3 lines, one per build), kept and recorded in the deviations. The `MAXIMUM_MEMORY` warning is also recorded there. All other compiler warnings were fixed.
 - Open: the `USE_WEBGPU` migration; the `ENGINE_THREADS` branch; the Jolt per-body cost estimates in the memory plan (the plan totals are measured, the per-body costs are not).
+
+
+## Phase A pass: durable labs flags and 1024 phase timers
+
+Each change below is in the Phase A commit. The witness column says what Phase B has to show before the change counts as verified.
+
+| # | Change | Witness |
+|---|---|---|
+| 1 | `scripts/browser/webgpu-profile.mjs` (new). Adds the three labs flags (`enable-unsafe-webgpu`, `enable-vulkan@1`, `enable-webgpu-developer-features`) to `browser.enabled_labs_experiments` in a profile's `Local State`. It keeps other keys and other labs, leaves the bytes alone when nothing is missing, and only seeds the project profile at `<root>/.playwriter/browser-profile`. | `scripts/check-webgpu-profile.mjs`, gates 1 to 4 |
+| 2 | `scripts/browser/chromium-webgpu.sh` (new, executable). Seeds the project profile when a `--user-data-dir` argument points at it, then execs Chromium with every argument unchanged. A corrupt `Local State` is reported and the file is left alone, and Chromium still starts. | gates 5 to 8 |
+| 3 | `PLAYWRITER_BROWSER_PATH` set to the wrapper in the gm playwriter entry, `/config/.gmnew/current/defaults/mcp.json`. This file is outside the repo and is an external change. It takes effect only after the playwriter server restarts. | Phase B: a fresh profile launch shows the seeded `Local State` and a non-fallback NVIDIA adapter |
+| 4 | `scripts/check-webgpu-profile.mjs` (new), added to `npm test` as `check:webgpu-profile` after `check:engine-artifacts`. Its fake Chromium stub is now created with mode 755. The first run failed with exit 126 (permission denied) on the stub, not on the wrapper. | gate run in npm test |
+| 5 | `scripts/browser/serve-root.mjs` (new). Static server for the repo root that serves `.wasm` as `application/wasm`. | Phase B adapter probe loads through it |
+| 6 | `scripts/browser/adapter-probe.html` (new). Calls `requestAdapter()` five times, 500 ms apart, and records vendor, architecture, device, description and `isFallbackAdapter` for each call. | Phase B adapter info, per launch |
+| 7 | `scripts/browser/thread-cpu-sampler.mjs` (new). Reads `/proc` every 20 ms for threads whose command line contains the browser profile, and logs the changed per-thread jiffies. | Phase B stall windows |
+| 8 | `scripts/browser/analyse-stalls.mjs` (new). Joins each outlier's wall window with the sampler log and reports per-thread CPU for the window and for the run. | Phase B stall evidence |
+| 9 | `engine/src/phase_timer.h` and `phase_timer.cpp` (new). A `Scope` per phase (pages, inputs, physics, readback) that adds its elapsed milliseconds to a total. Under `ENGINE_PHASE_TIMERS` only; without it the scope is empty. | Phase B timed build |
+| 10 | `engine/src/bridge.cpp` `tickBatch`. A scope around `applyPending` (pages) and `drainInputs` (inputs). No behaviour change. | Phase B timed build and the fixed build sha |
+| 11 | `engine/src/world.cpp` `World::step`. A scope around the physics `Update` (physics) and around the sync loop (readback). No behaviour change. | as row 10 |
+| 12 | `engine/src/engine_core.cpp`. `engine_phase_total_ms(id)` and `engine_phase_count()` exported under `ENGINE_PHASE_TIMERS` only. | as row 10 |
+| 13 | `engine/CMakeLists.txt`. Option `ENGINE_PHASE_TIMERS` (default OFF), name suffix `-timed`, the two exports added only when it is on, and `phase_timer.cpp` in the sources. The fixed link flags are unchanged, so `check:engine-artifacts` still passes. | `check:engine-artifacts` and the timed build |
+| 14 | `engine/build.sh`. A `timed` variant (leak OFF, timers ON, suffix `-timed`). The `fixed` and `leak` variants keep their flags and suffixes. | the fixed 128 MiB sha compared with the pin `8475e5fb` |
+| 15 | `scripts/browser/engine-render-browser.js`. `?timed=1` loads the `-timed` glue and records one row per frame: tick, render, total and gap in ms, and the four phases. The result adds `timed`, `tickMedianMs`, `outlierThresholdMs` (2 times the frame median), `outliers` (frame, wall ms, total, tick, render, gap and phases for each frame above the threshold), `phaseMedianMs` and `phaseMaxMs`. | Phase B timed runs |
+| 16 | `package.json`. The `check:webgpu-profile` script and its entry in the `test` chain. | `npm test` |
+
+What did not change: the harness's frame metric is still the synchronous tick plus render, and the fixed-variant gates read the same exports and link flags as before.
+
+Pending in Phase B: the outcome of each row, the fixed 128 MiB sha against the pin, and the stall cause with its evidence.

@@ -1,0 +1,18 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>adapter probe</title>
+<script>
+(async () => {
+  const out = { secure: isSecureContext, hasGpu: !!navigator.gpu, t0: Math.round(performance.now()), tries: [] };
+  for (let i = 0; i < 5; i += 1) {
+    const at = Math.round(performance.now());
+    let adapter = null;
+    let error = null;
+    try { adapter = navigator.gpu ? await navigator.gpu.requestAdapter() : null; } catch (e) { error = String((e && e.message) || e); }
+    const info = adapter && adapter.info ? { vendor: adapter.info.vendor, architecture: adapter.info.architecture, device: adapter.info.device, description: adapter.info.description, isFallbackAdapter: adapter.info.isFallbackAdapter } : null;
+    out.tries.push({ at, ok: !!adapter, error, info, ms: Math.round(performance.now() - at) });
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  window.probe = out;
+})();
+</script>

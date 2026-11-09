@@ -1,3 +1,4 @@
+#include "phase_timer.h"
 #include "bridge.h"
 
 #include "arena.h"
@@ -71,8 +72,14 @@ std::uint32_t eventSlotCount() {
 void tickBatch(std::uint32_t steps) {
   if (inputs == nullptr) return;
   control[kEpoch] += 1;
-  planet::state().pages.applyPending();
-  drainInputs();
+  {
+    engine::phase::Scope scope(engine::phase::kPages);
+    planet::state().pages.applyPending();
+  }
+  {
+    engine::phase::Scope scope(engine::phase::kInputs);
+    drainInputs();
+  }
   World& w = world();
   w.step(steps);
   control[kBodyCount] = w.count();

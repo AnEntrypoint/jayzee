@@ -1,3 +1,4 @@
+#include "phase_timer.h"
 #include <Jolt/Jolt.h>
 
 #include <Jolt/Core/Factory.h>
@@ -412,9 +413,15 @@ void World::step(std::uint32_t steps) {
   const float dt = 1.0f / static_cast<float>(tickRate_);
   for (std::uint32_t s = 0; s < steps; ++s) {
     if (runtime_ != nullptr) {
-      runtime_->physics.Update(dt, 1, &runtime_->temp, &runtime_->jobs);
-      for (std::uint32_t slot = 0; slot < fresh_; ++slot) {
-        if (alive_[slot] != 0) sync(slot);
+      {
+        engine::phase::Scope scope(engine::phase::kPhysics);
+        runtime_->physics.Update(dt, 1, &runtime_->temp, &runtime_->jobs);
+      }
+      {
+        engine::phase::Scope scope(engine::phase::kReadback);
+        for (std::uint32_t slot = 0; slot < fresh_; ++slot) {
+          if (alive_[slot] != 0) sync(slot);
+        }
       }
     }
     tick_ += 1;

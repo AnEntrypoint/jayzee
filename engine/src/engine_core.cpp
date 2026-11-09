@@ -1,3 +1,4 @@
+#include "phase_timer.h"
 #include <cstdint>
 #include <cstdlib>
 
@@ -239,6 +240,16 @@ EMSCRIPTEN_KEEPALIVE std::uint64_t engine_allocations_since_warmup() {
 EMSCRIPTEN_KEEPALIVE std::uint64_t engine_allocations_total() {
   return engine::allocationsTotal();
 }
+
+#if defined(ENGINE_PHASE_TIMERS)
+EMSCRIPTEN_KEEPALIVE double engine_phase_total_ms(int id) {
+  return engine::phase::total(static_cast<engine::phase::Id>(id));
+}
+
+EMSCRIPTEN_KEEPALIVE int engine_phase_count() {
+  return static_cast<int>(engine::phase::kCount);
+}
+#endif
 
 EMSCRIPTEN_KEEPALIVE std::uint64_t engine_ticks() {
   return engine::world().tick();

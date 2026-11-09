@@ -7,11 +7,15 @@ endif()
 
 set(ENGINE_TIER_MIB 64 CACHE STRING "Fixed memory tier in MiB")
 option(ENGINE_LEAK_ON_TICK "Retain one block per tick, the witness that the memory gate catches growth" OFF)
+option(ENGINE_PHASE_TIMERS "Per-phase timers inside engine_tick, for the diagnostic build only" OFF)
 
 math(EXPR ENGINE_TIER_BYTES "${ENGINE_TIER_MIB} * 1024 * 1024")
 set(ENGINE_NAME "engine-core-${ENGINE_TIER_MIB}mib")
 if(ENGINE_LEAK_ON_TICK)
   string(APPEND ENGINE_NAME "-leak")
+endif()
+if(ENGINE_PHASE_TIMERS)
+  string(APPEND ENGINE_NAME "-timed")
 endif()
 
 set(CMAKE_CXX_STANDARD 20)
@@ -47,6 +51,7 @@ FetchContent_MakeAvailable(JoltPhysics)
 
 add_executable(engine_core
   src/engine_core.cpp
+  src/phase_timer.cpp
   src/arena.cpp
   src/budget.cpp
   src/pool_alloc.cpp
@@ -183,6 +188,9 @@ set(ENGINE_EXPORTS
   _engine_texture_layer
   _engine_texture_live_count
   _engine_texture_remove)
+if(ENGINE_PHASE_TIMERS)
+  list(APPEND ENGINE_EXPORTS _engine_phase_total_ms _engine_phase_count)
+endif()
 string(JOIN "," ENGINE_EXPORT_LIST ${ENGINE_EXPORTS})
 
 target_link_options(engine_core PRIVATE
@@ -201,6 +209,9 @@ target_link_options(engine_core PRIVATE
   -sINITIAL_MEMORY=${ENGINE_TIER_BYTES}
   -sEXPORTED_FUNCTIONS=${ENGINE_EXPORT_LIST})
 
+if(ENGINE_PHASE_TIMERS)
+  target_compile_definitions(engine_core PRIVATE ENGINE_PHASE_TIMERS)
+endif()
 if(ENGINE_LEAK_ON_TICK)
   target_compile_definitions(engine_core PRIVATE ENGINE_LEAK_ON_TICK)
   target_link_options(engine_core PRIVATE -sALLOW_MEMORY_GROWTH=1)

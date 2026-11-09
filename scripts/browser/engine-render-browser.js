@@ -3,7 +3,8 @@ import { loadRenderer, RENDER_LAYOUT } from '../../src/engine/renderer.js'
 const QUERY = new URLSearchParams(location.search)
 const PHASE = QUERY.get('phase') === '11' ? 11 : 10
 const TIER = QUERY.get('tier') === '1024' ? 1024 : 64
-const TIER_GLUE = TIER === 1024 ? '../../engine/out/engine-core-128mib.mjs' : '../../engine/out/engine-core-64mib.mjs'
+const TIMED = QUERY.get('timed') === '1'
+const TIER_GLUE = (TIER === 1024 ? '../../engine/out/engine-core-128mib' : '../../engine/out/engine-core-64mib') + (TIMED ? '-timed' : '') + '.mjs'
 const TIER_BUDGET = TIER === 1024 ? 128 * 1024 * 1024 : 64 * 1024 * 1024
 const FRAMES = 600
 const WARMUP_FRAMES = 60
@@ -167,18 +168,29 @@ const run = async () => {
 
   const aspect = canvas.width / canvas.height
   const frameTimes = []
+  const frameRows = []
+  const PHASE_NAMES = ['pages', 'inputs', 'physics', 'readback']
+  const phaseCount = TIMED && module._engine_phase_count ? module._engine_phase_count() : 0
+  const readPhases = () => Array.from({ length: phaseCount }, (_, i) => module._engine_phase_total_ms(i))
   let lastStats = null
   await new Promise((resolve, reject) => {
     let frame = 0
+    let lastStarted = null
     const step = () => {
       try {
         const started = performance.now()
+        const phasesBefore = readPhases()
         module._engine_tick(TICK_STEPS)
+        const tickEnd = performance.now()
+        const phasesAfter = readPhases()
         const { viewProj, eye } = orbitCamera(frame, aspect)
         renderer.setCamera({ viewProj, eye })
         const status = renderer.frame()
         if (status !== 0) throw new Error('engine_render_frame status ' + status)
-        frameTimes.push(performance.now() - started)
+        const totalMs = performance.now() - started
+        frameTimes.push(totalMs)
+        frameRows.push({ frame, started, tickMs: tickEnd - started, renderMs: totalMs - (tickEnd - started), totalMs, gapMs: lastStarted === null ? null : started - lastStarted, phases: phasesAfter.map((v, i) => v - phasesBefore[i]) })
+        lastStarted = started
         if (frame === WARMUP_FRAMES) renderer.markWarmup()
         if (frame >= WARMUP_FRAMES) lastStats = renderer.stats()
         frame += 1
@@ -199,6 +211,14 @@ const run = async () => {
   result.frameTimeP99Ms = p99(timed)
   result.frameTimeMedianMs = median(timed)
   result.frameTimeMaxMs = Math.max(...timed)
+  const round2 = (v) => Math.round(v * 100) / 100
+  const timedRows = frameRows.slice(WARMUP_FRAMES)
+  result.timed = TIMED
+  result.tickMedianMs = round2(median(timedRows.map((row) => row.tickMs)))
+  result.outlierThresholdMs = round2(2 * result.frameTimeMedianMs)
+  result.outliers = timedRows.filter((row) => row.totalMs > 2 * result.frameTimeMedianMs).map((row) => ({ frame: row.frame, wallMs: Math.round(performance.timeOrigin + row.started), totalMs: round2(row.totalMs), tickMs: round2(row.tickMs), renderMs: round2(row.renderMs), gapMs: row.gapMs === null ? null : round2(row.gapMs), phasesMs: Object.fromEntries(row.phases.map((v, i) => [PHASE_NAMES[i], round2(v)])) }))
+  result.phaseMedianMs = Object.fromEntries(PHASE_NAMES.slice(0, phaseCount).map((name, i) => [name, round2(median(timedRows.map((row) => row.phases[i])))]))
+  result.phaseMaxMs = Object.fromEntries(PHASE_NAMES.slice(0, phaseCount).map((name, i) => [name, round2(Math.max(...timedRows.map((row) => row.phases[i])))]))
   result.apiCallsPerFrame = lastStats.apiCallsLastFrame
   result.allocationsSinceWarmup = String(lastStats.allocationsSinceWarmup)
   result.createsAfterSeal = lastStats.createsAfterSeal
