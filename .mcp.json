@@ -1,0 +1,25 @@
+{
+  "mcpServers": {
+    "playwriter": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "-p",
+        "github:AnEntrypoint/pw#1488a92",
+        "playwriter-project"
+      ],
+      "env": {
+        "PLAYWRITER_TELEMETRY": "0",
+        "PLAYWRITER_BROWSER_PATH": "/workspace/jayzee/scripts/browser/chromium-webgpu.sh"
+      },
+      "ignore": [
+        ".playwriter/"
+      ],
+      "deny": [
+        "reset"
+      ],
+      "timeoutMs": 300000,
+      "startupTimeoutMs": 600000
+    }
+  }
+}

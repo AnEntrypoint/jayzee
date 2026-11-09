@@ -1,7 +1,7 @@
 import { appendFileSync, readdirSync, readFileSync } from 'node:fs'
 
 const [out, periodArg, profile] = process.argv.slice(2)
-const period = Number(periodArg ?? 20)
+const period = Number(periodArg ?? 50)
 const pids = new Map()
 const last = new Map()
 
@@ -20,7 +20,7 @@ const scan = () => {
     } catch {
       continue
     }
-    if (cmd.includes(profile)) pids.set(Number(name), processType(cmd))
+    if (Number(name) !== process.pid && cmd.includes('--user-data-dir=' + profile)) pids.set(Number(name), processType(cmd))
   }
 }
 

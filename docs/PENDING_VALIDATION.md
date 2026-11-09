@@ -512,3 +512,51 @@ Each change below is in the Phase A commit. The witness column says what Phase B
 What did not change: the harness's frame metric is still the synchronous tick plus render, and the fixed-variant gates read the same exports and link flags as before.
 
 Pending in Phase B: the outcome of each row, the fixed 128 MiB sha against the pin, and the stall cause with its evidence.
+
+## Phase B: adapter witnesses, timed 1024 runs, and the launcher move
+
+### Changes in this pass (the Phase B commit, after f38d704)
+
+- The wrapper setting moved out of gm's shipped config. `/config/.gmnew/current/defaults/mcp.json` is outside any repo, and it is gm's file for every project. The `PLAYWRITER_BROWSER_PATH` entry is no longer in it. The file is byte-identical to the pre-change copy (`/config/.gmnew/current/.gmnew-previous/defaults/mcp.json`, dated 04:07, before the change): sha256 `1836fb52c00f6f38c27a6f6fd3112194a21b08ec4b7b3453e6c5538f4bd6d9e2` for both. `cmp` reports them identical. gm's own update record `.gmnew-update.json` (04:46, gm version `7b6e993-276`) also touched the defaults directory, so the restore is confirmed by comparison, not by a step of mine.
+- The new location is the project-scope `.mcp.json` at the repo root. It is the gm playwriter entry copied field for field (`command`, `args`, `ignore`, `deny`, both timeouts), with `env` set to `PLAYWRITER_TELEMETRY=0` and `PLAYWRITER_BROWSER_PATH=/workspace/jayzee/scripts/browser/chromium-webgpu.sh`. The pinned launcher (`pw/bin/playwriter-project`) reads `PLAYWRITER_BROWSER_PATH` only from its own process environment and loads no project file, so `.mcp.json` is the only repo-side place the setting can live. Open: this file is not yet witnessed as loaded. It takes effect only if the host reads the project `.mcp.json` for the gm playwriter server, and the current gate was started before this file existed. The absolute path is machine-specific.
+- `scripts/browser/thread-cpu-sampler.mjs` matched every process whose command line contained the profile path, so it sampled itself. Its own main thread logged about 296 s of CPU over the first WebGPU run, which made that run's sampler log invalid. The fix matches only processes whose command line carries `--user-data-dir=<profile>`, skips the sampler's own pid, and defaults to a 50 ms period.
+- `scripts/browser/launch-witness.mjs` and `scripts/browser/timed-run.mjs` are the launch drivers used for the witnesses below. They read `PLAYWRIGHT_CORE` for the `playwright-core` path, as `run-player-webgpu.mjs` does. `timed-run.mjs` waits for `window.engineRenderResult.done`. Its first version waited for text in `#result`, and that text was not seen before the run finished, so the driver timed out while the page had finished.
+- Build note. The timed 128 MiB configure with the plain `build.sh` stalled on a GitHub clone of JoltPhysics, because FetchContent fetches it on each new build directory. The configure was rerun with `FETCHCONTENT_SOURCE_DIR_JOLTPHYSICS` pointing at the existing checkout in `build/engine-fixed-128mib/_deps/joltphysics-src`. That checkout is commit `0373ec0dd762e4bc2f6acdb08371ee84fa23c6db` (v5.3.0), the same `GIT_TAG` as `engine/CMakeLists.txt`. This is a build-environment change, and `build.sh` itself is unchanged.
+
+### Builds
+
+- Fixed 128 MiB, rebuilt with the Phase A sources: sha256 `8475e5fbfc335497c9542737f9461e5d9fb030350b487e46961d4872c83c75f8`. It equals the pin in `engine/artifacts.json`, so the timer instrumentation does not change the fixed artifact. `git status engine/out` is clean.
+- Timed 128 MiB (`-DENGINE_PHASE_TIMERS=ON`): `engine/out/engine-core-128mib-timed.wasm`, sha256 `b05358c92377782aa351339e46b17f339f8be6562a930f30fd09b1f9abfae3a0`. It exports `_engine_phase_total_ms` and `_engine_phase_count`. The fixed module exports neither.
+
+### Adapter witnesses
+
+Both launches used the wrapper, `scripts/browser/chromium-webgpu.sh`, with `WEBGPU_CHROMIUM=/usr/lib/chromium/chromium.real` (the binary the gate starts), `DISPLAY=:1`, and the adapter probe page at `http://127.0.0.1:8765/scripts/browser/adapter-probe.html`. The probe calls `requestAdapter()` five times.
+
+- Fresh profile launch. The project profile was moved to `.playwriter/browser-profile.before-phaseA` first, so the wrapper created a new profile and seeded it before Chromium started. Adapter: NVIDIA GeForce RTX 3060 Laptop GPU, vendor `nvidia`, architecture `ampere`, device `0x2520`, `isFallbackAdapter` false, on 5 of 5 calls. `Local State` `browser.enabled_labs_experiments`: `enable-unsafe-webgpu`, `enable-vulkan@1`, `enable-webgpu-developer-features`.
+- Restart. The browser was closed, and a second launch started on the same profile on a new debugging port. Adapter: the same NVIDIA ampere adapter, `isFallbackAdapter` false, on 5 of 5 calls. Labs unchanged.
+- Not witnessed here: a launch through the playwriter gate. The gate was started before the setting existed, and its environment has no `PLAYWRITER_BROWSER_PATH`. The witness above runs the same wrapper the gate would run, but not the gate's own path. The gate-level check waits for the next playwriter server start.
+
+### Timed 1024-tier runs, one backend at a time
+
+Both runs used `scripts/browser/engine-render.html?tier=1024&timed=1`, with WebGPU as phase 10 and WebGL2 as phase 11. Each run used the thread sampler at 50 ms and nothing else running. Frame time is the synchronous tick plus render, and the tick is almost all of it. Phase values are per-frame milliseconds over the 540 timed frames.
+
+| Run | Backend and adapter | Frame median | p99 | max | Tick median | Outlier threshold (2 x median) | Outliers | Physics median / max | Readback max | Allocations after warm-up |
+|---|---|---|---|---|---|---|---|---|---|---|
+| WebGPU r2 (corrected sampler) | webgpu, NVIDIA RTX 3060 ampere | 83.85 | 104.2 | 172.9 | 82.7 | 167.7 | 1 | 79.7 / 169.4 | 26.4 | 0 |
+| WebGL2 (corrected sampler) | webgl2, ANGLE over NVIDIA RTX 3060 OpenGL 4.5 | 83.15 | 105.0 | 119.2 | 82.45 | 166.3 | 0 | 79.2 / 116.7 | 27.3 | 0 |
+| WebGPU r1 (sampler invalid, see above) | webgpu, NVIDIA RTX 3060 ampere | 88.05 | 139.7 | 602.6 | 87.25 | 176.1 | 2 | 84.35 / 533.8 | 28.2 | 0 |
+
+- WebGPU r2 outlier, frame 89: total 172.9 ms, tick 171.5 ms, physics 169.4 ms, readback 2.1 ms, render 1.4 ms, gap to the previous frame 82.2 ms. The renderer main thread logged about 60 ms of CPU inside that frame's window (`build/diag/analysis-webgpu-1024-r2.json`). So about 110 ms of the 171 ms tick was wall time with the tick thread not running. The GPU readback is 2.1 ms in that frame, so it is not the GPU readback.
+- WebGL2 run: no frame above threshold.
+- The WebGPU r1 numbers came from a run in which the sampler measured its own CPU at about 20% of a core. Treat them as contaminated. The 705 ms outlier is still not reproduced in r2 or in the WebGL2 run.
+- Full result JSON is in `build/diag/timed-webgpu-1024-r2.json` and `build/diag/timed-webgl2-1024.json`. `build/` is git-ignored, so the numbers above are the record.
+
+### Stall cause, with this evidence
+
+- The outlier pattern is the same as before: the single-threaded wasm tick is wall-time slow while its thread is not on CPU. The sampler shows that for frame 89. The physics phase carries the whole excess. Readback, render and GPU submit account for almost none of it. GC is not indicated by these phases.
+- Still not proven: why the tick thread is descheduled for about 110 ms. The shared CPU quota is the likely cause, but this run did not record host run-queue or throttle counters for that window. The fix is still not made, so this is not a fix.
+
+### Gates and push
+
+- `npm test`: exit 0. `RESULT: PASS` 218 times, `RESULT: FAIL` 0 times. Lines beginning `PASS ` 4451, lines beginning `FAIL ` 0. One PASS label contains the word `FAILED` (`MODEL_LOAD_FAILED sets the failure label…`); it is a label, not a failure. Log in `/tmp/npm-test.log` (outside the repo).
+- Commits in this round: `67e8ade` (earlier doc commit), `f38d704` (Phase A), and the commit that carries this section, the sampler fix, `.mcp.json`, and the two witness drivers. The push is one `git push origin main` covering all of them.
