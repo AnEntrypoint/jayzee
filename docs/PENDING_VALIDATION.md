@@ -738,3 +738,22 @@ Summary, from the rows above.
 Verdict. WebGPU is not faster than WebGL2 at 1024 after the Phase A change, and it is slower in every round (0.97 times on the means). The cause of the remaining gap is not established. The one candidate that is in our code and was measurable (the plan's per-frame store) costs 0.1 ms, so removing it cannot close the gap. The weak WebGPU coupling to the previous frame's render is the only signal in this run, and the load on this machine changed between rounds.
 
 Not done: the load-recording change was made to the repo driver (`scripts/browser/timed-run.mjs`), but the runs above went through the project's playwriter browser, which the driver does not use. The stamp module, the merge and the summariser are the same code in both paths.
+
+## WebGPU re-run with Vulkan enabled: adapter and backend (Phase A, before timed runs)
+
+Phase A is this record and no code change. The adapter is available, so no adapter defect is recorded.
+
+Machine and driver, from `vulkaninfo --summary` and `lspci`:
+
+- GPU0: NVIDIA GeForce RTX 3060 Laptop GPU (vendor `0x10de`, discrete), Vulkan API 1.4.312, driver NVIDIA proprietary 580.178.04 (`/proc/driver/nvidia/version`), ICD `/etc/vulkan/icd.d/nvidia_icd.json`.
+- GPU1: llvmpipe (CPU, Vulkan API 1.4.335). The loader enumerates it, and it is not the adapter that WebGPU selects.
+
+Chromium, from the project browser (gate pid 101717, debug port 10221, browser pid 122269, profile `/workspace/jayzee/.playwriter/browser-profile`):
+
+- Command line: `--use-vulkan --enable-features=Vulkan,VaapiVideoDecoder --ignore-gpu-blocklist`.
+- `Local State` labs: `enable-unsafe-webgpu`, `enable-vulkan@1`, `enable-webgpu-developer-features`.
+- WebGPU adapter, from `navigator.gpu.requestAdapter()` and `GPUAdapter.info` in `scripts/browser/adapter-probe.html`: `{"vendor":"nvidia","architecture":"ampere","device":"0x2520","description":"NVIDIA GeForce RTX 3060 Laptop GPU","isFallbackAdapter":false}`. The probe's five calls (at 12, 541, 1042, 1542 and 2043 ms) all returned it, with no error. Direct call: 25 features, `maxBufferSize` 4294967292, `maxStorageBufferBindingSize` 2147483644.
+- Backend: Vulkan. The browser's GPU process (pid 122338) maps Chromium's `libvulkan.so.1` (`/usr/lib/chromium/libvulkan.so.1`), the loader `libvulkan.so.1.4.341`, and the NVIDIA Vulkan driver `libnvidia-glvkspirv.so.580.178.04`, with the NVIDIA device nodes `/dev/nvidia0` and `/dev/nvidiactl`. This is evidence from the loaded libraries and the labs flags. Chromium's `chrome://gpu` page gives no text through Playwright (its DOM is empty), so no text readout of the backend was obtained.
+- WebGL2 for comparison: ANGLE over OpenGL 4.5 on the same NVIDIA device (`libGLX_nvidia` is mapped by the same GPU process), as recorded in the earlier runs.
+
+Run plan, Phase B: the timed 1024 build `engine/out/engine-core-128mib-timed.wasm` (sha256 `2b28cd2381f4385b4226d2c0e3a9f55090024b9b2ed0f56d1212613715c044d3`, the Phase A build). Three alternating rounds, WebGPU (phase 10) then WebGL2 (phase 11), one at a time in the project browser. Each file in `build/diag/` records `load.before` and `load.after` from `/proc/loadavg`. Medians and p99s are then quoted side by side from those files, and the speedup is computed only from them.
