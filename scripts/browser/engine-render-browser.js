@@ -1,9 +1,13 @@
 import { loadRenderer, RENDER_LAYOUT } from '../../src/engine/renderer.js'
 
-const PHASE = new URLSearchParams(location.search).get('phase') === '11' ? 11 : 10
+const QUERY = new URLSearchParams(location.search)
+const PHASE = QUERY.get('phase') === '11' ? 11 : 10
+const TIER = QUERY.get('tier') === '1024' ? 1024 : 64
+const TIER_GLUE = TIER === 1024 ? '../../engine/out/engine-core-128mib.mjs' : '../../engine/out/engine-core-64mib.mjs'
+const TIER_BUDGET = TIER === 1024 ? 128 * 1024 * 1024 : 64 * 1024 * 1024
 const FRAMES = 600
 const WARMUP_FRAMES = 60
-const BODIES = 512
+const BODIES = TIER === 1024 ? 10240 : 512
 const PAGES = 16
 const LIGHTS = 8
 const ALBEDO_SIDE = 16
@@ -16,7 +20,7 @@ const CAMERA_FOV = Math.PI / 3
 const NEAR = 0.1
 const FAR = 500
 const GROUND = [-200, -1, -200, 200, 0, 200]
-const WORLD = { capacity: 4096, tickRate: 60, gravity: -9.8, drag: 0, radius: 0.5, restitution: 0, iterations: 8 }
+const WORLD = { capacity: TIER === 1024 ? 10240 : 2048, tickRate: 60, gravity: -9.8, drag: 0, radius: 0.5, restitution: 0, iterations: 8 }
 const PLANET = { radius: 6371000, cellSize: 1000, gravity: 9.8, maxHeight: 8000 }
 const CLASS_MATERIALS = [0, 1, 2, 3]
 
@@ -84,7 +88,8 @@ const setupWorld = (module) => {
   if (status !== 0) throw new Error('world configure status ' + status)
   module._engine_world_add_box(...GROUND)
   for (let i = 0; i < BODIES; i++) {
-    module._engine_spawn((i % 32) * 2 - 32, 2 + (i % 5), Math.floor(i / 32) * 2 - 16, 0, 0, 0)
+    const at = TIER === 1024 ? [(i % 100) * 0.6 - 30, 1 + (i % 5), Math.floor(i / 100) * 0.6 - 30] : [(i % 32) * 2 - 32, 2 + (i % 5), Math.floor(i / 32) * 2 - 16]
+    module._engine_spawn(at[0], at[1], at[2], 0, 0, 0)
   }
 }
 
@@ -135,7 +140,7 @@ const run = async () => {
   const canvas = document.getElementById('engine-canvas')
   const navigatorLike = PHASE === 11 ? {} : navigator
   const requested = PHASE === 11 ? 'webgl2' : 'webgpu'
-  const renderer = await loadRenderer({ canvas, navigatorLike, requested })
+  const renderer = await loadRenderer({ glue: new URL(TIER_GLUE, import.meta.url).href, canvas, navigatorLike, requested, players: TIER, budgetBytes: TIER_BUDGET })
   const module = renderer.module
   setupScene(module, renderer)
 
@@ -167,6 +172,8 @@ const run = async () => {
 
   const timed = frameTimes.slice(WARMUP_FRAMES)
   result.backend = renderer.backendName
+  result.tier = TIER
+  result.bodies = BODIES
   result.frames = FRAMES
   result.frameTimeP99Ms = p99(timed)
   result.apiCallsPerFrame = lastStats.apiCallsLastFrame
