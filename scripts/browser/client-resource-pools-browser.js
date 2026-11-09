@@ -15,7 +15,8 @@ const compiledAtLoad = registry.seal()
 
 const lights = createLightPool(256)
 const engine = await loadEngineModule()
-const textures = createTexturePool({ layers: 32, width: 64, height: 64, host: createTextures(engine), pixels: new Uint8Array(32 * 64 * 64 * 4) })
+const textureHost = createTextures(engine)
+const textures = createTexturePool({ layers: textureHost.capacity, width: 64, height: 64, host: textureHost, pixels: new Uint8Array(textureHost.capacity * 64 * 64 * 4) })
 const meshes = createMeshPool({ slots: 64, vertexCapacity: 3, indexCapacity: 3, stride: 3 })
 
 const p99 = (values) => {
