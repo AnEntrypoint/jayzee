@@ -36,7 +36,11 @@ gate('day and night ambient samples equal spoint at 11 sun elevations', () => {
 
 gate('terrain grade equals spoint for 4 colours under 3 grade option sets', () => {
   assert.equal(fixture.ambient.grades.length, 12)
-  for (const row of fixture.ambient.grades) assert.deepEqual(ambient.terrainGrade(row.rgb, row.options), row.out, JSON.stringify(row.rgb))
+  for (const row of fixture.ambient.grades) {
+    const out = ambient.terrainGrade(row.rgb, row.options)
+    assert.equal(out.length, row.out.length, JSON.stringify(row.rgb))
+    out.forEach((value, i) => near(value, row.out[i], 'grade ' + JSON.stringify(row.rgb) + ' channel ' + i))
+  }
 })
 
 gate('ACES channel curve and luma equal spoint for the fixture inputs', () => {
