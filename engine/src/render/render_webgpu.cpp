@@ -9,76 +9,6 @@ namespace engine::render::webgpu {
 
 namespace {
 
-constexpr char kCullWgsl[] = R"WGSL(
-struct Camera {
-  planes: array<vec4f, 6>,
-  viewProj: mat4x4f,
-  eye: vec4f,
-  counts: vec4u,
-  classRadius: vec4f,
-  classMaterial: vec4u,
-};
-
-@group(0) @binding(0) var<uniform> cam: Camera;
-@group(0) @binding(1) var<storage, read> body: array<u32>;
-@group(0) @binding(2) var<storage, read_write> counters: array<atomic<u32>, 4>;
-@group(0) @binding(3) var<storage, read_write> inst0: array<u32>;
-@group(0) @binding(4) var<storage, read_write> inst1: array<u32>;
-@group(0) @binding(5) var<storage, read_write> inst2: array<u32>;
-@group(0) @binding(6) var<storage, read_write> inst3: array<u32>;
-@group(0) @binding(7) var<storage, read_write> args: array<u32>;
-
-fn bodyF(i: u32) -> f32 {
-  return bitcast<f32>(body[i]);
-}
-
-fn emitRecord(cls: u32, slot: u32, base: u32) {
-  let o = slot * 8u;
-  for (var k = 0u; k < 8u; k = k + 1u) {
-    let w = body[base + k];
-    switch cls {
-      case 0u: { inst0[o + k] = w; }
-      case 1u: { inst1[o + k] = w; }
-      case 2u: { inst2[o + k] = w; }
-      default: { inst3[o + k] = w; }
-    }
-  }
-}
-
-@compute @workgroup_size(64)
-fn cull(@builtin(global_invocation_id) gid: vec3u) {
-  let i = gid.x;
-  if (i >= cam.counts.y) {
-    return;
-  }
-  let base = i * 8u;
-  let cls = body[base + 7u];
-  if (cls >= 4u) {
-    return;
-  }
-  let centre = vec3f(bodyF(base), bodyF(base + 1u), bodyF(base + 2u));
-  let radius = cam.classRadius[cls];
-  for (var p = 0u; p < 6u; p = p + 1u) {
-    let plane = cam.planes[p];
-    if (dot(plane.xyz, centre) + plane.w < -radius) {
-      return;
-    }
-  }
-  let slot = atomicAdd(&counters[cls], 1u);
-  emitRecord(cls, slot, base);
-}
-
-@compute @workgroup_size(1)
-fn finalize() {
-  for (var c = 0u; c < 4u; c = c + 1u) {
-    args[c * 4u + 0u] = 36u;
-    args[c * 4u + 1u] = atomicLoad(&counters[c]);
-    args[c * 4u + 2u] = 0u;
-    args[c * 4u + 3u] = 0u;
-  }
-}
-)WGSL";
-
 constexpr char kPropWgsl[] = R"WGSL(
 struct Camera {
   planes: array<vec4f, 6>,
@@ -237,7 +167,6 @@ fn fsTerrain(vin: TerrainOut) -> @location(0) vec4f {
 }
 )WGSL";
 
-constexpr std::uint32_t kCullBindings = 8;
 constexpr std::uint32_t kPropBindings = 5;
 constexpr std::uint32_t kTerrainBindings = 3;
 constexpr double kClearRed = 0.05;
@@ -256,8 +185,6 @@ wgpu::Device device;
 wgpu::Queue queue;
 wgpu::Surface surface;
 wgpu::Buffer cameraBuf;
-wgpu::Buffer bodyBuf;
-wgpu::Buffer counterBuf;
 wgpu::Buffer argsBuf;
 wgpu::Buffer lightBuf;
 wgpu::Buffer materialBuf;
@@ -269,11 +196,8 @@ wgpu::Texture depthTex;
 wgpu::TextureView heightView;
 wgpu::TextureView albedoView;
 wgpu::TextureView depthView;
-wgpu::ComputePipeline cullPipe;
-wgpu::ComputePipeline finalizePipe;
 wgpu::RenderPipeline propPipe;
 wgpu::RenderPipeline terrainPipe;
-wgpu::BindGroup cullGroup;
 wgpu::BindGroup propGroup[kPropClasses];
 wgpu::BindGroup terrainGroup;
 wgpu::TextureFormat surfaceFormat = wgpu::TextureFormat::BGRA8Unorm;
@@ -382,30 +306,9 @@ void writeLayer(wgpu::Texture texture, std::uint32_t layer, const void* pixels, 
 }
 
 int buildPipelines() {
-  wgpu::ShaderModule cullModule = makeModule(kCullWgsl);
   wgpu::ShaderModule propModule = makeModule(kPropWgsl);
   wgpu::ShaderModule terrainModule = makeModule(kTerrainWgsl);
-  if (!cullModule || !propModule || !terrainModule) return engine::kNotConfigured;
-
-  const wgpu::ShaderStage compute = wgpu::ShaderStage::Compute;
-  wgpu::BindGroupLayoutEntry cullEntries[kCullBindings];
-  cullEntries[0] = bufferEntry(0, compute, wgpu::BufferBindingType::Uniform);
-  cullEntries[1] = bufferEntry(1, compute, wgpu::BufferBindingType::ReadOnlyStorage);
-  for (std::uint32_t b = 2; b < kCullBindings; ++b) cullEntries[b] = bufferEntry(b, compute, wgpu::BufferBindingType::Storage);
-  wgpu::BindGroupLayout cullLayout = makeLayout(cullEntries, kCullBindings);
-  wgpu::PipelineLayout cullPipeLayout = makePipelineLayout(cullLayout);
-
-  wgpu::ComputePipelineDescriptor cullDesc{};
-  cullDesc.layout = cullPipeLayout;
-  cullDesc.compute.module = cullModule;
-  cullDesc.compute.entryPoint = "cull";
-  cullPipe = device.CreateComputePipeline(&cullDesc);
-
-  wgpu::ComputePipelineDescriptor finalizeDesc{};
-  finalizeDesc.layout = cullPipeLayout;
-  finalizeDesc.compute.module = cullModule;
-  finalizeDesc.compute.entryPoint = "finalize";
-  finalizePipe = device.CreateComputePipeline(&finalizeDesc);
+  if (!propModule || !terrainModule) return engine::kNotConfigured;
 
   const wgpu::ShaderStage vertexFragment = wgpu::ShaderStage::Vertex | wgpu::ShaderStage::Fragment;
   const wgpu::ShaderStage vertex = wgpu::ShaderStage::Vertex;
@@ -466,15 +369,7 @@ int buildPipelines() {
   terrainDesc.primitive.cullMode = wgpu::CullMode::None;
   terrainPipe = device.CreateRenderPipeline(&terrainDesc);
 
-  if (!cullPipe || !finalizePipe || !propPipe || !terrainPipe) return engine::kNotConfigured;
-
-  wgpu::BindGroupEntry cullBindings[kCullBindings];
-  cullBindings[0] = bufferBinding(0, cameraBuf, kCameraBytes);
-  cullBindings[1] = bufferBinding(1, bodyBuf, kBodyBytes);
-  cullBindings[2] = bufferBinding(2, counterBuf, 16);
-  for (std::uint32_t c = 0; c < kPropClasses; ++c) cullBindings[3 + c] = bufferBinding(3 + c, instanceBuf[c], kBodyBytes);
-  cullBindings[7] = bufferBinding(7, argsBuf, kArgsBytes);
-  cullGroup = makeGroup(cullLayout, cullBindings, kCullBindings);
+  if (!propPipe || !terrainPipe) return engine::kNotConfigured;
 
   for (std::uint32_t c = 0; c < kPropClasses; ++c) {
     wgpu::BindGroupEntry propBindings[kPropBindings];
@@ -492,7 +387,7 @@ int buildPipelines() {
   terrainBindings[2] = viewBinding(2, heightView);
   terrainGroup = makeGroup(terrainLayout, terrainBindings, kTerrainBindings);
 
-  return (cullGroup && propGroup[0] && terrainGroup) ? engine::kOk : engine::kNotConfigured;
+  return (propGroup[0] && terrainGroup) ? engine::kOk : engine::kNotConfigured;
 }
 
 }
@@ -523,8 +418,6 @@ int init(const char* selector, std::uint32_t width, std::uint32_t height) {
   surface.Configure(&config);
 
   cameraBuf = makeBuffer(kCameraBytes, wgpu::BufferUsage::Uniform | wgpu::BufferUsage::CopyDst);
-  bodyBuf = makeBuffer(kBodyBytes, wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst);
-  counterBuf = makeBuffer(16, wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst);
   argsBuf = makeBuffer(kArgsBytes, wgpu::BufferUsage::Storage | wgpu::BufferUsage::Indirect | wgpu::BufferUsage::CopyDst);
   lightBuf = makeBuffer(kLightBytes, wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst);
   materialBuf = makeBuffer(kMaterialBytes, wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst);
@@ -553,14 +446,20 @@ int frame(const SceneView& scene, const FramePlan& plan, const Camera& camera) {
   if (!ready) return engine::kNotConfigured;
 
   writeBuffer(cameraBuf, 0, &camera, kCameraBytes);
-  writeBuffer(bodyBuf, 0, plan.bodyRecords, static_cast<std::uint64_t>(scene.bodyCount) * kRecordBytes);
-  static const std::uint32_t zeroCounters[4] = {0, 0, 0, 0};
-  writeBuffer(counterBuf, 0, zeroCounters, sizeof zeroCounters);
+  std::uint32_t propArgs[kPropClasses * 4];
+  for (std::uint32_t c = 0; c < kPropClasses; ++c) {
+    const std::uint32_t count = plan.propCount[c];
+    if (count != 0) {
+      writeBuffer(instanceBuf[c], 0, plan.propRecords + c * kBodySlots * kRecordWords, static_cast<std::uint64_t>(count) * kRecordBytes);
+    }
+    propArgs[c * 4 + 0] = kPropVertices;
+    propArgs[c * 4 + 1] = count;
+    propArgs[c * 4 + 2] = 0;
+    propArgs[c * 4 + 3] = 0;
+  }
+  writeBuffer(argsBuf, kArgsPropWord * 4, propArgs, sizeof propArgs);
   const std::uint32_t terrainArgs[4] = {kPageVertices, plan.pageCount, 0, 0};
   writeBuffer(argsBuf, kArgsTerrainWord * 4, terrainArgs, sizeof terrainArgs);
-  const std::uint32_t groups = (scene.bodyCount + kCullGroupSize - 1) / kCullGroupSize;
-  const std::uint32_t dispatchArgs[3] = {groups, 1, 1};
-  writeBuffer(argsBuf, kArgsDispatchWord * 4, dispatchArgs, sizeof dispatchArgs);
   writeBuffer(lightBuf, 0, scene.lights, kLightBytes);
   writeBuffer(materialBuf, 0, plan.materialWords, kMaterialBytes);
   writeBuffer(pageBuf, 0, plan.pageRecords, kPageBytes);
@@ -574,13 +473,6 @@ int frame(const SceneView& scene, const FramePlan& plan, const Camera& camera) {
   }
 
   wgpu::CommandEncoder encoder = ENGINE_RENDER_CALL(device.CreateCommandEncoder());
-  wgpu::ComputePassEncoder compute = ENGINE_RENDER_CALL(encoder.BeginComputePass());
-  ENGINE_RENDER_CALL(compute.SetPipeline(cullPipe));
-  ENGINE_RENDER_CALL(compute.SetBindGroup(0, cullGroup));
-  ENGINE_RENDER_CALL(compute.DispatchWorkgroupsIndirect(argsBuf, kArgsDispatchWord * 4));
-  ENGINE_RENDER_CALL(compute.SetPipeline(finalizePipe));
-  ENGINE_RENDER_CALL(compute.DispatchWorkgroups(1, 1, 1));
-  ENGINE_RENDER_CALL(compute.End());
 
   wgpu::SurfaceTexture surfaceTexture{};
   ENGINE_RENDER_CALL(surface.GetCurrentTexture(&surfaceTexture));

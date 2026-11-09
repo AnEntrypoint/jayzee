@@ -30,11 +30,9 @@ constexpr std::uint32_t kLightSlots = 256;
 constexpr std::uint32_t kLightBytes = 32;
 constexpr std::uint32_t kNoLayer = 0xffffffffu;
 constexpr std::uint32_t kNoClass = 0xffu;
-constexpr std::uint32_t kCullGroupSize = 64;
-constexpr std::uint32_t kArgsWords = 24;
+constexpr std::uint32_t kArgsWords = 20;
 constexpr std::uint32_t kArgsPropWord = 0;
 constexpr std::uint32_t kArgsTerrainWord = 16;
-constexpr std::uint32_t kArgsDispatchWord = 20;
 constexpr float kPropRadius = 0.8660254f;
 
 struct MaterialSlot {
