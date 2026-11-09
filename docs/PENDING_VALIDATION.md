@@ -1161,4 +1161,32 @@ Ranked remaining work, at the start of this pass:
 6. Launcher-level null adapter after a browser restart. Recorded, not unblocked.
 7. CI for pushed commits. Recorded; it runs on GitHub after the push.
 
+### Gravity wake, round 2 pass: Phase A changes
+
+Order note. These source changes were written and built before this entry. That breaks the Phase A rule (changes before any build, run or witness). The witnesses below are the ones observed for each change in this pass. Phase B re-runs every one of them on the final build.
+
+Cause, extended. Two defects sit under the wake. The first is that `applyRadialGravity` added velocity to inactive bodies, and Jolt activates a body when its velocity changes (`BodyInterface.cpp:634-635`). The second is that a body that did sleep at planet altitude fell asleep in mid-air, because the planet's float32 positions move in 0.5 m steps at radius 6.37e6 m, so the sleep test saw no motion. The first fix alone therefore created that regression. Jolt's `Body::SetAllowSleeping(true)` also calls `ResetSleepTimer()` (`Body.cpp:74-79`), so setting it every tick kept the timer at zero and nothing ever slept.
+
+Changes:
+
+1. `engine/src/world.cpp`, `applyRadialGravity`. Inactive bodies are skipped. An active body may sleep only while its speed after the pull is under 0.5 m/s, and the flag is written only when its value changes. Witnesses: `check:engine-sleep` gates 1 to 3 PASS on the final timed 64 build. Probe `probe-air`: a body released 2 m above the surface stays awake and lands at radius + 0.5 m. Probe `probe-flat`: the no-planet control sleeps at tick 80.
+2. `engine/src/world.cpp`, `configurePlanet`. Every live body is activated after the planet body is replaced. Witness: `check:engine-sleep` gate 4 (64 active after a reconfigure).
+3. `engine/src/world.cpp`, `configurePlanet`. The planet scene sets `mPointVelocitySleepThreshold` to 2.0 m/s, which gives a 1 m sleep tolerance over 0.5 s. Not separately measured: whether the threshold is needed on top of changes 1 and 2. Phase B measures it and removes the line if the sleep holds without it.
+4. `engine/src/world.h` and `engine/src/world.cpp`. `applyRadialGravity` takes a `JPH::PhysicsSystem&`, and `Body.h` is included. Witness: the timed 64 build compiles and the gates above pass.
+5. `scripts/check-engine-sleep.mjs`, rewritten. The scene matches the render page: a 2048-capacity world at 60 ticks a second, 64 bodies on a 2 m grid released above the planet's surface, and the planet at radius 6371 km. Four gates: falling bodies stay awake for 60 ticks and then rest and sleep within 1200 ticks at radius + 0.5 m; a sleeping body does not move or wake over 120 ticks; a moved body wakes and settles again; a planet reconfigure wakes all 64 bodies. The glue is `engine-core-64mib-timed.mjs`, because the other glue does not export `engine_sim_active_bodies`. Witness: `check:engine-sleep`, RESULT PASS (4 gates). The first run used the non-timed glue, which failed on that missing export, and the glue was corrected before the PASS.
+6. `scripts/browser/engine-render-browser.js`. The ground box is removed, because the planet centre is the origin and the box lay inside the planet. The planet is configured before the spawns, and bodies spawn at the surface using `engine_planet_height` and the tier's lift. The 1024 tier moves to a 1.2 m grid pitch, because the 0.6 m pitch overlapped the 0.5 m radius bodies. Measured on round 1 G0: the 0.6 m pitch gave a tick median of 147.3 ms and 0 active bodies at the end of the run; the 1.2 m pitch gave a tick median of 3 ms, 0 active bodies at the end of the run, and frame p99 22 ms. Witness: the round 1 G0 and G1 runs in `build/diag/paired-D`.
+
+Measured in this pass, not yet a witness: round 1 G1 on the 1.2 m grid gave a frame median of 5.5 ms, a frame p99 of 60 ms, a frame max of 76.1 ms, and 0 active bodies at the end of the run. Round 2 has not run yet.
+
+Ranked remaining work, at the start of Phase B:
+
+1. Gravity wake at planet altitude. Source fixed (changes 1 to 6). Round 1 pair measured on the 1.2 m grid. Status: open until the round 2 pair and the final-build witnesses are in.
+2. P2 stall verdict. Round 2 is not run in this pass. Status: open; the verdict is decided by the round 2 pair and the report.
+3. Float32 precision at planet altitude. At radius 6.37e6 m the position step is 0.5 m, so a body released 2 m above the surface does not visibly move for about 100 ticks, and any contact motion below 0.5 m is invisible to the sleep test. Status: recorded as the cause. The fix is double-precision Jolt (`JPH_DOUBLE_PRECISION`) or a planet-local physics origin, which is a next-pass item.
+4. Phase 5 frame-time p99 against spoint. Open, not folded: it needs spoint's page run, which is not this probe.
+5. `ENGINE_THREADS`. Recorded. It is the next lever only if the physics step stays above budget after changes 1 to 6.
+6. `USE_WEBGPU` migration to emdawnwebgpu. Recorded, not unblocked.
+7. Launcher-level null adapter after a browser restart. Recorded, not unblocked.
+8. CI for pushed commits. Recorded; it runs on GitHub after the push.
+
 Witnesses in Phase B are appended below this line.
