@@ -10,7 +10,7 @@ Each entry names the file, the ENGINE.md phase and the witness it needs. The sta
 |---|---|---|
 | Phase 1: toolchain and fixed-memory module | `check-engine-core` on 64 and 128 MiB, `check-engine-leak`, `check-engine-artifacts`, CI run 42538780790 | PASS. The leak variant grows its memory (`check-engine-leak`), so the fixed-memory witness is not vacuous. |
 | Phase 2: Jolt world parity | `check-engine-world` 13 PASS, `check-world` 13 PASS, native phase 2 | PASS. Float32 tolerance 1e-5 for the engine (deviation). |
-| Phase 3: the bridge | `check-engine-bridge` 7 PASS | PASS. The rotation gate noted as missing is still missing: the bridge gate checks bounds and alignment only. OPEN. |
+| Phase 3: the bridge | `check-engine-bridge` 7 PASS | PASS. The rotation gate is the rolling-sphere gate added in the Phase A pass below, and it passes in Phase B (9 PASS in the bridge gate, and inside npm test). |
 | Phase 4: body pools and allocation witness | `check-engine-pools` 7 PASS, native phase 4 17 PASS | PASS. Gate 6 (zero allocations after warm-up) passes. |
 | Phase 5: PlanetShape and the page cache | `check-engine-planet` 9 PASS, native phase 5 24 PASS | PASS for the gates. OPEN: the frame-time p99 against spoint's streamer was never measured. |
 | Phase 6: vegetation field | `check-engine-vegetation` 7 PASS | PASS. Finding: in the timed run, 200 spheres over 256 ticks cost 361.77 ms with the field and 307.77 ms with one body per tree. Timings are printed, not thresholded. The cube-sphere keying decision is still open for the dispatcher. |
@@ -26,7 +26,7 @@ Each entry names the file, the ENGINE.md phase and the witness it needs. The sta
 | Paired host-sharing runs (round 1 and round 2, G0 and G1), the project-profile page probe, and the 64-tier timed build | `paired-run.mjs` x4 with a page result each, `paired-report.mjs`, `npm test`, and 23 named check gates | PASS for the witnesses: four run records and four page results, each page with `errors` empty, zero allocations after warm-up and the expected checksum. Verdict `mixed` on two pairs. See "Phase B: paired host-sharing rows, closed". |
 | Memory, arena and allocator | `check-engine-core`, `check-engine-tiers` 6 PASS, native host witness | PASS. Post-warm-up carves are zero at 64 and 1024 players. |
 
-Still OPEN after Phase B: the phase 5 frame-time comparison; the phase 3 rotation gate; the `USE_WEBGPU` migration (`emdawnwebgpu`); the `ENGINE_THREADS` branch, which is not compiled; `scripts/browser/run-player-webgpu.mjs`, which still needs `PLAYWRIGHT_CORE`; the 1024-tier long-frame stalls in both backends (up to 705 ms in WebGPU, not reproduced; the largest of six diagnosed runs was 251 ms): the cause is recorded in "Stalls at 1024, Phase B diagnosis", with no code fix verified; the 362.9 ms WebGL2 outlier is not reproduced and is covered by the same section; the `requestAdapter()` null after a browser restart: the cause is recorded in "Null adapter after the browser restart", and the flag fix is verified, while a launcher-level fix is still open.
+Still OPEN after Phase B: the phase 5 frame-time comparison; the `USE_WEBGPU` migration (`emdawnwebgpu`); the `ENGINE_THREADS` branch, which is not compiled; the 1024-tier long-frame stalls in both backends (up to 705 ms in WebGPU, not reproduced; the largest of six diagnosed runs was 251 ms): the cause is recorded in "Stalls at 1024, Phase B diagnosis", with no code fix verified; the 362.9 ms WebGL2 outlier is not reproduced and is covered by the same section; the `requestAdapter()` null after a browser restart: the cause is recorded in "Null adapter after the browser restart", and the flag fix is verified, while a launcher-level fix is still open.
 
 ## Problems in docs/ENGINE.md (for the dispatcher)
 
@@ -2433,3 +2433,16 @@ Change made, not built or run. The Phase 3 row above names the rotation gate as 
 Stale status line, found by reading and not yet witnessed: the Phase B line about `scripts/browser/run-player-webgpu.mjs` still needing `PLAYWRIGHT_CORE` is out of date. A Phase A grep for `PLAYWRIGHT_CORE` in `scripts/browser/*.mjs` returned no match. Phase B repeats that grep, runs the page witness (`node scripts/browser/run-player-webgpu.mjs <page>`), and only then closes the line in the status index.
 
 Not done in this pass, recorded so the next pass does not restart them: the phase 5 frame-time p99 (needs a planet-path harness and a timed run), the `USE_WEBGPU` to `emdawnwebgpu` migration, the `ENGINE_THREADS` branch, the 1024-tier stall fix, the launcher-level null-adapter fix, and the JF6 allocation inside `decodeCrowdDots` under TSL. The phase 6 cube-sphere keying and the ENGINE.md decisions in the dispatcher section belong to the dispatcher and are not changed here.
+
+### Phase B results: rolling-sphere rotation gate (run 2026-11-10-01-19-08-27b71f)
+
+Commit cee1951 carries the Phase A change. The Phase B change is the engine bridge gate joining the test chain: `check:engine-bridge` is appended to the end of `npm test` in `package.json`, after `check:alloc-audit`. Nothing was pushed before this section.
+
+- `bash engine/build.sh`: exit 0, log `build/diag/phaseB-engine-build.log`. The 64 MiB glue and wasm are rebuilt (wasm sha256 `09efce65…`).
+- `node scripts/check-engine-bridge.mjs`: exit 0, 9 PASS, `RESULT: PASS`. The new gate `a sphere pushed along +x on the ground rolls about the z axis, with a unit quaternion` passes. Log `build/diag/phaseB-engine-bridge.log`.
+- The new gate passed on its first run, so no negative control was run for it. Its sign assertion (quaternion z below -0.1 for a push along +x) is the part that would fail on a wrong rotation; the drop gate it complements does not test rotation at all.
+- Stale line `PLAYWRIGHT_CORE`: `grep -rln 'PLAYWRIGHT_CORE\|playwright-core' scripts/browser/` returns no match (exit 1). The status index no longer lists run-player-webgpu as needing it. The page witness itself was witnessed in the earlier Phase B section (2375 onward) and was not rerun here.
+- `check:hygiene`: exit 0, `RESULT: PASS`. Log `build/diag/phaseB-hygiene.log`.
+- `npm test`, once, after the package.json edit: exit 0, 4806 PASS lines, 0 FAIL lines, 239 RESULT PASS lines (238 before this change, plus the bridge gate). The bridge gate runs last in the chain. Log `build/diag/phaseB-npm-test.log`.
+
+Still open after this pass, unchanged from the Phase A list: the phase 5 frame-time p99, the `USE_WEBGPU` to `emdawnwebgpu` migration, the `ENGINE_THREADS` branch, the 1024-tier stall fix, the launcher-level null-adapter fix, the JF6 allocation under TSL, the phase 6 cube-sphere keying decision (dispatcher), and the ENGINE.md decisions (dispatcher).
