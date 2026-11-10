@@ -1,6 +1,5 @@
 #include "render_webgpu.h"
 
-#include <emscripten/html5_webgpu.h>
 #include <webgpu/webgpu_cpp.h>
 
 #include "../page_cache.h"

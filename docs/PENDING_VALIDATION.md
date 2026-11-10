@@ -26,7 +26,7 @@ Each entry names the file, the ENGINE.md phase and the witness it needs. The sta
 | Paired host-sharing runs (round 1 and round 2, G0 and G1), the project-profile page probe, and the 64-tier timed build | `paired-run.mjs` x4 with a page result each, `paired-report.mjs`, `npm test`, and 23 named check gates | PASS for the witnesses: four run records and four page results, each page with `errors` empty, zero allocations after warm-up and the expected checksum. Verdict `mixed` on two pairs. See "Phase B: paired host-sharing rows, closed". |
 | Memory, arena and allocator | `check-engine-core`, `check-engine-tiers` 6 PASS, native host witness | PASS. Post-warm-up carves are zero at 64 and 1024 players. |
 
-Still OPEN after Phase B: the phase 5 frame-time comparison; the `USE_WEBGPU` migration (`emdawnwebgpu`); the `ENGINE_THREADS` branch, which is not compiled; the 1024-tier long-frame stalls in both backends (up to 705 ms in WebGPU, not reproduced; the largest of six diagnosed runs was 251 ms): the cause is recorded in "Stalls at 1024, Phase B diagnosis", with no code fix verified; the 362.9 ms WebGL2 outlier is not reproduced and is covered by the same section; the `requestAdapter()` null after a browser restart: the cause is recorded in "Null adapter after the browser restart", and the flag fix is verified, while a launcher-level fix is still open.
+Still OPEN after Phase B: the phase 5 frame-time comparison against spoint (the engine side is measured in the Phase B pass of run 2026-11-10-01-38-00-f8d9be); the 1024-tier long-frame stalls in both backends (up to 705 ms in WebGPU, not reproduced; the largest of six diagnosed runs was 251 ms): the cause is recorded in "Stalls at 1024, Phase B diagnosis", with no code fix verified; the 362.9 ms WebGL2 outlier is not reproduced and is covered by the same section; the `requestAdapter()` null after a browser restart: the cause is recorded in "Null adapter after the browser restart", and the flag fix is verified, while a launcher-level fix is still open.
 
 ## Problems in docs/ENGINE.md (for the dispatcher)
 
@@ -2481,7 +2481,7 @@ Code, docs and tests only. Nothing was built, run, gated or witnessed in this pa
 |---|---|---|---|
 | 2. USE_WEBGPU to emdawnwebgpu | `engine/CMakeLists.txt`: `-sUSE_WEBGPU=1` replaced by `--use-port=emdawnwebgpu` on the link and on the engine_core compile; `engine/src/render/render_webgpu.cpp`: `ImageCopyTexture` to `TexelCopyTextureInfo`, `TextureDataLayout` to `TexelCopyBufferLayout`, `SurfaceDescriptorFromCanvasHTMLSelector` to `EmscriptenSurfaceSourceCanvasHTMLSelector` | `bash engine/build.sh` (fixed 64 MiB), then `node scripts/check-engine-core.mjs`, `node scripts/check-engine-render.mjs` in a browser run (`node scripts/browser/render-witness.mjs <out> 8843`, which must report the WebGPU backend and the checksum), and `node scripts/check-engine-artifacts.mjs` after the pins are updated from the new build | Written, not built. Facts read from the package in `build/emdawn-pkg` (tag v20250531.224602, from the port in the emsdk at 4.0.10): `emscripten_webgpu_get_device` is still implemented (library_webgpu.js:626), and it reads `Module.preinitializedWebGPUDevice`, which the legacy path already sets. The renamed types are in webgpu_cpp.h. If the compile still fails, the cause goes here. |
 | 3. ENGINE_THREADS, threaded build | `engine/CMakeLists.txt`: `ENGINE_THREADS` option (off by default), `-pthread` on all compiles, `-sUSE_PTHREADS=1 -sPTHREAD_POOL_SIZE=8` on the link, the `-threads` artifact name; `engine/build.sh`: `threads` variant | `bash engine/build.sh` with `ENGINE_VARIANT=threads` (64 MiB), then `node scripts/check-engine-threads.mjs` (new): the threaded heap is a SharedArrayBuffer and the single-threaded heap is not; two threaded runs give the same positions; the threaded build agrees with the single-threaded build within 1 mm after 600 ticks; the scenario moves bodies. Then the cross-origin witness, `node scripts/browser/threads-run.mjs <out.json>`, which runs the threaded module in the project playwriter browser on a page served with COOP and COEP. It must report `crossOriginIsolated` true and `ok` true. | Written, not built. `scripts/browser/serve-root.mjs` now sends the two isolation headers on every response (`cross-origin-opener-policy`, `cross-origin-embedder-policy`). Before this, no page from the server was cross-origin isolated. |
-| 1. Planet-path timed harness, phase 5 frame-time p99 | `scripts/browser/engine-render-browser.js`: `path=planet` mode (camera moves along the planet at 30 m/s, 0.5 m per frame at 60 Hz, and the 4 by 4 page window is restaged when the camera's cell changes; restages are timed and reported as `restages`, `restageMsP99`, `restageMsMax`, `cellChanges`). `scripts/browser/planet-path-run.mjs` runs it as a job (`node scripts/browser/planet-path-run.mjs <out.json> 8847 1200`, a timed 64 MiB build with 1200 frames). | The run is a background job. Its JSON must carry `ok` true, `frameTimeP99Ms`, `frameTimeMedianMs`, `restages` above zero and `cellChanges` above zero. The engine side of the p99 is that number. | Written, not run. Limits, recorded so the number is read correctly: page origins use `PAGE_SPAN` (20 m), while the planet cell is about 25.5 m, so the terrain is not continuous across the window, and the harness measures frame time, not terrain fidelity. Spoint's streamer side is not measured here, because spoint's `HeightfieldStreamer` has no per-step entry point to time from outside. The phase 5 comparison against spoint therefore stays open, and this harness closes only the engine's half. |
+| 1. Planet-path timed harness, phase 5 frame-time p99 | `scripts/browser/engine-render-browser.js`: `path=planet` mode (the camera circles the anchor at the orbit's 60 m radius, 30 m/s, 0.5 m per frame at 60 Hz; the first straight-line version left the bodies out of view, with `visible` `[0,0,0,0]`, so the path was changed to a circle; and the 4 by 4 page window is restaged when the camera's cell changes; restages are timed and reported as `restages`, `restageMsP99`, `restageMsMax`, `cellChanges`). `scripts/browser/planet-path-run.mjs` runs it as a job (`node scripts/browser/planet-path-run.mjs <out.json> 8847 1200`, a timed 64 MiB build with 1200 frames). | The run is a background job. Its JSON must carry `ok` true, `frameTimeP99Ms`, `frameTimeMedianMs`, `restages` above zero and `cellChanges` above zero. The engine side of the p99 is that number. | Written, not run. Limits, recorded so the number is read correctly: page origins use `PAGE_SPAN` (20 m), while the planet cell is about 25.5 m, so the terrain is not continuous across the window, and the harness measures frame time, not terrain fidelity. Spoint's streamer side is not measured here, because spoint's `HeightfieldStreamer` has no per-step entry point to time from outside. The phase 5 comparison against spoint therefore stays open, and this harness closes only the engine's half. |
 | 4. 1024-tier long-frame stalls | none | none | Not changed. See the decision below. |
 | 5. Launcher null adapter | none | none | Left as recorded (the failure did not recur, and the harness retries three times). |
 | 6a. Phase 6 keying | none | none | Decided, see below. |
@@ -2500,3 +2500,50 @@ Decisions, with the reasoning, for the ledger. ENGINE.md itself is the dispatche
 Item 4, the 1024-tier stalls, is not changed in Phase A, and I do not think a code fix can be verified from the record. The Phase B result (above) says the two stall frames are in the physics phase, that the same frames are normal in the other backend, that the active body count is flat, and that the recorded cause is host CPU sharing, which the record calls not proven. The cgroup throttle was ruled out for the one run with a flat throttled counter. No code change is supported by that data. The run that would settle it is a per-thread run-queue wait during a stall frame, read from `/proc/<tid>/schedstat` on the host, which the browser does not expose. That measurement is not part of this queue, so the item stays open with that reason.
 
 Phase B order: build fixed 64 MiB (migration), then the threads 64 MiB build, then the timed 64 MiB build for the planet run, then update `engine/artifacts.json` from the new fixed hashes and run `check:engine-artifacts`. Run `check:engine-core`, `check:engine-threads` (node), `threads-run.mjs` (browser), `render-witness.mjs` (browser, WebGPU), and `planet-path-run.mjs` (background job, blocked once on its PID with a timeout). Fix what fails, then `npm test` once, then push once.
+
+### Phase B results: the whole queue (run 2026-11-10-01-38-00-f8d9be)
+
+Defects found by the builds and runs, and fixed in this phase:
+
+1. `render_webgpu.cpp` included `<emscripten/html5_webgpu.h>`. Its legacy `WGPUSwapChain` clashes with the emdawn `webgpu.h`. The include supplied only `emscripten_webgpu_get_device`, which the emdawn header already declares, so the include is removed.
+2. `-sUSE_PTHREADS=1` is a legacy setting, refused under `STRICT=1` (`legacy setting used in strict mode: USE_PTHREADS`). `-pthread` alone is enough, so the setting is dropped.
+3. The threaded module ran out of memory on the first `createEngineWorld` (`Aborted(OOM)` in `_emscripten_resize_heap`). The 64 MiB tier leaves 4 MiB of headroom, and eight pool threads at the default stack size did not fit. The pool is now `-sPTHREAD_POOL_SIZE=3` with `-sDEFAULT_PTHREAD_STACK_SIZE=524288`, and the threaded witness passes after that.
+4. The first planet path moved the camera in a straight line, which left the bodies behind it: `visible` was `[0,0,0,0]` on the last frame, so the timed frames did not include the body draw. The path is now a circle of the orbit's 60 m radius around the anchor, at 30 m/s, and the bodies stay in view (`visible` `[9,11,13,14]`).
+
+Artifacts. The three variants in `engine/artifacts.json` were rebuilt from the migrated source and their pins were replaced. The threads and timed builds were built from the same source and are hashed here; they are not pinned in `artifacts.json`.
+
+| Artifact | sha256 (prefix) | Pinned |
+|---|---|---|
+| engine-core-64mib (fixed) | `f892b2c9…` | yes |
+| engine-core-128mib (fixed) | `55a0acd2…` | yes |
+| engine-core-64mib-leak | `2ec59bdd…` | yes |
+| engine-core-64mib-threads | `d4af3088…` | no |
+| engine-core-64mib-timed | `91baccae…` | no |
+| engine-core-128mib-timed | `eddaeaa0…` | no |
+
+Witnesses, with the values read from the files named:
+
+- `node scripts/check-engine-artifacts.mjs`: 6 PASS, `RESULT: PASS`. `check-engine-core`: 3 PASS, `RESULT: PASS`. `check-engine-leak`: 3 PASS, `RESULT: PASS`.
+- `node scripts/check-engine-threads.mjs` (new): 5 PASS, `RESULT: PASS`. The threaded heap is a `SharedArrayBuffer` and the single-threaded heap is not. Two threaded runs give equal positions. The threaded and single-threaded runs agree within the gate's 1e-3 m bound.
+- Threads in the browser, `build/diag/phaseB6-threads-browser.json` (project playwriter browser, COOP and COEP from `serve-root.mjs`): `crossOriginIsolated` true, `sharedArrayBuffer` function, `workers` 4, `bodies` 256, `repeatable` true, `worstDeviationM` 0, `errors` [], `ok` true.
+- WebGPU render, 64 tier, `build/diag/webgpu64.json`: backend `webgpu`, checksum `-5415737363265412373`, `allocationsSinceWarmup` 0, `errors` [], `ok` true, 600 frames, p99 28 ms. This file does not record the adapter.
+- WebGPU render, 1024 tier timed, `build/diag/phaseB6-render1024.json`: checksum `-3826851758512048142`, which matches the recorded value, `allocationsSinceWarmup` 0, `errors` [], `ok` true, backend `webgpu`, adapter NVIDIA GeForce RTX 3060 Laptop GPU, `isFallbackAdapter` false.
+- Planet path, run as a background job, blocked once on its PID with a timeout. Three runs from `build/diag/planet-path.json`, `planet-path-r2.json` and `planet-path-r3.json`. All are `ok` true with no errors, `allocationsSinceWarmup` 0, 1200 frames, 36 cell changes and 36 restages, and `visible` `[9,11,13,14]` on every frame read:
+
+| Run | Frame p99 (ms) | Frame median (ms) | Frame max (ms) | Restage p99 (ms) |
+|---|---|---|---|---|
+| 1 | 5.02 | 2.95 | 17.74 | 9.63 |
+| 2 | 5.86 | 3.10 | 19.97 | 1.49 |
+| 3 | 6.92 | 3.25 | 14.77 | 1.34 |
+
+The engine side of the phase 5 frame-time p99 is therefore 5.0 to 6.9 ms over three runs on the RTX 3060 Laptop, WebGPU, 64 MiB tier, 512 bodies, with the page window restaged 36 times per run. The spoint streamer side is not measured, and that comparison stays open for the reason in the Phase A section.
+- `npm test`, run once with `check:engine-threads` in the chain: exit 0, 4813 PASS, 0 FAIL, 240 RESULT PASS.
+
+Items, as they stand:
+
+- Phase 5 frame-time p99: engine side measured (above). Spoint side open, because the streamer has no per-step entry point to time from outside without patching spoint.
+- USE_WEBGPU to emdawnwebgpu: done. The fixed, leak and timed builds, and the threaded build, use the port. The 1024 WebGPU render matches the recorded checksum.
+- ENGINE_THREADS: built and witnessed in Node and in the cross-origin browser. The threaded build is a separate artifact.
+- 1024-tier long-frame stalls: not fixed. The recorded cause is host CPU sharing, which the record itself calls not proven. The data supports no code change. Settling it needs a per-thread run-queue wait from `/proc/<tid>/schedstat` on the host during a stall frame, which this queue does not run, so the item stays blocked.
+- Launcher null adapter: left as recorded.
+- Phase 6 cube-sphere keying and the ENGINE.md decisions: decided in the Phase A section, with the reasoning recorded there.

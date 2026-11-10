@@ -251,17 +251,19 @@ const setupPlanetPath = (module, renderer) => {
 }
 
 const planetCamera = (module, renderer, frame, aspect, surface) => {
-  const x = frame * PATH_STEP_M
-  const cell = cellOf(module, x, PLANET.radius, 0)
+  const angle = frame * (PATH_STEP_M / CAMERA_RADIUS)
+  const x = Math.sin(angle) * CAMERA_RADIUS
+  const z = Math.cos(angle) * CAMERA_RADIUS
+  const cell = cellOf(module, x, PLANET.radius, z)
   if (cell.face !== pathCell.face || cell.cx !== pathCell.cx || cell.cy !== pathCell.cy) {
     pathStats.cellChanges += 1
     restageWindow(module, renderer, cell)
     pathCell = cell
   }
   CAMERA.eye[0] = x
-  CAMERA.eye[1] = surface(x, 0) + CAMERA_HEIGHT
-  CAMERA.eye[2] = 0
-  lookAt(CAMERA.eye, [x + 20, surface(x + 20, 0), 0], UP, VIEW)
+  CAMERA.eye[1] = surface(x, z) + CAMERA_HEIGHT
+  CAMERA.eye[2] = z
+  lookAt(CAMERA.eye, ORIGIN, UP, VIEW)
   perspective(CAMERA_FOV, aspect, NEAR, FAR, PROJ)
   multiply(PROJ, VIEW, CAMERA.viewProj)
   return CAMERA
