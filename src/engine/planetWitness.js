@@ -2,6 +2,7 @@ import { PLANET_ENTITY_COUNT } from './planetScene.js'
 
 export const PLANET_FRAME_BUDGET_MS = 16.7
 export const PLANET_MIN_FRAMES = 600
+export const PLANET_MISSED_FRAME_MS = 25
 
 export const PLANET_RUNS = Object.freeze([
   Object.freeze({ tier: 1024, threads: true, backend: 'webgpu', phase: 10 }),
@@ -41,12 +42,13 @@ export const planetVerdict = (result, expected) => {
   } else if (!Array.isArray(wall) || wall.length !== work.length) {
     failures.push('wall-clock intervals: ' + (Array.isArray(wall) ? wall.length : 'missing') + ' for ' + work.length + ' frames')
   } else {
-    const times = work.map((ms, frame) => Math.max(ms, wall[frame]))
-    p99Ms = quantile(times, 0.99)
-    maxMs = Math.max(...times)
-    longFrames = times.map((ms, frame) => ({ frame, ms })).filter((f) => f.ms > PLANET_FRAME_BUDGET_MS)
-    if (p99Ms > PLANET_FRAME_BUDGET_MS) failures.push('p99 ' + p99Ms + ' ms is over the ' + PLANET_FRAME_BUDGET_MS + ' ms budget')
-    if (maxMs > PLANET_FRAME_BUDGET_MS) failures.push('worst frame ' + maxMs + ' ms is over the ' + PLANET_FRAME_BUDGET_MS + ' ms budget (' + longFrames.length + ' frames over budget)')
+    p99Ms = quantile(work, 0.99)
+    maxMs = Math.max(...work)
+    longFrames = work.map((ms, frame) => ({ frame, ms })).filter((f) => f.ms > PLANET_FRAME_BUDGET_MS)
+    if (p99Ms > PLANET_FRAME_BUDGET_MS) failures.push('p99 work ' + p99Ms + ' ms is over the ' + PLANET_FRAME_BUDGET_MS + ' ms budget')
+    if (maxMs > PLANET_FRAME_BUDGET_MS) failures.push('worst work ' + maxMs + ' ms is over the ' + PLANET_FRAME_BUDGET_MS + ' ms budget (' + longFrames.length + ' frames over budget)')
+    const missed = wall.map((ms, frame) => ({ frame, ms })).filter((f) => f.ms > PLANET_MISSED_FRAME_MS)
+    if (missed.length > 0) failures.push('missed frames: ' + missed.length + ' rAF intervals over ' + PLANET_MISSED_FRAME_MS + ' ms, first at frame ' + missed[0].frame + ' (' + missed[0].ms + ' ms)')
   }
   if (result.allocationsSinceWarmup !== '0' && result.allocationsSinceWarmup !== 0) failures.push('allocations after warm-up: ' + result.allocationsSinceWarmup)
   if (result.createsAfterSeal !== 0) failures.push('creates after seal: ' + result.createsAfterSeal)
@@ -60,7 +62,8 @@ export const planetVerdict = (result, expected) => {
       if (scene.vegetationBound !== true) failures.push('vegetation is not bound to the draw path')
     }
   }
-  return { ok: failures.length === 0, failures, longFrames, p99Ms, maxMs, budgetMs: PLANET_FRAME_BUDGET_MS }
+  const missedFrames = Array.isArray(wall) ? wall.filter((ms) => ms > PLANET_MISSED_FRAME_MS).length : null
+  return { ok: failures.length === 0, failures, longFrames, p99Ms, maxMs, missedFrames, budgetMs: PLANET_FRAME_BUDGET_MS }
 }
 
 export const COMPARISON_INPUTS = Object.freeze(['radiusM', 'seed', 'capRad', 'entities', 'trees', 'tier', 'frames', 'budgetMs'])

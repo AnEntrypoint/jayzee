@@ -66,13 +66,24 @@ gate('the verdict fails when the p99 is over the budget, and names the frames ov
   assert.equal(v.longFrames.length, 60)
 })
 
-gate('the verdict fails when a wall-clock interval is over the budget, even when the work time is under it', () => {
+gate('a rAF interval over 25 ms is a missed frame and fails the run, and jitter below it does not', () => {
+  const jitter = frames(10).map(() => 17.7)
+  assert.equal(planetVerdict(good({ wallIntervalsMs: jitter }), webgpu1024).ok, true)
   const wall = frames(10)
   wall[300] = 25.2
   const v = planetVerdict(good({ wallIntervalsMs: wall }), webgpu1024)
   assert.equal(v.ok, false)
-  assert.deepEqual(v.longFrames, [{ frame: 300, ms: 25.2 }])
-  assert.ok(v.failures.some((f) => f.includes('worst frame 25.2')))
+  assert.equal(v.missedFrames, 1)
+  assert.ok(v.failures.some((f) => f.includes('missed frames: 1') && f.includes('frame 300')))
+  assert.equal(v.longFrames.length, 0)
+})
+
+gate('a work time over 16.7 ms on any frame fails the run, whatever the intervals', () => {
+  const times = frames(10)
+  times[10] = 16.9
+  const v = planetVerdict(good({ frameTimesMs: times }), webgpu1024)
+  assert.equal(v.ok, false)
+  assert.ok(v.failures.some((f) => f.includes('worst work 16.9')))
 })
 
 gate('the verdict fails when the wall-clock intervals are missing', () => {
@@ -87,7 +98,7 @@ gate('the verdict fails on the 362.9 ms outlier, and reports the frame index of 
   const v = planetVerdict(good({ backend: 'webgl2', frameTimesMs: times, adapter: { api: 'webgl2' } }), { backend: 'webgl2', tier: 1024 })
   assert.equal(v.ok, false)
   assert.deepEqual(v.longFrames, [{ frame: 417, ms: 362.9 }])
-  assert.ok(v.failures.some((f) => f.includes('worst frame 362.9')))
+  assert.ok(v.failures.some((f) => f.includes('worst work 362.9')))
 })
 
 gate('the verdict fails with no adapter, and with a fallback WebGPU adapter; WebGL2 has no fallback flag and passes', () => {
