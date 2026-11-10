@@ -3,6 +3,7 @@ import { loadRenderer } from '../../src/engine/renderer.js'
 const WIDTH = 960
 const HEIGHT = 540
 const FRAMES = 3
+const MAX_UPLOAD_FRAMES = 64
 const GRID = 12
 const MODEL_VERTICES = (GRID + 1) * (GRID + 1)
 const MODEL_INDICES = GRID * GRID * 6
@@ -25,6 +26,12 @@ const WEBGL2_CONFIGS = [
   { name: 'visibility-requested', path: 'visibility', occlusion: true },
 ]
 const BACKEND = new URLSearchParams(location.search).get('backend') === 'webgl2' ? 'webgl2' : 'webgpu'
+const DUMP = new URLSearchParams(location.search).has('dump')
+const toBase64 = (bytes) => {
+  let text = ''
+  for (let i = 0; i < bytes.length; i += 0x8000) text += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
+  return btoa(text)
+}
 
 const result = { done: false, error: null, backend: null, adapter: null, models: [], configs: [], comparisons: {}, ok: false }
 window.visibilityResult = result
@@ -217,12 +224,19 @@ const run = async () => {
   result.backend = renderer.backendName
   result.adapter = { modelTier: renderer.modelTier, clusterStride: renderer.clusterStride() }
   buildScene(renderer)
+  let uploadFrames = 0
+  while (renderer.module._engine_models_dirty() > 0) {
+    if (renderer.frame() !== 0 || uploadFrames >= MAX_UPLOAD_FRAMES) throw new Error('the model pool did not finish uploading in ' + uploadFrames + ' frames')
+    uploadFrames += 1
+  }
+  result.uploadFrames = uploadFrames
   const rendered = []
   for (const config of BACKEND === 'webgl2' ? WEBGL2_CONFIGS : CONFIGS) {
     const shot = await renderConfig(renderer, canvas, config)
     rendered.push(shot)
     result.configs.push({ name: shot.name, status: shot.status, requestedPath: shot.requestedPath, effectivePath: shot.effectivePath, occlusion: shot.occlusion, statsPath: shot.statsPath, nonBackground: shot.nonBackground, hash: shot.hash })
   }
+  if (DUMP) result.dumps = Object.fromEntries(rendered.map((shot) => [shot.name, toBase64(shot.pixels)]))
   if (BACKEND === 'webgl2') {
     const [forward, requested] = rendered
     result.ok =

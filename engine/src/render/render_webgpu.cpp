@@ -1300,7 +1300,7 @@ int init(const char* selector, std::uint32_t width, std::uint32_t height) {
 
 int frame(const SceneView& scene, const FramePlan& plan, const Camera& camera) {
   if (!ready) return engine::kNotConfigured;
-  const bool visible = engine::render::modelSettings().path == engine::render::kModelPathVisibility && visibilityReady && engine::models::bound();
+  const bool visible = engine::render::modelSettings().path == engine::render::kModelPathVisibility && visibilityReady && engine::models::liveCount() > 0;
 
   {
     engine::phase::Scope scope(engine::phase::kUpload);

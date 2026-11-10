@@ -10,8 +10,9 @@ const backend = process.argv[4] ?? 'webgpu'
 if (backend !== 'webgpu' && backend !== 'webgl2') throw new RangeError('backend must be webgpu or webgl2')
 const DONE = '(() => { const r = window.visibilityResult; return r && r.done === true ? JSON.stringify(r) : null })()'
 
+const dump = process.argv[5] === 'dump' ? '&dump=1' : ''
 const started = Date.now()
-const run = await runPageWitness({ root, port, pagePath: 'scripts/browser/visibility.html?backend=' + backend, expression: DONE, timeoutMs: 300000, pollMs: 1000, record: false })
+const run = await runPageWitness({ root, port, pagePath: 'scripts/browser/visibility.html?backend=' + backend + dump, expression: DONE, timeoutMs: 300000, pollMs: 1000, record: false })
 const wallMs = Date.now() - started
 const result = run.result ?? null
 const out = { wallMs, error: run.error ?? result?.error ?? null, result }

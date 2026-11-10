@@ -114,7 +114,10 @@ gate('the indirect args live in one buffer, written by queue writes from the CPU
   assert.equal([...webgpu.matchAll(/argsBuf/g)].length >= 6, true)
   assert.ok(webgpu.includes('writeBuffer(argsBuf'))
   assert.ok(webgpu.includes('DrawIndirect(argsBuf'))
-  assert.ok(!webgpu.includes('DispatchWorkgroups'), 'the WebGPU frame has no compute dispatch')
+  const forwardStart = webgpu.indexOf('void encodeForward(')
+  const cullStart = webgpu.indexOf('void dispatchCull(')
+  assert.ok(forwardStart > 0 && cullStart > forwardStart)
+  assert.ok(!webgpu.slice(forwardStart, cullStart).includes('DispatchWorkgroups'), 'the forward path has no compute dispatch')
 })
 
 gate('pipelines are compiled in init only, and a sealed registry refuses a create', () => {

@@ -2964,4 +2964,107 @@ Known gaps at the end of Phase A, to be settled in Phase B:
 
 ## Phase C: Phase B results
 
-To be filled in by the Phase B pass.
+Run on this host (NVIDIA GeForce RTX 3060 Laptop GPU). The owner reports WebGPU and Vulkan are enabled here. The adapter probe record (`build/diag/adapter-probe-phaseb.json`) names the vendor and architecture but not the Dawn backend, so "via Vulkan" is the owner's report and is not witnessed in a file.
+
+Adapter, WebGPU path (`build/diag/adapter-probe-phaseb.json`, 5 of 5 calls ok):
+
+| field | value |
+|---|---|
+| description | NVIDIA GeForce RTX 3060 Laptop GPU |
+| vendor, architecture, device | nvidia, ampere, 0x2520 |
+| isFallbackAdapter | false |
+| backend | webgpu (the page reported `backend: webgpu` in every WebGPU record below) |
+
+WebGL2 path (`build/diag/webgl2-1024.json`): ANGLE (NVIDIA Corporation, NVIDIA GeForce RTX 3060 Laptop GPU, OpenGL 4.5.0).
+
+### Defects found in Phase B and their fixes
+
+1. The visibility witness compared configurations at different upload states. Tier 2 uploads 2 MiB per frame and a slot is 1.375 MiB, so one slot uploaded per frame and the forward picture showed slots 0 to 2 while the visibility picture showed 0 to 5 (24,794 px differing, max delta 242). Fix: `visibility-browser.js` renders until `_engine_models_dirty()` is 0 before any configuration (`result.uploadFrames`, capped at 64). After the fix all three WebGPU configurations are pixel-identical (`build/diag/visibility/run-webgpu-dump.json`: 61,494 non-background px, hash 0xa6e81b3a, uploadFrames 8, differing 0 in both comparisons).
+2. The render gate `check:engine-render` asserted that the WebGPU frame had no compute dispatch, which Phase C makes false. Fix: the assertion now covers only the forward path, the text between `encodeForward(` and `dispatchCull(`. This is a changed claim. The compute path is now allowed; the forward path still has none.
+3. `render-witness.mjs` at 1024 failed with `module._engine_models_bind_plan is not a function`. The default query has `timed=1`, which loaded `engine-core-128mib-timed.mjs`, a pre-Phase-C artifact. Fix: rebuilt the timed variants with `ENGINE_VARIANT=timed ENGINE_TIER_MIB=128 bash engine/build.sh`.
+4. Liveness: the visibility path ran its culls, HZB and resolve with zero models. On the 1024 WebGPU witness `apiCallsPerFrame` was 118. Fix: `frame()` takes the visibility path only when `engine::models::liveCount() > 0`. After the fix `apiCallsPerFrame` is 36 (and 48 on WebGL2).
+5. `engine/artifacts.json` pins were first-round hashes. Rebuilt all seven variants after the liveness fix and repinned the four pinned variants. `check:engine-artifacts` 6 PASS.
+6. SwiftShader record: an earlier WebGPU 1024 run came from a headless launch that had no hardware adapter and fell back to SwiftShader. It is kept as `build/diag/webgpu1024.swiftshader-defect.json`. The runs below use the project browser, with `isFallbackAdapter: false`.
+7. The visibility probe page logged a 404 for a favicon. This is not an adapter error. The render pages set `<link rel="icon" href="data:,">`, and the probe page does not. Not fixed; it does not affect the result.
+
+### Wasm variants (after the liveness fix)
+
+| variant | sha256 prefix | pinned in artifacts.json |
+|---|---|---|
+| engine-core-64mib | fe7cebdb | yes |
+| engine-core-128mib | b660524c | yes |
+| engine-core-512mib | e54a3cb9 | yes |
+| engine-core-64mib-leak | 2c891d94 | yes |
+| engine-core-64mib-timed | 043ed995 | no |
+| engine-core-128mib-timed | 0fec862c | no |
+| engine-threads-64mib | f1f975f7 | no |
+
+### Gates and witnesses run in the foreground
+
+| witness | result |
+|---|---|
+| `check:engine-host-witness` (`engine/test/build_host.sh`) | 292 PASS, RESULT PASS |
+| `check:engine-core` / `world` / `bridge` / `threads` / `sleep` / `pools` / `tiers` / `materials` / `leak` | 3 / 13 / 9 / 5 / 4 / 7 / 6 / 15 / 3 PASS |
+| `check:engine-render` | 17 PASS (with the narrowed compute assertion, defect 2) |
+| `check:engine-visibility` | 13 PASS |
+| `check:engine-artifacts` | 6 PASS |
+| `check:decode-path` / `hygiene` / `asset-pipeline` / `ci-engine-glue` | 8 / 39 / 14 / 3 PASS |
+| `check:engine-planet` / `codecs` / `interest` / `isolation` / `vegetation` | 9 / 11 / 4 / 9 / 7 PASS |
+| `check:render` / `check:render-1024-visible` | 49 / 4 PASS |
+| `visibility-run.mjs ... webgpu dump` | ok true, error null, 61,494 px per configuration, all differing 0 |
+| `visibility-run.mjs ... webgl2 dump` | ok true, error null, requested visibility reports effective forward, hash 0x401aff46 |
+| `models-run.mjs build/diag/models/run.json 8843 600` | exit 0, ok true, 270 churn loads and 258 unloads, 0 failures |
+| `device-loss-run.mjs` | exit 0, ok true, lost reason destroyed, 0 errors, allocationsSinceWarmup "0" |
+| `planet-path-run.mjs ... 8847 1200` | exit 0, ok true, backend webgpu, 36 restages |
+| `models-vram-run.mjs` | exit 0, errors none. Tier 2 RGBA8 is over budget (peak 2,994 MiB, planned 2,516,582,400 B against a 1,073,741,824 B budget) and is not selected by the planner, as before |
+| `decode-worker-run.mjs` | exit 0, ok true, meshopt vertices equal, decode 24.52 ms |
+| `spoint-streamer-compare.mjs 200` | exit 0, like-for-like sample p99 spoint 0.759 ms against jayzee 0.301 ms on this run (ratio 2.53). The output's caveat applies: the call boundary differs between the two sides |
+
+### 1024 tier: WebGPU and WebGL2 side by side
+
+Both runs use `render-witness.mjs` on `engine-core-128mib-timed`, 600 frames, orbit path, 10,240 bodies, the same scene and seed.
+
+| field | WebGPU (`build/diag/webgpu1024.json`, phase 10) | WebGL2 (`build/diag/webgl2-1024.json`, phase 11) |
+|---|---|---|
+| adapter | NVIDIA GeForce RTX 3060 Laptop GPU, isFallbackAdapter false | ANGLE on the same GPU, OpenGL 4.5.0 |
+| frame p99 (ms) | 67.54 | 78.64 |
+| frame median (ms) | 52.86 | 59.10 |
+| frame max (ms) | 72.63 | 84.49 |
+| outliers over 105.72 ms | 0 | 0 |
+| tick median (ms) | 52.41 | 58.73 |
+| physics phase median (ms) | 50.52 | 56.70 |
+| render-side phase medians (backend, acquire, upload, submit) (ms) | 0.24, 0.04, 0.09, 0.04 | 0.11, 0.00, 0.04, 0.00 |
+| readback phase median (ms) | 1.80 | 1.93 |
+| apiCallsPerFrame | 36 | 48 |
+| allocationsSinceWarmup | "0" | "0" |
+| createsAfterSeal | 0 | 0 |
+| checksum | -3826851758512048142 | -3826851758512048142 |
+| visible slots | [729, 746, 747, 750] | [729, 746, 747, 750] |
+| ok | true | true |
+
+Speedup, from these numbers only: the frame median ratio is 59.10 / 52.86 = 1.12, and the p99 ratio is 78.64 / 67.54 = 1.16. These ratios include the tick. The tick medians differ by 6.3 ms, and the physics phase accounts for that difference. The render-side medians are under 0.5 ms on both backends, so this record shows no render-path speedup. The render path is not faster by any amount these runs can resolve. The 1024 frame time is dominated by the synchronous physics tick on both backends.
+
+### 64 tier: WebGPU and WebGL2 side by side
+
+Both runs use `render-witness.mjs` with `tier=64&timed=1`. Visible slots are [18, 20, 21, 20] on both backends, and the checksum is -5415737363265412373 on both.
+
+| field | WebGPU (`build/diag/webgpu64.json`) | WebGL2 (`build/diag/webgl2-64.json`) |
+|---|---|---|
+| frame p99 (ms) | 7.44 | 4.75 |
+| frame median (ms) | 3.16 | 2.68 |
+| frame max (ms) | 15.06 | 6.84 |
+| tick median (ms) | 2.83 | 2.52 |
+| outliers | 8 | 3 |
+| apiCallsPerFrame | 36 | 48 |
+| allocationsSinceWarmup | "0" | "0" |
+
+At 64 the WebGPU median is slower: 2.68 / 3.16 = 0.85, so WebGL2 is 1.18 times faster on the median here. The WebGPU outliers come from the backend and submit phases (up to 1.7 ms and 1.4 ms in the outlier rows) and from the physics tick. This record does not explain the cause, so it is open.
+
+### Remaining open items
+
+- No culled-count readback. The browser witness shows that the pictures agree, not how many clusters the GPU culled, so occlusion efficiency is not witnessed. The scene has nothing hidden enough to be culled.
+- The HZB reference in `engine/test/occlusion_reference.h` is written from the shader's rules. A mismatch between it and the WGSL is not caught by a separate witness.
+- The Dawn backend (Vulkan) is not recorded in a file. Read `chrome://gpu` on the project browser to witness it.
+- The WebGPU 64-tier outliers (8 frames over the outlier threshold) are not explained.
+- The 1024 p99 stalls recorded in earlier sections (a WebGPU 705 ms frame and a WebGL2 362.9 ms outlier) are not reproduced in these runs. They remain unexplained in their earlier sections.
+- The full `npm test` chain was not run. The gates above were run directly, and the host witness was run as `check:engine-host-witness`.

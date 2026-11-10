@@ -299,6 +299,8 @@ Decisions taken in this pass:
 - The vertex pool at tier 2 is 256 MiB, over the 128 MiB default `maxStorageBufferBindingSize`. `renderer.js` requests the adapter's storage limit and plans the pool against the smaller of the buffer and storage limits. A device with a 128 MiB storage limit is planned at a lower tier, not refused.
 - Clusters: `visibilityId` is `(cluster << 7 | triangle) + 1`, so 0 is no model. The largest cluster index at tier 2 is 65,535, which gives an id of 2^23. The witness checks the id round trip up to cluster 131,071 (512 slots), where the id is 2^24.
 - The C++ side allocates nothing per frame. Every GPU object is created in `init` or `buildVisibility`, and `frame()` writes buffers and records passes. The per-frame wgpu encoder and pass objects are the same as before this pass.
+- The visibility path runs only when at least one model is live (`models::liveCount() > 0`). With no live models the culls, HZB and resolve would run on nothing. The 1024 WebGPU witness measured 118 API calls per frame that way, and 36 after the rule.
+- The forward path records no compute dispatch. The visibility path does (cull, finalize, HZB, id and resolve), and `check:engine-render` asserts only the forward path, which is a narrower claim than the Phase A text made.
 
 Memory, in VRAM. Wasm memory is unchanged: the cluster table is already part of the carved pool (the Phase B table).
 
