@@ -32,6 +32,7 @@ struct Plan {
 };
 
 bool plan(const Limits& limits, Plan& out);
+bool planTier(std::uint32_t tier, std::uint32_t texelBytes, Plan& out);
 std::uint64_t vramBytesOf(const Plan& planned);
 
 }

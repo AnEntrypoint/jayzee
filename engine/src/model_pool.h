@@ -33,9 +33,24 @@ const Layout& layout();
 std::uint32_t liveCount();
 double acquire(std::uint32_t vertices, std::uint32_t indices);
 Status upload(double handle, const void* vertices, std::uint32_t vertexCount, const void* indices, std::uint32_t indexCount);
+Status mutableSlot(double handle, std::uint8_t*& vertices, std::uint8_t*& indices);
+Status markDirty(double handle);
 Status ranges(double handle, Range& out);
 Status release(double handle);
 bool isLive(double handle);
+bool uploaded(double handle);
+std::uint32_t slotCount();
+bool slotDirty(std::uint32_t slot);
+bool slotReady(std::uint32_t slot);
+void clearDirty(std::uint32_t slot);
+std::uint32_t dirtyCount();
+Range slotRange(std::uint32_t slot);
+const std::uint8_t* slotVertices(std::uint32_t slot);
+const std::uint8_t* slotIndices(std::uint32_t slot);
+std::uint64_t slotVertexBytes();
+std::uint64_t slotIndexBytes();
+std::uint64_t vertexPoolBytes();
+std::uint64_t indexPoolBytes();
 
 }
 

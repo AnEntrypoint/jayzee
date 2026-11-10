@@ -2,6 +2,7 @@
 
 #include <webgpu/webgpu_cpp.h>
 
+#include "../model_pool.h"
 #include "../page_cache.h"
 #include "../phase_timer.h"
 
@@ -106,6 +107,41 @@ fn fsProps(vin: PropOut) -> @location(0) vec4f {
 }
 )WGSL";
 
+constexpr char kModelWgsl[] = R"WGSL(
+struct Camera {
+  planes: array<vec4f, 6>,
+  viewProj: mat4x4f,
+  eye: vec4f,
+  counts: vec4u,
+  classRadius: vec4f,
+  classMaterial: vec4u,
+};
+
+@group(0) @binding(0) var<uniform> cam: Camera;
+
+struct ModelOut {
+  @builtin(position) clip: vec4f,
+  @location(0) shade: f32,
+};
+
+@vertex
+fn vsModel(@location(0) pos: vec3f, @builtin(instance_index) iid: u32) -> ModelOut {
+  let world = pos * 2.0 + vec3f(f32(iid) * 4.0 - 8.0, 0.0, -20.0);
+  var out: ModelOut;
+  out.clip = cam.viewProj * vec4f(world, 1.0);
+  out.shade = 0.5 + 0.5 * pos.y;
+  return out;
+}
+
+@fragment
+fn fsModel(vin: ModelOut) -> @location(0) vec4f {
+  return vec4f(vin.shade, 0.6, 0.9, 1.0);
+}
+)WGSL";
+
+constexpr std::uint32_t kModelBindings = 1;
+constexpr std::uint64_t kModelUploadBudgetBytes = 512ull * 1024ull;
+
 constexpr char kTerrainWgsl[] = R"WGSL(
 struct Camera {
   planes: array<vec4f, 6>,
@@ -198,6 +234,10 @@ wgpu::TextureView albedoView;
 wgpu::TextureView depthView;
 wgpu::RenderPipeline propPipe;
 wgpu::RenderPipeline terrainPipe;
+wgpu::RenderPipeline modelPipe;
+wgpu::BindGroup modelGroup;
+wgpu::Buffer modelVertexBuf;
+wgpu::Buffer modelIndexBuf;
 wgpu::BindGroup propGroup[kPropClasses];
 wgpu::BindGroup terrainGroup;
 wgpu::TextureFormat surfaceFormat = wgpu::TextureFormat::BGRA8Unorm;
@@ -369,6 +409,49 @@ int buildPipelines() {
   terrainDesc.primitive.cullMode = wgpu::CullMode::None;
   terrainPipe = device.CreateRenderPipeline(&terrainDesc);
 
+  if (engine::models::bound()) {
+    wgpu::ShaderModule modelModule = makeModule(kModelWgsl);
+    wgpu::BindGroupLayoutEntry modelEntries[kModelBindings];
+    modelEntries[0] = bufferEntry(0, vertex, wgpu::BufferBindingType::Uniform);
+    wgpu::BindGroupLayout modelLayout = makeLayout(modelEntries, kModelBindings);
+    wgpu::PipelineLayout modelPipeLayout = makePipelineLayout(modelLayout);
+
+    wgpu::VertexAttribute position{};
+    position.format = wgpu::VertexFormat::Float32x3;
+    position.offset = 0;
+    position.shaderLocation = 0;
+    wgpu::VertexBufferLayout vertexLayout{};
+    vertexLayout.arrayStride = engine::models::layout().vertexStrideBytes;
+    vertexLayout.stepMode = wgpu::VertexStepMode::Vertex;
+    vertexLayout.attributeCount = 1;
+    vertexLayout.attributes = &position;
+
+    wgpu::ColorTargetState modelColour{};
+    modelColour.format = surfaceFormat;
+    wgpu::FragmentState modelFragment{};
+    modelFragment.module = modelModule;
+    modelFragment.entryPoint = "fsModel";
+    modelFragment.targetCount = 1;
+    modelFragment.targets = &modelColour;
+
+    wgpu::RenderPipelineDescriptor modelDesc{};
+    modelDesc.layout = modelPipeLayout;
+    modelDesc.vertex.module = modelModule;
+    modelDesc.vertex.entryPoint = "vsModel";
+    modelDesc.vertex.bufferCount = 1;
+    modelDesc.vertex.buffers = &vertexLayout;
+    modelDesc.fragment = &modelFragment;
+    modelDesc.depthStencil = &depth;
+    modelDesc.primitive.topology = wgpu::PrimitiveTopology::TriangleList;
+    modelDesc.primitive.cullMode = wgpu::CullMode::None;
+    modelPipe = device.CreateRenderPipeline(&modelDesc);
+
+    wgpu::BindGroupEntry modelBindings[kModelBindings];
+    modelBindings[0] = bufferBinding(0, cameraBuf, kCameraBytes);
+    modelGroup = makeGroup(modelLayout, modelBindings, kModelBindings);
+    if (!modelPipe || !modelGroup) return engine::kNotConfigured;
+  }
+
   if (!propPipe || !terrainPipe) return engine::kNotConfigured;
 
   for (std::uint32_t c = 0; c < kPropClasses; ++c) {
@@ -426,6 +509,11 @@ int init(const char* selector, std::uint32_t width, std::uint32_t height) {
     instanceBuf[c] = makeBuffer(kBodyBytes, wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst);
   }
 
+  if (engine::models::bound()) {
+    modelVertexBuf = makeBuffer(engine::models::vertexPoolBytes(), wgpu::BufferUsage::Vertex | wgpu::BufferUsage::CopyDst);
+    modelIndexBuf = makeBuffer(engine::models::indexPoolBytes(), wgpu::BufferUsage::Index | wgpu::BufferUsage::CopyDst);
+  }
+
   heightTex = makeTexture(kPageSide, kPageSide, kPageLayers, wgpu::TextureFormat::R32Float, wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::CopyDst);
   albedoTex = makeTexture(kAlbedoSide, kAlbedoSide, kAlbedoLayers, wgpu::TextureFormat::RGBA8Unorm, wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::CopyDst);
   depthTex = makeTexture(width, height, 1, wgpu::TextureFormat::Depth24Plus, wgpu::TextureUsage::RenderAttachment);
@@ -465,6 +553,18 @@ int frame(const SceneView& scene, const FramePlan& plan, const Camera& camera) {
     writeBuffer(lightBuf, 0, scene.lights, kLightBytes);
     writeBuffer(materialBuf, 0, plan.materialWords, kMaterialBytes);
     writeBuffer(pageBuf, 0, plan.pageRecords, kPageBytes);
+
+    std::uint64_t modelBudget = kModelUploadBudgetBytes;
+    for (std::uint32_t s = 0; s < engine::models::slotCount(); ++s) {
+      if (!engine::models::slotDirty(s)) continue;
+      const std::uint64_t vertexSlotBytes = engine::models::slotVertexBytes();
+      const std::uint64_t indexSlotBytes = engine::models::slotIndexBytes();
+      if (vertexSlotBytes + indexSlotBytes > modelBudget) break;
+      writeBuffer(modelVertexBuf, s * vertexSlotBytes, engine::models::slotVertices(s), vertexSlotBytes);
+      writeBuffer(modelIndexBuf, s * indexSlotBytes, engine::models::slotIndices(s), indexSlotBytes);
+      engine::models::clearDirty(s);
+      modelBudget -= vertexSlotBytes + indexSlotBytes;
+    }
 
     for (std::uint32_t u = 0; u < plan.uploadCount;) {
       const std::uint32_t end = uploadRunEnd(plan, u);
@@ -512,6 +612,17 @@ int frame(const SceneView& scene, const FramePlan& plan, const Camera& camera) {
   for (std::uint32_t c = 0; c < kPropClasses; ++c) {
     ENGINE_RENDER_CALL(pass.SetBindGroup(0, propGroup[c]));
     ENGINE_RENDER_CALL(pass.DrawIndirect(argsBuf, (kArgsPropWord + c * 4) * 4));
+  }
+  if (engine::models::bound()) {
+    ENGINE_RENDER_CALL(pass.SetPipeline(modelPipe));
+    ENGINE_RENDER_CALL(pass.SetBindGroup(0, modelGroup));
+    ENGINE_RENDER_CALL(pass.SetVertexBuffer(0, modelVertexBuf, 0, engine::models::vertexPoolBytes()));
+    ENGINE_RENDER_CALL(pass.SetIndexBuffer(modelIndexBuf, wgpu::IndexFormat::Uint32, 0, engine::models::indexPoolBytes()));
+    for (std::uint32_t s = 0; s < engine::models::slotCount(); ++s) {
+      if (!engine::models::slotReady(s)) continue;
+      const engine::models::Range range = engine::models::slotRange(s);
+      ENGINE_RENDER_CALL(pass.DrawIndexed(range.indexCount, 1, range.firstIndex, static_cast<std::int32_t>(range.firstVertex), s));
+    }
   }
   ENGINE_RENDER_CALL(pass.SetPipeline(terrainPipe));
   ENGINE_RENDER_CALL(pass.SetBindGroup(0, terrainGroup));

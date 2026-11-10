@@ -6,6 +6,7 @@ const PHASE = QUERY.get('phase') === '11' ? 11 : 10
 const TIER = QUERY.get('tier') === '1024' ? 1024 : 64
 const TIMED = QUERY.get('timed') === '1'
 const DRAW = QUERY.get('draw') !== '0'
+const MODELS = QUERY.get('models') === '1'
 const HOLD_END = QUERY.get('hold') === '1'
 const TIER_GLUE = (TIER === 1024 ? '../../engine/out/engine-core-128mib' : '../../engine/out/engine-core-64mib') + (TIMED ? '-timed' : '') + '.mjs'
 const TIER_BUDGET = TIER === 1024 ? 128 * 1024 * 1024 : 64 * 1024 * 1024
@@ -320,6 +321,76 @@ const adapterInfo = async () => {
   return { api: 'webgpu', vendor: info.vendor, architecture: info.architecture, device: info.device, description: info.description, isFallbackAdapter: adapter.info ? info.isFallbackAdapter : undefined }
 }
 
+const MODEL_CHURN_VERTICES = 1024
+const MODEL_CHURN_INDICES = 3072
+const MODEL_NEW_VERTICES = 4096
+const MODEL_NEW_INDICES = 12288
+const MODEL_CHURN_LIVE = 12
+const MODEL_EVENT_EVERY = 50
+const models = { churn: [], events: [], loads: 0, unloads: 0, failures: 0, begin: null }
+const roundTo2 = (v) => Math.round(v * 100) / 100
+
+const memorySnapshot = (module) => ({
+  wasmBytes: module.HEAPU8.buffer.byteLength,
+  allocationsSinceWarmup: String(module._engine_allocations_since_warmup()),
+  jsHeapBytes: performance.memory ? performance.memory.usedJSHeapSize : null,
+  liveModels: module._engine_models_live(),
+})
+
+const modelsStep = (module, frame) => {
+  if (frame === WARMUP_FRAMES) models.begin = memorySnapshot(module)
+  if (frame < WARMUP_FRAMES) return
+  if (frame % 2 === 0) {
+    const handle = module._engine_models_load(MODEL_CHURN_VERTICES, MODEL_CHURN_INDICES, frame)
+    if (handle > 0) models.churn.push(handle)
+    else models.failures += 1
+    models.loads += 1
+    if (models.churn.length > MODEL_CHURN_LIVE) {
+      if (module._engine_models_unload(models.churn.shift()) !== 0) models.failures += 1
+      models.unloads += 1
+    }
+  }
+  if ((frame - WARMUP_FRAMES) % MODEL_EVENT_EVERY === 0) {
+    const handle = module._engine_models_load(MODEL_NEW_VERTICES, MODEL_NEW_INDICES, 1000 + frame)
+    if (handle > 0) models.events.push({ frame, handle })
+    else models.failures += 1
+  }
+}
+
+const modelsReport = (module, frameTimes) => {
+  const eventFrames = new Set(models.events.map((e) => e.frame))
+  const steady = []
+  for (let f = WARMUP_FRAMES; f < frameTimes.length; f++) if (!eventFrames.has(f)) steady.push(frameTimes[f])
+  const eventMs = models.events.map((e) => frameTimes[e.frame])
+  const newcomerUploaded = models.events.every((e) => module._engine_models_uploaded(e.handle) === 1)
+  const dirtyAtEnd = module._engine_models_dirty()
+  for (const handle of models.churn.splice(0)) if (module._engine_models_unload(handle) !== 0) models.failures += 1
+  for (const e of models.events) if (module._engine_models_unload(e.handle) !== 0) models.failures += 1
+  const end = memorySnapshot(module)
+  const steadyMedian = median(steady)
+  const eventMedian = median(eventMs)
+  return {
+    poolBytes: module._engine_models_pool_bytes(),
+    churnLoads: models.loads,
+    churnUnloads: models.unloads,
+    failures: models.failures,
+    begin: models.begin,
+    end,
+    dirtyAtEnd,
+    newcomers: models.events.length,
+    newcomerUploaded,
+    steadyFrames: steady.length,
+    steadyFrameMedianMs: roundTo2(steadyMedian),
+    steadyFrameP99Ms: roundTo2(p99(steady)),
+    newcomerFrameMedianMs: roundTo2(eventMedian),
+    newcomerFrameMaxMs: roundTo2(Math.max(...eventMs)),
+    firstFrameCostMs: roundTo2(eventMedian - steadyMedian),
+    firstFrameRatio: roundTo2(eventMedian / steadyMedian),
+    newcomerFrames: models.events.map((e) => ({ frame: e.frame, totalMs: roundTo2(frameTimes[e.frame]) })),
+    ok: models.failures === 0 && newcomerUploaded && dirtyAtEnd === 0 && end.liveModels === 0 && end.wasmBytes === models.begin.wasmBytes,
+  }
+}
+
 const run = async () => {
   const canvas = document.getElementById('engine-canvas')
   const navigatorLike = PHASE === 11 ? {} : navigator
@@ -354,6 +425,7 @@ const run = async () => {
         module._engine_tick(TICK_STEPS)
         const tickEnd = performance.now()
         renderer.setCamera(PATH === 'planet' ? planetCamera(module, renderer, frame, aspect, surface) : orbitCamera(frame, aspect, surface))
+        if (MODELS) modelsStep(module, frame)
         if (DRAW) {
           const status = renderer.frame()
           if (status !== 0) throw new Error('engine_render_frame status ' + status)
@@ -433,6 +505,7 @@ const run = async () => {
     const at = r * ROW_WIDTH
     return [timedRows[at], round2(performance.timeOrigin + timedRows[at + 1]), round2(timedRows[at + 2]), round2(timedRows[at + 3]), nullIfNaN(timedRows[at + 5], round2), nullIfNaN(timedRows[at + 6]), ...Array.from({ length: phaseCount }, (_, i) => round2(timedRows[at + ROW_FIELDS + i]))]
   })
+  if (MODELS) result.models = modelsReport(module, frameTimes)
   if (DRAW) {
     result.apiCallsPerFrame = lastStats.apiCallsLastFrame
     result.allocationsSinceWarmup = String(lastStats.allocationsSinceWarmup)

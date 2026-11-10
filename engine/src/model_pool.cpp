@@ -11,6 +11,7 @@ namespace {
 struct Meta {
   std::uint32_t vertices;
   std::uint32_t indices;
+  std::uint32_t dirty;
 };
 
 constexpr std::uint64_t kMaxPoolBytes = 0x7fffffffull;
@@ -45,6 +46,10 @@ std::size_t indexBytes(const Layout& layout) {
 bool resolveSlot(double handle, std::uint32_t& slot) {
   std::uint32_t whole = 0;
   return gBound && handles::wholeHandle(handle, whole) && handles::resolve(gTable, whole, slot);
+}
+
+bool held(std::uint32_t slot) {
+  return gBound && slot < gLayout.slots && gMeta[slot].vertices != 0;
 }
 
 }
@@ -99,7 +104,7 @@ double acquire(std::uint32_t vertices, std::uint32_t indices) {
   if (indices < 1 || indices > gLayout.indicesPerSlot) return kRange;
   std::uint32_t slot = 0;
   if (!handles::acquire(gTable, slot)) return kFull;
-  gMeta[slot] = Meta{vertices, indices};
+  gMeta[slot] = Meta{vertices, indices, 0};
   return handles::handleOf(gTable, slot);
 }
 
@@ -108,10 +113,26 @@ Status upload(double handle, const void* vertices, std::uint32_t vertexCount, co
   if (!resolveSlot(handle, slot)) return kBadId;
   if (vertices == nullptr || indices == nullptr) return kRange;
   if (vertexCount != gMeta[slot].vertices || indexCount != gMeta[slot].indices) return kRange;
-  const std::size_t vertexOffset = static_cast<std::size_t>(slot) * gLayout.verticesPerSlot * gLayout.vertexStrideBytes;
-  const std::size_t indexOffset = static_cast<std::size_t>(slot) * gLayout.indicesPerSlot * kIndexBytes;
-  std::memcpy(gVertices + vertexOffset, vertices, static_cast<std::size_t>(vertexCount) * gLayout.vertexStrideBytes);
-  std::memcpy(gIndices + indexOffset, indices, static_cast<std::size_t>(indexCount) * kIndexBytes);
+  std::memcpy(gVertices + static_cast<std::size_t>(slot) * gLayout.verticesPerSlot * gLayout.vertexStrideBytes, vertices,
+              static_cast<std::size_t>(vertexCount) * gLayout.vertexStrideBytes);
+  std::memcpy(gIndices + static_cast<std::size_t>(slot) * gLayout.indicesPerSlot * kIndexBytes, indices,
+              static_cast<std::size_t>(indexCount) * kIndexBytes);
+  gMeta[slot].dirty = 1;
+  return kOk;
+}
+
+Status mutableSlot(double handle, std::uint8_t*& vertices, std::uint8_t*& indices) {
+  std::uint32_t slot = 0;
+  if (!resolveSlot(handle, slot)) return kBadId;
+  vertices = gVertices + static_cast<std::size_t>(slot) * gLayout.verticesPerSlot * gLayout.vertexStrideBytes;
+  indices = gIndices + static_cast<std::size_t>(slot) * gLayout.indicesPerSlot * kIndexBytes;
+  return kOk;
+}
+
+Status markDirty(double handle) {
+  std::uint32_t slot = 0;
+  if (!resolveSlot(handle, slot)) return kBadId;
+  gMeta[slot].dirty = 1;
   return kOk;
 }
 
@@ -129,7 +150,7 @@ Status release(double handle) {
   std::uint32_t whole = 0;
   std::uint32_t slot = 0;
   if (!gBound || !handles::wholeHandle(handle, whole) || !handles::resolve(gTable, whole, slot)) return kBadId;
-  gMeta[slot] = Meta{0, 0};
+  gMeta[slot] = Meta{0, 0, 0};
   handles::release(gTable, slot);
   return kOk;
 }
@@ -137,6 +158,69 @@ Status release(double handle) {
 bool isLive(double handle) {
   std::uint32_t slot = 0;
   return resolveSlot(handle, slot);
+}
+
+bool uploaded(double handle) {
+  std::uint32_t slot = 0;
+  return resolveSlot(handle, slot) && gMeta[slot].dirty == 0;
+}
+
+std::uint32_t slotCount() {
+  return gBound ? gLayout.slots : 0;
+}
+
+bool slotDirty(std::uint32_t slot) {
+  return held(slot) && gMeta[slot].dirty != 0;
+}
+
+bool slotReady(std::uint32_t slot) {
+  return held(slot) && gMeta[slot].dirty == 0;
+}
+
+void clearDirty(std::uint32_t slot) {
+  if (held(slot)) gMeta[slot].dirty = 0;
+}
+
+std::uint32_t dirtyCount() {
+  std::uint32_t count = 0;
+  for (std::uint32_t slot = 0; slot < slotCount(); ++slot) {
+    if (slotDirty(slot)) count += 1;
+  }
+  return count;
+}
+
+Range slotRange(std::uint32_t slot) {
+  Range out{0, 0, 0, 0};
+  if (!held(slot)) return out;
+  out.firstVertex = slot * gLayout.verticesPerSlot;
+  out.vertexCount = gMeta[slot].vertices;
+  out.firstIndex = slot * gLayout.indicesPerSlot;
+  out.indexCount = gMeta[slot].indices;
+  return out;
+}
+
+const std::uint8_t* slotVertices(std::uint32_t slot) {
+  return gVertices + static_cast<std::size_t>(slot) * slotVertexBytes();
+}
+
+const std::uint8_t* slotIndices(std::uint32_t slot) {
+  return gIndices + static_cast<std::size_t>(slot) * slotIndexBytes();
+}
+
+std::uint64_t slotVertexBytes() {
+  return gBound ? static_cast<std::uint64_t>(gLayout.verticesPerSlot) * gLayout.vertexStrideBytes : 0;
+}
+
+std::uint64_t slotIndexBytes() {
+  return gBound ? static_cast<std::uint64_t>(gLayout.indicesPerSlot) * kIndexBytes : 0;
+}
+
+std::uint64_t vertexPoolBytes() {
+  return static_cast<std::uint64_t>(slotCount()) * slotVertexBytes();
+}
+
+std::uint64_t indexPoolBytes() {
+  return static_cast<std::uint64_t>(slotCount()) * slotIndexBytes();
 }
 
 }

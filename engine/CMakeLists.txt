@@ -72,6 +72,7 @@ add_executable(engine_core
   src/textures.cpp
   src/model_pool.cpp
   src/device_tier.cpp
+  src/exports_models.cpp
   src/materials.cpp
   src/exports_materials.cpp
   src/interest.cpp
@@ -118,6 +119,16 @@ set(ENGINE_EXPORTS
   _engine_planet_locate
   _engine_planet_resolve
   _engine_planet_key
+  _engine_models_load
+  _engine_models_unload
+  _engine_models_live
+  _engine_models_bound
+  _engine_models_pool_bytes
+  _engine_models_dirty
+  _engine_models_uploaded
+  _engine_device_plan_tier
+  _engine_device_tier_vram
+  _engine_device_tier_budget
   _engine_planet_scratch
   _engine_planet_height
   _engine_planet_gap_queries

@@ -61,22 +61,31 @@ std::uint64_t vramBytesOf(const Plan& planned) {
          indexBytes(planned.modelSlots, planned.indicesPerModel);
 }
 
+bool planTier(std::uint32_t tier, std::uint32_t texelBytes, Plan& out) {
+  if (tier >= kTierCount) return false;
+  if (texelBytes != 1 && texelBytes != 4) return false;
+  const Tier& source = kTiers[tier];
+  out.tier = tier;
+  out.textureSide = source.textureSide;
+  out.textureLayers = source.textureLayers;
+  out.texelBytes = texelBytes;
+  out.modelSlots = source.modelSlots;
+  out.verticesPerModel = source.verticesPerModel;
+  out.indicesPerModel = source.indicesPerModel;
+  out.vertexStrideBytes = kVertexStrideBytes;
+  out.uploadBytesPerFrame = source.uploadBytesPerFrame;
+  out.vramBudgetBytes = source.vramBudgetBytes;
+  out.vramBytes = vramBytesOf(out);
+  return true;
+}
+
 bool plan(const Limits& limits, Plan& out) {
   if (limits.texelBytes != 1 && limits.texelBytes != 4) return false;
   for (std::uint32_t i = kTierCount; i > 0; --i) {
     const Tier& tier = kTiers[i - 1];
     if (!fits(tier, limits)) continue;
-    out.tier = i - 1;
-    out.textureSide = tier.textureSide;
-    out.textureLayers = tier.textureLayers;
-    out.texelBytes = limits.texelBytes;
-    out.modelSlots = tier.modelSlots;
-    out.verticesPerModel = tier.verticesPerModel;
-    out.indicesPerModel = tier.indicesPerModel;
-    out.vertexStrideBytes = kVertexStrideBytes;
-    out.uploadBytesPerFrame = tier.uploadBytesPerFrame;
+    if (!planTier(i - 1, limits.texelBytes, out)) return false;
     out.vramBudgetBytes = budgetFor(tier, limits);
-    out.vramBytes = vramBytesOf(out);
     return true;
   }
   return false;

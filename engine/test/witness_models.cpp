@@ -62,6 +62,8 @@ void modelsAndTiers() {
   check(device::vramBytesOf(device::Plan{0, 512, 64, 1, 128, 4096, 12288, 32, 0, 0, 0}) == 45438293ull,
         "vramBytesOf for tier 0 at one byte per texel equals 45438293");
 
+  check(device::planTier(2, 1, planned) && planned.vramBytes == 905969664ull, "planTier fills the accounted bytes without the fit test");
+  check(!device::planTier(2, 2, planned), "planTier refuses a texel size other than 1 or 4");
   check(models::validLayout(kLayout), "a four-slot layout with 32-byte vertices is valid");
   check(!models::validLayout({0, 8, 12, 32}), "a layout with no slots is refused");
   check(!models::validLayout({handles::kMaxSlots + 1, 8, 12, 32}), "a layout above the slot maximum is refused");
@@ -92,6 +94,10 @@ void modelsAndTiers() {
   for (std::size_t i = 0; i < sizeof vertices; ++i) vertices[i] = static_cast<std::uint8_t>(i + 1);
   for (std::size_t i = 0; i < sizeof indices; ++i) indices[i] = static_cast<std::uint8_t>(0x80 + i);
   check(models::upload(first, vertices, 8, indices, 12) == kOk, "upload with the acquired counts succeeds");
+  check(models::slotDirty(0) && !models::uploaded(first), "an upload marks its slot dirty until the GPU copy clears it");
+  models::clearDirty(0);
+  check(models::slotReady(0) && models::uploaded(first), "clearing the dirty flag makes the slot ready to draw");
+  check(models::dirtyCount() == 0, "no slot is dirty after its upload is cleared");
   check(models::upload(first, vertices, 7, indices, 12) == kRange, "upload with a vertex count other than acquired is refused");
   check(models::upload(first, vertices, 8, indices, 11) == kRange, "upload with an index count other than acquired is refused");
   check(models::upload(first, nullptr, 8, indices, 12) == kRange, "upload with a null vertex pointer is refused");
@@ -103,7 +109,7 @@ void modelsAndTiers() {
   check(models::ranges(second, range) == kOk && range.firstVertex == 8 && range.firstIndex == 12,
         "the second slot starts after the first slot's pool share");
 
-  const std::size_t vertexBase = 64;
+  const std::size_t vertexBase = 80;
   check(std::memcmp(gStorage + vertexBase, vertices, sizeof vertices) == 0,
         "upload copies the vertex bytes into the slot's pool share");
 
@@ -133,7 +139,7 @@ void modelsAndTiers() {
   }
   check(churnFailures == 0, "10000 acquire, upload and release cycles all succeed");
   check(models::liveCount() == 0, "the churn leaves no live slot");
-  check(models::bytesFor(kLayout) == 1280, "the pool's byte size is unchanged by the churn");
+  check(models::bytesFor(kLayout) == 1296, "the pool's byte size is unchanged by the churn");
   observe("model churn cycles", kChurnCycles);
 }
 

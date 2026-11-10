@@ -9,6 +9,7 @@
 #include "budget.h"
 #include "codec.h"
 #include "interest.h"
+#include "model_pool.h"
 #include "materials.h"
 #include "textures.h"
 #include "planet_frame.h"
@@ -133,6 +134,9 @@ int initialize(std::uint32_t players, std::uint32_t workers, double budgetBytes)
     return engine::kFull;
   }
   if (!engine::interest::bind(engine::arena::carve(engine::interest::bytesFor(capacity), 8), capacity)) return engine::kFull;
+  constexpr engine::models::Layout modelLayout{128, 4096, 12288, 32};
+  void* modelBase = engine::arena::carve(engine::models::bytesFor(modelLayout), engine::models::kAlignment);
+  if (modelBase == nullptr || engine::models::bind(modelBase, engine::models::bytesFor(modelLayout), modelLayout) != engine::kOk) return engine::kFull;
   stageRows = carveArray<float>(static_cast<std::size_t>(capacity.bodies) * engine::kBatchFloats);
   stageHandles = carveArray<std::uint32_t>(capacity.bodies);
   if (stageRows == nullptr || stageHandles == nullptr) return engine::kFull;
