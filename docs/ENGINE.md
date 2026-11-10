@@ -526,3 +526,15 @@ Not done in this pass. The owner asked for repeatable physics scenarios from spo
 - Decode runs on a worker. In a browser worker, a meshopt vertex stream decodes byte for byte, and the Basis transcoder loads in the worker and refuses a KTX2 header with no content (scripts/browser/decode-worker-run.mjs). A real KTX2 transcode is not witnessed (no encoder on the host).
 - Device loss is detected and reported through `renderer.deviceLost`. Recovery re-creates the renderer. The arena copies do not survive a device loss. The browser witness destroys the device, reloads, and draws with status 0 (scripts/browser/device-loss-run.mjs).
 - Phase B measurements are in docs/PENDING_VALIDATION.md under the Phase B result for this pass.
+
+## Stretch 2: the sphere and the distributed population (Phase A)
+
+Planet. The radius is 6,360,000 m, the value of `PLANET_RADIUS_M` in spoint's `packages/mapspinner/src/planet-radius.js` and in jayzee's `src/packages/mapspinner/planet-radius.js`. `src/engine/sphere.js` takes that radius, and its gate reads both files. The engine's C++ planet already carries a radius, cube-sphere face addressing (`worldToFaceLocal`, `worldToCell` in `engine/src/planet_frame.h`) and radial gravity (`World::applyRadialGravity`, which points at the planet centre). Stretch 2 adds no new planet geometry in C++. Its surface and gravity helpers are the JavaScript side of the same model.
+
+Population. `src/engine/population.js` places objects on a spherical cap with a seeded generator. Each object's up vector is its surface normal, and its height comes from a caller-supplied height function (procedural heights or the patch heights). The count is `round(densityPerKm2 × cap area)`. Density is an input. Spoint's population density was searched for in `/workspace/spoint` (vegetation, placement, scatter and cell-count names) and was not found in this checkout, so no spoint density is used. The density value for the witness is OPEN until it is located, and the witness records the value it used.
+
+Colliders. Three layers, in `src/engine/colliderLayers.js`. Very static (terrain and planet geometry) is built once and refuses changes. Static objects are refitted only when changed. Dynamic bodies are returned every step. The gate checks the layer counts and the refit set.
+
+Streaming. Page streaming follows the engine's existing cube-sphere face cells, so it follows the curvature through `worldToCell`. No change is made in Phase A. Phase B checks it on the witness scene.
+
+Witness scene. The stretch-2 witness scene is not run in Phase A. Its object, collider and triangle counts and its patch counts are recorded in Phase B, with the asset source of each object class. The asset sources, in order: `/workspace/assets` (934 `.cluster.glb`) first, then `/workspace/hy3d`, `/workspace/oscraft` and `/workspace/spoint`.
