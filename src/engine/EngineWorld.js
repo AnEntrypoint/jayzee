@@ -387,7 +387,7 @@ export const createEngineWorld = async (options = {}, glue = DEFAULT_GLUE) => {
   if (settings.capacity > layout.bodies) {
     throw new RangeError('engine capacity is at most ' + layout.bodies + ' for ' + layout.players + ' players')
   }
-  const iterations = options.solverIterations === undefined ? solverIterationsFor(plan.players) : settings.solverIterations
+  const iterations = options.solverIterations === undefined ? solverIterationsFor(layout.players) : settings.solverIterations
   const configured = module._engine_world_configure(
     settings.capacity,
     settings.tickRate,

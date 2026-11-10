@@ -1,10 +1,10 @@
 import { createEngineWorld } from '../../src/engine/EngineWorld.js'
 import { solverIterationsFor } from '../../src/engine/solverIterations.js'
 
-export const STATE_TIER = Object.freeze({ players: 1024, capacity: 10240, ticks: 120, budgetBytes: 67108864 })
+export const STATE_TIER = Object.freeze({ players: 1024, capacity: 10240, ticks: 120, budgetBytes: 134217728 })
 export const STATE_KEY = 'tier1024-solver' + solverIterationsFor(STATE_TIER.players)
-export const FIXED_GLUE = 'engine/out/engine-core-64mib.mjs'
-export const THREADED_GLUE = 'engine/out/engine-core-64mib-threads.mjs'
+export const FIXED_GLUE = 'engine/out/engine-core-128mib.mjs'
+export const THREADED_GLUE = 'engine/out/engine-core-128mib-threads.mjs'
 export const THREADED_WORKERS = 4
 
 const FNV_OFFSET = 0x811c9dc5

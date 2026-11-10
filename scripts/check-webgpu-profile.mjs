@@ -52,13 +52,13 @@ gate('only the project profile counts as owned, a sibling or other root does not
   assert.equal(profileIsOwned(join(tmp, 'other'), root), false)
 })
 
-gate('the wrapper seeds the project profile and forwards every argument unchanged', () => {
+gate('the wrapper seeds the project profile, starts Chromium with the WebGPU flags, and forwards every argument after them unchanged', () => {
   const projectRoot = join(tmp, 'project')
   const profile = join(projectRoot, '.playwriter', 'browser-profile')
   const argsFile = join(tmp, 'args-project.txt')
   const result = chromiumArgs(projectRoot, profile, argsFile)
   assert.equal(result.status, 0, result.stderr)
-  assert.deepEqual(readFileSync(argsFile, 'utf8').split('\n').filter(Boolean), ['--user-data-dir=' + profile, '--no-first-run', 'about:blank'])
+  assert.deepEqual(readFileSync(argsFile, 'utf8').split('\n').filter(Boolean), ['--enable-unsafe-webgpu', '--enable-features=Vulkan,WebGPUService', '--user-data-dir=' + profile, '--no-first-run', 'about:blank'])
   assert.deepEqual(labsOf(join(profile, 'Local State')), WEBGPU_LABS)
 })
 

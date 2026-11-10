@@ -3311,3 +3311,36 @@ Recorded, not changed in Phase A:
 - Physics scenario witnesses from spoint's example games (item 8). Not started. The planet landscape is the one dataset; spoint's spawn assumptions are not copied.
 
 Defect recorded in this pass: the "simulation hashes" b6675ee2 and 21494c4d (ENGINE.md and the Phase A NoLock entry) are not produced by any gate or record in this repo. The render page's `hash` covers the camera and page samples. They are replaced by `tier1024-solver4` in `engine/state-hashes.json`.
+
+Phase B (this stretch, 2026-11-10). Each row was run once after the last edit of its file. Wall times are from the run.
+
+| step | result | wall |
+|---|---|---|
+| `check:engine-solver-tier` | PASS 4 | under 1 s |
+| `check:chromium-launcher` | PASS 4 (flags present, before the caller's arguments, no SwiftShader switch, profile seeding kept) | 1 s |
+| rebuild `engine-core-128mib-threads` (stale from before this stretch) | rc 0, sha256 530ea581… | 25 s |
+| `gen:engine-state-hash-1024` | fixed (1 worker) and threaded (4 workers) agree; pin `tier1024-solver4` = `8e96da08` | 16 s |
+| `check:engine-state-hash-1024` | PASS 3 | 16 s |
+| `check:engine-budget-floor` (rewritten, see the defect below) | PASS 3; the 128 MiB build boots 1024 players at 128 MiB; floor INFO 105 MiB | under 1 s |
+| `check:ktx2-transcode` | PASS 8 of 8: the 8 KTX2 images across the four prepped assets are valid, and each transcodes to ETC1 and BC1 with non-zero output | under 1 s |
+| stream witness, 1024 with 4 iterations (run 3) | 64, 128 and 512 tiers pass every check (as before); 1024 median 11.6 to 13.4 ms; p99 14.4 to 16.7 ms; worst frame 16.6 to 20.0 ms in 3 of 4 runs; `STREAM_WITNESS FAIL 3 of 16` | about 4.5 min |
+| 1024 A/B, planet, 2 rounds, same page, iterations 8 against the default 4 | 8 iterations: WebGPU median 13.2 to 14.6, WebGL2 12.7 to 13.2 (p99 15.2 to 18.9). 4 iterations: WebGPU median 11.7 to 11.8, WebGL2 11.2 to 11.4 (p99 13.7 to 17.5) | about 4 min |
+| 1024 A/B, iterations 3 and 2 (one run failed, see the record) | 3: WebGPU median 11.2, WebGL2 11.0 to 11.7; 2: WebGPU 11.9 to 12.7, WebGL2 11.0 to 11.9. No lower median and no lower tail than 4 | about 4 min |
+| controlled LIVE, 1024 threaded, WebGPU | median 12.6, p99 15.4, max 20.1; externalBusy 0.148 | 2 min |
+| controlled LIVE, 1024 threaded, WebGL2 | median 11.8, p99 19.9, max 23.6; externalBusy 0.089 | 2 min |
+| controlled LIVE, 1024 single-threaded (default query, no `threads=1`) | median 43.4, p99 62.2, max 67.5 (WebGPU, externalBusy 0.34). This is the single-threaded build, not the page's 1024 configuration, so it is recorded as a different configuration | 2 min |
+| `npm test` | see the record below | |
+
+Findings from Phase B:
+
+1. Defect, corrected: the arena floor gate and ENGINE.md said the 1024 plan boots at 48 MiB, and that the floor is 35 MiB in the 64 MiB build. Both were wrong. The gate checked only the return code. The 64 MiB build steps down: at 35 to 48 MiB it boots 64 players (2048 bodies), and at 60 to 64 MiB it boots 256 players (5120 bodies). The 1024 plan does not fit that build at any budget. The gate now runs the 128 MiB build and checks the booted player count. The floor for 1024 players in the 128 MiB build is 105 MiB.
+2. Defect, corrected: `createEngineWorld` chose the solver iterations from the requested players, so a stepped-down world would get the 1024 setting. It now chooses from the layout the engine booted (`layout.players`). The render page does the same with `readLayout(module).players`.
+3. Defect, corrected: the stream witness's first 1024 record (before this stretch) and the 1024 "simulation hashes" in the older records were not produced by any gate. The new pin is `tier1024-solver4` = `8e96da08`. It is the physics state of 10,240 bodies, not the render scene.
+4. The 1024 solver result. Moving the 1024 tier from 8 to 4 iterations cut the median by about 2 ms on both backends, at equal load (13.2 to 14.6 ms down to 11.2 to 11.8 ms). The earlier 24 to 28 ms medians were run under host load of 9 to 11, not under the same load as these runs. Going below 4 (2 or 3) did not lower the median or the tails further, so 4 is the chosen value. The 1024 tier now meets the budget on the median on both backends (11 to 13 ms). It does not yet meet the budget on the tails: p99 is 14 to 20 ms and the worst frame is 15 to 24 ms, in the stream and controlled runs. The tails are not explained by the solver count, so they stay OPEN, with the cause not recorded.
+5. Harness defect, recorded: one A/B run returned `Session with given id not found` from the page session (`error` in its record). It did not recur in the next run. Cause not recorded.
+6. The KTX2 transcode is witnessed in Node through three's Basis transcoder (the CommonJS build copied to `build/ktx2-transcode`). The browser-worker path is not covered by this gate.
+7. The launcher flags. A live probe could not make a null adapter appear: the system `/usr/bin/chromium` wrapper already passes Vulkan flags and a fresh profile on it gave the NVIDIA adapter on 5 of 5 calls. The real binary behind it did not open a debug port in this probe, so the control with the flags removed was not obtained. The launcher fix is therefore gated for its flags, but it is not shown to change the adapter. The null adapter stays OPEN.
+8. The PAUSED condition of `controlled-run.mjs` sends SIGSTOP to the PIDs it is given. Under the standing rule, only processes this job started may be stopped. Only the LIVE condition was run, so the pause comparison is not done. OPEN.
+9. Instanced GLB vegetation: not built (see the Phase A entry). The spoint walk comparison, the physics scenario witnesses and the 362.9 ms outlier stay OPEN, as recorded in Phase A.
+
+Full `npm test` after the fixes above: EXIT 0, PASS 4985, FAIL 0 (wall about 5 min). The first run, before `check-webgpu-profile.mjs` was updated, failed one assertion. That assertion expected the wrapper to forward its arguments alone, and the launcher change adds two flags. The assertion now expects the two flags first, then the forwarded arguments.

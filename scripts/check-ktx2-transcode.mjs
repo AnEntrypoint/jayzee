@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { copyFileSync, mkdirSync, readFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { NodeIO } from '@gltf-transform/core'
@@ -15,8 +16,12 @@ const BASIS_SOURCE = join(root, 'node_modules/three/examples/jsm/libs/basis/basi
 const BASIS_WASM = join(root, 'node_modules/three/examples/jsm/libs/basis/basis_transcoder.wasm')
 const TARGETS = Object.freeze({ ETC1: 0, BC1: 2 })
 
+const BASIS_DIR = join(root, 'build/ktx2-transcode')
 const loadBasis = () => {
-  const factory = new Function(readFileSync(BASIS_SOURCE, 'utf8') + '\nreturn BASIS;')()
+  mkdirSync(BASIS_DIR, { recursive: true })
+  const copy = join(BASIS_DIR, 'basis_transcoder.cjs')
+  copyFileSync(BASIS_SOURCE, copy)
+  const factory = createRequire(import.meta.url)(copy)
   const wasmBinary = readFileSync(BASIS_WASM)
   return new Promise((resolveModule) => {
     const module = {

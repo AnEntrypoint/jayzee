@@ -1,6 +1,7 @@
 import { loadRenderer, RENDER_LAYOUT } from '../../src/engine/renderer.js'
 import { cellOrigin, PAGE_SIDE, PAGE_U_EDGE, PAGE_V_EDGE, planetCellSize } from '../../src/engine/pageLayout.js'
 import { solverIterationsFor } from '../../src/engine/solverIterations.js'
+import { readLayout } from '../../src/engine/bridge.js'
 
 const QUERY = new URLSearchParams(location.search)
 const PHASE = QUERY.get('phase') === '11' ? 11 : 10
@@ -28,7 +29,9 @@ const CAMERA_FOV = Math.PI / 3
 const NEAR = 0.1
 const FAR = 500
 const GROUND = [-200, -1, -200, 200, 0, 200]
-const WORLD = { capacity: TIER === 1024 ? 10240 : 2048, tickRate: 60, gravity: -9.8, drag: 0, radius: 0.5, restitution: 0, iterations: solverIterationsFor(TIER) }
+const SOLVER_ITERATIONS_QUERY = QUERY.get('iterations')
+const runConfig = { solverIterations: null }
+const WORLD = { capacity: TIER === 1024 ? 10240 : 2048, tickRate: 60, gravity: -9.8, drag: 0, radius: 0.5, restitution: 0 }
 const PLANET = { radius: 6371000, cellSize: planetCellSize(6371000), gravity: 9.8, maxHeight: 8000 }
 const CLASS_MATERIALS = [0, 1, 2, 3]
 
@@ -154,7 +157,8 @@ const sceneDigest = (module, placed, camera) => {
 }
 
 const setupWorld = (module) => {
-  const status = module._engine_world_configure(WORLD.capacity, WORLD.tickRate, WORLD.gravity, WORLD.drag, WORLD.radius, WORLD.restitution, WORLD.iterations)
+  runConfig.solverIterations = SOLVER_ITERATIONS_QUERY === null ? solverIterationsFor(readLayout(module).players) : Number(SOLVER_ITERATIONS_QUERY)
+  const status = module._engine_world_configure(WORLD.capacity, WORLD.tickRate, WORLD.gravity, WORLD.drag, WORLD.radius, WORLD.restitution, runConfig.solverIterations)
   if (status !== 0) throw new Error('world configure status ' + status)
   module._engine_world_add_box(...GROUND)
   for (let i = 0; i < BODIES; i++) {
@@ -543,6 +547,7 @@ const run = async () => {
   result.threads = THREADS
   result.workers = WORKERS
   result.glue = TIER_GLUE
+  result.solverIterations = runConfig.solverIterations
   result.tickMedianMs = round2(median(column(2)))
   result.outlierThresholdMs = round2(2 * result.frameTimeMedianMs)
   result.outliers = []

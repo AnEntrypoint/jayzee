@@ -21,13 +21,13 @@ gate('the 1024 override table is frozen', () => {
 
 gate('the host applies the tier default only when solverIterations is not given', () => {
   const source = read('src/engine/EngineWorld.js')
-  assert.ok(source.includes('options.solverIterations === undefined ? solverIterationsFor(plan.players) : settings.solverIterations'))
+  assert.ok(source.includes('options.solverIterations === undefined ? solverIterationsFor(layout.players) : settings.solverIterations'))
 })
 
-gate('the render page takes its iteration count from the same tier table', () => {
+gate('the render page takes its iteration count from the same tier table, for the tier the engine booted', () => {
   const page = read('scripts/browser/engine-render-browser.js')
   assert.ok(page.includes("import { solverIterationsFor } from '../../src/engine/solverIterations.js'"))
-  assert.ok(page.includes('iterations: solverIterationsFor(TIER)'))
+  assert.ok(page.includes('solverIterationsFor(readLayout(module).players)'))
   assert.ok(!page.includes('iterations: 8'))
 })
 
