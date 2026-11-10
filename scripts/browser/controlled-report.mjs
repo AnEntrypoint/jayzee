@@ -25,7 +25,7 @@ export const percentile = (values, q) => {
 export const cellOf = (row) => row.condition + ' ' + (row.pin ?? 'unpinned')
 
 export function analyseRunData({ run, page, samples, threadRows, schedRows, ticksRows }) {
-  const base = { label: run.label, round: run.round, condition: run.condition, pin: run.pin ?? null, externalBusy: run.externalBusy?.share ?? null }
+  const base = { label: run.label, round: run.round, condition: run.condition, pin: run.pin ?? null, experiment: run.experiment ?? null, externalBusy: run.externalBusy?.share ?? null }
   if (typeof page.error === 'string' || !Array.isArray(page.rows)) return { ...base, valid: false, reason: page.error ?? 'page has no rows' }
   const frames = framesFromResult(page)
   const totals = frames.map((frame) => frame.totalMs)
@@ -42,6 +42,7 @@ export function analyseRunData({ run, page, samples, threadRows, schedRows, tick
     valid: true,
     reason: null,
     rendererPid,
+    stallWindows: stalls.map((stall) => ({ frame: stall.frame, startMs: stall.startMs, totalMs: stall.totalMs })),
     frames: frames.length,
     medianMs: report.baseMs,
     p99Ms: percentile(totals, 0.99),
@@ -105,7 +106,7 @@ export const analyseDir = (dir) => readdirSync(dir).filter((name) => name.endsWi
       ticksRows: parseTicksLog(read(run.files.threads + '.ticks')),
     })
   } catch (error) {
-    return { label: run.label, round: run.round, condition: run.condition, pin: run.pin ?? null, valid: false, reason: error.message }
+    return { label: run.label, round: run.round, condition: run.condition, pin: run.pin ?? null, experiment: run.experiment ?? null, valid: false, reason: error.message }
   }
 })
 

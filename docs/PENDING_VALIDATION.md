@@ -2591,3 +2591,38 @@ The matrix ran in two jobs, controlled-1024 and controlled-1024-retry. Full resu
 Phase B pending lines.
 - scripts/check-controlled-run.mjs: RESULT: PASS. Witness: the gate output.
 - npm test on the Phase B tree: EXIT 0 with the PASS count. Witness: the job log.
+
+
+## Shared-core and clock causes (Phase A, pre-registered before any run)
+
+Harness: scripts/browser/controlled-run.mjs, with --experiment=core-shared, core-separate or core-none and --main=<cpu> (default 0). Topology is read from sysfs core_id and physical_package_id at run time. On this host the SMT pairs are (0,1), (2,3) and so on, so the sibling is not cpu modulo 8.
+
+Placement, the same in every arm: the renderer main thread is pinned to cpu 0, and the co-tenant is one busy loop. The LIVE sampler is the cgroup and thread samplers.
+- core-shared: samplers and the co-tenant both on cpu 1, the SMT sibling of cpu 0, so the LIVE sampler and the co-tenant share the renderer's physical core.
+- core-separate: samplers on cpu 2 (core 1), co-tenant on cpu 4 (core 2). Sampler and co-tenant are on separate physical cores, and neither is on the renderer's core.
+- core-none: samplers on cpu 2, no co-tenant. This is the control, pinned like the other two arms.
+
+Condition: PAUSED with the foreign pids paused by PID, and the 0.2 busy gate as before.
+
+Clock: every run records the clock source and each CPU's governor and scaling_cur_freq at start and end (run.json clock.start and clock.end). The renderer's CPU and its frequency are sampled every 100 ms into <label>.clock.txt (time, pid, cpu, kHz).
+
+Report: node scripts/browser/core-report.mjs <dir> prints experiments, and verdicts.sharedCore, verdicts.clusterOnChanges and verdicts.stallsAtLowerClock.
+
+Pre-registered predictions:
+- S1 (shared core): core-shared stall frames exceed core-separate in total and in at least two of three rounds. Predicted verdict: "supported". core-none is reported as the control, not part of the verdict.
+- C1 (clock clustering): stall frames cluster on frequency changes, a ratio of at least 2 by clusterStats. Predicted verdict: "does not cluster on frequency changes". The earlier matrix showed frequency moving between runs, not within them, so no within-run clustering is expected.
+- C2 (lower clock): stalls sit at a lower clock in most runs. Predicted verdict: "stalls do not sit at a lower clock in most runs".
+
+Decision: S1 counts as a found cause only when it is supported and C1 does not account for it. Any other verdict leaves the cause open, and the Phase B record states the counts.
+
+Phase A changes:
+| file | section | change | witness |
+| scripts/browser/controlled-run.mjs | experiment placement | coreLayout and experimentSettings add the three arms, read from sysfs | scripts/check-controlled-run.mjs, gates "coreLayout picks ...", "experimentSettings puts ..." |
+| scripts/browser/controlled-run.mjs | pinning | one scan every 100 ms pins the renderer main thread, records the renderer CPU and frequency, and restores the first pre-pin affinity list; the controller is not pinned | not gated in Phase A (no run in Phase A); Phase B reads run.json pinned and the per-thread readback |
+| scripts/browser/controlled-run.mjs | clock record | run.json gets clock.start and clock.end for every run, and <label>.clock.txt for every run | gate "parseProcessor reads field 39 ..." covers the CPU column of each clock sample; the run.json clock fields are not gated in Phase A and are read in Phase B |
+| scripts/browser/controlled-run.mjs | pinApplied | null when no pin was asked for; otherwise every pinned thread must read back the target | not gated in Phase A; Phase B reads run.json pinApplied |
+| scripts/browser/core-report.mjs (new) | report | clusterStats, clockDuringStalls, sharedCoreVerdict, clockVerdict and clockDropVerdict, plus reportCoreDir | gates "clusterStats counts ...", "clockVerdict needs ...", "clockDropVerdict needs ...", "sharedCoreVerdict is supported ...", "frequencyChanges reports ...", "parseClockLog reads ..." |
+| scripts/browser/controlled-report.mjs | analyseRunData | adds experiment and stallWindows; analyseDir keeps experiment on an errored run | gate "analyseRunData counts the one stall ..." |
+| scripts/check-controlled-run.mjs | gate | the existing gates updated for the new pinPlan fields, plus the new ones above | npm test runs it as check:controlled-run |
+
+Phase A has not been built or run. Phase B runs the nine-run matrix, three rounds of core-shared, core-separate and core-none, each PAUSED with the four foreign pids, then core-report.mjs over the directory.

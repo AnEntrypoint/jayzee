@@ -1,14 +1,17 @@
 import assert from 'node:assert/strict'
+import { existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { gate, finish } from './lib/gate.mjs'
-import { busyShare, isProfileRenderer, parseAllowedList, parseCpuList, parseFlags, parseProcStatCpu, parseStatState, pinPlan, runControlled, sameCpus } from './browser/controlled-run.mjs'
+import { busyShare, coreFlagValues, coreLayout, experimentSettings, isProfileRenderer, parseAllowedList, parseCpuList, parseFlags, parseProcStatCpu, parseProcessor, parseStatState, pinPlan, readTopology, runControlled, sameCpus } from './browser/controlled-run.mjs'
 import { analyseRunData, cpuSharingVerdict, pinningVerdict, summariseCell } from './browser/controlled-report.mjs'
+import { clockDropVerdict, clockVerdict, clusterStats, frequencyChanges, parseClockLog, sharedCoreVerdict } from './browser/core-report.mjs'
 import { parseThreadLog } from './browser/stall-probe.mjs'
 import { parseSchedLog, parseTicksLog } from './browser/thread-sampling.mjs'
 import { parseThrottleLog } from './browser/stall-attribution.mjs'
 
 const row = (label, condition, pin, stallCount, extra = {}) => ({ label, round: 1, condition, pin, valid: true, stallCount, stallMs: stallCount * 50, measuredStallMs: stallCount * 50, waitMs: 0, medianMs: 10, p99Ms: 12, maxMs: 20, externalBusy: 0.05, ...extra })
+const topology8x2 = Array.from({ length: 16 }, (_, cpu) => ({ cpu, core: cpu % 8, pkg: 0 }))
 
 gate('parseCpuList reads ranges and lists, and refuses backwards, malformed and empty input', () => {
   assert.deepEqual(parseCpuList('0-3,8'), [0, 1, 2, 3, 8])
@@ -32,8 +35,19 @@ gate('pinPlan refuses a pause of this job, of its parent, of a duplicate, and a 
   assert.throws(() => pinPlan({ ...base, condition: 'LIVE', pauseList: [7] }), TypeError)
   assert.throws(() => pinPlan({ ...base, condition: 'SOLO', pauseList: [] }), TypeError)
   assert.throws(() => pinPlan({ ...base, condition: 'LIVE', pin: '3-1', pauseList: [] }), TypeError)
-  assert.deepEqual(pinPlan({ ...base, condition: 'PAUSED', pin: '0-7', pauseList: [7, 9] }), { condition: 'PAUSED', pin: '0-7', pauseList: [7, 9] })
-  assert.deepEqual(pinPlan({ ...base, condition: 'LIVE' }), { condition: 'LIVE', pin: null, pauseList: [] })
+  assert.deepEqual(pinPlan({ ...base, condition: 'PAUSED', pin: '0-7', pauseList: [7, 9] }), { condition: 'PAUSED', pin: '0-7', pauseList: [7, 9], experiment: null, mainCpu: null, burnWorkers: 0, burnCpus: null, samplerCpus: null })
+  assert.deepEqual(pinPlan({ ...base, condition: 'LIVE' }), { condition: 'LIVE', pin: null, pauseList: [], experiment: null, mainCpu: null, burnWorkers: 0, burnCpus: null, samplerCpus: null })
+})
+
+gate('pinPlan refuses a burn without CPUs, a bad main CPU, a main CPU with a full pin, an unknown experiment and a negative burn count', () => {
+  const base = { selfPid: 500, parentPid: 400, condition: 'PAUSED', pauseList: [7] }
+  assert.throws(() => pinPlan({ ...base, burnWorkers: 1 }), TypeError)
+  assert.throws(() => pinPlan({ ...base, mainCpu: 'x' }), TypeError)
+  assert.throws(() => pinPlan({ ...base, mainCpu: '0', pin: '0-7' }), TypeError)
+  assert.throws(() => pinPlan({ ...base, experiment: 'core-other' }), TypeError)
+  assert.throws(() => pinPlan({ ...base, burnWorkers: -1 }), TypeError)
+  const plan = pinPlan({ ...base, experiment: 'core-shared', mainCpu: '0', burnWorkers: 1, burnCpus: '8', samplerCpus: '8' })
+  assert.deepEqual([plan.mainCpu, plan.burnWorkers, plan.burnCpus, plan.samplerCpus, plan.experiment], ['0', 1, '8', '8', 'core-shared'])
 })
 
 gate('parseStatState reads the state after the last closing parenthesis, so a command name with brackets is safe', () => {
@@ -41,6 +55,13 @@ gate('parseStatState reads the state after the last closing parenthesis, so a co
   assert.equal(parseStatState('12 (a) b) T 1 2'), 'T')
   assert.throws(() => parseStatState('12 chrome S'), TypeError)
   assert.throws(() => parseStatState('12 (x) 9 1'), TypeError)
+})
+
+gate('parseProcessor reads field 39 of the stat line, the CPU the thread last ran on, and refuses a line without it', () => {
+  const full = Array.from({ length: 50 }, (_, i) => (i === 0 ? 'S' : i === 36 ? '7' : '0'))
+  assert.equal(parseProcessor('12 (chrome render) ' + full.join(' ')), 7)
+  assert.throws(() => parseProcessor('12 (x) S 1 2'), TypeError)
+  assert.throws(() => parseProcessor('12 chrome S'), TypeError)
 })
 
 gate('parseAllowedList reads the kernel line and refuses a status with none', () => {
@@ -63,7 +84,79 @@ gate('parseProcStatCpu and busyShare give the busy share of all CPU time between
   assert.throws(() => busyShare(before, before), RangeError)
 })
 
-gate('analyseRunData counts the one stall, its run-queue wait and its sleep from synthetic counters', () => {
+gate('coreLayout picks the SMT sibling of the main CPU, a CPU on another physical core, and a third physical core, and refuses a missing sibling, a single core or fewer than three cores', () => {
+  const layout = coreLayout(topology8x2, 0)
+  assert.deepEqual([layout.main, layout.sameCore, layout.separateCore, layout.thirdCore], [0, 8, 1, 2])
+  assert.throws(() => coreLayout(topology8x2, 99), TypeError)
+  assert.throws(() => coreLayout(Array.from({ length: 4 }, (_, cpu) => ({ cpu, core: cpu, pkg: 0 })), 0), RangeError)
+  assert.throws(() => coreLayout(Array.from({ length: 2 }, (_, cpu) => ({ cpu, core: 0, pkg: 0 })), 0), RangeError)
+  assert.throws(() => coreLayout(Array.from({ length: 4 }, (_, cpu) => ({ cpu, core: cpu >> 1, pkg: 0 })), 0), RangeError)
+})
+
+gate('experimentSettings puts the shared arm on the renderer sibling, the separate arm on two other cores, and the control with no burn', () => {
+  const layout = coreLayout(topology8x2, 0)
+  assert.deepEqual(experimentSettings('core-shared', layout), { mainCpu: '0', burnWorkers: 1, burnCpus: '8', samplerCpus: '8' })
+  assert.deepEqual(experimentSettings('core-separate', layout), { mainCpu: '0', burnWorkers: 1, burnCpus: '2', samplerCpus: '1' })
+  assert.deepEqual(experimentSettings('core-none', layout), { mainCpu: '0', burnWorkers: 0, burnCpus: '', samplerCpus: '1' })
+  assert.deepEqual(experimentSettings(null, null), { mainCpu: '', burnWorkers: 0, burnCpus: '', samplerCpus: '' })
+  assert.throws(() => experimentSettings('core-x', layout), TypeError)
+  assert.throws(() => experimentSettings('core-x', null), TypeError)
+})
+
+gate('readTopology reads this host with a core and a package id for every CPU', () => {
+  const cpus = readTopology()
+  assert.ok(cpus.length >= 1)
+  assert.ok(cpus.every((entry) => Number.isInteger(entry.core) && Number.isInteger(entry.pkg) && Number.isInteger(entry.cpu)))
+})
+
+gate('coreFlagValues reads the experiment flag and defaults the main CPU to 0', () => {
+  assert.deepEqual(coreFlagValues({}), { experiment: null, main: '0' })
+  assert.deepEqual(coreFlagValues({ experiment: 'core-shared', main: '2' }), { experiment: 'core-shared', main: '2' })
+})
+
+gate('parseClockLog reads four fields per line and refuses any other count', () => {
+  assert.deepEqual(parseClockLog('100 9 3 2000000\n')[0], { t: 100, pid: 9, cpu: 3, kHz: 2000000 })
+  assert.throws(() => parseClockLog('100 9 3\n'), TypeError)
+})
+
+gate('frequencyChanges reports the times a renderer frequency differs from its previous sample, ignoring other pids and unreadable samples', () => {
+  const rows = parseClockLog(['0 9 3 1000000', '20 9 3 1000000', '40 9 3 2000000', '60 9 3 2000000', '80 9 3 1000000', '90 8 1 5000000', '100 9 3 -1'].join('\n'))
+  assert.deepEqual(frequencyChanges(rows, 9), [40, 80])
+  assert.deepEqual(frequencyChanges(rows, 8), [])
+})
+
+gate('clusterStats counts the stall frames and the frames with a frequency change within 100 ms of them', () => {
+  const stats = clusterStats({ stallWindows: [{ frame: 30, startMs: 1000, totalMs: 60 }], frameWindows: [{ startMs: 1000, totalMs: 60 }, { startMs: 0, totalMs: 10 }, { startMs: 5000, totalMs: 10 }], changes: [1040] })
+  assert.equal(stats.stalls, 1)
+  assert.equal(stats.stallsNear, 1)
+  assert.equal(stats.framesNear, 1)
+  assert.equal(stats.frames, 3)
+  assert.equal(stats.ratio, 3)
+})
+
+gate('clockVerdict needs three stall frames, then names clustering, no clustering, or an in-between ratio', () => {
+  const run = (stalls, stallsNear, frames, framesNear) => ({ stalls, stallsNear, frames, framesNear })
+  assert.match(clockVerdict([run(2, 2, 10, 1)]), /^insufficient/)
+  assert.equal(clockVerdict([run(3, 3, 10, 1)]), 'clusters on frequency changes')
+  assert.equal(clockVerdict([run(6, 1, 10, 5)]), 'does not cluster on frequency changes')
+  assert.match(clockVerdict([run(6, 2, 10, 2)]), /^inconclusive/)
+})
+
+gate('clockDropVerdict needs three runs with stalls, then names a lower clock in two runs of three', () => {
+  assert.match(clockDropVerdict([{ stalls: 2, lower: true }, { stalls: 2, lower: true }]), /^insufficient/)
+  assert.equal(clockDropVerdict([{ stalls: 2, lower: true }, { stalls: 2, lower: true }, { stalls: 2, lower: false }]), 'stalls sit at a lower clock in most runs')
+  assert.equal(clockDropVerdict([{ stalls: 2, lower: false }, { stalls: 2, lower: false }, { stalls: 2, lower: true }]), 'stalls do not sit at a lower clock in most runs')
+})
+
+gate('sharedCoreVerdict is supported only when the shared arm exceeds the separate arm in total and in two rounds of three', () => {
+  const arm = (experiment, counts) => counts.map((stallCount, i) => ({ experiment, round: i + 1, valid: true, stallCount }))
+  assert.equal(sharedCoreVerdict([...arm('core-shared', [3, 2, 1]), ...arm('core-separate', [0, 1, 0])]), 'supported: shared-core stall frames exceed separate-core in 3 of 3 rounds')
+  assert.match(sharedCoreVerdict([...arm('core-shared', [0, 0, 0]), ...arm('core-separate', [1, 1, 1])]), /^not supported/)
+  assert.match(sharedCoreVerdict([...arm('core-shared', [0, 3, 0]), ...arm('core-separate', [1, 0, 1])]), /^inconclusive/)
+  assert.match(sharedCoreVerdict([...arm('core-shared', [1, 1])]), /^insufficient/)
+})
+
+gate('analyseRunData counts the one stall, its run-queue wait, its sleep and its window from synthetic counters', () => {
   const frames = []
   for (let i = 0; i < 30; i += 1) frames.push([i, 1000 + i * 25, 9, 1])
   frames.push([30, 2000, 59, 1])
@@ -90,9 +183,12 @@ gate('analyseRunData counts the one stall, its run-queue wait and its sleep from
     ticksRows: parseTicksLog(ticksLines.join('\n')),
   })
   assert.equal(analysis.valid, true)
+  assert.equal(analysis.experiment, null)
   assert.equal(analysis.frames, 41)
   assert.equal(analysis.medianMs, 10)
   assert.equal(analysis.stallCount, 1)
+  assert.equal(analysis.stallWindows.length, 1)
+  assert.equal(analysis.stallWindows[0].startMs, 2000)
   assert.ok(Math.abs(analysis.waitMs - 30) < 1e-6)
   assert.ok(Math.abs(analysis.measuredStallMs - 60) < 1e-6)
   assert.ok(Math.abs(analysis.waitShare - 0.5) < 1e-9)
@@ -137,6 +233,9 @@ gate('runControlled refuses bad input before it creates a directory or pauses a 
   await assert.rejects(runControlled({ label: 'ok', round: 1, condition: 'PAUSED', pauseList: [process.pid], out }), TypeError)
   await assert.rejects(runControlled({ label: 'ok', round: 1, condition: 'LIVE', pauseList: [7], out }), TypeError)
   await assert.rejects(runControlled({ label: 'ok', round: 1, condition: 'LIVE', out: '' }), TypeError)
+  await assert.rejects(runControlled({ label: 'ok', round: 1, condition: 'PAUSED', pauseList: [7], out, experiment: 'core-other' }), TypeError)
+  await assert.rejects(runControlled({ label: 'ok', round: 1, condition: 'PAUSED', pauseList: [], out, experiment: 'core-shared' }), TypeError)
+  assert.equal(existsSync(out), false)
 })
 
 gate('parseFlags reads --name=value pairs and refuses a bare word', () => {
