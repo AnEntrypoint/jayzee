@@ -3350,3 +3350,15 @@ Full `npm test` after the fixes above: EXIT 0, PASS 4985, FAIL 0 (wall about 5 m
 - Defect: CI run 42778647706 (push 118c72b) and run 42783197645 (push 9a86d4f) failed `runControlled refuses bad input before it creates a directory or pauses a pid`. The experiment cases read the core topology before the input checks, so a runner with fewer than three physical cores threw RangeError ("the host has fewer than three physical cores") instead of TypeError.
 - Change: `scripts/browser/controlled-run.mjs` refuses an unknown experiment name, and runs `pinPlan` (with no experiment) on the condition, pause list and pids, before `coreLayout` reads the topology.
 - Witness (Phase B): `node scripts/check-controlled-run.mjs` on this host, then the CI run on the pushed commit. Expected: the gate reports PASS and the `ci` job is green.
+
+## Phase A (2026-11-10): tails, PAUSED own-children, tail attribution
+
+Phase A, code and gates only. Each row is witnessed in Phase B.
+
+| change | files | witness (Phase B) |
+|---|---|---|
+| PAUSED pauses only children the run spawns itself. A caller pause list is refused. The validation runs with placeholder PIDs before any child is spawned | `scripts/browser/controlled-run.mjs` | `node scripts/check-controlled-run.mjs` (new gate "runControlled refuses a caller pause list"); then a live PAUSED run, which must show its paused PIDs equal to its own children |
+| Tail attribution per frame: 99th percentile, worst frame, and the verdict for frames over 16.7 ms (run-queue wait, cgroup throttling, on-CPU), from the page rows, the cgroup samples and the scheduler log. Frames without samples are counted with null shares | `scripts/browser/tail-report.mjs` (new) | `npm run check:tail-report` (synthetic, in the test chain); then `node scripts/browser/tail-report.mjs <controlled run prefix>` on each LIVE and PAUSED run |
+| CI fix 2296095 (local, goes out in the Phase B push) | `scripts/browser/controlled-run.mjs`, `docs/PENDING_VALIDATION.md` | CI on the Phase B push |
+
+Not yet done in Phase A, recorded here so none is silently dropped: the tail cause fix itself (needs the Phase B measurement first); the sphere, population and collision placement decision; the instanced vegetation path; the planet-scale witnesses; the spoint comparison; the 362.9 ms outlier, whose recorded cause is load and throttling class, unchanged; the launcher, whose fix is in `chromium-webgpu.sh` and gated by `check:chromium-launcher` but not shown to change the adapter.

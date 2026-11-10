@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { gate, finish } from './lib/gate.mjs'
@@ -237,6 +237,15 @@ gate('runControlled refuses bad input before it creates a directory or pauses a 
   await assert.rejects(runControlled({ label: 'ok', round: 1, condition: 'PAUSED', pauseList: [7], out, experiment: 'core-other' }), TypeError)
   await assert.rejects(runControlled({ label: 'ok', round: 1, condition: 'PAUSED', pauseList: [], out, experiment: 'core-shared' }), TypeError)
   assert.equal(existsSync(out), false)
+})
+
+gate('runControlled refuses a caller pause list, so PAUSED stops only the children the run starts', async () => {
+  const out = join(tmpdir(), 'controlled-run-gate-own-pause')
+  await assert.rejects(runControlled({ label: 'ok', round: 1, condition: 'PAUSED', pauseList: [7], out }), TypeError)
+  assert.equal(existsSync(out), false)
+  const source = readFileSync(new URL('./browser/controlled-run.mjs', import.meta.url), 'utf8')
+  assert.ok(source.includes("spawn(process.execPath, ['-e', 'while (true);']"), 'PAUSED does not spawn its own children')
+  assert.ok(source.includes('pauseList: pauseChildren.map((child) => child.pid)'), 'the plan does not take its pids from its own children')
 })
 
 gate('pinOutcome reads the readback of renderers still alive at the end, and ignores one that exited', () => {

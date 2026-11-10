@@ -10,6 +10,8 @@ export const PAGE_QUERY = 'phase=10&tier=1024&timed=1'
 export const MAX_PAUSED_BUSY = 0.2
 export const PIN_SCAN_MS = 100
 export const DEFAULT_DURATION_MS = 120000
+export const OWN_PAUSE_COUNT = 2
+const OWN_PAUSE_PLACEHOLDER = [2147483646, 2147483645]
 const ROOT = fileURLToPath(new URL('../..', import.meta.url))
 const CGROUP_SAMPLER = new URL('./cgroup-sampler.mjs', import.meta.url).pathname
 const THREAD_SAMPLER = new URL('./thread-cpu-sampler.mjs', import.meta.url).pathname
@@ -261,11 +263,13 @@ export async function runControlled({ label, round, condition, pin = '', pauseLi
   if (!Number.isInteger(round) || round < 1) throw new TypeError('round must be a whole number from 1')
   if (typeof out !== 'string' || out === '') throw new TypeError('out must name a directory')
   if (!Number.isFinite(durationMs) || durationMs <= 0) throw new TypeError('duration must be a positive number of ms')
+  if (pauseList.length > 0) throw new TypeError('the run pauses only pids it starts itself; pass no pause list')
   if (experiment !== null && !EXPERIMENTS.includes(experiment)) throw new TypeError('unknown experiment: ' + experiment)
-  pinPlan({ condition, pin, pauseList, selfPid: process.pid, parentPid: process.ppid, experiment: null })
+  pinPlan({ condition, pin, pauseList: condition === 'PAUSED' ? OWN_PAUSE_PLACEHOLDER : [], selfPid: process.pid, parentPid: process.ppid, experiment: null })
   const layout = experiment === null ? null : coreLayout(readTopology(), main)
   const settings = experimentSettings(experiment, layout)
-  const plan = pinPlan({ condition, pin, pauseList, selfPid: process.pid, parentPid: process.ppid, experiment, ...settings })
+  const pauseChildren = condition === 'PAUSED' ? Array.from({ length: OWN_PAUSE_COUNT }, () => spawn(process.execPath, ['-e', 'while (true);'], { stdio: 'ignore' })) : []
+  const plan = pinPlan({ condition, pin, pauseList: pauseChildren.map((child) => child.pid), selfPid: process.pid, parentPid: process.ppid, experiment, ...settings })
   mkdirSync(out, { recursive: true })
   const base = join(out, label)
   const files = { cgroup: base + '.cgroup.txt', threads: base + '.threads.txt', page: base + '.page.json', clock: base + '.clock.txt', run: base + '.run.json' }
@@ -281,7 +285,7 @@ export async function runControlled({ label, round, condition, pin = '', pauseLi
   const stopAll = () => {
     if (scanTimer !== null) clearInterval(scanTimer)
     scanTimer = null
-    for (const child of [...burnChildren, ...samplers]) {
+    for (const child of [...burnChildren, ...pauseChildren, ...samplers]) {
       try {
         child.kill('SIGTERM')
       } catch {
