@@ -2788,7 +2788,7 @@ The owner asked for these decisions to be made here, not held. The arithmetic an
 | row | file | section | change | witness (Phase B) |
 |---|---|---|---|---|
 | R3-1 | engine/src/model_pool.h | Layout | `uploadBytesPerFrame` added with default 0; the planned tier fills it | engine/test/witness_models.cpp: "tier 0 carries a 512 KiB upload budget per frame", "tier 2 carries a 2 MiB upload budget per frame" |
-| R3-2 | engine/src/exports_models.cpp | engine_models_bind_plan | plans the tier from the limits, carves `bytesFor` of the planned layout, binds it; returns the tier or −1, −2, −3 | scripts/check-decode-path.mjs "the tier 0 pool is bound from the device limits and the arena holds it"; scripts/browser/models-run.mjs (poolBytes) |
+| R3-2 | engine/src/exports_models.cpp | engine_models_bind_plan | plans the tier from the limits, carves `bytesFor` of the planned layout and binds it; steps down a tier when the arena cannot hold the pool; returns the bound tier, or −1, −2, −3, −4 (already bound) | scripts/check-decode-path.mjs "a device that plans tier 2 binds tier 0 on the 64 MiB arena" and "a second bind is refused"; scripts/browser/models-run.mjs (poolBytes 23071104) |
 | R3-3 | engine/src/engine_core.cpp | initialize | the model pool carve is removed from `engine_init`; the pool is bound by `engine_models_bind_plan` | scripts/check-engine-core.mjs and the other gates that call `_engine_init` (run in Phase B) |
 | R3-4 | engine/src/render/render_webgpu.cpp | frame | `kModelUploadBudgetBytes` removed; the per-frame budget is `models::layout().uploadBytesPerFrame` | scripts/browser/models-run.mjs (newcomerUploaded, first-frame cost) |
 | R3-5 | engine/test/witness_models.cpp | modelsAndTiers | three checks: the tier 0 and tier 2 budgets, and the tier 2 pool holds 369098752 bytes and fits the 512 MiB build | native host witness, bash engine/test/build_host.sh (PASS count) |
@@ -2805,3 +2805,78 @@ The owner asked for these decisions to be made here, not held. The arithmetic an
 | R6-2 | docs/ENGINE.md | decisions for ranks 3 to 6, status | arithmetic and the decisions | read in the commit |
 
 The Phase B result for these rows is in the section below.
+
+## Ranks 3 to 6: Phase B result
+
+Ran in this pass, in the project browser (the playwriter Chrome on debug port 10221, NVIDIA GeForce RTX 3060 Laptop GPU, WebGPU with texture-compression-bc, 16 GB reported device memory). Each wall time is the runner's own. The planet path, churn and VRAM figures come from the stored records in build/diag. Nothing is backgrounded.
+
+Builds (final, after all fixes): fixed 64 MiB, fixed 512 MiB, fixed 128 MiB, leak 64 MiB, timed 64 MiB, threads 64 MiB, each with its wall time. The 512 MiB build took 226 s when first built from scratch and 5 s after the last change, since only exports_models.cpp moved. Every build exits 0 with no errors. The pins in engine/artifacts.json are the final hashes: 64 MiB `e7ee110d…`, 512 MiB `53df1cdd…`, 128 MiB `3954605d…`, leak `c7e9b062…`.
+
+Native host witness: `bash engine/test/build_host.sh`, 21 s wall, 257 PASS, 0 FAIL, 0 compiler warnings (4 more than before: the upload budgets, the tier 2 pool size and the 512 MiB fit).
+
+Gates, all foreground, final artifacts:
+
+| gate | exit | PASS lines |
+|---|---|---|
+| check:engine-artifacts | 0 | 6 |
+| check:engine-core | 0 | 3 |
+| check:engine-pools | 0 | 7 |
+| check:engine-tiers | 0 | 6 (55 s) |
+| check:engine-materials | 0 | 15 |
+| check:engine-leak | 0 | 3 |
+| check:engine-bridge | 0 | 9 |
+| check:engine-world | 0 | 13 |
+| check:engine-sleep | 0 | 4 |
+| check:engine-threads | 0 | 5 |
+| check:engine-render | 0 | 17 |
+| check:decode-path (new) | 0 | 8 |
+| check:hygiene | 0 | 39 |
+| check:asset-pipeline | 0 | 14 |
+
+Each gate prints RESULT: PASS and exits 0. The counts are the lines that begin with PASS.
+
+Browser witnesses:
+
+- **Churn and first-frame cost** (`node scripts/browser/models-run.mjs build/diag/models/run.json 8843 600`, 64 MiB timed build, wall 12,399 ms, exit 0, models.ok true). The pool is 23,071,104 B, which is tier 0: the device plans tier 2, and the 64 MiB arena steps down to tier 0. Wasm memory is 67,108,864 B at the start and at the end. Allocations since warm-up are 0 at both ends. There were 270 churn loads and 258 unloads, with 0 failures. Eleven newcomers were uploaded (`newcomerUploaded` true). Live models go from 1 to 0, and dirty slots are 0 at the end. JS heap goes from 1,774,949 B to 2,805,297 B (Chrome's figure, with no forced GC). Quiet frames: 529 frames, median 2.40 ms, p99 3.62 ms. Newcomer frames: median 2.64 ms, max 3.29 ms. First-frame cost 0.24 ms, ratio 1.10. createsAfterSeal 0, apiCallsPerFrame 56. An earlier run in this pass, before the BC request below, gave first-frame cost 0.46 ms (ratio 1.18), with the same tier 0 binding. The spread between runs is about 0.2 ms, so the figure is quoted as a range: 0.24 to 0.46 ms.
+- **Churn cycles, native**: 10,000 acquire, upload and release cycles, `INFO model churn cycles 10000`, PASS in the host witness.
+- **Device loss and recovery** (`node scripts/browser/device-loss-run.mjs build/diag/device-loss/run.json 8843`, 512 MiB default glue, wall 442 ms, exit 0, ok true). Limits: maxTextureDimension2D 8192, maxTextureArrayLayers 256, maxBufferSize 4,294,967,292, texture-compression-bc true, deviceMemory 16. Before the loss: modelTier 2, five frames, all status 0. `device.destroy()` resolved `deviceLost` with reason `destroyed` in 34 ms. The reload took 139 ms. After the reload: modelTier 2, five frames, all status 0, createsAfterSeal 0, allocationsSinceWarmup "0" after markWarmup. The first instance was not collected during the run. Its memory cost is not measured.
+- **Planet path** (`node scripts/browser/planet-path-run.mjs build/diag/planet/run.json 8847 1200`, wall 22 s, exit 0, ok true): frame time p99 3.405 ms, median 2.52 ms, max 4.295 ms. 36 cell changes and 36 restages. Restage p99 1.195 ms, and the restage max is the same figure. allocationsSinceWarmup "0", createsAfterSeal 0.
+- **In-wasm tier budgets** (`node scripts/browser/models-vram-run.mjs build/diag/models/vram.json 8843`, wall 26,311 ms, exit 0, 0 errors, no out-of-memory row). "planned" is the wasm planner, "created" is the sum of the sizes the page created, "nvidia" is the peak of nvidia-smi above the idle median:
+
+| tier | format | planned B | created B | nvidia B | budget B | within budget |
+|---|---|---|---|---|---|---|
+| 0 | bc7 | 45,438,293 | 45,440,000 | 47,185,920 | 268,435,456 | yes |
+| 0 | rgba8 | 112,547,157 | 112,547,072 | 112,197,632 | 268,435,456 | yes |
+| 1 | bc7 | 363,506,346 | 363,509,760 | 364,904,448 | 536,870,912 | yes |
+| 1 | rgba8 | 900,377,258 | 900,377,088 | 900,726,784 | 536,870,912 | no (planner refuses texel 4) |
+| 2 | bc7 | 905,969,664 | 905,972,224 | 908,066,816 | 1,073,741,824 | yes |
+| 2 | rgba8 | 2,516,582,400 | 2,516,582,272 | 2,520,776,704 | 1,073,741,824 | no (planner refuses texel 4) |
+
+The planner's bytes match the created sizes to within 0.01%. The driver's view is within about 2% of the planner for every row the planner selects. The driver's idle baseline is 676 to 677 MiB this run, against 597 to 602 MiB in the earlier pass, so the driver's own baseline moved. The figure that counts is the peak above that baseline.
+
+- **Decode worker** (`node scripts/browser/decode-worker-run.mjs build/diag/decode-worker/run.json 8843`, wall 77 ms, exit 0, ok true). A meshopt vertex stream (64 vertices, 32 B stride) encoded in the page decodes in the module worker in 14.87 ms, and the bytes are equal to the source. The KTX2 check with bad bytes is refused by the JS prefilter with "not a valid KTX2 file". A KTX2 identifier with no header content reaches the Basis transcoder in the worker, which refuses it with "cube KTX2 is not decoded here", in 48.5 ms. The transcoder therefore loads in the worker. A real KTX2 transcode is not witnessed (no encoder on the host).
+- **Item 1** (`node scripts/spoint-streamer-compare.mjs 200 build/diag/item1/compare.json`, wall 1 s, exit 0). spoint's checkout has moved from 03f107f to 0b76d94 since the last pass, so the spoint numbers are from 0b76d94 and differ from the previous pass. Like-for-like, on the same grid (33 by 33 over 256 m, 200 builds, same host): spoint's sample p99 is 0.326 ms, and jayzee's `engine_planet_height` sample p99 is 0.234 ms. The ratio is 1.39. The spoint total step p99 is 0.772 ms. jayzee's phase 5 flight-frame p99 is 0.003667 ms, and that ratio (210) is kept as a separate, labelled row.
+
+Defects found in this pass, each fixed at its cause:
+
+1. The planner chose the highest tier the device fits, and the 64 MiB arena cannot hold tier 2's 369 MB pool. The bind failed, so `models-run` could not load. Fixed: `engine_models_bind_plan` steps down through the tiers until the arena holds the pool.
+2. A second `engine_models_bind_plan` carved a second pool. Fixed: the export refuses with −4 before it carves anything.
+3. The device request omitted `texture-compression-bc`, so `device.features` lacked it and the planner used texel 4 and tier 0. Fixed: `requestWebGpuDevice` requests the feature when the adapter has it, and requests the adapter's `maxBufferSize`.
+4. The check-decode-path gate used `MeshoptEncoder` before its `ready` promise resolved. Fixed: the gate awaits `ready`.
+5. The Basis transcoder file needs `require`, `__dirname` and `__filename` on its Node path. Fixed: `loadBasisFactory` takes a host object, and the gate passes Node's require and the file's path.
+6. meshopt's index codec can rotate the vertices of a triangle without changing its geometry. The gate compared raw word order and failed. Fixed: the gate compares triangles up to rotation.
+7. The transcoder did not refuse a 4-byte garbage input on its own `isValid` check in this build. Fixed: `transcodeKtx2` checks the 12-byte KTX2 identifier before it constructs the transcoder object.
+8. The decode client transferred `bytes.buffer` directly. That detaches the whole buffer, and it fails for a view into a larger buffer. Fixed: the client sends a copy.
+9. A failure inside the decode worker left its promise pending forever, because the client had no `onerror`. Fixed: the client rejects every pending call with the worker's error.
+10. `decodeCore.js` imported `meshoptimizer/decoder` as a bare specifier, which a dedicated worker cannot resolve without an import map. The page hung until its 120 s timeout. Fixed: the import is a relative path.
+11. The device-loss page put a BigInt into its JSON result, and the allocation count was counted from module start, not from warm-up. Fixed: the page converts BigInt fields, and calls `markWarmup` before the recovered frames.
+12. `spoint-streamer-compare.mjs` configured the planet without configuring the world first, so `engine_planet_configure` returned −3 (kNotConfigured). Fixed: it calls `engine_world_configure` with the harness's values first.
+
+Caveats, all open or not witnessed:
+
+- The like-for-like row compares the sampling step only. spoint's is a JavaScript height function, and jayzee's is the engine export, so the call boundary differs. The planet restage p99 (1.195 ms) is a different operation (16 pages of stage, commit and place), and it is not compared with the 0.234 ms sample.
+- Device loss re-creates the renderer. The arena copies do not survive, and the first 512 MiB instance is not collected during the run. Its memory cost is not measured.
+- A real KTX2 transcode to RGBA32 or BC7 is not witnessed, since the host has no KTX2 encoder. BC7 output waits for the tiered texture array, which the renderer does not yet allocate.
+- The wasm memory of the 512 MiB default glue is always reserved, even for tier 0 devices. A small device that cannot reserve 512 MiB of wasm memory has no path yet.
+- The npm test chain was not run in full in this pass. The gates listed above were run directly, and check:decode-path is in the chain.
+- The browser runs were in the project's Chromium through the playwriter setup (invariant 11), not `/usr/bin/chromium`.

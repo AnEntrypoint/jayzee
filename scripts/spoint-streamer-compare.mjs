@@ -29,6 +29,7 @@ const PLANET = { radius: 6371000, gravity: 9.8, maxHeight: 8000 }
 const engineGlue = await import(pathToFileURL(join(root, 'engine/out/engine-core-64mib.mjs')).href)
 const engine = await engineGlue.default()
 if (engine._engine_init(64, 1, 67108864) !== 0) throw new Error('engine_init failed')
+if (engine._engine_world_configure(2048, 60, -9.8, 0, 0.5, 0, 8) !== 0) throw new Error('engine_world_configure failed')
 if (engine._engine_planet_configure(PLANET.radius, planetCellSize(PLANET.radius), PLANET.gravity, PLANET.maxHeight) !== 0) throw new Error('engine_planet_configure failed')
 const sampleGrid = () => {
   const started = performance.now()
