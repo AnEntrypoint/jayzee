@@ -225,6 +225,12 @@ const restorePins = (pins) => {
   }
 }
 
+export const pinOutcome = (pinned, expected) => {
+  if (expected === null) return null
+  const alive = pinned.filter((entry) => entry.atEnd.length > 0)
+  return alive.length > 0 && alive.every((entry) => entry.exitStatus === 0 && entry.afterPin.length > 0 && entry.afterPin.every((list) => sameCpus(list, expected)) && entry.atEnd.every((list) => sameCpus(list, expected)))
+}
+
 const stopOne = async (pid) => {
   const stateBefore = stateOf(pid)
   if (stateBefore === null || stateBefore === 'T') return { pid, stateBefore, stopped: false, stateAfter: stateBefore }
@@ -343,7 +349,7 @@ export async function runControlled({ label, round, condition, pin = '', pauseLi
   }
   if (failure !== null) throw failure
   const expected = plan.pin ?? plan.mainCpu
-  const pinApplied = expected === null ? null : pinned.length > 0 && pinned.every((entry) => entry.exitStatus === 0 && entry.afterPin.length > 0 && entry.afterPin.every((list) => sameCpus(list, expected)) && entry.atEnd.length > 0 && entry.atEnd.every((list) => sameCpus(list, expected)))
+  const pinApplied = pinOutcome(pinned, expected)
   const run = {
     label, round, experiment, layout, condition: plan.condition, pin: plan.pin, mainCpu: plan.mainCpu, pauseList: plan.pauseList, paused,
     externalBusy: { windowMs: WINDOW_MS, share: externalBusy }, loadBefore,

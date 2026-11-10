@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { gate, finish } from './lib/gate.mjs'
 import { busyShare, coreFlagValues, coreLayout, experimentSettings, isProfileRenderer, parseAllowedList, parseCpuList, parseFlags, parseProcStatCpu, parseProcessor, parseStatState, pinPlan, readTopology, runControlled, sameCpus } from './browser/controlled-run.mjs'
+import { pinOutcome } from './browser/controlled-run.mjs'
 import { analyseRunData, cpuSharingVerdict, pinningVerdict, summariseCell } from './browser/controlled-report.mjs'
 import { clockDropVerdict, clockVerdict, clusterStats, frequencyChanges, parseClockLog, sharedCoreVerdict } from './browser/core-report.mjs'
 import { parseThreadLog } from './browser/stall-probe.mjs'
@@ -236,6 +237,14 @@ gate('runControlled refuses bad input before it creates a directory or pauses a 
   await assert.rejects(runControlled({ label: 'ok', round: 1, condition: 'PAUSED', pauseList: [7], out, experiment: 'core-other' }), TypeError)
   await assert.rejects(runControlled({ label: 'ok', round: 1, condition: 'PAUSED', pauseList: [], out, experiment: 'core-shared' }), TypeError)
   assert.equal(existsSync(out), false)
+})
+
+gate('pinOutcome reads the readback of renderers still alive at the end, and ignores one that exited', () => {
+  assert.equal(pinOutcome([{ exitStatus: 0, afterPin: ['0'], atEnd: ['0'] }, { exitStatus: 0, afterPin: ['0'], atEnd: [] }], '0'), true)
+  assert.equal(pinOutcome([{ exitStatus: 0, afterPin: ['0'], atEnd: ['0-3'] }], '0'), false)
+  assert.equal(pinOutcome([{ exitStatus: 0, afterPin: ['0'], atEnd: [] }], '0'), false)
+  assert.equal(pinOutcome([], '0'), false)
+  assert.equal(pinOutcome([], null), null)
 })
 
 gate('parseFlags reads --name=value pairs and refuses a bare word', () => {

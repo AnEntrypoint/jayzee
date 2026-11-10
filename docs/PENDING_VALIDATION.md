@@ -2626,3 +2626,20 @@ Phase A changes:
 | scripts/check-controlled-run.mjs | gate | the existing gates updated for the new pinPlan fields, plus the new ones above | npm test runs it as check:controlled-run |
 
 Phase A has not been built or run. Phase B runs the nine-run matrix, three rounds of core-shared, core-separate and core-none, each PAUSED with the four foreign pids, then core-report.mjs over the directory.
+
+
+## Shared-core and clock causes: Phase B result (ran once)
+
+Matrix: job core-matrix-2, output in build/diag/core (git-ignored). Nine PAUSED runs, three rounds of core-shared, core-separate and core-none, foreign pids paused and resumed by PID, busy gate 0.2. Report: docs/stall-causes/core-1024-report.json. Narrative and per-run table: docs/stall-causes/core-1024.md.
+
+- S1 shared core: observed "not supported: shared-core 1 stall frames, separate-core 2" (control core-none 12). Predicted "supported". Not held.
+- C1 clock clustering: observed "does not cluster on frequency changes". Predicted the same, but the test is uninformative: framesNear equals the frame count in every run, so the verdict is set by construction.
+- C2 lower clock at stalls: observed "stalls sit at a lower clock in most runs" (4 of 4 runs with stalls, 0.03% to 7.0%). Predicted otherwise. Not held.
+- Cause: open. No fix adopted.
+- npm test, once after the matrix (job core-matrix-2): exit 0, no RESULT: FAIL lines. An earlier attempt (job core-matrix) exited 1 at check:controlled-run on the analyseRunData window (fixed, see below) and ran no later gate.
+
+Phase B fixes (defects, not stall fixes):
+| file | section | change | witness |
+| scripts/browser/controlled-report.mjs | analyseRunData stallWindows | window taken from report.stalls, which carries startMs; offCpuForStalls does not | gate "analyseRunData counts the one stall ..." PASS |
+| scripts/browser/controlled-run.mjs | pinApplied | pinOutcome ignores renderers not alive at the end; stored run.json values unchanged, recomputed from the pinned lists: all nine true | gate "pinOutcome reads the readback ..." PASS (node scripts/check-controlled-run.mjs, RESULT: PASS) |
+| docs/stall-causes/core-1024.md (new) | result | counts, predictions, cause open, harness defects | read in the commit |

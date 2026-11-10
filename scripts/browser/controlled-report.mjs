@@ -42,7 +42,7 @@ export function analyseRunData({ run, page, samples, threadRows, schedRows, tick
     valid: true,
     reason: null,
     rendererPid,
-    stallWindows: stalls.map((stall) => ({ frame: stall.frame, startMs: stall.startMs, totalMs: stall.totalMs })),
+    stallWindows: report.stalls.map((stall) => ({ frame: stall.frame, startMs: stall.startMs, totalMs: stall.totalMs })),
     frames: frames.length,
     medianMs: report.baseMs,
     p99Ms: percentile(totals, 0.99),
