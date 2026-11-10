@@ -361,7 +361,7 @@ int init(const char* selector, std::uint32_t width, std::uint32_t height) {
 
   glGenBuffers(1, &pageVbo);
   glBindBuffer(GL_ARRAY_BUFFER, pageVbo);
-  glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(kPageLayers) * kPageRecordBytes, nullptr, GL_DYNAMIC_DRAW);
+  glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(kMaxPageLayers) * kPageRecordBytes, nullptr, GL_DYNAMIC_DRAW);
   glGenVertexArrays(1, &terrainVao);
   glBindVertexArray(terrainVao);
   glVertexAttribIPointer(0, 1, GL_UNSIGNED_INT, kPageRecordBytes, offsetPointer(0));
@@ -378,7 +378,7 @@ int init(const char* selector, std::uint32_t width, std::uint32_t height) {
   glBindTexture(GL_TEXTURE_2D_ARRAY, heightTex);
   glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
   glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-  glTexStorage3D(GL_TEXTURE_2D_ARRAY, 1, GL_R32F, kPageSide, kPageSide, kPageLayers);
+  glTexStorage3D(GL_TEXTURE_2D_ARRAY, 1, GL_R32F, kPageSide, kPageSide, static_cast<GLsizei>(pageLayers()));
 
   glActiveTexture(GL_TEXTURE0);
   glGenTextures(1, &albedoTex);

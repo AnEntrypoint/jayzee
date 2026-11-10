@@ -1,7 +1,10 @@
 #include "render_frame.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstring>
+
+#include "../planet_frame.h"
 
 namespace engine::render {
 
@@ -52,7 +55,7 @@ bool inFrustum(const float planes[6][4], const float* centre, float radius) {
 }
 
 std::uint32_t firstFreeLayer(const FramePlan& plan) {
-  for (std::uint32_t layer = 0; layer < kPageLayers; ++layer) {
+  for (std::uint32_t layer = 0; layer < pageLayers(); ++layer) {
     if (plan.layerSlot[layer] == kNoLayer) return layer;
   }
   return kNoLayer;
@@ -81,7 +84,7 @@ void writePageRecord(FramePlan& plan, std::uint32_t index, const PagePlacement& 
 void syncPages(const SceneView& scene, FramePlan& plan) {
   plan.uploadCount = 0;
   plan.pageCount = 0;
-  for (std::uint32_t slot = 0; slot < kPageLayers; ++slot) {
+  for (std::uint32_t slot = 0; slot < pageLayers(); ++slot) {
     const bool resident = scene.pages->state(static_cast<int>(slot)) == planet::PageState::kResident;
     if (!resident) {
       releaseSlot(plan, slot);
@@ -139,8 +142,12 @@ bool acceptCreate() {
   return true;
 }
 
+std::uint32_t pageLayers() {
+  return std::min(kMaxPageLayers, static_cast<std::uint32_t>(planet::state().pages.pageSlotCount()));
+}
+
 void resetPlan(FramePlan& plan) {
-  for (std::uint32_t layer = 0; layer < kPageLayers; ++layer) {
+  for (std::uint32_t layer = 0; layer < pageLayers(); ++layer) {
     plan.slotLayer[layer] = kNoLayer;
     plan.layerSlot[layer] = kNoLayer;
     plan.dirty[layer] = 0;

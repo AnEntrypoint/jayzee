@@ -473,7 +473,18 @@ Measured with `scripts/bench-landscape-store.mjs` (Node, the built wasm, the pag
 
 The extra copy costs 64 KiB and about 0.01 to 0.03 ms for the whole store. No measured reason forbids sharing any part, so no part is split. The reason to keep one store is correctness: the collider and the drawn surface then read the same numbers, so they cannot drift apart at a page edge.
 
-Two limits recorded with the decision. The store holds 64 pages in every build, so the near-field landscape is capped at 64 resident pages, which is the first limit any streaming witness will hit. And commits are pending until the tick applies them, so a freshly committed page is not resident until the next `applyPending` (the bench reports `residentAfterBuild` 0 for this reason).
+Page store sizing rule (replaces the fixed 64-page store)
+
+The store holds `pageSlots` pages, chosen once when the arena is planned, from the arena budget:
+
+- `pageSlots = clamp(floor(budget / 8 / 1033 B), 64, 256)`, where 1033 B is one page's arena cost (256 float samples, an int64 key and a state byte, `planet::kPageArenaBytes`) and 1/8 is the share of the budget the pages may take.
+- The lower bound 64 is the old fixed count, so a small budget never has fewer pages than before. The upper bound 256 is `planet::kMaxRenderedPages`, the render array maximum: WebGPU's default `maxTextureArrayLayers` and the WebGL2 minimum for layers, so one height texture array fits every backend.
+- The renderer reads the count from the store (`pageLayers()` = min(256, `pages.pageSlotCount()`)). Its GPU height texture is created with that many layers at init. The layer arrays in `FramePlan` and the record buffer are sized to 256 at compile time and are never resized.
+- Every buffer is allocated once in `engine_init` or `engine_render_init`. Nothing is added after the seal, and `createsAfterSeal` stays 0.
+
+Measured: a 48 MiB budget gives 256 pages, a 262,144 B store, and a 4.53 ms build for 256 pages (`scripts/bench-landscape-store.mjs`). The 64-tier render witness on both backends still checksums -5415737363265412373 with 16 scene pages, so the change does not alter the rendered scene. A 16 MiB arena is refused by `engine_init` before the store is touched; that is the existing planner, not the page count.
+
+Commits are pending until the tick applies them, so a freshly committed page is not resident until the next `applyPending` (the bench reports `residentAfterBuild` 0 for this reason).
 
 1024 frame budget decision
 

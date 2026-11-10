@@ -24,7 +24,7 @@ constexpr char kCanvasSelector[] = "#engine-canvas";
 struct RenderState {
   FramePlan plan;
   Camera camera;
-  PagePlacement placements[kPageLayers];
+  PagePlacement placements[kMaxPageLayers];
   LightSlot lights[kLightSlots];
   MaterialSlot materials[kMaterialSlots];
   std::uint8_t albedoReady[kAlbedoLayers];
@@ -202,7 +202,7 @@ EMSCRIPTEN_KEEPALIVE int engine_render_commit_albedo(std::uint32_t layer) {
 
 EMSCRIPTEN_KEEPALIVE int engine_render_place_page(std::uint32_t slot, float ox, float oy, float oz, float ux, float uy, float uz, float vx, float vy,
                                                   float vz) {
-  if (rnd::renderState == nullptr || slot >= rnd::kPageLayers) return engine::kRange;
+  if (rnd::renderState == nullptr || slot >= rnd::pageLayers()) return engine::kRange;
   rnd::PagePlacement& placement = rnd::renderState->placements[slot];
   placement.origin[0] = ox;
   placement.origin[1] = oy;
@@ -218,13 +218,13 @@ EMSCRIPTEN_KEEPALIVE int engine_render_place_page(std::uint32_t slot, float ox, 
 }
 
 EMSCRIPTEN_KEEPALIVE int engine_render_unplace_page(std::uint32_t slot) {
-  if (rnd::renderState == nullptr || slot >= rnd::kPageLayers) return engine::kRange;
+  if (rnd::renderState == nullptr || slot >= rnd::pageLayers()) return engine::kRange;
   rnd::renderState->placements[slot].placed = 0;
   return engine::kOk;
 }
 
 EMSCRIPTEN_KEEPALIVE int engine_render_mark_page(std::uint32_t slot) {
-  if (rnd::renderState == nullptr || slot >= rnd::kPageLayers) return engine::kRange;
+  if (rnd::renderState == nullptr || slot >= rnd::pageLayers()) return engine::kRange;
   rnd::renderState->plan.dirty[slot] = 1;
   return engine::kOk;
 }

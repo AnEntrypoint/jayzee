@@ -1,5 +1,7 @@
 #include "budget.h"
 
+#include <algorithm>
+
 #include "arena.h"
 #include "bridge.h"
 #include "codec.h"
@@ -30,7 +32,7 @@ constexpr Tier kTiers[] = {
 
 constexpr std::uint32_t kStatics = 64;
 constexpr std::uint32_t kTrunks = 1024;
-constexpr std::uint32_t kPageSlots = 64;
+constexpr std::uint64_t kPageBudgetDivisor = 8;
 constexpr std::uint32_t kCellsPerSide = 32;
 constexpr std::uint32_t kInstancesPerCell = 32;
 constexpr std::uint32_t kMaterials = 1024;
@@ -105,13 +107,18 @@ std::uint64_t totalBytes(const Capacity& c) {
 
 }
 
+std::uint32_t pageSlotsFor(std::uint64_t budgetBytes) {
+  const std::uint64_t affordable = budgetBytes / kPageBudgetDivisor / planet::kPageArenaBytes;
+  return static_cast<std::uint32_t>(std::clamp<std::uint64_t>(affordable, planet::kMinPageSlots, planet::kMaxRenderedPages));
+}
+
 bool fitsTier(std::uint64_t budgetBytes, std::uint32_t players, std::uint32_t workers, Capacity& out) {
   Capacity next{};
   next.players = players;
   next.bodies = bodiesFor(players);
   next.statics = kStatics;
   next.trunks = kTrunks;
-  next.pageSlots = kPageSlots;
+  next.pageSlots = pageSlotsFor(budgetBytes);
   next.cellsPerSide = kCellsPerSide;
   next.instancesPerCell = kInstancesPerCell;
   next.materials = kMaterials;

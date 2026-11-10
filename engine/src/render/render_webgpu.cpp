@@ -567,7 +567,7 @@ constexpr std::uint64_t kCameraBytes = sizeof(Camera);
 constexpr std::uint64_t kBodyBytes = static_cast<std::uint64_t>(kBodySlots) * kRecordBytes;
 constexpr std::uint64_t kLightBytes = static_cast<std::uint64_t>(kLightSlots) * engine::render::kLightBytes;
 constexpr std::uint64_t kMaterialBytes = static_cast<std::uint64_t>(kMaterialSlots) * engine::render::kMaterialBytes;
-constexpr std::uint64_t kPageBytes = static_cast<std::uint64_t>(kPageLayers) * kPageRecordBytes;
+constexpr std::uint64_t kPageBytes = static_cast<std::uint64_t>(kMaxPageLayers) * kPageRecordBytes;
 constexpr std::uint64_t kArgsBytes = static_cast<std::uint64_t>(kArgsWords) * 4;
 constexpr std::uint32_t kZeroCounters[4] = {0, 0, 0, 0};
 
@@ -1318,10 +1318,10 @@ int init(const char* selector, std::uint32_t width, std::uint32_t height) {
     modelIndexBuf = makeBuffer(engine::models::indexPoolBytes(), wgpu::BufferUsage::Index | wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst);
   }
 
-  heightTex = makeTexture(kPageSide, kPageSide, kPageLayers, wgpu::TextureFormat::R32Float, wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::CopyDst);
+  heightTex = makeTexture(kPageSide, kPageSide, pageLayers(), wgpu::TextureFormat::R32Float, wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::CopyDst);
   albedoTex = makeTexture(kAlbedoSide, kAlbedoSide, kAlbedoLayers, wgpu::TextureFormat::RGBA8Unorm, wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::CopyDst);
   depthTex = makeTexture(width, height, 1, wgpu::TextureFormat::Depth32Float, wgpu::TextureUsage::RenderAttachment | wgpu::TextureUsage::TextureBinding);
-  heightView = makeArrayView(heightTex, kPageLayers);
+  heightView = makeArrayView(heightTex, pageLayers());
   albedoView = makeArrayView(albedoTex, kAlbedoLayers);
   depthView = depthTex.CreateView();
   wgpu::TextureViewDescriptor depthOnlyDesc{};

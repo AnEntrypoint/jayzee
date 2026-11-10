@@ -3185,3 +3185,38 @@ Measured reason for sharing: none found. A second CPU copy costs 64 KiB and abou
 The 64-page limit is a real finding for the streaming goal. The store is `kPageSlots = 64` (budget.cpp:33) at every tier, so the resident landscape is capped at 64 pages. Any streaming witness will hit this limit first. It is open, not fixed.
 
 Open after this stretch: the scenario physics witnesses, the vegetation and terrain streaming walk and fly-over, the 64-tier backend-phase trace, and the spoint frame-time comparison, the 1024 stalls, the controlled pause run, the 362.9 ms outlier and the null adapter after restart from earlier.
+
+## Stretch: page store sized to the device, not fixed at 64 (this pass)
+
+Phase A changes:
+
+- `engine/src/page_cache.h`: `kMinPageSlots` 64, `kMaxRenderedPages` 256, `kPageArenaBytes` 1033 (the samples, the key and the state byte of one page).
+- `engine/src/budget.cpp`: `pageSlotsFor(budget)` = clamp(budget / 8 / 1033, 64, 256). `fitsTier` uses it in place of the fixed `kPageSlots` 64.
+- `engine/src/render/render_frame.h`, `render_frame.cpp`: `kPageLayers` becomes `kMaxPageLayers` (256) for the array sizes. `pageLayers()` is min(256, the store's slot count) and is the runtime count in every loop. Declared in the header, defined at `engine::render` scope, so the anonymous-namespace call is not ambiguous.
+- `engine/src/exports_render.cpp`: the placement array is 256, and the slot checks use `pageLayers()`.
+- `engine/src/render/render_webgl2.cpp`: the page record buffer is sized to the maximum; the height array is created with `pageLayers()` layers.
+- `engine/src/render/render_webgpu.cpp`: the height texture and its array view use `pageLayers()`; the record buffer size uses the maximum.
+- `src/engine/renderer.js`: `PAGE_LAYERS` is 256, the JavaScript slot range.
+- `scripts/check-engine-render.mjs`: the page gate checks the maximum, the runtime count, and the budget rule. It was stale for 64 layers.
+- `engine/artifacts.json`: repinned for 64, 128, 512 and leak 64.
+- `scripts/bench-landscape-store.mjs`: the budget is an environment variable (`LANDSCAPE_BUDGET_MIB`).
+- `docs/ENGINE.md`: the sizing rule, the measured numbers, and the old limit paragraph replaced.
+
+Phase B: each change built and witnessed once after the last edit.
+
+| step | result | wall |
+|---|---|---|
+| host witness | PASS 292, FAIL 0 | 17 s |
+| all eight wasm variants | rc 0 each (one build pass, Jolt cached) | 65 s |
+| `bench-landscape-store.mjs engine/out/engine-core-64mib.mjs 256 5` (48 MiB budget) | 256 pages built, store 262,144 B, two copies 524,288 B, build shared 4.53 ms, extra copy 0.12 ms | under 1 s |
+| `check:engine-render` | PASS 18 (after the gate rewrite) | 4 s |
+| `check:engine-core`, `check:engine-leak`, `check:engine-artifacts` | PASS (after repin) | under 10 s |
+| `check:engine-tiers`, `pools`, `planet`, `render`, `visibility`, `materials`, `bridge`, `threads`, `world`, `codecs`, `interest`, `vegetation`, `render-1024-visible`, `ci-engine-glue`, `hygiene` | all PASS, the counts are the earlier ones | 80 s for the batch |
+| render witness, 64 tier, WebGPU (phase 10) | ok true, checksum -5415737363265412373 (unchanged), 16 scene pages, allocations after warm-up 0, createsAfterSeal 0 | 12 s |
+| render witness, 64 tier, WebGL2 (phase 11) | ok true, checksum -5415737363265412373 (unchanged), 16 scene pages, allocations after warm-up 0, createsAfterSeal 0 | 12 s |
+
+Two earlier failures were expected and are repaired: the four artifact pins (the wasm changed), and the render gate's 64-layer text. Neither is a regression.
+
+Finding: at a 16 MiB arena `engine_init` refuses the plan (returns -2). The planner refuses a budget below the 1024-player plan, as before. Not changed by this stretch.
+
+The render scene places 16 pages, so the 256-page store is not yet exercised by any witness. A streaming witness that places more than 64 pages is the open test of this change.

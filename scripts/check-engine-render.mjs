@@ -47,7 +47,7 @@ const EXPECT_LAYOUT = {
   Transform: 28,
 }
 const EXPECT_PAGE_SIDE = 16
-const EXPECT_PAGE_LAYERS = 64
+const EXPECT_PAGE_LAYERS = 256
 const EXPECT_PROP_CLASSES = 4
 const EXPECT_BODY_SLOTS = 10240
 const EXPECT_ALLOCATIONS_SINCE_WARMUP = '0'
@@ -60,6 +60,8 @@ const sources = Object.fromEntries(RENDER_FILES.map((file) => [file, read(file)]
 const cmake = read('engine/CMakeLists.txt')
 const exportsSource = sources['engine/src/exports_render.cpp']
 const renderFrameHeader = sources['engine/src/render/render_frame.h']
+const renderFrameWrite = read('engine/src/render/render_frame.cpp')
+const budgetSource = read('engine/src/budget.cpp')
 const gluePath = join(root, 'engine/out/engine-core-64mib.mjs')
 const wasmPath = join(root, 'engine/out/engine-core-64mib.wasm')
 
@@ -85,11 +87,17 @@ gate('the layout static_asserts pin the byte sizes of the slot structs and the t
   }
 })
 
-gate('the page is 16 by 16 float samples in 64 layers, matching kPageSide and the 64 page slots of the budget', () => {
-  assert.ok(renderFrameHeader.includes('kPageLayers = 64'))
+gate('the page is 16 by 16 float samples, the layer array is sized to the largest store, and the count is read from the store at run time', () => {
+  assert.ok(renderFrameHeader.includes('kMaxPageLayers = planet::kMaxRenderedPages'))
   assert.ok(renderFrameHeader.includes('kPageSide = planet::kPageSide'))
+  assert.ok(renderFrameHeader.includes('std::uint32_t pageLayers();'))
+  assert.ok(renderFrameWrite.includes('std::uint32_t pageLayers() {'))
+  assert.ok(renderFrameWrite.includes('planet::state().pages.pageSlotCount()'))
+  assert.ok(budgetSource.includes('std::uint32_t pageSlotsFor(std::uint64_t budgetBytes)'))
+  assert.ok(budgetSource.includes('constexpr std::uint64_t kPageBudgetDivisor = 8'))
+  assert.ok(budgetSource.includes('next.pageSlots = pageSlotsFor(budgetBytes)'))
   assert.equal(EXPECT_PAGE_SIDE * EXPECT_PAGE_SIDE, 256)
-  assert.equal(EXPECT_PAGE_LAYERS, 64)
+  assert.equal(EXPECT_PAGE_LAYERS, 256)
 })
 
 gate('the prop classes and body slots match the expected instance buffer shape', () => {

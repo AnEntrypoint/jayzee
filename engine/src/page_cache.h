@@ -12,6 +12,10 @@ constexpr std::uint32_t kMaxPageSlots = 1u << 16;
 
 enum class PageState : std::uint8_t { kFree, kStaged, kPendingCommit, kResident, kPendingRelease };
 
+constexpr std::uint32_t kMinPageSlots = 64;
+constexpr std::uint32_t kMaxRenderedPages = 256;
+constexpr std::uint64_t kPageArenaBytes = kPageSamples * sizeof(float) + sizeof(std::int64_t) + sizeof(PageState);
+
 class PageCache {
  public:
   static std::size_t bytesFor(std::uint32_t pageSlots);
