@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
-import { awaitLoadGate, busyFraction, CAUSES, formatTable, frequencyPlan, generatorEnv, GENERATORS, loadGate, LOAD_LIMIT, MODES, parseProcStatCpu, summarizeFrequency } from './browser/frequency-runs.mjs'
+import { awaitLoadGate, busyFraction, CAUSES, formatTable, frequencyPlan, generatorEnv, GENERATORS, HEADROOM_CORES, loadGate, workersUnderQuota, LOAD_LIMIT, MODES, parseProcStatCpu, summarizeFrequency } from './browser/frequency-runs.mjs'
+import { quotaCores } from './browser/cpu-load.mjs'
 import { finish, gate } from './lib/gate.mjs'
 
 const stat = (idle, iowait, busy) => 'cpu  ' + busy + ' 0 0 ' + idle + ' ' + iowait + ' 0 0 0 0 0\ncpu0 1 0 0 1 0 0 0 0 0 0\n'
@@ -42,6 +43,14 @@ gate('the separate generator leaves the burn workers on their default CPUs off t
   assert.deepEqual(generatorEnv('shared'), { GENERATOR_CPUS: '' })
   assert.throws(() => generatorEnv('pinned'), TypeError)
   assert.throws(() => generatorEnv(undefined), TypeError)
+})
+gate('the default worker count leaves two cores of the cgroup quota free, so the run is not throttled', () => {
+  assert.equal(quotaCores('1200000 100000\n', 16), 12)
+  assert.equal(quotaCores('max 100000', 16), 16)
+  assert.throws(() => quotaCores('0 100000', 16), TypeError)
+  assert.equal(HEADROOM_CORES, 2)
+  assert.equal(workersUnderQuota(12), 10)
+  assert.equal(workersUnderQuota(2.5), 1)
 })
 gate('a skipped run is never counted as valid and does not add gaps', () => {
   const table = summarizeFrequency([

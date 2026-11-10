@@ -18,6 +18,14 @@ export const cpusExcept = (excluded) => {
   return allowedCpus().filter((cpu) => !skip.has(cpu)).join(',')
 }
 
+export const quotaCores = (cpuMaxText, cpus) => {
+  const [quota, period] = String(cpuMaxText).trim().split(/\s+/)
+  if (quota === 'max') return cpus
+  const cores = Number(quota) / Number(period)
+  if (!(cores > 0)) throw new TypeError('cpu.max is not a quota and a period: ' + cpuMaxText)
+  return cores
+}
+
 export async function burn({ workers, durationMs, now = () => Date.now(), cpus = '' }) {
   const requestedEnd = now() + durationMs
   const start = now()

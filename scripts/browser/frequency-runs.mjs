@@ -2,10 +2,13 @@ import { spawn } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { basename, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { allowedCpus, quotaCores } from './cpu-load.mjs'
 import { attributeOverLimit, parseCgroupSamples, sampledRows } from './sampler-gap-check.mjs'
 
 export const LOAD_LIMIT = 0.2
 export const MODES = Object.freeze({ pinned: '15', unpinned: '' })
+export const HEADROOM_CORES = 2
+export const workersUnderQuota = (cores) => Math.max(1, Math.floor(cores) - HEADROOM_CORES)
 export const GENERATORS = Object.freeze(['separate', 'shared'])
 export const CAUSES = Object.freeze(['host-cfs-quota', 'run-queue-wait', 'sampler-work', 'unattributed'])
 export const GATE_READ_MS = 5000
@@ -157,7 +160,7 @@ export const runFrequency = async ({ n, outDir, durationMs, workers, ticks, load
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const args = Object.fromEntries(process.argv.slice(2).map((arg) => {
     const match = /^--([\w-]+)=(.*)$/.exec(arg)
-    if (!match) throw new TypeError('usage: node scripts/browser/frequency-runs.mjs --n=5 --out=DIR [--duration=240000 --workers=12 --ticks=6000 --load-limit=0.2 --max-wait-ms=14400000 --generator=separate|shared]: ' + arg)
+    if (!match) throw new TypeError('usage: node scripts/browser/frequency-runs.mjs --n=5 --out=DIR [--duration=240000 --workers=<quota cores minus 2> --ticks=6000 --load-limit=0.2 --max-wait-ms=14400000 --generator=separate|shared]: ' + arg)
     return [match[1], match[2]]
   }))
   const n = Number(args.n ?? 5)
@@ -165,7 +168,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     n,
     outDir: args.out ?? 'build/diag/paired-G/freq',
     durationMs: Number(args.duration ?? 240000),
-    workers: Number(args.workers ?? 12),
+    workers: Number(args.workers ?? workersUnderQuota(quotaCores(readFileSync('/sys/fs/cgroup/cpu.max', 'utf8'), allowedCpus().length))),
     ticks: Number(args.ticks ?? 6000),
     loadLimit: Number(args['load-limit'] ?? LOAD_LIMIT),
     generator: args.generator ?? 'separate',
