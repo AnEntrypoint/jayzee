@@ -113,6 +113,7 @@ class World {
   const double* velocities() const { return velocities_; }
   const Transform* transforms() const { return transforms_; }
   std::uint64_t rebases() const { return rebases_; }
+  Status applyPoses(const Transform* rows, std::uint32_t count);
 
  private:
   struct Runtime;

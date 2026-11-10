@@ -85,7 +85,9 @@ add_executable(engine_core
   src/render/render_frame.cpp
   src/render/render_webgpu.cpp
   src/render/render_webgl2.cpp
-  src/exports_render.cpp)
+  src/exports_render.cpp
+  src/pose_handoff.cpp
+  src/exports_pose.cpp)
 target_link_libraries(engine_core PRIVATE Jolt)
 target_compile_options(engine_core PRIVATE --use-port=emdawnwebgpu)
 set(ENGINE_POOL_STACK_BYTES 0)
@@ -108,6 +110,11 @@ set(ENGINE_EXPORTS
   _engine_ticks
   _engine_memory_bytes
   _engine_body_count
+  _engine_pose_bytes
+  _engine_pose_reserve
+  _engine_pose_export
+  _engine_pose_import
+  _engine_follow
   _engine_retired_slots
   _engine_physics_bodies
   _engine_positions

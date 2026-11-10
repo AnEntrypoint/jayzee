@@ -142,7 +142,7 @@ bool fitsTier(std::uint64_t budgetBytes, std::uint32_t players, std::uint32_t wo
   next.interestCellsPerSide = kInterestCellsPerSide;
   next.workers = workers;
   next.tempBytes = kTempBytes + static_cast<std::uint64_t>(next.bodies) * kTempBytesPerBody;
-  next.hostBytes = kHostReserveBytes;
+  next.hostBytes = players == kMaxPlayers ? kHostReserveBytes : 0;
   bool fits = false;
   for (std::uint32_t tier = device::kTierCount; tier-- > 0;) {
     next.modelTier = tier;

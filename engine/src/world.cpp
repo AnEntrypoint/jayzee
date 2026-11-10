@@ -24,6 +24,8 @@
 #include <new>
 
 #include "arena.h"
+#include <cstring>
+
 #include "physics_origin.h"
 #include "planet_frame.h"
 #include "planet_shape.h"
@@ -488,6 +490,12 @@ void World::step(std::uint32_t steps) {
     }
     tick_ += 1;
   }
+}
+
+Status World::applyPoses(const Transform* rows, std::uint32_t count) {
+  if (transforms_ == nullptr || count != limits_.bodies) return kRange;
+  std::memcpy(transforms_, rows, static_cast<std::size_t>(count) * sizeof(Transform));
+  return kOk;
 }
 
 void World::setTick(std::uint64_t tick) {
