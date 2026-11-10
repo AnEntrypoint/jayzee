@@ -168,10 +168,14 @@ const cellOf = (module, x, y, z) => {
   return { face: module.HEAPU32[at], cx: module.HEAPU32[at + 1], cy: module.HEAPU32[at + 2] }
 }
 
-const setupPlanet = (module, renderer, placed) => {
+const configurePlanet = (module) => {
   const status = module._engine_planet_configure(PLANET.radius, PLANET.cellSize, PLANET.gravity, PLANET.maxHeight)
   if (status !== 0) throw new Error('planet configure status ' + status)
-  const surface = planetSurface(module)
+  return planetSurface(module)
+}
+
+const setupPlanet = (module, renderer, placed) => {
+  const surface = configurePlanet(module)
   const anchor = cellOf(module, 0, PLANET.radius, 0)
   const uEdge = PAGE_U_EDGE
   const vEdge = PAGE_V_EDGE
@@ -197,9 +201,75 @@ const setupPlanet = (module, renderer, placed) => {
   return surface
 }
 
+const PATH = QUERY.get('path') === 'planet' ? 'planet' : 'orbit'
+const PATH_SPEED_M_PER_S = 30
+const PATH_STEP_M = PATH_SPEED_M_PER_S / 60
+const pagePlacement = new Map()
+const pathStats = { restages: 0, restageMs: [], cellChanges: 0 }
+let pathRef = null
+let pathCell = null
+
+const restageWindow = (module, renderer, cell) => {
+  const started = performance.now()
+  const wanted = new Map()
+  for (let dy = -2; dy <= 1; dy++) {
+    for (let dx = -2; dx <= 1; dx++) {
+      wanted.set(module._engine_planet_key(cell.face, cell.cx + dx, cell.cy + dy), [cell.cx + dx - pathRef.cx, cell.cy + dy - pathRef.cy])
+    }
+  }
+  for (const [key, held] of pagePlacement) {
+    if (wanted.has(key)) continue
+    renderer.unplacePage(held.slot)
+    module._engine_page_release(key)
+    pagePlacement.delete(key)
+  }
+  for (const [key, [dx, dy]] of wanted) {
+    if (pagePlacement.has(key)) continue
+    const slot = module._engine_page_stage(key)
+    if (slot < 0) throw new Error('page stage refused at window cell ' + dx + ',' + dy)
+    const samples = module._engine_page_samples(slot) >> 2
+    const k = Math.abs(Number(key)) % 97
+    for (let s = 0; s < PAGE_SIDE * PAGE_SIDE; s++) {
+      module.HEAPF32[samples + s] = 0.5 * Math.sin((s % PAGE_SIDE) * 0.6 + k) * Math.cos(Math.floor(s / PAGE_SIDE) * 0.6)
+    }
+    module._engine_page_commit(slot)
+    renderer.placePage(slot, cellOrigin(dx, dy), PAGE_U_EDGE, PAGE_V_EDGE)
+    pagePlacement.set(key, { slot })
+  }
+  pathStats.restages += 1
+  pathStats.restageMs.push(performance.now() - started)
+}
+
+const setupPlanetPath = (module, renderer) => {
+  const surface = configurePlanet(module)
+  pathRef = cellOf(module, 0, PLANET.radius, 0)
+  pathCell = pathRef
+  restageWindow(module, renderer, pathRef)
+  pathStats.restages = 0
+  pathStats.restageMs = []
+  return surface
+}
+
+const planetCamera = (module, renderer, frame, aspect, surface) => {
+  const x = frame * PATH_STEP_M
+  const cell = cellOf(module, x, PLANET.radius, 0)
+  if (cell.face !== pathCell.face || cell.cx !== pathCell.cx || cell.cy !== pathCell.cy) {
+    pathStats.cellChanges += 1
+    restageWindow(module, renderer, cell)
+    pathCell = cell
+  }
+  CAMERA.eye[0] = x
+  CAMERA.eye[1] = surface(x, 0) + CAMERA_HEIGHT
+  CAMERA.eye[2] = 0
+  lookAt(CAMERA.eye, [x + 20, surface(x + 20, 0), 0], UP, VIEW)
+  perspective(CAMERA_FOV, aspect, NEAR, FAR, PROJ)
+  multiply(PROJ, VIEW, CAMERA.viewProj)
+  return CAMERA
+}
+
 const setupScene = (module, renderer, placed) => {
   setupWorld(module)
-  const surface = setupPlanet(module, renderer, placed)
+  const surface = PATH === 'planet' ? setupPlanetPath(module, renderer) : setupPlanet(module, renderer, placed)
   const classes = new Uint8Array(RENDER_LAYOUT.BODY_SLOTS).fill(255)
   for (let i = 0; i < BODIES; i++) classes[i] = i % RENDER_LAYOUT.PROP_CLASSES
   renderer.setBodyClasses(classes)
@@ -281,7 +351,7 @@ const run = async () => {
         readPhases(phasesBefore)
         module._engine_tick(TICK_STEPS)
         const tickEnd = performance.now()
-        renderer.setCamera(orbitCamera(frame, aspect, surface))
+        renderer.setCamera(PATH === 'planet' ? planetCamera(module, renderer, frame, aspect, surface) : orbitCamera(frame, aspect, surface))
         if (DRAW) {
           const status = renderer.frame()
           if (status !== 0) throw new Error('engine_render_frame status ' + status)
@@ -335,6 +405,16 @@ const run = async () => {
   result.frameTimeP99Ms = p99(timed)
   result.frameTimeMedianMs = median(timed)
   result.frameTimeMaxMs = Math.max(...timed)
+  result.path = PATH
+  if (PATH === 'planet') {
+    result.pathSpeedMps = PATH_SPEED_M_PER_S
+    result.cellChanges = pathStats.cellChanges
+    result.restages = pathStats.restages
+    if (pathStats.restageMs.length > 0) {
+      result.restageMsMax = Math.max(...pathStats.restageMs)
+      result.restageMsP99 = p99(pathStats.restageMs)
+    }
+  }
   const round2 = (v) => Math.round(v * 100) / 100
   result.timed = TIMED
   result.tickMedianMs = round2(median(column(2)))

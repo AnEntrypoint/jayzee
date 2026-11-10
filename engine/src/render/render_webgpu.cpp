@@ -295,10 +295,10 @@ void writeBuffer(wgpu::Buffer buffer, std::uint64_t offset, const void* data, st
 }
 
 void writeLayers(wgpu::Texture texture, std::uint32_t firstLayer, std::uint32_t layers, const void* pixels, std::uint32_t side, std::uint32_t bytesPerTexel) {
-  wgpu::ImageCopyTexture destination{};
+  wgpu::TexelCopyTextureInfo destination{};
   destination.texture = texture;
   destination.origin = wgpu::Origin3D{0, 0, firstLayer};
-  wgpu::TextureDataLayout layout{};
+  wgpu::TexelCopyBufferLayout layout{};
   layout.bytesPerRow = side * bytesPerTexel;
   layout.rowsPerImage = side;
   const wgpu::Extent3D size{side, side, layers};
@@ -402,7 +402,7 @@ int init(const char* selector, std::uint32_t width, std::uint32_t height) {
   queue = device.GetQueue();
 
   wgpu::Instance instance = wgpu::CreateInstance();
-  wgpu::SurfaceDescriptorFromCanvasHTMLSelector canvas{};
+  wgpu::EmscriptenSurfaceSourceCanvasHTMLSelector canvas{};
   canvas.selector = selector;
   wgpu::SurfaceDescriptor surfaceDesc{};
   surfaceDesc.nextInChain = &canvas;

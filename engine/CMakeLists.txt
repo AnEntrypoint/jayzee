@@ -8,6 +8,7 @@ endif()
 set(ENGINE_TIER_MIB 64 CACHE STRING "Fixed memory tier in MiB")
 option(ENGINE_LEAK_ON_TICK "Retain one block per tick, the witness that the memory gate catches growth" OFF)
 option(ENGINE_PHASE_TIMERS "Per-phase timers inside engine_tick, for the diagnostic build only" OFF)
+option(ENGINE_THREADS "Multithreaded Jolt job system on pthreads, a separate artifact from the single-threaded build" OFF)
 
 math(EXPR ENGINE_TIER_BYTES "${ENGINE_TIER_MIB} * 1024 * 1024")
 set(ENGINE_NAME "engine-core-${ENGINE_TIER_MIB}mib")
@@ -17,6 +18,9 @@ endif()
 if(ENGINE_PHASE_TIMERS)
   string(APPEND ENGINE_NAME "-timed")
 endif()
+if(ENGINE_THREADS)
+  string(APPEND ENGINE_NAME "-threads")
+endif()
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -24,6 +28,9 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_BUILD_TYPE Release CACHE STRING "" FORCE)
 
 add_compile_options(-O2 -g0 -ffp-contract=off -fno-fast-math -fno-exceptions -fno-rtti)
+if(ENGINE_THREADS)
+  add_compile_options(-pthread)
+endif()
 
 set(CROSS_PLATFORM_DETERMINISTIC ON CACHE BOOL "" FORCE)
 set(INTERPROCEDURAL_OPTIMIZATION OFF CACHE BOOL "" FORCE)
@@ -73,6 +80,7 @@ add_executable(engine_core
   src/render/render_webgl2.cpp
   src/exports_render.cpp)
 target_link_libraries(engine_core PRIVATE Jolt)
+target_compile_options(engine_core PRIVATE --use-port=emdawnwebgpu)
 math(EXPR ENGINE_ARENA_BYTES "${ENGINE_TIER_BYTES} - 4 * 1024 * 1024")
 target_compile_definitions(engine_core PRIVATE JPH_CROSS_PLATFORM_DETERMINISTIC ENGINE_ARENA_BYTES=${ENGINE_ARENA_BYTES}ull)
 
@@ -199,7 +207,7 @@ target_link_options(engine_core PRIVATE
   -sENVIRONMENT=web,node
   -sEXPORTED_RUNTIME_METHODS=HEAPU8,HEAP32,HEAPU32,HEAPF32,HEAPF64
   -sSTRICT=1
-  -sUSE_WEBGPU=1
+  --use-port=emdawnwebgpu
   -sMIN_WEBGL_VERSION=2
   -sMAX_WEBGL_VERSION=2
   -sUSE_WEBGL2=1
@@ -211,6 +219,10 @@ target_link_options(engine_core PRIVATE
 
 if(ENGINE_PHASE_TIMERS)
   target_compile_definitions(engine_core PRIVATE ENGINE_PHASE_TIMERS)
+endif()
+if(ENGINE_THREADS)
+  target_compile_definitions(engine_core PRIVATE ENGINE_THREADS)
+  target_link_options(engine_core PRIVATE -pthread -sUSE_PTHREADS=1 -sPTHREAD_POOL_SIZE=8)
 endif()
 if(ENGINE_LEAK_ON_TICK)
   target_compile_definitions(engine_core PRIVATE ENGINE_LEAK_ON_TICK)
