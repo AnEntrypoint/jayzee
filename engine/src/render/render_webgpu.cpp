@@ -237,6 +237,7 @@ wgpu::RenderPipeline modelPipe;
 wgpu::BindGroup modelGroup;
 wgpu::Buffer modelVertexBuf;
 wgpu::Buffer modelIndexBuf;
+engine::models::Range modelRuns[engine::models::kMaxClustersPerSlot];
 wgpu::BindGroup propGroup[kPropClasses];
 wgpu::BindGroup terrainGroup;
 wgpu::TextureFormat surfaceFormat = wgpu::TextureFormat::BGRA8Unorm;
@@ -619,8 +620,11 @@ int frame(const SceneView& scene, const FramePlan& plan, const Camera& camera) {
     ENGINE_RENDER_CALL(pass.SetIndexBuffer(modelIndexBuf, wgpu::IndexFormat::Uint32, 0, engine::models::indexPoolBytes()));
     for (std::uint32_t s = 0; s < engine::models::slotCount(); ++s) {
       if (!engine::models::slotReady(s)) continue;
-      const engine::models::Range range = engine::models::slotRange(s);
-      ENGINE_RENDER_CALL(pass.DrawIndexed(range.indexCount, 1, range.firstIndex, static_cast<std::int32_t>(range.firstVertex), s));
+      const std::uint32_t runs = engine::models::visibleRuns(s, camera.planes, modelRuns);
+      for (std::uint32_t r = 0; r < runs; ++r) {
+        const engine::models::Range& run = modelRuns[r];
+        ENGINE_RENDER_CALL(pass.DrawIndexed(run.indexCount, 1, run.firstIndex, static_cast<std::int32_t>(run.firstVertex), s));
+      }
     }
   }
   ENGINE_RENDER_CALL(pass.SetPipeline(terrainPipe));

@@ -2880,3 +2880,27 @@ Caveats, all open or not witnessed:
 - The wasm memory of the 512 MiB default glue is always reserved, even for tier 0 devices. A small device that cannot reserve 512 MiB of wasm memory has no path yet.
 - The npm test chain was not run in full in this pass. The gates listed above were run directly, and check:decode-path is in the chain.
 - The browser runs were in the project's Chromium through the playwriter setup (invariant 11), not `/usr/bin/chromium`.
+
+## Nanite macro view: Phase A (cluster culling for model slots)
+
+Decisions and the reason for each technique are in docs/ENGINE.md, under "Decisions from the Nanite macro view". This table lists only the code that changed, and the witness each change must pass in Phase B.
+
+| id | change | file | witness | Phase B must show |
+|---|---|---|---|---|
+| N1 | Cluster table: 384-index clusters with bounding spheres, built in `upload` and `markDirty`; unbounded when an index leaves the slot's vertices or a position is not finite | engine/src/model_pool.h, engine/src/model_pool.cpp | engine/test/witness_models.cpp, cluster block: sphere contains every vertex; two-cluster slot has runs 0 to 384 and 384 to 768 | host witness passes; carved tier pools read back |
+| N2 | `visibleRuns`: plane test per cluster, adjacent visible clusters merged into one range | engine/src/model_pool.cpp | witness_models.cpp: all planes pass gives one run of 768; a cutting plane gives one run of 384; a conservative cut (every vertex of the culled cluster lies outside the plane); a plane every cluster fails gives zero runs; a slot past the layout gives zero runs | host witness passes |
+| N3 | WebGPU model draw loop draws each visible run, not each slot | engine/src/render/render_webgpu.cpp | browser: scripts/browser/models-run.mjs and models-vram-run.mjs draw model slots with createsAfterSeal 0 | both browser runs pass with the 512 MiB build |
+| N4 | `validLayout` refuses a vertex stride under 12 bytes and an index count above 256 clusters | engine/src/model_pool.cpp | witness_models.cpp: stride 8 refused; 98304 indices accepted; 98305 refused | host witness passes |
+| N5 | Witness layout changed to 4 slots × 512 vertices × 768 indices; its numbers updated (acquire limits 513 and 769, second slot at 512 and 768, pool bytes 78096) | engine/test/witness_models.cpp | the existing model checks in the same file | host witness passes |
+| N6 | Model placement in C++ (`modelOffset`, `kModelScale`) mirrors `vsModel` in the WGSL | engine/src/model_pool.h, engine/src/model_pool.cpp, render_webgpu.cpp shader | witness_models.cpp: slot 3 is at x 4, y 0, z −20; the browser draw in N3 shows the placement | host witness and browser draw pass |
+
+Not changed in this pass:
+
+- WebGL2 has no model draw path. The culling reaches WebGPU only, and a WebGL2 model path is a follow-up.
+- No compute pass, no visibility buffer, no HZB, no deferred material pass (ENGINE.md lists each as deferred or dropped).
+
+Phase B also owes:
+
+- Rebuild each variant that includes model_pool.cpp (64 MiB fixed, leak, timed, threads, 128 MiB fixed and 512 MiB fixed) and update engine/artifacts.json with the new hashes.
+- Read the carved tier 0 pool back and record it beside the formula (ENGINE.md, the 2,432 B gap).
+- Run engine/test/build_host.sh in the foreground and every engine gate in the list in the ranks 3 to 6 section, then the browser runs listed there.

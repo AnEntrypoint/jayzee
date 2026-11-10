@@ -234,6 +234,46 @@ The 64 MiB build's arena is 60 MiB, which holds the tier 0 pool and the budget t
 
 **Like-for-like with spoint (rank 6).** The operation is the same on both sides: sample a 33 by 33 height grid over 256 m, once per build, timed per build, on the same host. spoint samples with its JavaScript height function inside `timeFieldSteps`. jayzee samples with `engine_planet_height` in the 64 MiB build, under Node. The call boundary differs, and the row says so. `scripts/spoint-streamer-compare.mjs` writes both rows, and the ratio of the two p99 values is the like-for-like figure. The one-frame phase 5 comparison stays as a separate, labelled row.
 
+### Decisions from the Nanite macro view (article, 2021, updated 2024)
+
+The article is a RenderDoc capture of Unreal's Nanite preview. It gives the pass order, the captured counts and the visibility buffer layout. It gives no LOD error formula, no cluster-tree construction, no streaming design and no measured gains, so every adaptation below is jayzee's, not a copy of a formula. Each row says what was taken, what was left out, and why.
+
+| technique in the article | decision | reason |
+|---|---|---|
+| Clusters of 128 triangles with a bounding sphere | Implemented: each model slot's index run is cut into clusters of 384 indices (128 triangles), each with a sphere in the model's local space | Gives cluster culling without a clusterizer in wasm. Clusters share the slot's vertices, so no vertex is duplicated (the article's 384-vertex cluster duplicates them) |
+| Cluster culling against the frame's view frustum | Implemented on the CPU for both APIs, against the six planes `planFrame` already extracts for props | The frame's planes already exist. A GPU pass needs compute, which WebGL2 does not have, so a CPU path is needed anyway |
+| Contiguous visible clusters drawn as one range | Implemented: `visibleRuns` merges adjacent visible clusters into one `DrawIndexed` | A slot's clusters are contiguous in its index run, so a run covers any visible stretch with one call |
+| Indirect execute for the cluster draws | Dropped | The run counts are known on the CPU in the same frame, so the indirect buffer would carry values the CPU already has |
+| GPU instance culling with compute, and a WebGL2 fallback | Deferred | The CPU pass costs at most slots × clusters sphere tests (65,536 at tier 2) per frame. No measurement shows that cost needs moving to the GPU |
+| Visibility buffer (R32G32_UINT, ClusterID and TriangleID) and the deferred material pass | Deferred, not implemented | It is the largest item in the article. It needs a second geometry pass that fetches vertices from storage buffers (WebGPU) or textures (WebGL2), a material classification pass, and integer colour targets on both backends. No overdraw or shading cost in the engine supports that rewrite yet |
+| Early depth emission (EmitDepthTargets) | Dropped | It doubles the model vertex work. No overdraw is measured, and the forward depth test already rejects hidden fragments |
+| HZB occlusion from the previous frame's depth, rebuilt after the post pass | Deferred | It needs a depth mip chain each frame: a compute pass on WebGPU and a fragment pass per level on WebGL2. The article gives no occlusion figure, and no occlusion problem is measured here |
+| Persistent threads with a fixed thread count | Dropped | It assigns work against a GPU queue. WebGPU gives no persistent-thread guarantee, and culling here runs on the CPU |
+| Compute software rasterization with 64-bit atomics | Dropped | WebGPU has no 64-bit atomics, and WebGL2 has no compute |
+| Hardware and software rasterizer split by triangle size (3,333 hardware instances and 34,821 software groups captured) | Dropped | The software path is compute. Only the hardware path exists here |
+| Cluster LOD with seam stitching | Dropped | The article gives no mechanism, so it cannot be implemented from its source. Each model has one level of detail |
+| 14-bit material IDs, early stencil marking, the NaN x-coordinate discard | Dropped | They belong to the deferred material pass, which is not built |
+| Streaming design | Dropped | The article gives no design |
+| HZB readback on WebGL2 | Dropped | The article names it as a stall. It is not built |
+
+Sizes, in the layout in `engine/src/model_pool.cpp`. A cluster record is 24 bytes: a centre (three floats), a radius, a first index and an index count. A slot holds ceil(indicesPerSlot / 384) clusters, at most 256, so the table is slots × clusters × 24 bytes. These rows replace the pool rows of the ranks 3 to 6 table above:
+
+| tier | cluster table | pool with the table | budget plus pool |
+|---|---|---|---|
+| 0 | 98,304 B (128 slots × 32 clusters) | 23,166,976 B | — |
+| 1 | 786,432 B (256 slots × 128 clusters) | 185,335,808 B | — |
+| 2 | 1,572,864 B (256 slots × 256 clusters) | 370,671,616 B | 437,780,480 B, headroom 94,896,128 B in the 512 MiB build |
+
+The table is in wasm memory, not VRAM, so `vramBytesOf` is unchanged. The earlier measured tier 0 carve was 23,071,104 B, against the formula's 23,068,672 B. That 2,432 B gap is not accounted for in the table above, so Phase B reads the carved bytes back and records them beside these figures.
+
+- Bounds are built in `upload` and in `markDirty`, after the slot's data is final, so a decoded slot is culled from its real geometry. Nothing is built per frame.
+- A cluster is unbounded (never culled) when an index is past the slot's vertex count, or when a position is not finite. The unbounded case is the safe one: a bad index draws, and it does not vanish.
+- `validLayout` now refuses a vertex stride under 12 bytes (a position is three floats, so the bounds read it) and an index count above 256 clusters of 384.
+- The model shader places slot `s` at `(4s − 8, 0, −20)` with scale 2. The culling uses the same placement (`modelOffset`, `kModelScale`), copied into C++. A change to the shader must change both; the witness checks the C++ numbers.
+- WebGL2 has no model draw path (it draws props and terrain only), so this culling reaches WebGPU only. A WebGL2 model path is a follow-up, and it would use the same `visibleRuns`.
+- The run buffer is a file-scope array of `kMaxClustersPerSlot` ranges in the WebGPU renderer, so a frame allocates nothing.
+- Witness: `engine/test/witness_models.cpp`, the cluster block. It checks each cluster's sphere against its vertices, the adjacent merge into one run, a plane that cuts a cluster, a conservative cut (every culled vertex lies outside the plane), a plane that rejects every cluster, an unbounded slot, and the layout limits.
+
 ### Status
 
 - The renderer draws model slots. Uploads reach the GPU on the planned tier's per-frame budget, and only slots whose upload is complete are drawn. The model pipeline is built before the seal (createsAfterSeal stays 0).

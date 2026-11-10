@@ -1,3 +1,4 @@
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -22,9 +23,20 @@ device::Limits limits(std::uint32_t side, std::uint32_t layers, std::uint64_t ma
   return device::Limits{side, layers, maxBuffer, texel, memory};
 }
 
-alignas(16) std::uint8_t gStorage[4096];
+alignas(16) std::uint8_t gStorage[96 * 1024];
 
-const models::Layout kLayout{4, 8, 12, 32};
+const models::Layout kLayout{4, 512, 768, 32};
+
+constexpr std::uint32_t kClusterVertices = 512;
+constexpr std::uint32_t kClusterSlotIndices = 768;
+constexpr std::uint32_t kVertexStride = 32;
+
+void unitPlanes(float planes[6][4]) {
+  for (int p = 0; p < 6; ++p) {
+    for (int c = 0; c < 4; ++c) planes[p][c] = 0.0f;
+    planes[p][3] = 1.0f;
+  }
+}
 
 constexpr std::uint32_t kChurnCycles = 10000;
 
@@ -74,6 +86,9 @@ void modelsAndTiers() {
   check(!models::validLayout({handles::kMaxSlots + 1, 8, 12, 32}), "a layout above the slot maximum is refused");
   check(!models::validLayout({4, 8, 12, 6}), "a vertex stride that is not a multiple of four is refused");
   check(!models::validLayout({65535, 65536, 12, 256}), "a vertex pool above the 32-bit range is refused");
+  check(!models::validLayout({4, 8, 12, 8}), "a vertex stride below 12 bytes is refused, since a position is three floats");
+  check(models::validLayout({4, 512, 98304, 32}), "a slot of 256 clusters of 384 indices is valid");
+  check(!models::validLayout({4, 512, 98305, 32}), "a slot needing more than 256 clusters is refused");
 
   check(refusedWith(models::acquire(1, 1), kNotConfigured), "acquire before bind reports not configured");
   check(models::bind(nullptr, sizeof gStorage, kLayout) == kRange, "bind refuses a null base");
@@ -90,8 +105,8 @@ void modelsAndTiers() {
   double fourth = models::acquire(8, 12);
   check(first > 0.0 && second > 0.0 && third > 0.0 && fourth > 0.0, "four slots acquire with positive handles");
   check(refusedWith(models::acquire(1, 1), kFull), "a fifth acquire on four slots reports full");
-  check(refusedWith(models::acquire(9, 1), kRange), "acquire refuses more vertices than a slot holds");
-  check(refusedWith(models::acquire(1, 13), kRange), "acquire refuses more indices than a slot holds");
+  check(refusedWith(models::acquire(513, 1), kRange), "acquire refuses more vertices than a slot holds");
+  check(refusedWith(models::acquire(1, 769), kRange), "acquire refuses more indices than a slot holds");
   check(models::liveCount() == 4, "four live slots after four acquires");
 
   alignas(16) std::uint8_t vertices[8 * 32];
@@ -111,7 +126,7 @@ void modelsAndTiers() {
   check(models::ranges(first, range) == kOk, "ranges reads a live slot");
   check(range.firstVertex == 0 && range.vertexCount == 8 && range.firstIndex == 0 && range.indexCount == 12,
         "the first slot's ranges are vertices 0 to 8 and indices 0 to 12");
-  check(models::ranges(second, range) == kOk && range.firstVertex == 8 && range.firstIndex == 12,
+  check(models::ranges(second, range) == kOk && range.firstVertex == 512 && range.firstIndex == 768,
         "the second slot starts after the first slot's pool share");
 
   const std::size_t vertexBase = 80;
@@ -144,8 +159,91 @@ void modelsAndTiers() {
   }
   check(churnFailures == 0, "10000 acquire, upload and release cycles all succeed");
   check(models::liveCount() == 0, "the churn leaves no live slot");
-  check(models::bytesFor(kLayout) == 1296, "the pool's byte size is unchanged by the churn");
+  check(models::bytesFor(kLayout) == 78096, "the pool's byte size is unchanged by the churn");
   observe("model churn cycles", kChurnCycles);
+
+  alignas(16) std::uint8_t clusterVertices[kClusterVertices * kVertexStride] = {};
+  alignas(16) std::uint32_t clusterIndices[kClusterSlotIndices];
+  for (std::uint32_t v = 0; v < kClusterVertices; ++v) {
+    const float position[3] = {static_cast<float>(v), 0.0f, 0.0f};
+    std::memcpy(clusterVertices + v * kVertexStride, position, sizeof position);
+  }
+  for (std::uint32_t i = 0; i < kClusterSlotIndices; ++i) clusterIndices[i] = i < 384 ? i % 256 : 256 + (i - 384) % 256;
+
+  const double geometry = models::acquire(kClusterVertices, kClusterSlotIndices);
+  const double outOfRange = models::acquire(4, 3);
+  check(geometry > 0.0 && outOfRange > 0.0, "two slots acquire for the cluster witness");
+  models::Range geometryRange{};
+  models::Range strayRange{};
+  check(models::ranges(geometry, geometryRange) == kOk && models::ranges(outOfRange, strayRange) == kOk,
+        "both cluster witness slots report their ranges");
+  const std::uint32_t slot = geometryRange.firstVertex / kClusterVertices;
+  const std::uint32_t strayPlace = strayRange.firstVertex / kClusterVertices;
+  check(models::upload(geometry, clusterVertices, kClusterVertices, clusterIndices, kClusterSlotIndices) == kOk,
+        "upload of a two-cluster slot succeeds");
+  check(models::slotClusterCount(slot) == 2, "a 768-index slot holds two 384-index clusters");
+
+  const models::Cluster* clusters = models::slotClusters(slot);
+  check(clusters[0].firstIndex == 0 && clusters[0].indexCount == 384 && clusters[1].firstIndex == 384 && clusters[1].indexCount == 384,
+        "cluster index runs are 0 to 384 and 384 to 768");
+  check(std::fabs(clusters[0].centre[0] - 127.5f) < 1e-3f && std::fabs(clusters[1].centre[0] - 383.5f) < 1e-3f,
+        "each cluster's sphere centre is the middle of its vertex run");
+
+  std::uint32_t outsideSphere = 0;
+  for (std::uint32_t c = 0; c < 2; ++c) {
+    for (std::uint32_t i = c * 384; i < (c + 1) * 384; ++i) {
+      float p[3];
+      std::memcpy(p, clusterVertices + clusterIndices[i] * kVertexStride, sizeof p);
+      const float dx = p[0] - clusters[c].centre[0];
+      const float dy = p[1] - clusters[c].centre[1];
+      const float dz = p[2] - clusters[c].centre[2];
+      if (std::sqrt(dx * dx + dy * dy + dz * dz) > clusters[c].radius) outsideSphere += 1;
+    }
+  }
+  check(outsideSphere == 0, "every vertex of every cluster lies inside its bounding sphere");
+
+  float offset[3];
+  models::modelOffset(3, offset);
+  check(offset[0] == 4.0f && offset[1] == 0.0f && offset[2] == -20.0f, "slot 3 is placed at x 4, y 0, z -20, as the shader places it");
+
+  float everything[6][4];
+  unitPlanes(everything);
+  models::Range runs[models::kMaxClustersPerSlot];
+  check(models::visibleRuns(slot, everything, runs) == 1 && runs[0].indexCount == 768 && runs[0].firstIndex == geometryRange.firstIndex &&
+            runs[0].firstVertex == geometryRange.firstVertex,
+        "with every plane passing, the two adjacent clusters merge into one run of 768 indices");
+
+  float leftOnly[6][4];
+  unitPlanes(leftOnly);
+  leftOnly[0][0] = -1.0f;
+  leftOnly[0][3] = 400.0f;
+  const std::uint32_t kept = models::visibleRuns(slot, leftOnly, runs);
+  check(kept == 1 && runs[0].indexCount == 384 && runs[0].firstIndex == geometryRange.firstIndex,
+        "a plane that cuts off the right cluster leaves the left cluster as one run of 384 indices");
+  float placed[3];
+  models::modelOffset(slot, placed);
+  std::uint32_t leakedVertices = 0;
+  for (std::uint32_t i = 384; i < 768; ++i) {
+    const float worldX = 2.0f * static_cast<float>(clusterIndices[i]) + placed[0];
+    if (-worldX + 400.0f >= 0.0f) leakedVertices += 1;
+  }
+  check(leakedVertices == 0, "every vertex of the culled right cluster is outside the plane that culled it");
+
+  float nothing[6][4];
+  unitPlanes(nothing);
+  nothing[0][0] = 1.0f;
+  nothing[0][3] = -10000.0f;
+  check(models::visibleRuns(slot, nothing, runs) == 0, "a plane every cluster fails culls the whole slot");
+  check(models::visibleRuns(models::slotCount() + 3, everything, runs) == 0, "a slot index past the layout has no runs");
+
+  check(models::slotClusterCount(strayPlace) == 1, "an out-of-range index slot still holds one cluster");
+  const std::uint32_t stray[3] = {0, 1, 9};
+  check(models::upload(outOfRange, clusterVertices, 4, stray, 3) == kOk, "upload with an index past the vertex count is accepted");
+  check(models::visibleRuns(strayPlace, nothing, runs) == 1 && runs[0].indexCount == 3,
+        "a cluster whose indices leave the slot's vertices is never culled");
+
+  check(models::release(geometry) == kOk && models::release(outOfRange) == kOk, "the cluster witness slots release");
+  check(models::liveCount() == 0, "no live slot after the cluster witness");
 }
 
 }

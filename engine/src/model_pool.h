@@ -10,6 +10,18 @@ namespace engine::models {
 
 constexpr std::size_t kAlignment = 16;
 constexpr std::uint32_t kIndexBytes = 4;
+constexpr std::uint32_t kClusterIndices = 384;
+constexpr std::uint32_t kMaxClustersPerSlot = 256;
+constexpr float kModelScale = 2.0f;
+
+struct Cluster {
+  float centre[3];
+  float radius;
+  std::uint32_t firstIndex;
+  std::uint32_t indexCount;
+};
+
+static_assert(sizeof(Cluster) == 24);
 
 struct Layout {
   std::uint32_t slots;
@@ -46,6 +58,10 @@ bool slotReady(std::uint32_t slot);
 void clearDirty(std::uint32_t slot);
 std::uint32_t dirtyCount();
 Range slotRange(std::uint32_t slot);
+std::uint32_t slotClusterCount(std::uint32_t slot);
+const Cluster* slotClusters(std::uint32_t slot);
+void modelOffset(std::uint32_t slot, float out[3]);
+std::uint32_t visibleRuns(std::uint32_t slot, const float planes[6][4], Range* out);
 const std::uint8_t* slotVertices(std::uint32_t slot);
 const std::uint8_t* slotIndices(std::uint32_t slot);
 std::uint64_t slotVertexBytes();
