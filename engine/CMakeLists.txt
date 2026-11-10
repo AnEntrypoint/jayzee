@@ -211,6 +211,7 @@ set(ENGINE_EXPORTS
   _engine_render_light_count
   _engine_render_lights
   _engine_render_light_positions
+  _engine_arena_carve
   _engine_render_mark_page
   _engine_render_material_table
   _engine_render_pages

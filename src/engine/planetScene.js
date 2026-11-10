@@ -4,6 +4,7 @@ import { densityFor } from './populationDensity.js'
 import { createColliderSet } from './colliderLayers.js'
 import { registerPopulation, registerTerrain } from './populationColliders.js'
 import { createEngineHeightAt } from './terrainHeight.js'
+import { arenaAllocator, canArenaAllocate } from './arenaAllocate.js'
 import { VEG_GEN_INSTANCES_PER_FRAME, VEG_SPECIES, createVegetationPool, planVegetationPool } from './vegetation.js'
 
 export const PLANET_ENTITY_COUNT = 1024
@@ -32,6 +33,21 @@ export const sceneSpec = (overrides = {}) => {
   need(spec.radiusM > 0 && Number.isFinite(spec.radiusM), 'radiusM must be a positive finite number')
   need(spec.deviceBufferBytes > 0 && Number.isFinite(spec.deviceBufferBytes), 'deviceBufferBytes must be a positive finite number, read from the device once')
   return spec
+}
+
+const bindVegetation = (module, vegetation, plan, cullRadiusM) => {
+  const memory = vegetation.memory()
+  const status = module._engine_vegetation_bind(
+    memory.block.byteOffset,
+    memory.counts.byteOffset,
+    memory.dirty.byteOffset,
+    memory.origins.byteOffset,
+    cullRadiusM,
+    VEG_SPECIES.length,
+    plan.slots,
+    plan.capacityPerPatch,
+  )
+  return status === 1
 }
 
 export const buildPlanetScene = ({ spec: overrides = {}, module, now, generate = true, allocate }) => {
@@ -74,7 +90,9 @@ export const buildPlanetScene = ({ spec: overrides = {}, module, now, generate =
       capRad: patchCapRad,
     }
   }
+  const cullRadiusM = spec.radiusM * patchCapRad + PATCH_HEIGHT_MARGIN_M
   const plan = planVegetationPool({ maxBufferBytes: spec.deviceBufferBytes, residentPatches: side * side, capacityPerPatch: patchTrees })
+  const inArena = allocate === undefined && canArenaAllocate(module)
   const vegetation = createVegetationPool({
     plan,
     species: VEG_SPECIES,
@@ -85,10 +103,11 @@ export const buildPlanetScene = ({ spec: overrides = {}, module, now, generate =
     generatePerFrame: Math.max(VEG_GEN_INSTANCES_PER_FRAME, plan.capacityPerPatch),
     now,
     radiusM: spec.radiusM,
-    cullRadiusM: spec.radiusM * patchCapRad + PATCH_HEIGHT_MARGIN_M,
-    allocate,
+    cullRadiusM,
+    allocate: inArena ? arenaAllocator(module) : allocate,
   })
   vegetation.sync(Array.from({ length: side * side }, (_, k) => k))
+  const vegetationBound = inArena ? bindVegetation(module, vegetation, plan, cullRadiusM) : null
   let generateMs = 0
   if (generate) {
     const t0 = now()
@@ -110,7 +129,7 @@ export const buildPlanetScene = ({ spec: overrides = {}, module, now, generate =
       heightCalls,
       vegetationPlan: plan,
       vegetationBytes: vegetation.bytes(),
-      vegetationBound: null,
+      vegetationBound,
     }
   }
 

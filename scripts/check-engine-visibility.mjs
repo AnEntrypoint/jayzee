@@ -85,8 +85,8 @@ gate('the surface is configured for copy-out and the storage binding limit is re
 })
 
 gate('the WebGL2 renderer draws models forward with CPU cluster culling and reports the forward path', () => {
-  if (!webgl2.includes('drawModels(camera)')) throw new Error('the WebGL2 frame does not draw models')
-  if (!webgl2.includes('visibleRuns(s, camera.planes, modelRuns, &kept)')) throw new Error('the WebGL2 model draw does not use the CPU cluster culling')
+  if (!webgl2.includes('drawModels(camera, scene.origin)')) throw new Error('the WebGL2 frame does not draw models')
+  if (!webgl2.includes('visibleRuns(s, camera.planes, modelRuns, &kept, frameOrigin)')) throw new Error('the WebGL2 model draw does not use the CPU cluster culling')
   if (!webgl2.includes('drawn += kept')) throw new Error('the WebGL2 model draw does not count the clusters it keeps')
   if (!webgl2.includes('counters().modelPath = engine::render::kModelPathForward')) throw new Error('the WebGL2 frame does not report the forward path')
 })

@@ -126,7 +126,7 @@ export const frameCauses = ({ page, cgroupSamples, schedRows = null, quotaCores 
   }
   const long = summarise(measured.filter((f) => f.tickMs > longMs))
   const normal = summarise(measured.filter((f) => f.tickMs <= longMs))
-  return { frames: frames.length, covered: measured.length, mainPid: pid, long, normal, cause: classifyLongFrames(long, quotaCores) }
+  return { frames: frames.length, covered: measured.length, mainPid: pid, measured, long, normal, cause: classifyLongFrames(long, quotaCores) }
 }
 
 if (process.argv[1] && process.argv[1].endsWith('/browser/frame-stall-cause.mjs')) {

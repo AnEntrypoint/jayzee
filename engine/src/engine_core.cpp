@@ -158,6 +158,10 @@ EMSCRIPTEN_KEEPALIVE void engine_arena_seal() {
   engine::arena::seal();
 }
 
+EMSCRIPTEN_KEEPALIVE std::uint8_t* engine_arena_carve(std::uint32_t bytes, std::uint32_t alignment) {
+  return static_cast<std::uint8_t*>(engine::arena::carve(bytes, alignment));
+}
+
 EMSCRIPTEN_KEEPALIVE std::uint32_t* engine_layout() {
   layoutWords[kWordUsedBytes] = static_cast<std::uint32_t>(engine::arena::used());
   return layoutWords;

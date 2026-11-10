@@ -15,9 +15,9 @@ const HOLD_END = QUERY.get('hold') === '1'
 const THREADS = QUERY.get('threads') === '1' && TIER === 1024
 const WORKERS = THREADS ? 4 : 1
 const TIER_GLUE = THREADS
-  ? '../../engine/out/engine-core-128mib-timed-threads-simd.mjs'
-  : (TIER === 1024 ? '../../engine/out/engine-core-128mib' : '../../engine/out/engine-core-64mib') + (TIMED ? '-timed' : '') + '.mjs'
-const TIER_BUDGET = TIER === 1024 ? 128 * 1024 * 1024 : 64 * 1024 * 1024
+  ? '../../engine/out/engine-core-512mib-timed-threads-simd.mjs'
+  : (TIER === 1024 ? '../../engine/out/engine-core-512mib' : '../../engine/out/engine-core-64mib') + (TIMED ? '-timed' : '') + '.mjs'
+const TIER_BUDGET = TIER === 1024 ? 512 * 1024 * 1024 : 64 * 1024 * 1024
 const WARMUP_FRAMES = 60
 const FRAMES = QUERY.has('frames') ? Number(QUERY.get('frames')) : 600
 if (!Number.isInteger(FRAMES) || FRAMES <= WARMUP_FRAMES) throw new RangeError('frames must be a whole number above the warm-up frames')
@@ -273,8 +273,8 @@ const planetCamera = (module, renderer, frame, aspect, surface) => {
   return CAMERA
 }
 
-const setupScene = (module, renderer, placed) => {
-  setupWorld(module)
+const setupScene = (module, renderer, placed, worldReady = false) => {
+  if (!worldReady) setupWorld(module)
   const surface = PATH === 'planet' ? setupPlanetPath(module, renderer) : setupPlanet(module, renderer, placed)
   const classes = new Uint8Array(RENDER_LAYOUT.BODY_SLOTS).fill(255)
   for (let i = 0; i < BODIES; i++) classes[i] = i % RENDER_LAYOUT.PROP_CLASSES
@@ -399,10 +399,13 @@ const run = async () => {
   const navigatorLike = PHASE === 11 ? {} : navigator
   const requested = PHASE === 11 ? 'webgl2' : 'webgpu'
   result.adapter = await adapterInfo()
-  const renderer = await loadRenderer({ glue: new URL(TIER_GLUE, import.meta.url).href, canvas, navigatorLike, requested, players: TIER, workers: WORKERS, budgetBytes: TIER_BUDGET })
+  let planetScene = null
+  let worldReady = false
+  const beforeSeal = TIER === 1024 ? (module) => { setupWorld(module); worldReady = true; planetScene = buildPlanetScene({ module, now: () => performance.now() }) } : null
+  const renderer = await loadRenderer({ glue: new URL(TIER_GLUE, import.meta.url).href, canvas, navigatorLike, requested, players: TIER, workers: WORKERS, budgetBytes: TIER_BUDGET, beforeSeal })
   const module = renderer.module
   const placed = []
-  const surface = setupScene(module, renderer, placed)
+  const surface = setupScene(module, renderer, placed, worldReady)
 
   const aspect = canvas.width / canvas.height
   const frameTimes = []
@@ -484,7 +487,7 @@ const run = async () => {
   result.frameTimeMaxMs = Math.max(...timed)
   result.frameTimesMs = timed.map(roundTo2)
   result.players = readLayout(module).players
-  if (TIER === 1024) result.scene = buildPlanetScene({ module, now: () => performance.now() }).report()
+  if (TIER === 1024) result.scene = planetScene.report()
   result.path = PATH
   if (PATH === 'planet') {
     result.pathSpeedMps = PATH_SPEED_M_PER_S

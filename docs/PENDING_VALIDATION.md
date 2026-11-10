@@ -3526,3 +3526,39 @@ Open for Phase B, not decided in Phase A:
 
 - The WebGPU visibility path does not draw vegetation. This is a missing feature, not a precision defect. It is not done here, and it stays open.
 - Rebase rounding accumulates at most 3e-5 m per rebase over a long session. The Phase B run measures the worst error over a real session, and does not rely on the gate's 4 km walk alone.
+
+
+## Phase B (this pass, 2026-11-10): stretches 2 to 7 witnesses
+
+Build: ENGINE_VARIANT and ENGINE_TIER_MIB through engine/build.sh for every variant in engine/out, each rebuilt after the last C++ edit. The leak 64, threads 128 and threadstimed 128 simd artifacts were rebuilt after partial output from an interrupted run failed to link or instantiate.
+
+| witness | result | wall | evidence |
+|---|---|---|---|
+| npm test (full chain) | exit 0 | 129 s | 256 RESULT: PASS blocks; build/npm-test9.log |
+| check-engine-threads (threaded 64, 4 workers) | PASS, 5 of 5 | 2.6 s | build/threads-run.log |
+| check-planet-witness (gate) | PASS, 17 of 17 | under 1 s | build/pw.log, includes the three arena-binding gates |
+| check-engine-visibility (WebGL2 gate strings updated to the current call shapes) | PASS, 13 of 13 | under 1 s | build/vis.log |
+| check-tail-report and check-frame-stall-cause | PASS and PASS | under 1 s | build/tail.log, build/fsc.log |
+| npm run planet-witness, 1024 WebGPU | PASS: p99 12.16 ms, worst 12.61 ms, 840 frames, vegetation bound, 16 patches | 16.4 s per run | build/diag/planet/1024-webgpu.json |
+| npm run planet-witness, 1024 WebGL2 | FAIL: p99 12.19 ms, worst 17.77 ms (1 frame over 16.7 ms), vegetation bound, 16 patches | 16.4 s per run | build/diag/planet/1024-webgl2.json |
+| npm run planet-witness, 64 WebGPU and WebGL2 | PASS: p99 3.11 and 3.17 ms, worst 8.04 and 4.42 ms | 16.4 s per run | build/diag/planet/64-*.json |
+
+Defects fixed in this pass:
+
+1. Threads OOM (check-engine-threads, RuntimeError Aborted(OOM) at four workers): the threaded arena was tier minus 4 MiB, which left the three 512 KiB pthread stacks in the malloc heap with no room. engine/CMakeLists.txt now subtracts the pool stacks from ENGINE_ARENA_BYTES when ENGINE_THREADS is on.
+2. The GetBodies compile fix and the stretch 2 to 7 gates were committed locally as lanmower with no trailer (d5f254a). Not pushed.
+3. check-engine-visibility: two gate strings were from stretch 6 and did not match the current drawModels(camera, scene.origin) and visibleRuns(..., &kept, frameOrigin) calls.
+4. check-tail-report: reportFromFiles called .map on the summary object that frameCauses returns. frameCauses now also returns measured (the per-frame list), and the gate regex matches the verdict text run on CPU.
+5. Stretch 5 vegetation binding on the 1024 page: engine_arena_carve is exported (engine/src/engine_core.cpp and CMake); src/engine/arenaAllocate.js carves typed-array views from the wasm arena; buildPlanetScene binds the pool through engine_vegetation_bind when the arena allocator is in use (vegetationBound); loadRenderer takes a beforeSeal hook so the scene is built and bound before engine_render_seal. The page runs setupWorld inside that hook first, because a pool carve before the world configure made the configure return kFull (-1).
+
+Deviations, recorded so they are visible:
+
+- Tier. The 1024 planet page runs on the 512 MiB threaded timed SIMD build (engine-core-512mib-timed-threads-simd, budget 512 MiB), not the 128 MiB build the earlier page used. Measured on 128 MiB threaded: the render path and the world take 127.2 MB of a 128.45 MB arena (4 MiB less the 1.5 MiB pool stacks) before the 8.64 MB vegetation block, so the pool does not fit. The 256 MiB threaded build instead fails at WebGPU setup with RuntimeError: table index is out of bounds before the first frame (build/diag/planet/1024-webgpu.json, lastFrame -1), at budgets of both 128 and 256 MiB. The 512 MiB build runs both backends. The budget planner (104.3 MiB for 1024 players) does not count the render path or the pool; this is open.
+- The 1024 WebGL2 run is red on one frame: 17.77 ms against the 16.7 ms budget, with p99 12.19 ms. The cause is not established here; it is recorded as a failing witness, not tuned away.
+
+Open after this pass:
+
+- 1024 WebGL2 single worst frame over budget (above). The witness requires every frame under budget, so the stretch 5 witness is not green.
+- The budget planner excludes render-path memory and the vegetation pool, so the 1024 tier needs 512 MiB, not the 104.3 MiB plan.
+- WebGPU at 256 MiB threaded: table index fault at setup (above). Not diagnosed.
+- Not pushed: the witness is red, so the push waits for the owner or the next pass.

@@ -37,7 +37,7 @@ export const reportFromFiles = ({ page, cgroupText, schedText, budgetMs = BUDGET
     cgroupSamples: parseCgroupSamples(cgroupText),
     schedRows: schedText === null ? null : parseSchedLog(schedText),
     longMs: budgetMs,
-  }).map((c) => [c.frame, c]))
+  }).measured.map((c) => [c.frame, c]))
   const causes = pageFrames(page).map((frame) => measured.get(frame.frame) ?? { frame: frame.frame, wallMs: frame.endMs - frame.startMs, runShare: null, waitShare: null, offShare: null, throttledMs: 0 })
   const wall = causes.map((c) => c.wallMs)
   const timed = page.rows.map((row) => row[page.rowColumns.indexOf('tickMs')] + row[page.rowColumns.indexOf('renderMs')])

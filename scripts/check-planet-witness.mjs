@@ -140,7 +140,8 @@ gate('the render page exports the per-frame times, the player count and the plan
   const page = readFileSync(join(root, 'scripts/browser/engine-render-browser.js'), 'utf8')
   assert.ok(page.includes('result.frameTimesMs = timed.map(roundTo2)'))
   assert.ok(page.includes('result.players = readLayout(module).players'))
-  assert.ok(page.includes('result.scene = buildPlanetScene({ module, now: () => performance.now() }).report()'))
+  assert.ok(page.includes('result.scene = planetScene.report()'))
+  assert.ok(page.includes('beforeSeal = TIER === 1024'))
 })
 
 gate('the planet witness is in the package scripts, and the runner calls the same verdict and exits non-zero on a miss', () => {
@@ -157,6 +158,61 @@ gate('the scene spec defaults to 1024 entities on the 6,360,000 m planet, and th
   assert.equal(sceneSpec().entities, PLANET_ENTITY_COUNT)
   assert.equal(PLANET_FRAME_BUDGET_MS, 16.7)
   assert.equal(PLANET_MIN_FRAMES, 600)
+})
+
+const arenaModule = () => {
+  const heap = new ArrayBuffer(64 * 1024 * 1024)
+  let top = 1024
+  const bound = []
+  return {
+    HEAPU8: new Uint8Array(heap),
+    _engine_planet_height: () => 0,
+    _engine_arena_used: () => top,
+    _engine_arena_carve: (bytes, alignment) => {
+      const start = Math.ceil(top / alignment) * alignment
+      if (start + bytes > heap.byteLength) return 0
+      top = start + bytes
+      return start
+    },
+    _engine_vegetation_bind: (...args) => {
+      bound.push(args)
+      return 1
+    },
+    bound,
+  }
+}
+
+gate('the planet scene binds its vegetation pool to arena memory, and the bind gets the pool pointers and sizes', () => {
+  const module = arenaModule()
+  const scene = buildPlanetScene({ module, now: clock(), generate: false })
+  const r = scene.report()
+  assert.equal(r.vegetationBound, true)
+  assert.equal(module.bound.length, 1)
+  const [block, counts, dirty, origins, radius, species, slots, capacity] = module.bound[0]
+  const memory = scene.vegetation.memory()
+  assert.equal(block, memory.block.byteOffset)
+  assert.equal(counts, memory.counts.byteOffset)
+  assert.equal(dirty, memory.dirty.byteOffset)
+  assert.equal(origins, memory.origins.byteOffset)
+  assert.equal(origins % 8, 0)
+  assert.equal(block % 16, 0)
+  assert.equal(radius, scene.vegetation.memory().radius)
+  assert.equal(species, 1)
+  assert.equal(slots, r.vegetationPlan.slots)
+  assert.equal(capacity, r.vegetationPlan.capacityPerPatch)
+})
+
+gate('a bind the engine refuses leaves the scene unbound, and a module without the arena keeps the JS heap pool unbound', () => {
+  const refusing = arenaModule()
+  refusing._engine_vegetation_bind = () => 0
+  assert.equal(buildPlanetScene({ module: refusing, now: clock(), generate: false }).report().vegetationBound, false)
+  assert.equal(buildPlanetScene({ module: fakeModule(), now: clock(), generate: false }).report().vegetationBound, null)
+})
+
+gate('an arena that runs out of room refuses the pool with a RangeError, and no view is handed out past its end', () => {
+  const module = arenaModule()
+  module._engine_arena_carve = () => 0
+  assert.throws(() => buildPlanetScene({ module, now: clock(), generate: false }), RangeError)
 })
 
 finish()

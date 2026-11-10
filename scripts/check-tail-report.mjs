@@ -25,7 +25,7 @@ gate('cgroup throttling with a large off-CPU share names the throttle', () => {
 
 gate('a tail that runs on CPU is attributed to the frame itself', () => {
   const verdict = attributeTails([{ wallMs: 25, runShare: 0.95, waitShare: 0.02, offShare: 0.03, throttledMs: 0 }]).verdict
-  assert.match(verdict, /runs on CPU/)
+  assert.match(verdict, /run on CPU/)
 })
 
 gate('a missing scheduler log says so instead of guessing', () => {

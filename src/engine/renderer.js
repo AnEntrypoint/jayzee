@@ -226,7 +226,7 @@ export const createRenderer = (module, backend, { modelTier = -1, device = null,
   })
 }
 
-export const loadRenderer = async ({ glue = DEFAULT_GLUE, canvas, navigatorLike = globalThis.navigator, requested = 'auto', players = 64, workers = 1, budgetBytes = 67108864 } = {}) => {
+export const loadRenderer = async ({ glue = DEFAULT_GLUE, canvas, navigatorLike = globalThis.navigator, requested = 'auto', players = 64, workers = 1, budgetBytes = 67108864, beforeSeal = null } = {}) => {
   if (!canvas) throw new TypeError('loadRenderer needs a canvas')
   ensureCanvasId(canvas)
   const backend = chooseBackend(requested, Boolean(navigatorLike && navigatorLike.gpu))
@@ -239,6 +239,7 @@ export const loadRenderer = async ({ glue = DEFAULT_GLUE, canvas, navigatorLike 
   const modelTier = module._engine_models_bind_plan(...(device ? modelLimits(device, navigatorLike) : WEBGL2_MODEL_LIMITS))
   if (modelTier < 0) throw new Error('engine_models_bind_plan refused: ' + (MODEL_BIND_REFUSALS[modelTier] ?? 'unknown status ' + modelTier))
   status(module._engine_render_init(backend), 'engine_render_init')
+  if (beforeSeal) beforeSeal(module)
   status(module._engine_render_seal(), 'engine_render_seal')
   const deviceLost = device ? device.lost.then((info) => ({ reason: info.reason, message: info.message })) : null
   return createRenderer(module, backend, { modelTier, device, deviceLost })
