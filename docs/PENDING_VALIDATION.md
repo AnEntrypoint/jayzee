@@ -2446,3 +2446,10 @@ Commit cee1951 carries the Phase A change. The Phase B change is the engine brid
 - `npm test`, once, after the package.json edit: exit 0, 4806 PASS lines, 0 FAIL lines, 239 RESULT PASS lines (238 before this change, plus the bridge gate). The bridge gate runs last in the chain. Log `build/diag/phaseB-npm-test.log`.
 
 Still open after this pass, unchanged from the Phase A list: the phase 5 frame-time p99, the `USE_WEBGPU` to `emdawnwebgpu` migration, the `ENGINE_THREADS` branch, the 1024-tier stall fix, the launcher-level null-adapter fix, the JF6 allocation under TSL, the phase 6 cube-sphere keying decision (dispatcher), and the ENGINE.md decisions (dispatcher).
+### Phase A pass: locate the allocation in decodeCrowdDots under TSL (run 2026-11-10-01-27-53-963539)
+
+Change made, not run. The JF6 scope above records that the render page allocates in decodeCrowdDots once three/tsl is loaded, and that the allocation inside the function was not located. The new probe samples heap allocations with V8's sampling heap profiler over 20000 reused-out calls, once with three/tsl loaded and once with --no-tsl, and prints the sites by bytes. Its output says which function allocates, and whether the allocation appears only when TSL is loaded.
+
+| Item | File | Commit | Witness | State after Phase A |
+|---|---|---|---|---|
+| JF6 allocation locate | `scripts/alloc-locate-crowd-dots.mjs` (new probe, not a gate) | this commit | Phase B: `node scripts/alloc-locate-crowd-dots.mjs` and `node scripts/alloc-locate-crowd-dots.mjs --no-tsl`. The TSL run must show the allocating site and its bytes per call. The no-TSL run is the control, which the gate already says is near zero. | Written, not run. |
