@@ -1,4 +1,4 @@
-export function applyMovement(state, input, movement, dt, overrides = null) {
+export function applyMovement(state, input, movement, dt, overrides = null, out = null) {
   const m = overrides ? { ...movement, ...overrides } : movement
   const { maxSpeed, groundAccel, airAccel, friction, stopSpeed, jumpImpulse } = m
   const coyoteWindow = m.coyoteTime ?? 0.12
@@ -111,7 +111,14 @@ export function applyMovement(state, input, movement, dt, overrides = null) {
 
   state.velocity[0] = vx
   state.velocity[2] = vz
-  return { wishX, wishZ, wishSpeed, jumped, sliding: !!state.sliding, forceCrouch }
+  if (out === null) return { wishX, wishZ, wishSpeed, jumped, sliding: !!state.sliding, forceCrouch }
+  out.wishX = wishX
+  out.wishZ = wishZ
+  out.wishSpeed = wishSpeed
+  out.jumped = jumped
+  out.sliding = !!state.sliding
+  out.forceCrouch = forceCrouch
+  return out
 }
 
 export const DEFAULT_MOVEMENT = {

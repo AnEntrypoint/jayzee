@@ -66,6 +66,7 @@ export class SnapshotTimeline {
   #out = { tick: 0, renderMs: 0, players: [] }
   #playerPool = []
   #byIdA = new Map()
+  #indexedSnap = null
 
   constructor({ tickRate = 60 } = {}) {
     this.tickMs = 1000 / tickRate
@@ -155,8 +156,11 @@ export class SnapshotTimeline {
     out.tick = b.tick
     out.renderMs = renderMs
     const byIdA = this.#byIdA, pool = this.#playerPool, dst = out.players
-    byIdA.clear()
-    for (const player of a.players) byIdA.set(player.id, player)
+    if (this.#indexedSnap !== a) {
+      byIdA.clear()
+      for (const player of a.players) byIdA.set(player.id, player)
+      this.#indexedSnap = a
+    }
     dst.length = 0
     for (const playerB of b.players) {
       if (!playerB.position) continue

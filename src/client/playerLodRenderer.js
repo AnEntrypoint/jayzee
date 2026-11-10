@@ -119,7 +119,7 @@ export function installPlayerLodRenderer(scene, opts = {}) {
     },
     getTiers: () => planner.getTiers(),
     tierOf(id) {
-      const tier = planner.getTiers().tierById.get(id)
+      const tier = planner.tierOf(id)
       return tier !== undefined ? tier : TIER_DOT
     },
     setFullCountOverride: (value) => planner.setFullCountOverride(value),

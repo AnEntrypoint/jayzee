@@ -153,7 +153,7 @@ export class PredictionEngine {
     this._renderState = null
     this._clearHorizontalBlock()
     this.walls = []
-    this._env = { applyMovement, gravityY: this.gravityY, ground: null, wedged: false, groundNormal: null, walls: null, wallExtentM: WALL_EXTENT_BASE_M, collider: null, wedgeNormal: this.wedgeNormal }
+    this._env = { applyMovement, moveResult: { wishX: 0, wishZ: 0, wishSpeed: 0, jumped: false, sliding: false, forceCrouch: false }, gravityY: this.gravityY, ground: null, wedged: false, groundNormal: null, walls: null, wallExtentM: WALL_EXTENT_BASE_M, collider: null, wedgeNormal: this.wedgeNormal }
     this._mirror = null
     this._trail = createStepTrail()
     this._trailPos = [0, 0, 0]

@@ -114,6 +114,15 @@ export function createVsyncMonitor() {
   let missStreak = 0, maxMissStreak = 0
   let missCount = 0, frameCount = 0
   let lastExpectedMs = 0, lastDeltaMs = 0, lastIsMiss = false, lastIsCompositorStall = false, lastMissedFrames = 0
+  const ticked = { isMiss: false, isCompositorStall: false, deltaMs: 0, expectedMs: 0, missedFrames: 0 }
+  const writeTick = (isMiss, isCompositorStall, deltaMs, expectedMs, missedFrames) => {
+    ticked.isMiss = isMiss
+    ticked.isCompositorStall = isCompositorStall
+    ticked.deltaMs = deltaMs
+    ticked.expectedMs = expectedMs
+    ticked.missedFrames = missedFrames
+    return ticked
+  }
 
   function median() {
     if (filled === 0) return inferredIntervalMs
@@ -127,7 +136,7 @@ export function createVsyncMonitor() {
     frameCount++
     if (lastTs < 0) {
       lastTs = ts
-      return { isMiss: false, isCompositorStall: false, deltaMs: 0, expectedMs: inferredIntervalMs, missedFrames: 0 }
+      return writeTick(false, false, 0, inferredIntervalMs, 0)
     }
     const deltaMs = ts - lastTs
     lastTs = ts
@@ -156,7 +165,7 @@ export function createVsyncMonitor() {
     lastIsMiss = isMiss
     lastIsCompositorStall = isCompositorStall
     lastMissedFrames = missedFrames
-    return { isMiss, isCompositorStall, deltaMs, expectedMs, missedFrames }
+    return writeTick(isMiss, isCompositorStall, deltaMs, expectedMs, missedFrames)
   }
 
   function state() {

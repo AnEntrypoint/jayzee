@@ -28,7 +28,7 @@ function slideAlongWalls(p, walls, extentM) {
 
 export function predictCharacterStep(state, input, movement, dt, env) {
   const wasGrounded = !!state.onGround
-  const result = env.applyMovement(state, input, movement, dt)
+  const result = env.applyMovement(state, input, movement, dt, null, env.moveResult ?? null)
   if (env.collider && !env.wedged) { env.collider.step(state, input, dt, env.gravityY, wasGrounded); return result }
   if (input) { state._physCrouch = !!input.crouch; state._crouchDy = 0 }
   const v = state.velocity, p = state.position
