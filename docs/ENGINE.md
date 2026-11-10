@@ -496,7 +496,7 @@ Open for this decision: a tick that is clearly under 16.7 ms at 1024 needs a phy
 
 Minimum arena for the 1024 plan (decision)
 
-Decision: `engine_init` keeps refusing a budget that cannot hold the planned tier. It returns -2 (range) and binds nothing. The device decides the budget, so the engine does not quietly boot a smaller plan that would break the tier contract. The host chooses a budget at or above the floor, and the floor is what the gate measures: `scripts/check-engine-budget-floor.mjs` asserts 16 MiB is refused, 48 MiB boots, and bisects the smallest booting arena between them, printing it as an INFO line. The floor value is recorded in docs/PENDING_VALIDATION.md from the Phase B run, not assumed here.
+Decision: `engine_init` keeps refusing a budget that cannot hold the planned tier. It returns -2 (range) and binds nothing. The device decides the budget, so the engine does not quietly boot a smaller plan that would break the tier contract. The host chooses a budget at or above the floor, and the floor is what the gate measures: `scripts/check-engine-budget-floor.mjs` asserts 16 MiB is refused, 48 MiB boots, and bisects the smallest booting arena between them, printing it as an INFO line. In this build the floor is 35 MiB (Phase B run, docs/PENDING_VALIDATION.md).
 
 Real vegetation and streaming (Phase A)
 

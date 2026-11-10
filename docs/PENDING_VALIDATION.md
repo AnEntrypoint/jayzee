@@ -3252,3 +3252,38 @@ Not done in Phase A, recorded as open in docs/ENGINE.md:
 - The null adapter launcher fix (the seeding in `scripts/browser/webgpu-profile.mjs` is in place, but the launcher-level retry is not written).
 - The 1024 budget (16.7 ms) is not reached by a renderer change. The NoLock sync is only a first step, and the solver iteration count is the larger lever. It changes the determinism hash, so it needs an owner decision.
 - The physics scenario witnesses (spoint example games) are not started.
+
+Phase B (this stretch): each change built and witnessed once after the last edit, except where noted.
+
+| step | result | wall |
+|---|---|---|
+| `bash /tmp/build-all.sh` (eight variants) | rc 0 each; fixed64 8a7d7413, fixed128 685ef43c, fixed512 7f7b8c3c, leak64 8ae29c40 (sha256 prefixes) | 11 s each, 85 s total |
+| `engine/artifacts.json` repin (four pinned artifacts) | `check:engine-artifacts` PASS | under 1 s |
+| `check:engine-budget-floor` | PASS 3 of 3; 16 MiB refused with -2, 48 MiB boots, floor INFO 35 MiB | under 1 s |
+| `check:vegetation-assets` | PASS 5 of 5; basisu 1.16.3 ran; tree 386,904 to 89,516 B (3 KTX2), tall_tree 600,260 to 183,492 B (3), grass_large 888,668 to 330,948 B (2), flowers 190,296 to 44,716 B (1); meshopt medium | 2 s |
+| `check:engine-render`, `core`, `leak`, `visibility`, `planet`, `pools`, `materials`, `bridge`, `threads`, `world`, `codecs`, `interest`, `vegetation` | all RESULT PASS (18, 3, 3, 13, and the rest) | under 5 s each |
+| `check:engine-tiers` | RESULT PASS | 85 s |
+| `check:engine-host-witness` | PASS 292, FAIL 0 | 25 s |
+| `check:controlled-run` | PASS 27, FAIL 0, reads the recorded run; the live pause run is not repeated here | 1 s |
+| `node scripts/browser/stream-witness-run.mjs`, run 1 | STREAM_WITNESS FAIL 11 of 16 | about 5 min |
+| the same witness, run 2 (after per-part timers were added to the page) | STREAM_WITNESS FAIL 4 of 16 | about 5 min |
+| `npm test` | EXIT 0, PASS 4974, FAIL 0 | 182 s |
+
+Streaming witness, run 2 (`build/diag/stream/summary.json`). Every run places more than 64 pages (224 on flyover, 256 on planet). The 64, 128 and 512 tiers pass every check on both backends and both paths: frame p99 at most 7.6 ms, worst frame at most 12.7 ms, restage at most 1.15 ms, zero allocations after warm-up, zero creates after seal. The 1024 tier fails on both backends and both paths: median frame 24.3 to 27.8 ms, p99 35.7 to 46.6 ms, worst 42 to 60.5 ms, against the 16.7 ms budget.
+
+Run 1 failed 11 of 16. The failures were frame p99 or worst-frame spikes at 64, 128 and 512, and restage between 2.5 and 7.6 ms. Re-running those configurations alone (with the same page) gave restage of 0.8 to 1.1 ms and p99 of about 5.6 ms, and run 2 passed them. Load average on the 12-core host was 4.5 to 5 during run 1 and 9 to 11 during the re-runs, so the run 1 spikes are recorded as load-driven, not as a fixed defect. The per-part timers (stage, fill, commit, place) are in the result as `restagePartsMaxMs`: each part is under 0.2 ms in the re-runs, so the restage cost is not in the page's fill loop.
+
+64-tier backend trace (the encode phase, one run, WebGPU planet, `phases`): physics 2.82 ms, backend 0.24 ms, of which encode 0.06, acquire 0.04, upload 0.06 and submit 0.04. The encode phase is now measured; the rest of the backend time is not yet attributed.
+
+Physics allocation (item 2 of the queue). Reading `engine/src/world.cpp`: `applyRadialGravity`, `step` and `sync` make no allocation per frame. Bodies are fixed slots, the Jolt temp allocator is sized at creation from `tempBytes`, and `sync` now uses NoLock. So the 1024 cost is solver work across 10,240 bodies, not allocation. The solver iteration count is the lever, and it changes the determinism hash, so it is OPEN for an owner decision.
+
+Open after Phase B:
+
+- 1024 frame budget (16.7 ms): missed on both backends and both paths. The render side is under 1 ms; the tick is the cost.
+- 1024 long-frame stalls (up to 60 ms in run 2; the earlier 705 ms was not reproduced).
+- 362.9 ms WebGL2 outlier: not reproduced in these runs.
+- Null adapter after a browser restart: the flag seeding is in `scripts/browser/webgpu-profile.mjs`; the launcher-level fix is not written, and it did not recur in this pass.
+- Instanced GLB vegetation draw path: not built. The vegetation gate proves validity only.
+- KTX2 transcode of the prepped assets: not witnessed.
+- Physics scenario witnesses (spoint example games): not started.
+- spoint walk frame-time comparison: not run.

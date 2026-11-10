@@ -4,19 +4,19 @@
   "artifacts": {
     "engine-core-64mib": {
       "wasm": "engine/out/engine-core-64mib.wasm",
-      "sha256": "9651bc5ba2174e694722bbecc29b45c4249cce480098ca0e311d9d9347202c1b"
+      "sha256": "8a7d74137eb1509d4d92226f4a9cf137b0c94cb10b749a8917b2e0f2c204041c"
     },
     "engine-core-128mib": {
       "wasm": "engine/out/engine-core-128mib.wasm",
-      "sha256": "1507b4fec66e696bf4eb187315e1f2d6c24084829d6edac249d4c11a4bd1bc2d"
+      "sha256": "685ef43cf5ee37415351c29caabf92f6b9958f2d49d0ebfaba25afe16465bdc6"
     },
     "engine-core-512mib": {
       "wasm": "engine/out/engine-core-512mib.wasm",
-      "sha256": "e03eeb9943ff7ab0a05b0fd7998c05531ff5d1dd942e940051be65628ffa4d37"
+      "sha256": "7f7b8c3c93a0231b50c9aa7e701ec427ea4384939692c721df35653f575fe378"
     },
     "engine-core-64mib-leak": {
       "wasm": "engine/out/engine-core-64mib-leak.wasm",
-      "sha256": "c10d418561e6adaa63992f7d550a14eaafb9413aeaa69aac5d4cd374be420d88"
+      "sha256": "8ae29c409797be0a0efdc417ff9704464fb087e7fb24e30b4a9c6de3f5a20b59"
     }
   }
 }

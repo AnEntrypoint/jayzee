@@ -217,7 +217,8 @@ const PATH_SPEED_M_PER_S = FLYOVER ? 300 : 30
 const PATH_STEP_M = PATH_SPEED_M_PER_S / 60
 const PATH_HEIGHT_M = FLYOVER ? 250 : CAMERA_HEIGHT
 const pagePlacement = new Map()
-const pathStats = { restages: 0, restageMs: [], cellChanges: 0 }
+const PART_NAMES = ["stage", "fill", "commit", "place"]
+const pathStats = { restages: 0, restageMs: [], cellChanges: 0, parts: { stage: [], fill: [], commit: [], place: [] } }
 let pathRef = null
 let pathCell = null
 const PATH_CELL_NOW = { face: 0, cx: 0, cy: 0 }
@@ -254,15 +255,24 @@ const streamPages = (module, renderer, limit) => {
   while (budget > 0 && pageQueue.stage.length > 0) {
     const [key, [dx, dy]] = pageQueue.stage.pop()
     if (pagePlacement.has(key)) continue
+    const t0 = performance.now()
     const slot = module._engine_page_stage(key)
     if (slot < 0) throw new Error('page stage refused at window cell ' + dx + ',' + dy)
+    const t1 = performance.now()
     const samples = module._engine_page_samples(slot) >> 2
     const k = Math.abs(Number(key)) % 97
     for (let s = 0; s < PAGE_SIDE * PAGE_SIDE; s++) {
       module.HEAPF32[samples + s] = 0.5 * Math.sin((s % PAGE_SIDE) * 0.6 + k) * Math.cos(Math.floor(s / PAGE_SIDE) * 0.6)
     }
+    const t2 = performance.now()
     module._engine_page_commit(slot)
+    const t3 = performance.now()
     renderer.placePage(slot, cellOrigin(dx, dy), PAGE_U_EDGE, PAGE_V_EDGE)
+    const t4 = performance.now()
+    pathStats.parts.stage.push(t1 - t0)
+    pathStats.parts.fill.push(t2 - t1)
+    pathStats.parts.commit.push(t3 - t2)
+    pathStats.parts.place.push(t4 - t3)
     pagePlacement.set(key, { slot })
     budget -= 1
   }
@@ -277,6 +287,7 @@ const setupPlanetPath = (module, renderer) => {
   streamPages(module, renderer, Infinity)
   pathStats.restages = 0
   pathStats.restageMs = []
+  for (const name of PART_NAMES) pathStats.parts[name] = []
   return surface
 }
 
@@ -523,6 +534,7 @@ const run = async () => {
     if (pathStats.restageMs.length > 0) {
       result.restageMsMax = Math.max(...pathStats.restageMs)
       result.restageMsP99 = p99(pathStats.restageMs)
+      result.restagePartsMaxMs = Object.fromEntries(PART_NAMES.map((name) => [name, Math.max(0, ...pathStats.parts[name])]))
     }
   }
   const round2 = (v) => Math.round(v * 100) / 100
