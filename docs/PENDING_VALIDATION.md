@@ -3133,3 +3133,36 @@ Medians of the three rounds: WebGPU 2.45 ms, WebGL2 2.30 ms, a ratio of 1.065 (W
 Decomposition of the WebGPU excess, from the phase medians: backend 0.17 against 0.07 ms (0.10 ms), acquire 0.03 ms, upload 0.04 ms and submit 0.03 ms, all of which are zero on WebGL2. The tick is the same on both sides within noise (2.15 to 2.26 ms against 2.09 to 2.22 ms). The WebGPU frame carries 32 API calls against WebGL2's 48, so the extra cost is per-call work in the WebGPU backend phase, not the number of calls.
 
 Status: the 64-tier slowdown is reduced from 0.48 ms (the withdrawn earlier figure) to a measured residual of about 0.15 ms. The residual is attributed to the WebGPU backend phase and to acquire, upload and submit. It is not fixed. The next measure is a per-call trace of the backend phase, which is open.
+
+## Stretch: static-pool witnesses and the 1024 tier, threaded and SIMD (this pass)
+
+Phase A: no code change. Each witness below was run against the current build and the rows are recorded here.
+
+Phase B, static-pool witnesses (one run each, wall time from the batch):
+
+| witness | command | result | wall |
+|---|---|---|---|
+| models churn | `models-run.mjs build/diag/models/run.json 8843 600` | ok true, 270 churn loads, 258 unloads, 0 failures, 600 frames | 13 s |
+| models VRAM | `models-vram-run.mjs` | errors none. Tier 1 and the planned format are within budget. Tier 2 RGBA8 is forced over budget on purpose (planned 2,516,582,400 B against a 1,073,741,824 B budget, peak 3,046 MiB) and is not selected by the planner | 26 s |
+| device loss | `device-loss-run.mjs` | ok true, lost reason `destroyed`, reload 155 ms, statuses 0 before and after, `allocationsSinceWarmup` "0", `createsAfterSeal` 0 | 2 s |
+| planet path | `planet-path-run.mjs build/diag/planet/run.json 8847 1200` | exit 0, backend webgpu, 36 restages, frame p99 4.06 ms | 22 s |
+| decode worker | `decode-worker-run.mjs` | ok true, meshopt vertices equal, decode 18.0 ms, KTX2 refusal on a non-KTX2 input, cube KTX2 refused | 1 s |
+
+The forced tier-2 RGBA8 row is a finding and not a pass criterion for the planner: the planner does not select it, and the witness shows why.
+
+Phase B, 1024 tier, threaded and SIMD (`engine-core-128mib-timed-threads-simd`, 4 workers, `phase=10|11&tier=1024&timed=1&threads=1`, 600 frames, three interleaved rounds, each run 12 to 14 s wall):
+
+| run | frame median (ms) | frame p99 (ms) | tick median (ms) | outliers | checksum |
+|---|---|---|---|---|---|
+| WebGPU r1 | 16.90 | 23.07 | 16.44 | 0 | -3826851758512048142 |
+| WebGPU r2 | 15.42 | 19.74 | 14.96 | 0 | same |
+| WebGPU r3 | 18.28 | 25.13 | 17.81 | 0 | same |
+| WebGL2 r1 | 13.71 | 18.67 | 13.43 | 0 | same |
+| WebGL2 r2 | 17.54 | 25.93 | 17.23 | 1 | same |
+| WebGL2 r3 | 17.55 | 24.30 | 17.21 | 0 | same |
+
+Medians of the three rounds: WebGPU 16.9 ms, WebGL2 17.5 ms (the mean of the three WebGL2 values is 16.3 ms; the round-to-round spread on each backend, 13.7 to 17.6 ms, is larger than the gap between backends). Both backends are at or near the 16.7 ms budget at 60 Hz, and neither is clearly inside it. The tick is most of the frame on both backends (13.4 to 17.8 ms), so the frame budget is a physics budget at this tier. The checksum and visible slots agree across backends, and `ok` is true on every run.
+
+Status of the 1024 budget: reached in some rounds and missed in others, and the backend choice does not change it. Not fixed. The budget decision (threads plus SIMD at 4 workers, with scalar as the hash-verified fallback) is still to be recorded in docs/ENGINE.md, and the 8-worker case is impossible with the current pthread pool size of 3.
+
+Open after this stretch, unchanged from the earlier list: the landscape dataset decision, the scenario and streaming witnesses, the 64-tier backend-phase trace, and the 1024 budget decision in ENGINE.md.
