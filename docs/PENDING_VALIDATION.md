@@ -3166,3 +3166,22 @@ Medians of the three rounds: WebGPU 16.9 ms, WebGL2 17.5 ms (the mean of the thr
 Status of the 1024 budget: reached in some rounds and missed in others, and the backend choice does not change it. Not fixed. The budget decision (threads plus SIMD at 4 workers, with scalar as the hash-verified fallback) is still to be recorded in docs/ENGINE.md, and the 8-worker case is impossible with the current pthread pool size of 3.
 
 Open after this stretch, unchanged from the earlier list: the landscape dataset decision, the scenario and streaming witnesses, the 64-tier backend-phase trace, and the 1024 budget decision in ENGINE.md.
+
+## Stretch: landscape store decision, and the 64-tier record check (this pass)
+
+The paired 64-tier runs from the previous stretch were checked directly: all six run files in `build/diag/tier64/` are populated, the batch log `PAIRED_DONE` is present, no run process is live, and no run died. The record in the section above stands and is pushed as `33fd059`.
+
+Phase A: `scripts/bench-landscape-store.mjs` (new). It loads a built glue, configures the world and the planet, stages and fills and commits pages, and times a second CPU copy of the same samples. It writes `build/diag/landscape/store.json`. The decision is recorded in docs/ENGINE.md under "Landscape dataset decision", and the 1024 budget decision under "1024 frame budget decision".
+
+Phase B:
+
+| run | result | wall |
+|---|---|---|
+| `bench-landscape-store.mjs engine/out/engine-core-64mib.mjs 256 5` | 64 pages built, shared store 65,536 B, two copies 131,072 B, build shared 3.79 ms, build with the extra copy 3.82 ms, extra copy 0.025 ms median, residentAfterBuild 0 | under 1 s |
+| `LANDSCAPE_BUDGET_MIB=400 bench-landscape-store.mjs engine/out/engine-core-512mib.mjs 4096 5` | 64 pages again (the store is 64 slots at every tier), build shared 3.62 ms, with extra copy 3.63 ms, extra copy 0.011 ms | under 1 s |
+
+Measured reason for sharing: none found. A second CPU copy costs 64 KiB and about 0.01 to 0.03 ms for the whole 64-page store, so the decision to keep one store rests on correctness, not on cost. The collider reads the same samples the renderer uploads, so the two cannot drift apart at a page edge.
+
+The 64-page limit is a real finding for the streaming goal. The store is `kPageSlots = 64` (budget.cpp:33) at every tier, so the resident landscape is capped at 64 pages. Any streaming witness will hit this limit first. It is open, not fixed.
+
+Open after this stretch: the scenario physics witnesses, the vegetation and terrain streaming walk and fly-over, the 64-tier backend-phase trace, and the spoint frame-time comparison, the 1024 stalls, the controlled pause run, the 362.9 ms outlier and the null adapter after restart from earlier.

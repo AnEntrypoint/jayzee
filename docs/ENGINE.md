@@ -454,9 +454,34 @@ Memory and budgets
 - [ ] Budget degradation (lower LOD, fewer slots) instead of allocation: partial
 - [ ] Jolt heap and caps that fail rather than grow: partial
 
-Landscape dataset decision (open)
+Landscape dataset decision
 
-Not done in this pass. The owner asked for one landscape store read by both collider and renderer, with a measured memory and build-time comparison against two copies. The current code has a shared page source, but the collider and the vertex stream are built from separate passes, so the measurement has not been made. Recorded as open, to be decided by that measurement.
+Decision: one CPU height store, the page cache in `engine/src/page_cache.cpp`, read by both the collider and the renderer. The GPU height texture is a per-layer upload of the same samples and is a separate GPU resource in every design.
+
+The code paths that read it, verified by grep:
+
+- collision: `planet_frame.cpp` bilinearly samples `terrain.pages.pageSamples(slot)` for every height query, and `PlanetShape` reads through the same `Planet`.
+- render: `render_webgpu.cpp` and `render_webgl2.cpp` write `scene.pages->pageSamples(slot)` into the height texture on upload.
+
+Measured with `scripts/bench-landscape-store.mjs` (Node, the built wasm, the page layout from `src/engine/pageLayout.js`, radius 6,371,000 m, cell 25.46 m, 5 repeats, median copy):
+
+| quantity | one shared store (as built) | two copies (a second CPU store) |
+|---|---|---|
+| pages in the store | 64 (`kPageSlots` is 64 at every tier) | 64 |
+| sample bytes | 65,536 (64 pages × 256 floats × 4 B) | 131,072 |
+| build time, stage, fill and commit 64 pages | 3.79 ms (3.62 ms on the 512 MiB glue) | 3.82 ms (extra copy 0.025 ms, 0.011 ms on 512 MiB) |
+
+The extra copy costs 64 KiB and about 0.01 to 0.03 ms for the whole store. No measured reason forbids sharing any part, so no part is split. The reason to keep one store is correctness: the collider and the drawn surface then read the same numbers, so they cannot drift apart at a page edge.
+
+Two limits recorded with the decision. The store holds 64 pages in every build, so the near-field landscape is capped at 64 resident pages, which is the first limit any streaming witness will hit. And commits are pending until the tick applies them, so a freshly committed page is not resident until the next `applyPending` (the bench reports `residentAfterBuild` 0 for this reason).
+
+1024 frame budget decision
+
+Decision: the 1024 tier's frame budget is 16.7 ms (one tick at 60 Hz). The 1024 witness scene is the planet scene of 10,240 bodies, and it runs on the threaded and SIMD build (`engine-core-128mib-timed-threads-simd`, 4 workers) with the scalar build as the fallback. The determinism runs recorded the simulation hashes b6675ee2 and 21494c4d, and the record says they are unchanged across the scalar, SIMD and threaded configurations (1 and 4 threads, with repeats).
+
+Measured: three interleaved rounds give a WebGPU median of 16.9 ms and a WebGL2 median of 17.5 ms, with round-to-round spread from 13.7 to 17.6 ms. The budget is reached in some rounds and missed in others, and the tick is most of the frame on both backends. So the 1024 tier is at the budget, not inside it. The 8-worker case is impossible with the current pthread pool size of 3, so 4 workers is the ceiling.
+
+Open for this decision: a tick that is clearly under 16.7 ms at 1024 needs a physics change, not a renderer change, because the render side is under 0.5 ms on both backends.
 
 Scenario and streaming witnesses (open)
 
