@@ -70,6 +70,7 @@ constexpr std::uint32_t kLayoutWords = kRegionWord0 + kRegionCount;
 
 std::uint32_t layoutWords[kLayoutWords];
 engine::budget::Capacity capacity{};
+std::uint64_t hostCarved = 0;
 float* stageRows = nullptr;
 std::uint32_t* stageHandles = nullptr;
 std::int32_t planetScratch[4];
@@ -159,7 +160,10 @@ EMSCRIPTEN_KEEPALIVE void engine_arena_seal() {
 }
 
 EMSCRIPTEN_KEEPALIVE std::uint8_t* engine_arena_carve(std::uint32_t bytes, std::uint32_t alignment) {
-  return static_cast<std::uint8_t*>(engine::arena::carve(bytes, alignment));
+  if (hostCarved + bytes > capacity.hostBytes) return nullptr;
+  void* raw = engine::arena::carve(bytes, alignment);
+  if (raw != nullptr) hostCarved += bytes;
+  return static_cast<std::uint8_t*>(raw);
 }
 
 EMSCRIPTEN_KEEPALIVE std::uint32_t* engine_layout() {
@@ -174,7 +178,10 @@ EMSCRIPTEN_KEEPALIVE std::uint64_t engine_allocation_failures() {
 EMSCRIPTEN_KEEPALIVE int engine_world_configure(std::uint32_t capacity, std::uint32_t tickRate, float gravity, float drag,
                                                 float radius, float restitution, std::uint32_t iterations) {
   const engine::Config config{capacity, tickRate, gravity, drag, radius, restitution, iterations};
-  return engine::world().configure(config);
+  const std::uint64_t failuresBefore = engine::pool::failures();
+  const int status = engine::world().configure(config);
+  if (engine::pool::failures() != failuresBefore) return engine::kFull;
+  return status;
 }
 
 EMSCRIPTEN_KEEPALIVE int engine_world_add_box(float minX, float minY, float minZ, float maxX, float maxY, float maxZ) {

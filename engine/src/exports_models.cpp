@@ -4,6 +4,7 @@
 #include <emscripten/emscripten.h>
 
 #include "arena.h"
+#include "budget.h"
 #include "device_tier.h"
 #include "model_pool.h"
 
@@ -75,17 +76,15 @@ EMSCRIPTEN_KEEPALIVE int engine_models_bind_plan(std::uint32_t maxTextureDimensi
   engine::device::Limits limits{maxTextureDimension, maxTextureLayers, static_cast<std::uint64_t>(maxBufferBytes), texelBytes, static_cast<std::uint64_t>(deviceMemoryBytes)};
   engine::device::Plan planned{};
   if (!engine::device::plan(limits, planned)) return -1;
-  for (std::uint32_t tier = planned.tier + 1; tier-- > 0;) {
-    engine::device::Plan candidate{};
-    if (!engine::device::planTier(tier, texelBytes, candidate)) return -3;
-    const engine::models::Layout layout{candidate.modelSlots, candidate.verticesPerModel, candidate.indicesPerModel, candidate.vertexStrideBytes, candidate.uploadBytesPerFrame};
-    const std::size_t bytes = engine::models::bytesFor(layout);
-    void* base = engine::arena::carve(bytes, engine::models::kAlignment);
-    if (base == nullptr) continue;
-    if (engine::models::bind(base, bytes, layout) != engine::kOk) return -3;
-    return static_cast<int>(tier);
-  }
-  return -2;
+  if (engine::budget::chosen().modelTier < planned.tier) return -5;
+  engine::device::Plan candidate{};
+  if (!engine::device::planTier(planned.tier, texelBytes, candidate)) return -3;
+  const engine::models::Layout layout{candidate.modelSlots, candidate.verticesPerModel, candidate.indicesPerModel, candidate.vertexStrideBytes, candidate.uploadBytesPerFrame};
+  const std::size_t bytes = engine::models::bytesFor(layout);
+  void* base = engine::arena::carve(bytes, engine::models::kAlignment);
+  if (base == nullptr) return -2;
+  if (engine::models::bind(base, bytes, layout) != engine::kOk) return -3;
+  return static_cast<int>(planned.tier);
 }
 
 EMSCRIPTEN_KEEPALIVE std::uint32_t engine_models_vertex_ptr(double handle) {

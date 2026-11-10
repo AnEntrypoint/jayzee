@@ -8,6 +8,8 @@
 #include "page_cache.h"
 #include "pool_alloc.h"
 #include "vegetation.h"
+#include "device_tier.h"
+#include "model_pool.h"
 #include "world.h"
 
 namespace engine::budget {
@@ -94,6 +96,8 @@ std::uint64_t totalBytes(const Capacity& c) {
   total += static_cast<std::uint64_t>(c.textures) * kTextureBytes;
   total += static_cast<std::uint64_t>(c.lights) * kLightBytes;
   total += kRenderBytes;
+  total += c.modelBytes;
+  total += c.hostBytes;
   total += players * c.inputDepth * sizeof(bridge::InputSlot);
   total += static_cast<std::uint64_t>(c.eventSlots) * sizeof(bridge::EventSlot);
   total += interestCells * (sizeof(std::uint32_t) + visible * sizeof(std::uint32_t));
@@ -110,6 +114,13 @@ std::uint64_t totalBytes(const Capacity& c) {
 std::uint32_t pageSlotsFor(std::uint64_t budgetBytes) {
   const std::uint64_t affordable = budgetBytes / kPageBudgetDivisor / planet::kPageArenaBytes;
   return static_cast<std::uint32_t>(std::clamp<std::uint64_t>(affordable, planet::kMinPageSlots, planet::kMaxRenderedPages));
+}
+
+std::uint64_t modelBytesOf(std::uint32_t tier) {
+  device::Plan planned{};
+  if (!device::planTier(tier, 1, planned)) return 0;
+  const models::Layout layout{planned.modelSlots, planned.verticesPerModel, planned.indicesPerModel, planned.vertexStrideBytes, planned.uploadBytesPerFrame};
+  return models::bytesFor(layout);
 }
 
 bool fitsTier(std::uint64_t budgetBytes, std::uint32_t players, std::uint32_t workers, Capacity& out) {
@@ -131,9 +142,19 @@ bool fitsTier(std::uint64_t budgetBytes, std::uint32_t players, std::uint32_t wo
   next.interestCellsPerSide = kInterestCellsPerSide;
   next.workers = workers;
   next.tempBytes = kTempBytes + static_cast<std::uint64_t>(next.bodies) * kTempBytesPerBody;
-  next.arenaBytes = totalBytes(next);
+  next.hostBytes = kHostReserveBytes;
+  bool fits = false;
+  for (std::uint32_t tier = device::kTierCount; tier-- > 0;) {
+    next.modelTier = tier;
+    next.modelBytes = modelBytesOf(tier);
+    next.arenaBytes = totalBytes(next);
+    if (next.arenaBytes <= budgetBytes && next.arenaBytes <= arena::kBytes) {
+      fits = true;
+      break;
+    }
+  }
   out = next;
-  return next.arenaBytes <= budgetBytes && next.arenaBytes <= arena::kBytes;
+  return fits;
 }
 
 void poolCounts(const Capacity& c, std::uint32_t (&out)[pool::kClasses]) {
@@ -143,14 +164,26 @@ void poolCounts(const Capacity& c, std::uint32_t (&out)[pool::kClasses]) {
 
 constexpr std::uint32_t kFallbackTiers[] = {1024, 256, 64};
 
+Capacity chosenCapacity{};
+
 bool plan(std::uint64_t budgetBytes, std::uint32_t players, std::uint32_t workers, Capacity& out) {
   if (players < kMinPlayers || players > kMaxPlayers) return false;
   if (workers < kMinWorkers || workers > kMaxWorkers) return false;
-  if (fitsTier(budgetBytes, players, workers, out)) return true;
+  if (fitsTier(budgetBytes, players, workers, out)) {
+    chosenCapacity = out;
+    return true;
+  }
   for (const std::uint32_t tier : kFallbackTiers) {
-    if (tier < players && fitsTier(budgetBytes, tier, workers, out)) return true;
+    if (tier < players && fitsTier(budgetBytes, tier, workers, out)) {
+      chosenCapacity = out;
+      return true;
+    }
   }
   return false;
+}
+
+const Capacity& chosen() {
+  return chosenCapacity;
 }
 
 }

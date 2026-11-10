@@ -37,6 +37,7 @@ const MODEL_BIND_REFUSALS = Object.freeze({
   '-2': 'the arena cannot hold the pool of any tier the device fits',
   '-3': 'the model pool refused the planned layout',
   '-4': 'the model pool is already bound',
+  '-5': 'the engine budget holds a smaller model tier than the device plans, so the bind is refused rather than lowered',
 })
 
 const modelLimits = (device, navigatorLike) => {

@@ -3562,3 +3562,19 @@ Open after this pass:
 - The budget planner excludes render-path memory and the vegetation pool, so the 1024 tier needs 512 MiB, not the 104.3 MiB plan.
 - WebGPU at 256 MiB threaded: table index fault at setup (above). Not diagnosed.
 - Not pushed: the witness is red, so the push waits for the owner or the next pass.
+
+
+## Phase B continued (2026-11-11): 256 MiB threaded fault, root cause and planner fix
+
+- Fault: a 1024 threaded WebGPU page on the 256 MiB build ended with "RuntimeError: table index is out of bounds" at engine_tick. Cause: the model pool was carved greedily and without budget. Its tier-2 layout is about 370 MB, which the 256 MiB arena cannot hold. The carve returned null, and the pool allocator handed null to Jolt during setup and tick, where the null was dereferenced. The 256 arena was short by the model pool, not by the render path alone.
+- Fix in code: budget.cpp counts modelBytes (the model pool at the chosen tier) and hostBytes (kHostReserveBytes, 16 MiB, for host carves) in totalBytes, and picks the highest model tier that fits. engine_models_bind_plan refuses with -5 when the planned tier is above the chosen tier, so the content is not lowered. engine_arena_carve refuses a host carve past hostBytes. engine_world_configure returns kFull when pool::failures() rises during setup, so the null never reaches Jolt.
+- Measured: the 256 MiB threaded build refuses the model bind with -5 through loadRenderer ("engine_models_bind_plan refused") before any world allocation. The 512 MiB threaded build chooses model tier 2, fits, and uses 482 MB after 60 ticks of 508 MiB.
+- Vegetation pool: 16 slots by 8300 capacity by 64 B by species is 8,641,536 bytes. The 16 MiB host reserve covers it with room to spare.
+
+## Phase B continued (2026-11-11): 1024 frame spike, measured
+
+- Per-frame rows from build/diag/planet/1024-webgl2.json: the frame gap is about 16.5 ms at the median, which is rAF pacing. The work (tick plus render) has a median of 9.7 to 10.2 ms. Render is about 0.3 ms.
+- Every frame over budget is inside engine_tick's physics phase. Physics is 9.4 ms at the median and 23.8 ms at p99 on WebGL2, against 11.1 ms at p99 on WebGPU in the same run, from the same engine build and the same physics code.
+- Two Jolt job threads (instead of four) made the physics median rise to 15 ms on both backends. Reverted. The step is compute-bound on the four threads.
+- The WebGL2 path runs through ANGLE on the same NVIDIA GPU, and its GL driver threads compete for CPU with the four Jolt workers on this 12-core host. Other processes were also busy (an exe at 94% CPU). The WebGL2 spike is the physics barrier stalling under that contention.
+- Status: open. A frame over 16.7 ms on WebGL2 is not removed by any change that keeps the content (10240 bodies) and the tick rate. Items that would move it are a physics cost reduction (solver iterations or collision steps) or a non-contended host, and each changes the simulation, so they need a decision.
