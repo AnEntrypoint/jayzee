@@ -103,6 +103,29 @@ struct SceneView {
   std::int32_t (*albedoLayerOf)(double handle);
 };
 
+constexpr std::uint32_t kModelPathForward = 0;
+constexpr std::uint32_t kModelPathVisibility = 1;
+constexpr std::uint32_t kTriangleBits = 7;
+constexpr std::uint32_t kTriangleMask = (1u << kTriangleBits) - 1u;
+constexpr std::uint32_t kNoVisibility = 0;
+
+constexpr std::uint32_t visibilityId(std::uint32_t cluster, std::uint32_t triangle) {
+  return ((cluster << kTriangleBits) | triangle) + 1u;
+}
+
+constexpr std::uint32_t visibilityCluster(std::uint32_t id) {
+  return (id - 1u) >> kTriangleBits;
+}
+
+constexpr std::uint32_t visibilityTriangle(std::uint32_t id) {
+  return (id - 1u) & kTriangleMask;
+}
+
+struct ModelSettings {
+  std::uint32_t path;
+  std::uint32_t occlusion;
+};
+
 struct Counters {
   std::uint64_t frames;
   std::uint64_t checksum;
@@ -116,9 +139,11 @@ struct Counters {
   std::uint32_t ready;
   std::uint32_t sealed;
   std::uint32_t createsAfterSeal;
+  std::uint32_t modelPath;
 };
 
 Counters& counters();
+ModelSettings& modelSettings();
 void countCall();
 bool acceptCreate();
 void resetPlan(FramePlan& plan);

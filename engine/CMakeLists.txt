@@ -132,6 +132,10 @@ set(ENGINE_EXPORTS
   _engine_models_vertex_count
   _engine_models_index_count
   _engine_models_mark_dirty
+  _engine_models_acquire
+  _engine_models_cluster_stride
+  _engine_models_cluster_bytes
+  _engine_models_clusters_ptr
   _engine_device_plan_tier
   _engine_device_tier_vram
   _engine_device_tier_budget
@@ -203,6 +207,11 @@ set(ENGINE_EXPORTS
   _engine_render_placements
   _engine_render_seal
   _engine_render_set_light_count
+  _engine_render_set_model_path
+  _engine_render_model_path
+  _engine_render_model_path_effective
+  _engine_render_set_occlusion
+  _engine_render_occlusion
   _engine_render_unplace_page
   _engine_render_uploads
   _engine_render_visible

@@ -22,6 +22,10 @@ struct Cluster {
 };
 
 static_assert(sizeof(Cluster) == 24);
+static_assert(offsetof(Cluster, centre) == 0);
+static_assert(offsetof(Cluster, radius) == 12);
+static_assert(offsetof(Cluster, firstIndex) == 16);
+static_assert(offsetof(Cluster, indexCount) == 20);
 
 struct Layout {
   std::uint32_t slots;
@@ -60,6 +64,10 @@ std::uint32_t dirtyCount();
 Range slotRange(std::uint32_t slot);
 std::uint32_t slotClusterCount(std::uint32_t slot);
 const Cluster* slotClusters(std::uint32_t slot);
+std::uint32_t clusterStride();
+std::uint64_t clusterSlotBytes();
+std::uint64_t clusterPoolBytes();
+const Cluster* clusterTable();
 void modelOffset(std::uint32_t slot, float out[3]);
 std::uint32_t visibleRuns(std::uint32_t slot, const float planes[6][4], Range* out);
 const std::uint8_t* slotVertices(std::uint32_t slot);

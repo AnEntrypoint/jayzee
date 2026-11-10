@@ -243,11 +243,11 @@ The article is a RenderDoc capture of Unreal's Nanite preview. It gives the pass
 | Clusters of 128 triangles with a bounding sphere | Implemented: each model slot's index run is cut into clusters of 384 indices (128 triangles), each with a sphere in the model's local space | Gives cluster culling without a clusterizer in wasm. Clusters share the slot's vertices, so no vertex is duplicated (the article's 384-vertex cluster duplicates them) |
 | Cluster culling against the frame's view frustum | Implemented on the CPU for both APIs, against the six planes `planFrame` already extracts for props | The frame's planes already exist. A GPU pass needs compute, which WebGL2 does not have, so a CPU path is needed anyway |
 | Contiguous visible clusters drawn as one range | Implemented: `visibleRuns` merges adjacent visible clusters into one `DrawIndexed` | A slot's clusters are contiguous in its index run, so a run covers any visible stretch with one call |
-| Indirect execute for the cluster draws | Dropped | The run counts are known on the CPU in the same frame, so the indirect buffer would carry values the CPU already has |
-| GPU instance culling with compute, and a WebGL2 fallback | Deferred | The CPU pass costs at most slots × clusters sphere tests (65,536 at tier 2) per frame. No measurement shows that cost needs moving to the GPU |
-| Visibility buffer (R32G32_UINT, ClusterID and TriangleID) and the deferred material pass | Deferred, not implemented | It is the largest item in the article. It needs a second geometry pass that fetches vertices from storage buffers (WebGPU) or textures (WebGL2), a material classification pass, and integer colour targets on both backends. No overdraw or shading cost in the engine supports that rewrite yet |
+| Indirect execute for the cluster draws | Implemented for the WebGPU visibility draws: `finalize` writes the vertex count from the GPU's atomic counts into a `DrawIndirect` buffer. The forward path keeps its CPU-counted direct draws | The GPU count is not on the CPU until a readback, so the arguments must be written on the GPU. The forward path already has its counts on the CPU, so it needs no indirect buffer |
+| GPU instance culling with compute, and a WebGL2 fallback | Implemented on WebGPU as two compute culls (`cullA` before the visibility draw, `cullB` on the candidates after it) and a `finalize` pass that writes the draw arguments. WebGL2 keeps the CPU `visibleRuns` | Compute is what WebGPU offers and WebGL2 lacks. The cull reads the cluster table that `markDirty` already writes, and the counts stay on the GPU, so no readback stalls the frame |
+| Visibility buffer (R32G32_UINT, ClusterID and TriangleID) and the deferred material pass | Implemented on WebGPU as one R32Uint id per pixel, `(cluster << 7 | triangle) + 1`, with 0 for no model. A vertex-pulling pass writes it, and a fullscreen resolve pass reconstructs the triangle and shades it with perspective-correct barycentrics. Only the model's one shade is resolved, since models have one material | One 32-bit id fits both fields for cluster indices below 2^25 (the id is then at most 2^32 − 1), so the second channel is not needed. Vertex pulling reads the pool's storage buffers, which the WebGPU limit request makes possible. WebGL2 has no storage buffers, so it keeps the forward draw |
 | Early depth emission (EmitDepthTargets) | Dropped | It doubles the model vertex work. No overdraw is measured, and the forward depth test already rejects hidden fragments |
-| HZB occlusion from the previous frame's depth, rebuilt after the post pass | Deferred | It needs a depth mip chain each frame: a compute pass on WebGPU and a fragment pass per level on WebGL2. The article gives no occlusion figure, and no occlusion problem is measured here |
+| HZB occlusion from the previous frame's depth, rebuilt after the post pass | Implemented on WebGPU as two passes. Pass A culls with the previous frame's HZB and draws the survivors. The HZB is rebuilt from this frame's model depth, and pass B retests only the rejected clusters against it. WebGL2 has no occlusion | The article gives no occlusion figure, so the value is unmeasured. The two-pass form is conservative whatever the HZB's age: a stale pyramid only costs culling, never a visible cluster. The witness checks that the occlusion and no-occlusion pictures are equal |
 | Persistent threads with a fixed thread count | Dropped | It assigns work against a GPU queue. WebGPU gives no persistent-thread guarantee, and culling here runs on the CPU |
 | Compute software rasterization with 64-bit atomics | Dropped | WebGPU has no 64-bit atomics, and WebGL2 has no compute |
 | Hardware and software rasterizer split by triangle size (3,333 hardware instances and 34,821 software groups captured) | Dropped | The software path is compute. Only the hardware path exists here |
@@ -270,9 +270,49 @@ The carved figure is the formula plus the meta array and the handle table, which
 - A cluster is unbounded (never culled) when an index is past the slot's vertex count, or when a position is not finite. The unbounded case is the safe one: a bad index draws, and it does not vanish.
 - `validLayout` now refuses a vertex stride under 12 bytes (a position is three floats, so the bounds read it) and an index count above 256 clusters of 384.
 - The model shader places slot `s` at `(4s − 8, 0, −20)` with scale 2. The culling uses the same placement (`modelOffset`, `kModelScale`), copied into C++. A change to the shader must change both; the witness checks the C++ numbers.
-- WebGL2 has no model draw path (it draws props and terrain only), so this culling reaches WebGPU only. A WebGL2 model path is a follow-up, and it would use the same `visibleRuns`.
+- WebGL2 draws models forward with the same `visibleRuns`: one `glDrawElements` per run, a `uOffset` uniform per slot and the slot's vertex base in the attribute pointer. It has no visibility buffer and no occlusion, and `engine_render_model_path_effective` reports `forward` whatever path is requested.
 - The run buffer is a file-scope array of `kMaxClustersPerSlot` ranges in the WebGPU renderer, so a frame allocates nothing.
 - Witness: `engine/test/witness_models.cpp`, the cluster block. It checks each cluster's sphere against its vertices, the adjacent merge into one run, a plane that cuts a cluster, a conservative cut (every culled vertex lies outside the plane), a plane that rejects every cluster, an unbounded slot, and the layout limits.
+
+### Phase C: visibility buffer, GPU culling and HZB
+
+Where each part runs. The WebGPU column is the visibility path, the default for models. The forward path is still built on WebGPU, as the comparison baseline.
+
+| part | WebGPU | WebGL2 | reason for the split |
+|---|---|---|---|
+| cluster cull A (frustum, previous frame's HZB) | compute `cullA` | CPU `visibleRuns` | WebGL2 has no compute |
+| cluster cull B (rejected clusters, this frame's HZB) | compute `cullB` | not used | the candidate list exists only with pass A |
+| draw arguments | `finalize` writes `DrawIndirect` arguments from the atomic counts | CPU run list | the counts stay on the GPU, so no readback |
+| visibility draw | R32Uint id target and Depth32Float, vertex pulling from the pool's storage buffers | not built | no storage buffers on WebGL2 |
+| HZB | R32Float mip chain, depth copy and max reduce in compute | not built | no compute |
+| resolve | fullscreen pass that shades each id's triangle | not built | follows the id target |
+| forward model draw | direct draws per run, the comparison baseline | the only model path | WebGL2 has no other path |
+
+Decisions taken in this pass:
+
+- The HZB is padded to a power of two, with padding texels at depth 1, which is far and never occludes. WebGPU sizes a mip as the floor of the base, so a non-power-of-two base drops the last odd row or column at every level. Tail levels clamp to one texel, which is WebGPU's rule (`max(1, size >> level)`). The occlusion test and the dispatch sizes use the same clamp.
+- The HZB is built from the model depth only. Props and terrain are drawn after the resolve, so they add no occlusion. This loses culling and never a visible cluster: the stored depth is the farthest of the covering texels, so it is at least the true nearest depth.
+- Pass B exists because pass A's HZB can be stale. A stale pyramid only changes which clusters pass A rejects. Every rejected cluster is retested against the pyramid of this frame's survivors before it is dropped, so a stale HZB costs culling and never a visible cluster.
+- Occlusion stays off on the first visibility frame, because no pyramid exists yet (`hzbValid`). A switch to the forward path leaves the pyramid in place, and the next visibility frame uses it under the rule above.
+- Depth is Depth32Float on the props, terrain and model pipelines. The HZB reads depth as float, and the id pass and the forward pass must share one format. The engine had Depth24Plus; it is replaced in all three.
+- The model shader used the GL projection on WebGPU, which has NDC depth in [0, 1]. The near half of the depth range was clipped. The props and terrain shaders already remapped depth with `clipOf`, and the model shader did not. Both model paths now use `clipOf`. The Phase B browser runs did not catch it, because they checked the counts and no pixels.
+- The vertex pool at tier 2 is 256 MiB, over the 128 MiB default `maxStorageBufferBindingSize`. `renderer.js` requests the adapter's storage limit and plans the pool against the smaller of the buffer and storage limits. A device with a 128 MiB storage limit is planned at a lower tier, not refused.
+- Clusters: `visibilityId` is `(cluster << 7 | triangle) + 1`, so 0 is no model. The largest cluster index at tier 2 is 65,535, which gives an id of 2^23. The witness checks the id round trip up to cluster 131,071 (512 slots), where the id is 2^24.
+- The C++ side allocates nothing per frame. Every GPU object is created in `init` or `buildVisibility`, and `frame()` writes buffers and records passes. The per-frame wgpu encoder and pass objects are the same as before this pass.
+
+Memory, in VRAM. Wasm memory is unchanged: the cluster table is already part of the carved pool (the Phase B table).
+
+| buffer | tier 2 size (256 slots × 256 clusters) | notes |
+|---|---|---|
+| cluster table | 1,572,864 B | copied per dirty slot, so an unchanged slot costs nothing |
+| candidate and visible lists | 3 × 65,536 × 4 = 786,432 B | `listA`, `listCand`, `listB` |
+| counters, draw arguments, parameters | 16 + 32 + 48 B | |
+| slot ready words | 1,024 B | 256 words |
+| id target | surface width × height × 4 B | 2,073,600 B at 960 × 540 |
+| HZB | padded surface, R32Float, full mip chain (about 4/3 of the base) | about 11 MB at 1920 × 1080 |
+| depth | surface width × height × 4 B | replaces the Depth24Plus target, same size |
+
+Witnesses for this pass are listed in docs/PENDING_VALIDATION.md under the Phase C section.
 
 ### Status
 

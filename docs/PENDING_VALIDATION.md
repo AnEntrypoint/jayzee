@@ -2933,3 +2933,35 @@ Open after Phase B:
 - The CPU cost of `visibleRuns` per frame is not measured. The bound is at most slots × clusters sphere tests (65,536 at tier 2).
 - WebGL2 draws no models, so the culling is not on that path.
 - The full `npm test` chain was not run. The gates above were run directly.
+
+## Phase C: visibility buffer, GPU culling and HZB (Phase A changes)
+
+Phase A is code, docs and tests only. Nothing in this section has been built or run yet. Phase B records the results below each row.
+
+| # | change | file | witness |
+|---|---|---|---|
+| C1 | Visibility id helpers `visibilityId`, `visibilityCluster`, `visibilityTriangle`, `kTriangleBits`, `kTriangleMask`, `kNoVisibility`, and `ModelSettings` (path and occlusion) with defaults visibility and occlusion on | `engine/src/render/render_frame.h`, `render_frame.cpp` | `engine/test/witness_visibility.cpp`: id 1 and 128 and 129, round trip for clusters 0, 1, 255, 4095, 131071 and triangles 0, 1, 64, 127, the largest id 2^24, the defaults |
+| C2 | `Counters.modelPath` reports the path that actually drew the frame | `render_frame.h` | `scripts/check-engine-visibility.mjs` (export defined and listed); browser `visibility-run` reads `effectivePath` |
+| C3 | Cluster accessors `clusterStride`, `clusterSlotBytes`, `clusterPoolBytes`, `clusterTable`, and static assertions on the `Cluster` layout | `engine/src/model_pool.h`, `model_pool.cpp` | `witness_models.cpp` cluster block (unchanged checks) and the static assertions at compile time |
+| C4 | `upload` and `markDirty` refuse an index count that is not a multiple of 3 | `engine/src/model_pool.cpp` | `engine/test/witness_models.cpp`: `upload(..., 8, indices, 11) == kRange` |
+| C5 | Exports `engine_models_acquire`, `engine_models_cluster_stride`, `engine_models_cluster_bytes`, `engine_models_clusters_ptr`, `engine_render_set_model_path`, `engine_render_model_path`, `engine_render_model_path_effective`, `engine_render_set_occlusion`, `engine_render_occlusion` | `engine/src/exports_models.cpp`, `exports_render.cpp`, `engine/CMakeLists.txt` | `scripts/check-engine-visibility.mjs`: listed in `ENGINE_EXPORTS` and defined in source |
+| C6 | WebGPU model shader clips through `clipOf` in both the forward and the id paths. Before this, the model shader used the GL projection, so on WebGPU the near half of depth was clipped | `engine/src/render/render_webgpu.cpp` | `check-engine-visibility.mjs`: no raw `out.clip = cam.viewProj` in WGSL; `vsModel` and `vsId` use `clipOf`. Browser run: pixels compared (see C12) |
+| C7 | Depth is Depth32Float on the props, terrain, model and id pipelines (was Depth24Plus) | `render_webgpu.cpp` | `check-engine-visibility.mjs`: no `Depth24Plus`, at least three `Depth32Float` targets |
+| C8 | Two-pass occlusion with a power-of-two HZB (padding at depth 1, mip sizes `max(1, size >> level)`, dispatch sizes and occlusion sampling use the same clamp) | `render_webgpu.cpp` | `witness_visibility.cpp`: pyramid of 37 by 23 is 64 by 32 with seven levels; every texel equals the brute maximum of the pixels it covers; no violation over 4000 random spheres; no occlusion with depth 1; a sphere behind a 0.2 wall is occluded; a sphere behind the camera is not |
+| C9 | GPU cluster culling (`cullA`, `cullB`) and `finalize` writing `DrawIndirect` arguments from atomic counts | `render_webgpu.cpp` | Browser `visibility-run`: the `visibility` and `occlusion` configurations draw; `occlusion` equals `visibility` pixel for pixel |
+| C10 | WebGL2 model forward path with CPU `visibleRuns`, one `glDrawElements` per run and a `uOffset` uniform; reports `forward` | `engine/src/render/render_webgl2.cpp` | `check-engine-visibility.mjs`: `drawModels(camera)` present and the forward path reported. Browser `visibility-run backend=webgl2`: non-background pixels, requested visibility reports `forward`, and the picture equals the forward picture |
+| C11 | `renderer.js`: request `maxStorageBufferBindingSize` and plan the pool against the smaller of the buffer and storage limits; `setModelPath`, `setOcclusion`, `modelPath`, `effectiveModelPath`, `occlusion`, `clusterStride`, `stats().modelPath` | `src/engine/renderer.js` | `check-engine-visibility.mjs`: each control present; browser run reads them |
+| C12 | Browser witness: eight wall models through `engine_models_acquire`, three configurations on WebGPU (forward, visibility, occlusion) with canvas readback each. Pass if the forward and visibility pictures differ by at most 4 per channel on at most 0.5 percent of pixels, and the visibility and occlusion pictures are equal | `scripts/browser/visibility.html`, `visibility-browser.js`, `visibility-run.mjs` | `node scripts/browser/visibility-run.mjs build/diag/visibility/run.json 8843 webgpu` |
+| C13 | Host witness build lists `witness_visibility.cpp` and `main_all.cpp` calls `visibilityAndOcclusion()` | `engine/test/build_host.sh`, `main_all.cpp` | `bash engine/test/build_host.sh` |
+| C14 | Static gate for the visibility pass, in the `npm test` chain | `scripts/check-engine-visibility.mjs`, `package.json` | `npm run check:engine-visibility` |
+| C15 | Clamp of the pool size to the storage binding limit, so a device with a 128 MiB storage limit is planned at a lower tier | `src/engine/renderer.js` `modelLimits` | `check-engine-visibility.mjs` (clamp present); the tier choice is checked by `check:engine-tiers` |
+| C16 | Docs: ENGINE.md decision rows updated, Phase C section with the split by API, the memory table and the decisions | `docs/ENGINE.md` | this section |
+
+Known gaps at the end of Phase A, to be settled in Phase B:
+
+- The culled-count readback is not implemented, so the browser witness cannot show how many clusters the GPU culled. It shows only that the pictures agree.
+- The HZB pyramid's sizes are checked by the host reference, which is written in C++ from the shader's rules. A mismatch between the reference and the WGSL is not caught by a witness of its own.
+
+## Phase C: Phase B results
+
+To be filled in by the Phase B pass.

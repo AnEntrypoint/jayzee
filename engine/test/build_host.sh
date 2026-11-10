@@ -23,6 +23,7 @@ c++ -std=c++20 -O2 -DNDEBUG -ffp-contract=off -fno-fast-math -fno-exceptions -fn
   "$engine/test/witness_phase8_resources.cpp" \
   "$engine/test/witness_phase10_plan.cpp" \
   "$engine/test/witness_models.cpp" \
+  "$engine/test/witness_visibility.cpp" \
   "$engine/src/render/render_frame.cpp" \
   "$engine/src/world.cpp" \
   "$engine/src/bridge.cpp" \

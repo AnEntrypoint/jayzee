@@ -4,6 +4,10 @@ export const RENDER_BACKEND_NAMES = Object.freeze(['webgpu', 'webgl2'])
 
 export const RENDER_CANVAS_ID = 'engine-canvas'
 
+export const RENDER_MODEL_PATH = Object.freeze({ FORWARD: 0, VISIBILITY: 1 })
+
+export const RENDER_MODEL_PATH_NAMES = Object.freeze(['forward', 'visibility'])
+
 export const RENDER_LAYOUT = Object.freeze({
   CAMERA_BYTES: 224,
   CAMERA_PLANES_WORD: 0,
@@ -36,10 +40,11 @@ const MODEL_BIND_REFUSALS = Object.freeze({
 })
 
 const modelLimits = (device, navigatorLike) => {
-  const { maxTextureDimension2D, maxTextureArrayLayers, maxBufferSize } = device.limits
+  const { maxTextureDimension2D, maxTextureArrayLayers, maxBufferSize, maxStorageBufferBindingSize } = device.limits
   const texelBytes = device.features.has('texture-compression-bc') ? 1 : 4
   const deviceMemoryBytes = navigatorLike.deviceMemory ? navigatorLike.deviceMemory * 1073741824 : 0
-  return [maxTextureDimension2D, maxTextureArrayLayers, maxBufferSize, texelBytes, deviceMemoryBytes]
+  const poolBytes = Math.min(maxBufferSize, maxStorageBufferBindingSize)
+  return [maxTextureDimension2D, maxTextureArrayLayers, poolBytes, texelBytes, deviceMemoryBytes]
 }
 
 export const chooseBackend = (requested, hasWebGpu) => {
@@ -56,7 +61,11 @@ const requestWebGpuDevice = async (gpu) => {
   const adapter = await gpu.requestAdapter()
   if (!adapter) throw new Error('WebGPU returned no adapter')
   const requiredFeatures = adapter.features.has('texture-compression-bc') ? ['texture-compression-bc'] : []
-  return adapter.requestDevice({ requiredFeatures, requiredLimits: { maxBufferSize: adapter.limits.maxBufferSize } })
+  const requiredLimits = {
+    maxBufferSize: adapter.limits.maxBufferSize,
+    maxStorageBufferBindingSize: adapter.limits.maxStorageBufferBindingSize,
+  }
+  return adapter.requestDevice({ requiredFeatures, requiredLimits })
 }
 
 const ensureCanvasId = (canvas) => {
@@ -141,6 +150,33 @@ export const createRenderer = (module, backend, { modelTier = -1, device = null,
       status(module._engine_render_set_light_count(count), 'light count')
     },
 
+    setModelPath(path) {
+      const mode = RENDER_MODEL_PATH_NAMES.indexOf(path)
+      if (mode < 0) throw new RangeError('model path must be one of ' + RENDER_MODEL_PATH_NAMES.join(', '))
+      status(module._engine_render_set_model_path(mode), 'set model path')
+    },
+
+    setOcclusion(on) {
+      if (typeof on !== 'boolean') throw new TypeError('occlusion takes a boolean')
+      status(module._engine_render_set_occlusion(on ? 1 : 0), 'set occlusion')
+    },
+
+    get modelPath() {
+      return RENDER_MODEL_PATH_NAMES[module._engine_render_model_path()]
+    },
+
+    get effectiveModelPath() {
+      return RENDER_MODEL_PATH_NAMES[module._engine_render_model_path_effective()]
+    },
+
+    get occlusion() {
+      return module._engine_render_occlusion() === 1
+    },
+
+    clusterStride() {
+      return module._engine_models_cluster_stride()
+    },
+
     setMaterial(slot, { colour, roughness, metallic, emissive, albedoLayer }) {
       if (!Number.isInteger(slot) || slot < 0 || slot >= L.MATERIAL_SLOTS) throw new RangeError('material slot out of range: ' + slot)
       expectWords(colour, 4, 'material colour')
@@ -177,6 +213,7 @@ export const createRenderer = (module, backend, { modelTier = -1, device = null,
         lights: module._engine_render_light_count(),
         createsAfterSeal: module._engine_render_creates_after_seal(),
         allocationsSinceWarmup: module._engine_render_allocations_since_warmup(),
+        modelPath: RENDER_MODEL_PATH_NAMES[module._engine_render_model_path_effective()],
       })
     },
 

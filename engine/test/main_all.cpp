@@ -18,6 +18,7 @@ void phase7Codecs();
 void phase8Resources();
 void phase10Plan();
 void modelsAndTiers();
+void visibilityAndOcclusion();
 
 }
 
@@ -52,6 +53,7 @@ int main() {
   engine::witness::phase8Resources();
   engine::witness::phase10Plan();
   engine::witness::modelsAndTiers();
+  engine::witness::visibilityAndOcclusion();
 
   check(engine::pool::failures() == 0, "no pool allocation failed during the run");
   return engine::test::finish();

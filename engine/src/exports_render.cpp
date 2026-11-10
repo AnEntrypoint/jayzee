@@ -233,6 +233,29 @@ EMSCRIPTEN_KEEPALIVE std::uint32_t engine_render_backend() {
   return rnd::counters().backend;
 }
 
+EMSCRIPTEN_KEEPALIVE int engine_render_set_model_path(std::uint32_t mode) {
+  if (mode != rnd::kModelPathForward && mode != rnd::kModelPathVisibility) return engine::kRange;
+  rnd::modelSettings().path = mode;
+  return engine::kOk;
+}
+
+EMSCRIPTEN_KEEPALIVE std::uint32_t engine_render_model_path() {
+  return rnd::modelSettings().path;
+}
+
+EMSCRIPTEN_KEEPALIVE std::uint32_t engine_render_model_path_effective() {
+  return rnd::counters().modelPath;
+}
+
+EMSCRIPTEN_KEEPALIVE int engine_render_set_occlusion(std::uint32_t on) {
+  rnd::modelSettings().occlusion = on != 0 ? 1u : 0u;
+  return engine::kOk;
+}
+
+EMSCRIPTEN_KEEPALIVE std::uint32_t engine_render_occlusion() {
+  return rnd::modelSettings().occlusion;
+}
+
 EMSCRIPTEN_KEEPALIVE std::uint32_t engine_render_api_calls_last_frame() {
   return rnd::counters().apiCallsLast;
 }

@@ -39,6 +39,22 @@ void fillModel(std::uint8_t* vertices, std::uint8_t* indices, std::uint32_t vert
 
 extern "C" {
 
+EMSCRIPTEN_KEEPALIVE double engine_models_acquire(std::uint32_t vertices, std::uint32_t indices) {
+  return engine::models::acquire(vertices, indices);
+}
+
+EMSCRIPTEN_KEEPALIVE std::uint32_t engine_models_cluster_stride() {
+  return engine::models::clusterStride();
+}
+
+EMSCRIPTEN_KEEPALIVE double engine_models_cluster_bytes() {
+  return static_cast<double>(engine::models::clusterPoolBytes());
+}
+
+EMSCRIPTEN_KEEPALIVE std::uint32_t engine_models_clusters_ptr() {
+  return static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(engine::models::clusterTable()));
+}
+
 EMSCRIPTEN_KEEPALIVE double engine_models_load(std::uint32_t vertices, std::uint32_t indices, std::uint32_t seed) {
   const double handle = engine::models::acquire(vertices, indices);
   if (handle <= 0.0) return handle;

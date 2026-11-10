@@ -195,6 +195,7 @@ Status upload(double handle, const void* vertices, std::uint32_t vertexCount, co
   if (!resolveSlot(handle, slot)) return kBadId;
   if (vertices == nullptr || indices == nullptr) return kRange;
   if (vertexCount != gMeta[slot].vertices || indexCount != gMeta[slot].indices) return kRange;
+  if (indexCount % 3 != 0) return kRange;
   std::memcpy(gVertices + static_cast<std::size_t>(slot) * gLayout.verticesPerSlot * gLayout.vertexStrideBytes, vertices,
               static_cast<std::size_t>(vertexCount) * gLayout.vertexStrideBytes);
   std::memcpy(gIndices + static_cast<std::size_t>(slot) * gLayout.indicesPerSlot * kIndexBytes, indices,
@@ -215,6 +216,7 @@ Status mutableSlot(double handle, std::uint8_t*& vertices, std::uint8_t*& indice
 Status markDirty(double handle) {
   std::uint32_t slot = 0;
   if (!resolveSlot(handle, slot)) return kBadId;
+  if (gMeta[slot].indices % 3 != 0) return kRange;
   buildClusters(slot);
   gMeta[slot].dirty = 1;
   return kOk;
@@ -285,6 +287,22 @@ Range slotRange(std::uint32_t slot) {
 
 std::uint32_t slotClusterCount(std::uint32_t slot) {
   return held(slot) ? clustersFor(gMeta[slot].indices) : 0;
+}
+
+std::uint32_t clusterStride() {
+  return gBound ? slotClusterStride() : 0;
+}
+
+std::uint64_t clusterSlotBytes() {
+  return static_cast<std::uint64_t>(clusterStride()) * sizeof(Cluster);
+}
+
+std::uint64_t clusterPoolBytes() {
+  return static_cast<std::uint64_t>(slotCount()) * clusterSlotBytes();
+}
+
+const Cluster* clusterTable() {
+  return gClusters;
 }
 
 const Cluster* slotClusters(std::uint32_t slot) {

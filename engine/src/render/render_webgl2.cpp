@@ -5,6 +5,7 @@
 #include <GLES3/gl3.h>
 #include <emscripten/html5.h>
 
+#include "../model_pool.h"
 #include "../page_cache.h"
 #include "../phase_timer.h"
 
@@ -165,6 +166,37 @@ void main() {
 }
 )GLSL";
 
+constexpr char kModelVertex[] = R"GLSL(#version 300 es
+precision highp float;
+precision highp int;
+layout(std140) uniform Frame {
+  vec4 planes[6];
+  mat4 viewProj;
+  vec4 eye;
+  uvec4 counts;
+  vec4 classRadius;
+  uvec4 classMaterial;
+};
+uniform vec3 uOffset;
+layout(location = 0) in vec3 aPos;
+out float vShade;
+
+void main() {
+  vShade = 0.5 + 0.5 * aPos.y;
+  gl_Position = viewProj * vec4(aPos * 2.0 + uOffset, 1.0);
+}
+)GLSL";
+
+constexpr char kModelFragment[] = R"GLSL(#version 300 es
+precision highp float;
+in float vShade;
+out vec4 outColour;
+
+void main() {
+  outColour = vec4(vShade, 0.6, 0.9, 1.0);
+}
+)GLSL";
+
 constexpr float kClearRed = 0.05f;
 constexpr float kClearGreen = 0.07f;
 constexpr float kClearBlue = 0.10f;
@@ -185,10 +217,17 @@ GLuint propVao = 0;
 GLuint terrainVao = 0;
 GLuint propProgram = 0;
 GLuint terrainProgram = 0;
+GLuint modelProgram = 0;
+GLuint modelVbo = 0;
+GLuint modelEbo = 0;
+GLuint modelVao = 0;
+GLint modelOffsetLocation = -1;
 GLuint heightTex = 0;
 GLuint albedoTex = 0;
 std::uint32_t surfaceWidth = 0;
 std::uint32_t surfaceHeight = 0;
+engine::models::Range modelRuns[engine::models::kMaxClustersPerSlot];
+bool modelsReady = false;
 bool ready = false;
 
 const void* offsetPointer(std::uint32_t bytes) {
@@ -243,6 +282,26 @@ GLuint makeUniformBuffer(std::uint32_t bytes, GLuint binding) {
   glBufferData(GL_UNIFORM_BUFFER, bytes, nullptr, GL_DYNAMIC_DRAW);
   glBindBufferBase(GL_UNIFORM_BUFFER, binding, buffer);
   return buffer;
+}
+
+void drawModels(const Camera& camera) {
+  const std::uint32_t stride = engine::models::layout().vertexStrideBytes;
+  ENGINE_RENDER_CALL(glUseProgram(modelProgram));
+  ENGINE_RENDER_CALL(glBindVertexArray(modelVao));
+  ENGINE_RENDER_CALL(glBindBuffer(GL_ARRAY_BUFFER, modelVbo));
+  for (std::uint32_t s = 0; s < engine::models::slotCount(); ++s) {
+    if (!engine::models::slotReady(s)) continue;
+    const std::uint32_t runs = engine::models::visibleRuns(s, camera.planes, modelRuns);
+    if (runs == 0) continue;
+    float offset[3];
+    engine::models::modelOffset(s, offset);
+    ENGINE_RENDER_CALL(glUniform3f(modelOffsetLocation, offset[0], offset[1], offset[2]));
+    for (std::uint32_t r = 0; r < runs; ++r) {
+      const engine::models::Range& run = modelRuns[r];
+      ENGINE_RENDER_CALL(glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, offsetPointer(run.firstVertex * stride)));
+      ENGINE_RENDER_CALL(glDrawElements(GL_TRIANGLES, run.indexCount, GL_UNSIGNED_INT, offsetPointer(run.firstIndex * engine::models::kIndexBytes)));
+    }
+  }
 }
 
 }
@@ -327,6 +386,27 @@ int init(const char* selector, std::uint32_t width, std::uint32_t height) {
   glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
   glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, 0, kAlbedoSide, kAlbedoSide, 1, GL_RGBA, GL_UNSIGNED_BYTE, whitePixels);
 
+  if (engine::models::bound()) {
+    modelProgram = linkProgram(kModelVertex, kModelFragment);
+    if (modelProgram == 0) return engine::kNotConfigured;
+    bindBlock(modelProgram, "Frame", kFrameBinding);
+    modelOffsetLocation = glGetUniformLocation(modelProgram, "uOffset");
+
+    glGenBuffers(1, &modelVbo);
+    glBindBuffer(GL_ARRAY_BUFFER, modelVbo);
+    glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(engine::models::vertexPoolBytes()), nullptr, GL_DYNAMIC_DRAW);
+    glGenBuffers(1, &modelEbo);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, modelEbo);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, static_cast<GLsizeiptr>(engine::models::indexPoolBytes()), nullptr, GL_DYNAMIC_DRAW);
+    glGenVertexArrays(1, &modelVao);
+    glBindVertexArray(modelVao);
+    glBindBuffer(GL_ARRAY_BUFFER, modelVbo);
+    glEnableVertexAttribArray(0);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, modelEbo);
+    glBindVertexArray(0);
+    modelsReady = true;
+  }
+
   glBindVertexArray(0);
   glBindBuffer(GL_ARRAY_BUFFER, 0);
   ready = true;
@@ -366,6 +446,21 @@ int frame(const SceneView& scene, const FramePlan& plan, const Camera& camera) {
                                          GL_RGBA, GL_UNSIGNED_BYTE, scene.albedoPixels + layer * kAlbedoBytes));
       layer = end;
     }
+    if (modelsReady) {
+      std::uint64_t modelBudget = engine::models::layout().uploadBytesPerFrame;
+      for (std::uint32_t s = 0; s < engine::models::slotCount(); ++s) {
+        if (!engine::models::slotDirty(s)) continue;
+        const std::uint64_t vertexSlotBytes = engine::models::slotVertexBytes();
+        const std::uint64_t indexSlotBytes = engine::models::slotIndexBytes();
+        if (vertexSlotBytes + indexSlotBytes > modelBudget) break;
+        ENGINE_RENDER_CALL(glBindBuffer(GL_ARRAY_BUFFER, modelVbo));
+        ENGINE_RENDER_CALL(glBufferSubData(GL_ARRAY_BUFFER, static_cast<GLintptr>(s * vertexSlotBytes), static_cast<GLsizeiptr>(vertexSlotBytes), engine::models::slotVertices(s)));
+        ENGINE_RENDER_CALL(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, modelEbo));
+        ENGINE_RENDER_CALL(glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, static_cast<GLintptr>(s * indexSlotBytes), static_cast<GLsizeiptr>(indexSlotBytes), engine::models::slotIndices(s)));
+        engine::models::clearDirty(s);
+        modelBudget -= vertexSlotBytes + indexSlotBytes;
+      }
+    }
   }
 
   ENGINE_RENDER_CALL(glBindFramebuffer(GL_FRAMEBUFFER, 0));
@@ -388,6 +483,8 @@ int frame(const SceneView& scene, const FramePlan& plan, const Camera& camera) {
     ENGINE_RENDER_CALL(glDrawArraysInstanced(GL_TRIANGLES, 0, kPropVertices, static_cast<GLsizei>(count)));
   }
 
+  if (modelsReady && engine::models::bound()) drawModels(camera);
+
   if (plan.pageCount > 0) {
     ENGINE_RENDER_CALL(glUseProgram(terrainProgram));
     ENGINE_RENDER_CALL(glBindVertexArray(terrainVao));
@@ -396,6 +493,7 @@ int frame(const SceneView& scene, const FramePlan& plan, const Camera& camera) {
     ENGINE_RENDER_CALL(glDrawArraysInstanced(GL_TRIANGLES, 0, kPageVertices, static_cast<GLsizei>(plan.pageCount)));
   }
   ENGINE_RENDER_CALL(glBindVertexArray(0));
+  engine::render::counters().modelPath = engine::render::kModelPathForward;
   return engine::kOk;
 }
 

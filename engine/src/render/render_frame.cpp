@@ -11,6 +11,7 @@ constexpr std::uint64_t kFnvOffset = 0xcbf29ce484222325ull;
 constexpr std::uint64_t kFnvPrime = 0x100000001b3ull;
 
 Counters state{};
+ModelSettings settings{kModelPathVisibility, 1u};
 
 std::uint32_t bitsOf(float value) {
   std::uint32_t bits;
@@ -120,6 +121,10 @@ MaterialSlot defaultMaterial() {
 
 Counters& counters() {
   return state;
+}
+
+ModelSettings& modelSettings() {
+  return settings;
 }
 
 void countCall() {
