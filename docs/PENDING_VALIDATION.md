@@ -2421,3 +2421,15 @@ Wall time is given for each witness. Commits made in this phase to fix what the 
 - Defect B state: closed as a measured limit. The gap is the cgroup quota, the attribution names it, and the frequency runs now stay under it. The limit depends on what else runs: quota minus two cores is enough without the page, and a run with the page needs quota minus about three for no throttling at all.
 - `npm test` at dd0d55f (123 s): exit 0, 4797 PASS lines, 238 RESULT PASS lines, 0 FAIL lines. `bash engine/test/build_host.sh` (17 s): exit 0, 196 PASS, 0 FAIL, `RESULT: PASS`.
 - Push: origin main, once, after this section is committed. No CI was checked.
+
+### Phase A pass: rolling-sphere rotation gate (run 2026-11-10-01-19-08-27b71f)
+
+Change made, not built or run. The Phase 3 row above names the rotation gate as missing. The drop gate in `scripts/check-engine-bridge.mjs` only tests a sphere that falls straight down, whose quaternion stays at identity, so its tilt bound cannot fail on a wrong rotation. The new gate pushes a resting sphere along +x and asserts that the roll turns it about -z (quaternion z negative, x and y near zero), a unit quaternion, and a forward move.
+
+| Item | File | Commit | Witness | State after Phase A |
+|---|---|---|---|---|
+| Phase 3 rotation gate | `scripts/check-engine-bridge.mjs` (new gate: a sphere pushed along +x on the ground rolls about the z axis, with a unit quaternion) | this commit | Phase B: `bash engine/build.sh`, then `node scripts/check-engine-bridge.mjs`, which must print PASS for that gate. The gate's inputs come from the boot call: radius 0.35 m, tick rate 64 Hz, a push of 1 m/s for 32 ticks. | Written, not run. |
+
+Stale status line, found by reading and not yet witnessed: the Phase B line about `scripts/browser/run-player-webgpu.mjs` still needing `PLAYWRIGHT_CORE` is out of date. A Phase A grep for `PLAYWRIGHT_CORE` in `scripts/browser/*.mjs` returned no match. Phase B repeats that grep, runs the page witness (`node scripts/browser/run-player-webgpu.mjs <page>`), and only then closes the line in the status index.
+
+Not done in this pass, recorded so the next pass does not restart them: the phase 5 frame-time p99 (needs a planet-path harness and a timed run), the `USE_WEBGPU` to `emdawnwebgpu` migration, the `ENGINE_THREADS` branch, the 1024-tier stall fix, the launcher-level null-adapter fix, and the JF6 allocation inside `decodeCrowdDots` under TSL. The phase 6 cube-sphere keying and the ENGINE.md decisions in the dispatcher section belong to the dispatcher and are not changed here.

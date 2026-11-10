@@ -145,4 +145,18 @@ gate('a sphere dropped straight down stays a unit quaternion, and in 240 ticks i
   assert.ok(Math.abs(x) < 1e-3 && Math.abs(z) < 1e-3, 'the drop drifted to x ' + x + ', z ' + z + ', over the 1 mm bound')
 })
 
+gate('a sphere pushed along +x on the ground rolls about the z axis, with a unit quaternion', async () => {
+  const module = await boot()
+  const bridge = createBridge(module)
+  for (let i = 0; i < 240; i++) module._engine_tick(1)
+  bridge.pushInput(0, [1, 0, 0])
+  bridge.tick(32)
+  const transform = new Float32Array(module.HEAPU8.buffer, module._engine_transforms(), BRIDGE.TRANSFORM_WORDS)
+  const [x, , , qx, qy, qz, qw] = transform
+  assert.ok(x > 0.05, 'the push moved the sphere ' + x + ' m along x')
+  assert.ok(Math.abs(qx * qx + qy * qy + qz * qz + qw * qw - 1) < 1e-5, 'quaternion is not unit length')
+  assert.ok(qz < -0.1, 'rolling along +x turns about -z, but quaternion z is ' + qz)
+  assert.ok(Math.abs(qx) < 0.05 && Math.abs(qy) < 0.05, 'the roll left the z axis: x ' + qx + ', y ' + qy)
+})
+
 finish()
