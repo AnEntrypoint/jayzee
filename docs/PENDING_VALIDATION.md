@@ -3220,3 +3220,11 @@ Two earlier failures were expected and are repaired: the four artifact pins (the
 Finding: at a 16 MiB arena `engine_init` refuses the plan (returns -2). The planner refuses a budget below the 1024-player plan, as before. Not changed by this stretch.
 
 The render scene places 16 pages, so the 256-page store is not yet exercised by any witness. A streaming witness that places more than 64 pages is the open test of this change.
+
+## Stretch: the spoint sampling comparison, re-run (this pass)
+
+Phase A: no code change. Phase B: `node scripts/spoint-streamer-compare.mjs 200`, rc 0, wall 1 s.
+
+Result, like for like (sample a 33 by 33 height grid over 256 m, once per build, same host): spoint p99 0.340 ms, jayzee p99 0.316 ms, ratio 1.08. The earlier record of 2.53 (spoint 0.759 ms) is not reproduced in this run, and this run replaces it.
+
+Not a frame-time comparison. The script's second ratio (148.6) divides a streamer step by a render frame, which are different operations, so it is not used. The call boundary also differs (spoint calls a JavaScript function, jayzee calls the engine export), which the script's caveat states. A frame-time comparison over a walk, with both sides rendering, is not done and stays open.
