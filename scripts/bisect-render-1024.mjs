@@ -6,7 +6,8 @@ import { readFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, extname, join, normalize, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { connectCdp } from './browser/cdp-client.mjs'
+import { connectCdp, OPEN_MODES, openPage, recordPageEvents } from './browser/cdp-client.mjs'
+import { collectCrashDumps } from './browser/crash-dumps.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const args = process.argv.slice(2)
@@ -18,6 +19,7 @@ const flag = (name, fallback) => {
 const debugPort = Number(flag('debug-port', ''))
 const port = Number(flag('port', '8843'))
 const scene = flag('scene', '')
+const openMode = flag('open', 'direct')
 const outDir = flag('out', join(root, 'build', 'diag', 'bisect-render-1024'))
 const emsdkDir = process.env.EMSDK_DIR || join(root, 'build', 'emsdk')
 const joltDir = join(root, 'build', 'jolt')
@@ -26,12 +28,14 @@ const RENDER_TIMEOUT_MS = 1200000
 const POLL_MS = 2000
 const SEND_TIMEOUT_MS = 60000
 const RENDER_ATTEMPTS = 2
+const DUMP_SETTLE_MS = 1500
 const MAX_BUFFER = 256 * 1024 * 1024
 const WASM_NAME = 'engine-core-128mib-timed.wasm'
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.json': 'application/json', '.wasm': 'application/wasm', '.css': 'text/css' }
 const BUILD_SCRIPT = 'set -euo pipefail; source "$1/emsdk_env.sh" >/dev/null; emcmake cmake -S "$2" -B "$3" -DENGINE_TIER_MIB=128 -DENGINE_LEAK_ON_TICK=OFF -DENGINE_PHASE_TIMERS=ON -DFETCHCONTENT_SOURCE_DIR_JOLTPHYSICS="$4" >/dev/null && cmake --build "$3" --parallel'
 
-if (!from || !to) throw new TypeError('usage: node scripts/bisect-render-1024.mjs <from> <to> --debug-port=<port> [--scene=<sha>] [--port=8843] [--out=DIR]')
+if (!from || !to) throw new TypeError('usage: node scripts/bisect-render-1024.mjs <from> <to> --debug-port=<port> [--scene=<sha>] [--port=8843] [--out=DIR] [--open=direct|navigate]')
+if (!OPEN_MODES.includes(openMode)) throw new TypeError('--open must be direct or navigate: ' + openMode)
 if (!Number.isInteger(debugPort) || debugPort <= 0) throw new TypeError('--debug-port must name the remote debugging port of the project playwriter browser')
 
 const git = (gitArgs, encoding = 'utf8') => execFileSync('git', gitArgs, { cwd: root, encoding, maxBuffer: MAX_BUFFER })
@@ -76,21 +80,27 @@ const serve = (dir, listenPort) => new Promise((ready, failed) => {
 })
 
 const renderOnce = async (url) => {
-  const { send, close } = await connectCdp(debugPort, { sendTimeoutMs: SEND_TIMEOUT_MS })
+  const client = await connectCdp(debugPort, { sendTimeoutMs: SEND_TIMEOUT_MS })
+  const { send, close } = client
   let targetId = null
+  let recorder = null
   try {
-    ({ targetId } = await send('Target.createTarget', { url: 'about:blank' }))
-    const { sessionId } = await send('Target.attachToTarget', { targetId, flatten: true })
-    await send('Page.navigate', { url }, sessionId)
+    const page = await openPage(send, { url, mode: openMode })
+    targetId = page.targetId
+    recorder = await recordPageEvents(client, page.sessionId)
     const deadline = Date.now() + RENDER_TIMEOUT_MS
     while (Date.now() < deadline) {
-      const evaluated = await send('Runtime.evaluate', { expression: 'JSON.stringify(window.engineRenderResult ?? null)', returnByValue: true }, sessionId)
+      const evaluated = await send('Runtime.evaluate', { expression: 'JSON.stringify(window.engineRenderResult ?? null)', returnByValue: true }, page.sessionId)
       const result = JSON.parse(evaluated.result.value ?? 'null')
       if (result && result.done === true) return result
       await sleep(POLL_MS)
     }
     return { error: 'the render did not finish within ' + RENDER_TIMEOUT_MS + ' ms' }
+  } catch (error) {
+    if (error.code === 'CDP_TARGET_CRASHED') error.lastEvents = recorder ? recorder.events() : []
+    throw error
   } finally {
+    if (recorder) recorder.stop()
     if (targetId) await send('Target.closeTarget', { targetId }).catch(() => {})
     close()
   }
@@ -99,11 +109,13 @@ const renderOnce = async (url) => {
 const renderInPlaywriterBrowser = async (url) => {
   const crashes = []
   for (let attempt = 1; attempt <= RENDER_ATTEMPTS; attempt += 1) {
+    const startedMs = Date.now()
     try {
       return { ...(await renderOnce(url)), attempts: attempt, crashes }
     } catch (error) {
       if (error.code !== 'CDP_TARGET_CRASHED') throw error
-      crashes.push(error.message)
+      await sleep(DUMP_SETTLE_MS)
+      crashes.push({ message: error.message, lastEvents: error.lastEvents, dumps: collectCrashDumps({ root, sinceMs: startedMs }) })
     }
   }
   return { error: 'the page crashed in each of ' + RENDER_ATTEMPTS + ' attempts', attempts: RENDER_ATTEMPTS, crashes }

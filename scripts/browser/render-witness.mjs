@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { connectCdp } from './cdp-client.mjs'
+import { connectCdp, openPage } from './cdp-client.mjs'
 
 export const RENDER_TIMEOUT_MS = 1200000
 const SEND_TIMEOUT_MS = 60000
@@ -41,9 +41,7 @@ const renderInProjectBrowser = async (debugPort, pageUrl) => {
   let browserContextId = null
   try {
     ({ browserContextId } = await send('Target.createBrowserContext', { disposeOnDetach: true }))
-    const { targetId } = await send('Target.createTarget', { url: 'about:blank', browserContextId })
-    const { sessionId } = await send('Target.attachToTarget', { targetId, flatten: true })
-    await send('Page.navigate', { url: pageUrl }, sessionId)
+    const { sessionId } = await openPage(send, { url: pageUrl, browserContextId })
     const deadline = Date.now() + RENDER_TIMEOUT_MS
     while (Date.now() < deadline) {
       const evaluated = await send('Runtime.evaluate', { expression: 'JSON.stringify(window.engineRenderResult ?? null)', returnByValue: true }, sessionId)

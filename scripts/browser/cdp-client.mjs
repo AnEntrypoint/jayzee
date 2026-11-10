@@ -20,6 +20,47 @@ export class CdpTargetCrashedError extends Error {
   }
 }
 
+export const OPEN_MODES = Object.freeze(['direct', 'navigate'])
+const PAGE_EVENT_LIMIT = 40
+const EVENT_TEXT_LIMIT = 300
+
+export const openPage = async (send, { url, mode = 'direct', browserContextId = null }) => {
+  if (!OPEN_MODES.includes(mode)) throw new TypeError('mode must be direct or navigate: ' + mode)
+  const scope = browserContextId ? { browserContextId } : {}
+  const { targetId } = await send('Target.createTarget', { url: mode === 'direct' ? url : 'about:blank', ...scope })
+  const { sessionId } = await send('Target.attachToTarget', { targetId, flatten: true })
+  if (mode === 'navigate') await send('Page.navigate', { url }, sessionId)
+  return { targetId, sessionId }
+}
+
+export const recordPageEvents = async ({ send, on, off }, sessionId, limit = PAGE_EVENT_LIMIT) => {
+  const events = []
+  const keep = (kind, text) => {
+    events.push({ t: Date.now(), kind, text: String(text).slice(0, EVENT_TEXT_LIMIT) })
+    if (events.length > limit) events.shift()
+  }
+  const handlers = {
+    'Runtime.consoleAPICalled': (params) => keep('console.' + params.type, params.args.map((arg) => arg.value ?? arg.description ?? arg.type).join(' ')),
+    'Runtime.exceptionThrown': (params) => keep('exception', params.exceptionDetails.exception?.description ?? params.exceptionDetails.text),
+    'Log.entryAdded': (params) => keep('log.' + params.entry.source + '.' + params.entry.level, params.entry.text),
+    'Page.lifecycleEvent': (params) => keep('lifecycle', params.name),
+  }
+  const bound = Object.entries(handlers).map(([name, handler]) => [name, (params, from) => {
+    if (from === sessionId) handler(params)
+  }])
+  for (const [name, listener] of bound) on(name, listener)
+  await send('Runtime.enable', {}, sessionId)
+  await send('Log.enable', {}, sessionId)
+  await send('Page.enable', {}, sessionId)
+  await send('Page.setLifecycleEventsEnabled', { enabled: true }, sessionId)
+  return {
+    events: () => events.slice(),
+    stop: () => {
+      for (const [name, listener] of bound) off(name, listener)
+    },
+  }
+}
+
 export const connectCdp = async (debugPort, { sendTimeoutMs = DEFAULT_SEND_TIMEOUT_MS } = {}) => {
   if (!(sendTimeoutMs > 0)) throw new RangeError('sendTimeoutMs must be positive: ' + sendTimeoutMs)
   const version = await (await fetch('http://127.0.0.1:' + debugPort + '/json/version')).json()
