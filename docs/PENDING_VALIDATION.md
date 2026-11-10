@@ -3406,3 +3406,30 @@ Open for Phase B, not decided in Phase A:
 - The tolerance `maxErrorM` is set before the run and recorded with its value.
 - The Jolt heightfield path needs a Jolt build from the render samples. Phase A does not connect it to the Jolt host, so the Phase B run wires `buildHeightfield` and `raycastDown` to `src/collision/joltHost.js`.
 - The byte and copy numbers for the witness scene (patch count, instance count) are recorded in Phase B.
+
+## Stretch 4, Phase A: vegetation on the sphere
+
+Code, docs and gates only. No build, test, gate or witness run in Phase A. Phase B runs each witness and fills in the ENGINE.md table.
+
+| change | files | witness (Phase B) |
+|---|---|---|
+| Device limit read once into a pool plan: slots bound by patches or by the device, refusal when no patch fits | `src/engine/vegetation.js` (new) | `npm run check:vegetation-stream` (gate "the device limit is read once") |
+| Pool refuses construction without its height store, patch centres, clock, or a budget below one patch | `src/engine/vegetation.js` | `npm run check:vegetation-stream` (gate "the pool refuses construction") |
+| One instance buffer per patch and per species, all allocated once; buffer identity and byte total unchanged through sync and step | `src/engine/vegetation.js` | `npm run check:vegetation-stream` (gate "the instance buffers are allocated once") |
+| Patch lifecycle from the quadtree leaves: a patch enters a free slot, a patch that leaves frees it, a full pool defers without growing | `src/engine/vegetation.js` | `npm run check:vegetation-stream` (gate "a patch enters a free slot") |
+| Generation budget in instances per frame, with a patch waiting for the next frame when it does not fit | `src/engine/vegetation.js` | `npm run check:vegetation-stream` (gate "a patch generates within the per-frame budget") |
+| Generation once per patch from its seed: the same bytes in any slot, and identical bytes on re-entry | `src/engine/vegetation.js` | `npm run check:vegetation-stream` (gate "a patch is generated once from its seed") |
+| Orthonormal instance matrices, and the origin plus translation at the height store height | `src/engine/vegetation.js` | `npm run check:vegetation-stream` (gate "each instance matrix is orthonormal") |
+| Translation relative to a float64 patch origin, so float32 keeps micrometre accuracy at planet radius; world position read from the same buffer as the render path | `src/engine/vegetation.js` | `npm run check:vegetation-stream` (gate "the world position is read from the render buffer in place") |
+| Draw ranges: one (slot, count) pair per resident slot per species, with no allocation in the list | `src/engine/vegetation.js` | `npm run check:vegetation-stream` (gate "draw ranges list one range per resident slot") |
+| Sharing accounting: patch copies and instance copies that the shared layout avoids | `src/engine/vegetation.js` | `npm run check:vegetation-stream` (gate "the sharing accounting") |
+| Gate wired into npm test, and an npm script | `scripts/check-vegetation-stream.mjs` (new), `package.json` | `npm test` |
+| Stretch 4 section in ENGINE.md: spoint's path, seven changes with reasons, work per patch and budget, sharing with stretch 3 | `docs/ENGINE.md` | Phase B fills the measured ms per patch and the sharing counts |
+
+Open for Phase B, not decided in Phase A:
+
+- The GPU draw call. `drawRanges` gives the list, and the render path (WebGL2 `frame()` or WebGPU) consumes it. Not written in Phase A.
+- The budget of 4096 instances per frame is a starting value. Phase B measures the milliseconds per patch and sets the number against the frame budget.
+- The witness walk and fly-over on the 64, 512 and 1024 tiers with KTX2 assets, on both backends.
+- The "no per-frame allocation" claim is a Phase B measurement (heap sampling over a run), not a Phase A claim. The Phase A code does not allocate in the generation loop, but that is read from the code, not measured.
+- The patch centres come from the quadtree's leaves through the caller's `patchCentre`. The mapping from quadtree leaf to patch id is the Phase B wiring.

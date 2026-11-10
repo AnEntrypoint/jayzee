@@ -586,3 +586,33 @@ Shared data, in `src/engine/sharedData.js`. One height store per patch holds the
 Phase B measures the same counts on the witness scene and records them here with the scene's patch and instance counts.
 
 Witness: `scripts/check-collision-placement.mjs` (`npm run check:collision-placement`, in `npm test`). Its gates cover the layer rates and per-step cost, the population registration, the refit on change, each option's refusal and measurement, the choice rule, the shared buffers, the normals, the in-place position read and the byte accounting.
+
+## Stretch 4: vegetation on the sphere (Phase A)
+
+Spoint's path, read from `/workspace/spoint`. Placement is `src/terrain/VegPlacement.js`: 32 m chunks (`VEG.CHUNK`), a 8 by 8 grid of 4 m cells per chunk (`VEG.GRID`, `VEG.CELL`), a per-cell accept test on a seeded coin, and `placementsForChunk` returning the chunk's placements. Rendering is `client/core/Vegetation.js` and `client/core/WebGPUInstancing.js`. Chunks are generated on demand under a load budget (`LOAD_BUDGET_MS = 2`, set in `Vegetation.js`). Each species is an `InstancedMesh` whose capacity starts at a fixed number and doubles through `_grow`, which creates a new mesh and copies every matrix across. Matrices are written with `setMatrixAt` and per-instance `Matrix4` temporaries. After a growth the BVH is rebuilt (`rebuildBVHAfterIncrementalGrowth`). Impostors and their textures are created per species and disposed on rebuild. The tree-texture budget is a separate `TEX_BUDGET`.
+
+What this path changes, and why.
+
+1. Fixed pools instead of doubling. Each patch owns one instance buffer per species, drawn from a pool that is sized once from the device's buffer limit (`planVegetationPool`). Spoint's `_grow` is a hitch because it recreates a mesh and copies every matrix in one frame. A pool that is sized up front never grows, so no frame copies.
+2. Patches from the quadtree state, not chunks from the camera. `sync(patchIds)` takes the quadtree's current leaves. A patch that leaves frees its slot in O(1). Spoint keys chunks by position and keeps its own keys; the quadtree already tracks the leaves that the terrain renders, so the vegetation follows the same state.
+3. Generation once per patch, from its seed. `patchSeed(worldSeed, patchId, species)` gives the same bytes in any slot, and a patch that re-enters regenerates identical bytes (gate). Spoint regenerates through `placementsForChunk` on each load, so its output depends on the load order only through its chunk cache.
+4. Budget in instances, not milliseconds. `step(budget)` spends at most `generatePerFrame` instances per frame (default `VEG_GEN_INSTANCES_PER_FRAME = 4096`). Spoint budgets in wall time, so the work per frame changes with the machine. An instance budget is the same work on every machine, and the Phase B run measures the time it costs on each.
+5. Matrices written in place with scalar math, and no `Matrix4` per instance. The generation loop keeps its vectors in typed scratch arrays. Spoint's per-instance `Matrix4` temporaries are the allocation the owner asked to remove.
+6. No BVH rebuild. The vegetation does not need a BVH for collision: collision reads the same height store as the population (stretch 3), so the BVH that spoint rebuilds after each growth has no job here.
+7. Translations relative to a patch origin. Positions are stored as float32, and at the planet radius (6,360,000 m) a float32 has a spacing of 0.5 m. Each slot keeps its origin in float64 (`origin(slot)`), and the matrix translation is relative to it, so a 64 m patch is accurate to micrometres. Spoint stores positions relative to its chunk too, so this follows its choice. The gate checks that the translation stays under 100 m.
+
+Work per patch. A patch of cap radius 64 m holds about 675 tree instances (`capAreaKm2` at 53,125 per km², `src/engine/populationDensity.js`), so its work is 675 height samples and 675 matrix writes of 16 floats. The per-frame budget is 4096 instances, about six patches. The Phase B run measures the milliseconds per 1024-instance patch on the witness scene and records them below. The budget is kept if the measured cost fits the frame budget with the render time added; otherwise the budget is lowered, and the number in the code is changed with the table.
+
+| quantity | value | source |
+|---|---|---|
+| instances per patch (cap 64 m) | ~675 | density × cap area |
+| capacity per patch | 1024 | `createVegetationPool` argument |
+| bytes per slot per species | 65,536 | 1024 × 64 |
+| generation budget | 4096 instances per frame | `VEG_GEN_INSTANCES_PER_FRAME` |
+| measured ms per patch | TBD (Phase B) | `stats().generateMs` |
+
+Sharing with stretch 3. The pool's buffers are the stretch 3 transform stream: a stride of 16 floats with the translation in the last column, read by the collision path at offset 12 through `readWorld`. The height store is the same `heightAt` (the engine patch store through `createEngineHeightAt`). Vegetation and collision therefore read one source, and `sharing(patchBytes)` records the copies that the shared layout avoids: per patch, one height store copy, and per instance, the 12-byte physics copy. Phase B measures the same counts on the witness scene and fills the table.
+
+Open for Phase B, not done in Phase A. The GPU draw call is not written. `drawRanges` gives the list of (slot, count) per species, and the render path (the WebGL2 `frame()` instanced draw, or the WebGPU path) consumes it. The witness walk and fly-over on the 64, 512 and 1024 tiers with KTX2 assets is a Phase B measurement.
+
+Witness: `scripts/check-vegetation-stream.mjs` (`npm run check:vegetation-stream`, in `npm test`). Its gates cover the device plan, the pool refusals, allocation once, the slot lifecycle and deferral, the budget, determinism and re-entry, orthonormal matrices, the origin and float32 translation, the draw ranges and the sharing accounting.
