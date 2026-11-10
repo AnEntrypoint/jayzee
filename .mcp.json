@@ -10,7 +10,8 @@
       ],
       "env": {
         "PLAYWRITER_TELEMETRY": "0",
-        "PLAYWRITER_BROWSER_PATH": "/workspace/jayzee/scripts/browser/chromium-webgpu.sh"
+        "PLAYWRITER_BROWSER_PATH": "/workspace/jayzee/scripts/browser/chromium-webgpu.sh",
+        "BREAKPAD_DUMP_LOCATION": "/workspace/jayzee/.playwriter/crash-dumps"
       },
       "ignore": [
         ".playwriter/"
