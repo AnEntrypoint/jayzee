@@ -1,6 +1,7 @@
 import { loadRenderer, RENDER_LAYOUT } from '../../src/engine/renderer.js'
 import { cellOrigin, PAGE_SIDE, PAGE_U_EDGE, PAGE_V_EDGE, planetCellSize } from '../../src/engine/pageLayout.js'
 import { solverIterationsFor } from '../../src/engine/solverIterations.js'
+import { createPhysicsHandoff } from '../../src/engine/physicsHandoff.js'
 import { readLayout } from '../../src/engine/bridge.js'
 import { buildPlanetScene } from '../../src/engine/planetScene.js'
 import { relativeLookAt } from '../../src/engine/cameraRelative.js'
@@ -406,6 +407,8 @@ const run = async () => {
   const module = renderer.module
   const placed = []
   const surface = setupScene(module, renderer, placed, worldReady)
+  const handoff = TIER === 1024 ? createPhysicsHandoff({ module, glue: new URL(THREADS ? '../../engine/out/engine-core-512mib-threads.mjs' : '../../engine/out/engine-core-512mib.mjs', import.meta.url).href, players: TIER, budgetBytes: TIER_BUDGET, solverIterations: runConfig.solverIterations, path: { window: PATH_WINDOW, perFrame: PAGES_PER_FRAME, stepM: PATH_STEP_M, heightM: PATH_HEIGHT_M } }) : null
+  if (handoff) await handoff.ready
 
   const aspect = canvas.width / canvas.height
   const frameTimes = []
@@ -428,7 +431,8 @@ const run = async () => {
       try {
         const started = performance.now()
         readPhases(phasesBefore)
-        module._engine_tick(TICK_STEPS)
+        if (handoff) handoff.requestFrame(frame)
+        else module._engine_tick(TICK_STEPS)
         const tickEnd = performance.now()
         renderer.setCamera(PATH === 'planet' ? planetCamera(module, renderer, frame, aspect, surface) : orbitCamera(frame, aspect, surface))
         if (MODELS) modelsStep(module, frame)
