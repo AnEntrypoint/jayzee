@@ -154,6 +154,7 @@ set(ENGINE_EXPORTS
   _engine_page_release
   _engine_page_lookup
   _engine_veg_configure
+  _engine_world_rebase_count
   _engine_veg_place
   _engine_veg_attach
   _engine_veg_placed
@@ -205,6 +206,7 @@ set(ENGINE_EXPORTS
   _engine_render_init
   _engine_render_light_count
   _engine_render_lights
+  _engine_render_light_positions
   _engine_render_mark_page
   _engine_render_material_table
   _engine_render_pages

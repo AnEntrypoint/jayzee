@@ -8,6 +8,7 @@
 #include "arena.h"
 #include "page_cache.h"
 #include "phase_timer.h"
+#include "physics_origin.h"
 #include "planet_frame.h"
 #include "render/render_backend.h"
 #include "render/render_frame.h"
@@ -28,6 +29,7 @@ struct RenderState {
   PagePlacement placements[kMaxPageLayers];
   LightSlot lights[kLightSlots];
   LightSlot relLights[kLightSlots];
+  double lightPositions[kLightSlots * 3];
   FrameOrigin origin;
   MaterialSlot materials[kMaterialSlots];
   std::uint8_t albedoReady[kAlbedoLayers];
@@ -61,6 +63,7 @@ void initState(RenderState& state) {
   for (std::uint32_t c = 0; c < kPropClasses; ++c) state.camera.classMaterial[c] = c;
   std::memset(state.placements, 0, sizeof state.placements);
   std::memset(state.lights, 0, sizeof state.lights);
+  std::memset(state.lightPositions, 0, sizeof state.lightPositions);
   const MaterialSlot fallback = ownDefaultMaterial();
   for (std::uint32_t m = 0; m < kMaterialSlots; ++m) state.materials[m] = fallback;
   std::memset(state.albedoReady, 0, sizeof state.albedoReady);
@@ -135,9 +138,11 @@ EMSCRIPTEN_KEEPALIVE int engine_render_frame() {
   scene.materials = state.boundMaterials;
   scene.materialCount = state.boundCount;
   scene.origin = state.origin;
+  const engine::PhysicsOrigin& bodyOrigin = engine::physicsOrigin();
+  scene.bodyOrigin = rnd::FrameOrigin{bodyOrigin.x, bodyOrigin.y, bodyOrigin.z};
   for (std::uint32_t i = 0; i < state.lightCount && i < rnd::kLightSlots; ++i) {
     const rnd::LightSlot& light = state.lights[i];
-    const double absolute[3] = {light.position[0], light.position[1], light.position[2]};
+    const double absolute[3] = {state.lightPositions[i * 3], state.lightPositions[i * 3 + 1], state.lightPositions[i * 3 + 2]};
     float rel[3];
     rnd::relativeOf(absolute, state.origin, rel);
     rnd::LightSlot& out = state.relLights[i];
@@ -182,6 +187,10 @@ EMSCRIPTEN_KEEPALIVE float* engine_render_lights() {
   return rnd::renderState == nullptr ? nullptr : reinterpret_cast<float*>(rnd::renderState->lights);
 }
 
+EMSCRIPTEN_KEEPALIVE double* engine_render_light_positions() {
+  return rnd::renderState == nullptr ? nullptr : rnd::renderState->lightPositions;
+}
+
 EMSCRIPTEN_KEEPALIVE int engine_render_set_light_count(std::uint32_t count) {
   if (rnd::renderState == nullptr || count > rnd::kLightSlots) return engine::kRange;
   rnd::renderState->lightCount = count;
@@ -218,6 +227,8 @@ EMSCRIPTEN_KEEPALIVE int engine_render_commit_albedo(std::uint32_t layer) {
 EMSCRIPTEN_KEEPALIVE int engine_render_set_origin(double x, double y, double z) {
   if (rnd::renderState == nullptr) return engine::kNotConfigured;
   if (!std::isfinite(x) || !std::isfinite(y) || !std::isfinite(z)) return engine::kRange;
+  const int status = engine::world().follow(x, y, z);
+  if (status != engine::kOk) return status;
   rnd::renderState->origin = rnd::FrameOrigin{x, y, z};
   return engine::kOk;
 }

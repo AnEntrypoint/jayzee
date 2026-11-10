@@ -26,7 +26,7 @@ struct Instance {
 };
 
 struct Field {
-  float origin = 0.0f;
+  double origin = 0.0;
   float cellSize = 0.0f;
   bool configured = false;
   std::uint64_t placed = 0;
@@ -39,7 +39,7 @@ struct Field {
 std::size_t bytesFor(std::uint32_t cellsPerSide, std::uint32_t instancesPerCell);
 Field* bind(void* base, std::uint32_t cellsPerSide, std::uint32_t instancesPerCell);
 Field& state();
-bool configure(Field& field, float origin, float cellSize);
+bool configure(Field& field, double origin, float cellSize);
 int place(Field& field, float x, float y, float z, float yaw, float scale, std::uint32_t cls);
 void clear(Field& field);
 void registerCollisions();

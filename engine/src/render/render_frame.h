@@ -104,6 +104,7 @@ struct SceneView {
   const std::uint8_t* albedoPixels;
   std::int32_t (*albedoLayerOf)(double handle);
   FrameOrigin origin;
+  FrameOrigin bodyOrigin;
 };
 
 constexpr std::uint32_t kModelPathForward = 0;

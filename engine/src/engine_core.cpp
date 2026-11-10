@@ -393,8 +393,10 @@ EMSCRIPTEN_KEEPALIVE int engine_page_lookup(std::int64_t key) {
   return engine::planet::state().pages.lookup(key);
 }
 
+EMSCRIPTEN_KEEPALIVE double engine_world_rebase_count() { return static_cast<double>(engine::world().rebases()); }
+
 EMSCRIPTEN_KEEPALIVE int engine_veg_configure(double origin, double cellSize) {
-  const bool ok = engine::vegetation::configure(engine::vegetation::state(), static_cast<float>(origin), static_cast<float>(cellSize));
+  const bool ok = engine::vegetation::configure(engine::vegetation::state(), origin, static_cast<float>(cellSize));
   return ok ? engine::kOk : engine::kRange;
 }
 

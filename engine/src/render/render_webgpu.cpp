@@ -277,6 +277,7 @@ struct ModelParams {
 @group(0) @binding(6) var<storage, read_write> counters: array<atomic<u32>>;
 @group(0) @binding(7) var<uniform> params: ModelParams;
 @group(0) @binding(8) var hzb: texture_2d<f32>;
+@group(0) @binding(9) var<storage, read> modelRel: array<vec4f>;
 
 fn clusterWord(gid: u32, word: u32) -> f32 {
   return bitcast<f32>(clusters[gid * 6u + word]);
@@ -284,7 +285,7 @@ fn clusterWord(gid: u32, word: u32) -> f32 {
 
 fn sphereOf(gid: u32) -> vec4f {
   let slot = gid / params.clustersPerSlot;
-  let placed = vec3f(f32(slot) * 4.0 - 8.0, 0.0, -20.0);
+  let placed = modelRel[slot].xyz;
   let centre = vec3f(clusterWord(gid, 0u), clusterWord(gid, 1u), clusterWord(gid, 2u)) * 2.0 + placed;
   return vec4f(centre, clusterWord(gid, 3u) * 2.0);
 }
@@ -463,6 +464,7 @@ struct ModelParams {
 @group(0) @binding(3) var<storage, read> indices: array<u32>;
 @group(0) @binding(4) var<storage, read> visible: array<u32>;
 @group(0) @binding(5) var<uniform> params: ModelParams;
+@group(0) @binding(6) var<storage, read> modelRel: array<vec4f>;
 
 struct IdOut {
   @builtin(position) clip: vec4f,
@@ -485,7 +487,7 @@ fn vsId(@builtin(vertex_index) vi: u32) -> IdOut {
   let corner = indices[slot * params.indicesPerSlot + firstIndex + within];
   let at = (slot * params.verticesPerSlot + corner) * params.vertexWords;
   let p = vec3f(bitcast<f32>(vertices[at]), bitcast<f32>(vertices[at + 1u]), bitcast<f32>(vertices[at + 2u]));
-  let world = p * 2.0 + vec3f(f32(slot) * 4.0 - 8.0, 0.0, -20.0);
+  let world = p * 2.0 + modelRel[slot].xyz;
   var out: IdOut;
   out.clip = clipOf(cam.viewProj * vec4f(world, 1.0));
   out.id = ((gid << 7u) | ((j % 384u) / 3u)) + 1u;
@@ -529,6 +531,7 @@ struct ModelParams {
 @group(0) @binding(3) var<storage, read> indices: array<u32>;
 @group(0) @binding(4) var<uniform> params: ModelParams;
 @group(0) @binding(5) var ids: texture_2d<u32>;
+@group(0) @binding(6) var<storage, read> modelRel: array<vec4f>;
 
 fn clipOf(p: vec4f) -> vec4f {
   return vec4f(p.xy, (p.z + p.w) * 0.5, p.w);
@@ -563,7 +566,7 @@ fn fsResolve(@builtin(position) frag: vec4f) -> @location(0) vec4f {
     let at = (slot * params.verticesPerSlot + corner) * params.vertexWords;
     let p = vec3f(bitcast<f32>(vertices[at]), bitcast<f32>(vertices[at + 1u]), bitcast<f32>(vertices[at + 2u]));
     height[k] = p.y;
-    clip[k] = clipOf(cam.viewProj * vec4f(p * 2.0 + vec3f(f32(slot) * 4.0 - 8.0, 0.0, -20.0), 1.0));
+    clip[k] = clipOf(cam.viewProj * vec4f(p * 2.0 + modelRel[slot].xyz, 1.0));
   }
   let pixel = vec2f(frag.x / f32(params.width) * 2.0 - 1.0, 1.0 - frag.y / f32(params.height) * 2.0);
   let n0 = clip[0].xy / clip[0].w;
@@ -648,9 +651,9 @@ constexpr std::uint64_t kVegOriginStride = 256;
 constexpr std::uint32_t kTerrainBindings = 3;
 constexpr std::uint32_t kModelBindings = 2;
 constexpr std::uint32_t kModelRelSlots = 64;
-constexpr std::uint32_t kCullBindings = 9;
-constexpr std::uint32_t kIdBindings = 6;
-constexpr std::uint32_t kResolveBindings = 6;
+constexpr std::uint32_t kCullBindings = 10;
+constexpr std::uint32_t kIdBindings = 7;
+constexpr std::uint32_t kResolveBindings = 7;
 constexpr std::uint32_t kMaxLevels = 16;
 constexpr std::uint32_t kReadyWords = 256;
 constexpr std::uint32_t kParamWords = 12;
@@ -1121,6 +1124,7 @@ bool buildVisibility(std::uint32_t width, std::uint32_t height) {
   cullEntries[6] = bufferEntry(6, compute, wgpu::BufferBindingType::Storage);
   cullEntries[7] = bufferEntry(7, compute, wgpu::BufferBindingType::Uniform);
   cullEntries[8] = textureEntry(8, compute, wgpu::TextureSampleType::UnfilterableFloat);
+  cullEntries[9] = bufferEntry(9, compute, wgpu::BufferBindingType::ReadOnlyStorage);
   wgpu::BindGroupLayout cullLayout = makeLayout(cullEntries, kCullBindings);
   wgpu::PipelineLayout cullPipeLayout = makePipelineLayout(cullLayout);
   wgpu::ShaderModule cullModule = makeModule(kCullWgsl);
@@ -1146,6 +1150,7 @@ bool buildVisibility(std::uint32_t width, std::uint32_t height) {
   hzbReducePipe = makeCompute(makePipelineLayout(reduceLayout), makeModule(kHzbReduceWgsl), "hzbReduce");
 
   wgpu::BindGroupLayoutEntry idEntries[kIdBindings];
+  idEntries[6] = bufferEntry(6, vertex, wgpu::BufferBindingType::ReadOnlyStorage);
   idEntries[0] = bufferEntry(0, vertex, wgpu::BufferBindingType::Uniform);
   idEntries[1] = bufferEntry(1, vertex, wgpu::BufferBindingType::ReadOnlyStorage);
   idEntries[2] = bufferEntry(2, vertex, wgpu::BufferBindingType::ReadOnlyStorage);
@@ -1176,6 +1181,7 @@ bool buildVisibility(std::uint32_t width, std::uint32_t height) {
   idPipe = device.CreateRenderPipeline(&idDesc);
 
   wgpu::BindGroupLayoutEntry resolveEntries[kResolveBindings];
+  resolveEntries[6] = bufferEntry(6, fragment, wgpu::BufferBindingType::ReadOnlyStorage);
   resolveEntries[0] = bufferEntry(0, fragment, wgpu::BufferBindingType::Uniform);
   resolveEntries[1] = bufferEntry(1, fragment, wgpu::BufferBindingType::ReadOnlyStorage);
   resolveEntries[2] = bufferEntry(2, fragment, wgpu::BufferBindingType::ReadOnlyStorage);
@@ -1211,6 +1217,7 @@ bool buildVisibility(std::uint32_t width, std::uint32_t height) {
   cullBindings[6] = bufferBinding(6, counterBuf, kCounterBytes);
   cullBindings[7] = bufferBinding(7, paramBuf, kParamBytes);
   cullBindings[8] = viewBinding(8, hzbAllView);
+  cullBindings[9] = bufferBinding(9, modelRelBuf, static_cast<std::uint64_t>(kModelRelSlots) * 16);
   cullGroup = makeGroup(cullLayout, cullBindings, kCullBindings);
 
   wgpu::BindGroupEntry finalizeBindings[2];
@@ -1238,6 +1245,7 @@ bool buildVisibility(std::uint32_t width, std::uint32_t height) {
     idBindings[3] = bufferBinding(3, modelIndexBuf, engine::models::indexPoolBytes());
     idBindings[4] = bufferBinding(4, listBuf[pass == 0 ? 0 : 2], static_cast<std::uint64_t>(visTotal) * 4);
     idBindings[5] = bufferBinding(5, paramBuf, kParamBytes);
+    idBindings[6] = bufferBinding(6, modelRelBuf, static_cast<std::uint64_t>(kModelRelSlots) * 16);
     idGroup[pass] = makeGroup(idLayout, idBindings, kIdBindings);
   }
 
@@ -1248,6 +1256,7 @@ bool buildVisibility(std::uint32_t width, std::uint32_t height) {
   resolveBindings[3] = bufferBinding(3, modelIndexBuf, engine::models::indexPoolBytes());
   resolveBindings[4] = bufferBinding(4, paramBuf, kParamBytes);
   resolveBindings[5] = viewBinding(5, idView);
+  resolveBindings[6] = bufferBinding(6, modelRelBuf, static_cast<std::uint64_t>(kModelRelSlots) * 16);
   resolveGroup = makeGroup(resolveLayout, resolveBindings, kResolveBindings);
 
   for (std::uint32_t l = 1; l < hzbLevels; ++l) {

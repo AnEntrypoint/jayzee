@@ -20,9 +20,11 @@
 #include <Jolt/RegisterTypes.h>
 
 #include <algorithm>
+#include <cmath>
 #include <new>
 
 #include "arena.h"
+#include "physics_origin.h"
 #include "planet_frame.h"
 #include "planet_shape.h"
 #include "pool_alloc.h"
@@ -263,7 +265,10 @@ Status World::addBox(const float* box) {
   if (!(halfX > 0.0f && halfY > 0.0f && halfZ > 0.0f)) return kZeroThickness;
   const float radius = std::min(kConvexRadius, std::min(halfX, std::min(halfY, halfZ)));
   JPH::ShapeRefC shape = new JPH::BoxShape(JPH::Vec3(halfX, halfY, halfZ), radius);
-  const JPH::RVec3 center((box[0] + box[3]) * 0.5f, (box[1] + box[4]) * 0.5f, (box[2] + box[5]) * 0.5f);
+  const PhysicsOrigin& o = physicsOrigin();
+  const JPH::RVec3 center(static_cast<float>((static_cast<double>(box[0]) + box[3]) * 0.5 - o.x),
+                          static_cast<float>((static_cast<double>(box[1]) + box[4]) * 0.5 - o.y),
+                          static_cast<float>((static_cast<double>(box[2]) + box[5]) * 0.5 - o.z));
   JPH::BodyCreationSettings settings(shape.GetPtr(), center, JPH::Quat::sIdentity(), JPH::EMotionType::Static, kLayerNonMoving);
   const JPH::BodyID id = runtime_->physics.GetBodyInterface().CreateAndAddBody(settings, JPH::EActivation::DontActivate);
   if (id.IsInvalid()) return kFull;
@@ -315,12 +320,22 @@ Status World::addTrunk(const float* trunk) {
   if (trunkBodies_ == limits_.trunks) return kFull;
   if (!(trunk[3] > 0.0f) || !(trunk[4] >= 0.0f)) return kRange;
   JPH::ShapeRefC shape = new JPH::CapsuleShape(trunk[4], trunk[3]);
-  JPH::BodyCreationSettings settings(shape.GetPtr(), JPH::RVec3(trunk[0], trunk[1], trunk[2]), JPH::Quat::sIdentity(),
-                                     JPH::EMotionType::Static, kLayerNonMoving);
+  const PhysicsOrigin& o = physicsOrigin();
+  const JPH::RVec3 at(static_cast<float>(trunk[0] - o.x), static_cast<float>(trunk[1] - o.y), static_cast<float>(trunk[2] - o.z));
+  JPH::BodyCreationSettings settings(shape.GetPtr(), at, JPH::Quat::sIdentity(), JPH::EMotionType::Static, kLayerNonMoving);
   const JPH::BodyID id = runtime_->physics.GetBodyInterface().CreateAndAddBody(settings, JPH::EActivation::DontActivate);
   if (id.IsInvalid()) return kFull;
   trunkBodies_ += 1;
   return kOk;
+}
+
+namespace {
+
+JPH::RVec3 toBody(const float* p) {
+  const PhysicsOrigin& o = physicsOrigin();
+  return JPH::RVec3(static_cast<float>(p[0] - o.x), static_cast<float>(p[1] - o.y), static_cast<float>(p[2] - o.z));
+}
+
 }
 
 std::int64_t World::spawn(const float* position, const float* velocity) {
@@ -341,7 +356,7 @@ int World::spawnBatch(const float* rows, std::uint32_t count, std::uint32_t* han
     const int slot = allocateSlot();
     if (slot < 0) return kFull;
     const JPH::BodyID id(bodyIds_[slot]);
-    bodies.SetPositionAndRotation(id, JPH::RVec3(row[0], row[1], row[2]), JPH::Quat::sIdentity(), JPH::EActivation::DontActivate);
+    bodies.SetPositionAndRotation(id, toBody(row), JPH::Quat::sIdentity(), JPH::EActivation::DontActivate);
     batch[i] = id;
     alive_[slot] = 1;
     live_ += 1;
@@ -384,8 +399,7 @@ Status World::setPosition(std::uint32_t handle, const float* position) {
   if (runtime_ == nullptr) return kNotConfigured;
   const int slot = resolve(handle);
   if (slot < 0) return kBadId;
-  runtime_->physics.GetBodyInterface().SetPosition(JPH::BodyID(bodyIds_[slot]),
-                                                   JPH::RVec3(position[0], position[1], position[2]), JPH::EActivation::Activate);
+  runtime_->physics.GetBodyInterface().SetPosition(JPH::BodyID(bodyIds_[slot]), toBody(position), JPH::EActivation::Activate);
   sync(static_cast<std::uint32_t>(slot));
   return kOk;
 }
@@ -400,9 +414,42 @@ Status World::setVelocity(std::uint32_t handle, const float* velocity) {
   return kOk;
 }
 
+Status World::follow(double x, double y, double z) {
+  const PhysicsOrigin& o = physicsOrigin();
+  const double dx = x - o.x;
+  const double dy = y - o.y;
+  const double dz = z - o.z;
+  if (dx * dx + dy * dy + dz * dz <= kRebaseMetres * kRebaseMetres) return kOk;
+  rebase(x, y, z);
+  return kOk;
+}
+
+void World::rebase(double x, double y, double z) {
+  PhysicsOrigin& o = physicsOrigin();
+  rebases_ += 1;
+  if (runtime_ != nullptr) {
+    JPH::BodyInterface& bodies = runtime_->physics.GetBodyInterfaceNoLock();
+    const JPH::RVec3 shift(static_cast<float>(x - o.x), static_cast<float>(y - o.y), static_cast<float>(z - o.z));
+    for (const JPH::Body* body : runtime_->physics.GetBodies()) {
+      const JPH::BodyID id = body->GetID();
+      const std::uint32_t index = id.GetIndexAndSequenceNumber();
+      if (index == planetBody_ || index == vegetationBody_) continue;
+      bodies.SetPosition(id, bodies.GetPosition(id) - shift, JPH::EActivation::DontActivate);
+    }
+  }
+  o.x = x;
+  o.y = y;
+  o.z = z;
+  if (runtime_ == nullptr) return;
+  for (std::uint32_t slot = 0; slot < fresh_; ++slot) {
+    if (alive_[slot] != 0) sync(slot);
+  }
+}
+
 void World::applyRadialGravity(JPH::PhysicsSystem& system, float dt) {
   if (runtime_ == nullptr || planetBody_ == kNoBody) return;
   constexpr float kSleepSpeed = 0.5f;
+  const PhysicsOrigin& o = physicsOrigin();
   JPH::BodyInterface& bodies = system.GetBodyInterfaceNoLock();
   const JPH::BodyLockInterfaceNoLock& locks = system.GetBodyLockInterfaceNoLock();
   for (std::uint32_t slot = 0; slot < fresh_; ++slot) {
@@ -410,10 +457,13 @@ void World::applyRadialGravity(JPH::PhysicsSystem& system, float dt) {
     const JPH::BodyID id(bodyIds_[slot]);
     if (!bodies.IsActive(id)) continue;
     const JPH::RVec3 position = bodies.GetCenterOfMassPosition(id);
-    const float distance = position.Length();
-    if (!(distance > 0.0f)) continue;
-    const float scale = -planetGravity_ * dt / distance;
-    bodies.AddLinearVelocity(id, JPH::Vec3(position.GetX() * scale, position.GetY() * scale, position.GetZ() * scale));
+    const double x = position.GetX() + o.x;
+    const double y = position.GetY() + o.y;
+    const double z = position.GetZ() + o.z;
+    const double distance = std::sqrt(x * x + y * y + z * z);
+    if (!(distance > 0.0)) continue;
+    const double scale = -static_cast<double>(planetGravity_) * dt / distance;
+    bodies.AddLinearVelocity(id, JPH::Vec3(static_cast<float>(x * scale), static_cast<float>(y * scale), static_cast<float>(z * scale)));
     const bool mayRest = bodies.GetLinearVelocity(id).Length() < kSleepSpeed;
     JPH::Body* body = locks.TryGetBody(id);
     if (body != nullptr && body->GetAllowSleeping() != mayRest) body->SetAllowSleeping(mayRest);
@@ -477,11 +527,12 @@ void World::sync(std::uint32_t slot) {
   const JPH::RVec3 p = bodies.GetPosition(id);
   const JPH::Vec3 v = bodies.GetLinearVelocity(id);
   const JPH::Quat q = bodies.GetRotation(id);
+  const PhysicsOrigin& o = physicsOrigin();
   double* position = positions_ + slot * 3;
   double* velocity = velocities_ + slot * 3;
-  position[0] = p.GetX();
-  position[1] = p.GetY();
-  position[2] = p.GetZ();
+  position[0] = p.GetX() + o.x;
+  position[1] = p.GetY() + o.y;
+  position[2] = p.GetZ() + o.z;
   velocity[0] = v.GetX();
   velocity[1] = v.GetY();
   velocity[2] = v.GetZ();

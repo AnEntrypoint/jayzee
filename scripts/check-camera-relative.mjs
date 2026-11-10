@@ -124,7 +124,7 @@ gate('the C++ side computes the render origin from the same float64 frame origin
   assert.ok(frameHeader.includes('FrameOrigin origin;'))
   const frame = read('engine/src/render/render_frame.cpp')
   assert.ok(frame.includes('relativeOf(pageOrigin, origin, rel);'))
-  assert.ok(frame.includes('relativeOfFloat(absolute, scene.origin, rel);'))
+  assert.ok(frame.includes('relativeOfBody(body, scene.bodyOrigin, scene.origin, rel);'))
   const exports = read('engine/src/exports_render.cpp')
   assert.ok(exports.includes('FrameOrigin origin;'))
   assert.ok(exports.includes('EMSCRIPTEN_KEEPALIVE int engine_render_set_origin(double x, double y, double z) {'))

@@ -97,6 +97,7 @@ class World {
   Status despawn(std::uint32_t handle);
   Status setPosition(std::uint32_t handle, const float* position);
   Status setVelocity(std::uint32_t handle, const float* velocity);
+  Status follow(double x, double y, double z);
   void step(std::uint32_t steps);
   void setTick(std::uint64_t tick);
   void applyRadialGravity(JPH::PhysicsSystem& system, float dt);
@@ -111,6 +112,7 @@ class World {
   const double* positions() const { return positions_; }
   const double* velocities() const { return velocities_; }
   const Transform* transforms() const { return transforms_; }
+  std::uint64_t rebases() const { return rebases_; }
 
  private:
   struct Runtime;
@@ -118,6 +120,7 @@ class World {
   int resolve(std::uint32_t handle) const;
   int allocateSlot();
   void sync(std::uint32_t slot);
+  void rebase(double x, double y, double z);
   void removeBody(std::uint32_t index);
   void releaseRuntime();
 
@@ -138,6 +141,7 @@ class World {
   std::uint32_t vegetationBody_ = kNoBody;
   std::uint32_t trunkBodies_ = 0;
   std::uint64_t tick_ = 0;
+  std::uint64_t rebases_ = 0;
   std::uint32_t* bodyIds_ = nullptr;
   std::uint32_t* batch_ = nullptr;
   std::uint32_t* freeSlots_ = nullptr;

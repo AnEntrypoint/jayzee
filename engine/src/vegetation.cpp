@@ -8,6 +8,7 @@
 #include <Jolt/Physics/Collision/CollisionDispatch.h>
 #include <Jolt/Physics/Collision/Shape/SphereShape.h>
 
+#include "physics_origin.h"
 #include "sphere_contact.h"
 #include "world.h"
 
@@ -26,10 +27,10 @@ std::size_t alignUp(std::size_t value) {
   return (value + kAlign - 1) / kAlign * kAlign;
 }
 
-int cellCoordinate(float value, float origin, float cellSize, std::uint32_t cellsPerSide) {
-  const float last = static_cast<float>(cellsPerSide) - 1.0f;
-  const float t = std::floor((value - origin) / cellSize);
-  if (!(t >= 0.0f)) return 0;
+int cellCoordinate(double value, double origin, float cellSize, std::uint32_t cellsPerSide) {
+  const double last = static_cast<double>(cellsPerSide) - 1.0;
+  const double t = std::floor((value - origin) / cellSize);
+  if (!(t >= 0.0)) return 0;
   if (t > last) return static_cast<int>(cellsPerSide) - 1;
   return static_cast<int>(t);
 }
@@ -68,11 +69,14 @@ bool instanceContact(const Instance& inst, JPH::Vec3Arg center, float radius, fl
 void collideField(const Field& field, JPH::Mat44Arg fieldToWorld, JPH::Vec3Arg center, float radius, float maxSeparation,
                   JPH::SubShapeID fieldSub, JPH::SubShapeID sphereSub, bool fieldFirst, JPH::CollideShapeCollector& ioCollector) {
   if (!field.configured) return;
-  const float reach = radius + kMaxReach;
-  const int x0 = cellCoordinate(center.GetX() - reach, field.origin, field.cellSize, field.cellsPerSide);
-  const int x1 = cellCoordinate(center.GetX() + reach, field.origin, field.cellSize, field.cellsPerSide);
-  const int z0 = cellCoordinate(center.GetZ() - reach, field.origin, field.cellSize, field.cellsPerSide);
-  const int z1 = cellCoordinate(center.GetZ() + reach, field.origin, field.cellSize, field.cellsPerSide);
+  const PhysicsOrigin& o = physicsOrigin();
+  const double reach = static_cast<double>(radius) + kMaxReach;
+  const double cx = static_cast<double>(center.GetX()) + o.x;
+  const double cz = static_cast<double>(center.GetZ()) + o.z;
+  const int x0 = cellCoordinate(cx - reach, field.origin, field.cellSize, field.cellsPerSide);
+  const int x1 = cellCoordinate(cx + reach, field.origin, field.cellSize, field.cellsPerSide);
+  const int z0 = cellCoordinate(cz - reach, field.origin, field.cellSize, field.cellsPerSide);
+  const int z1 = cellCoordinate(cz + reach, field.origin, field.cellSize, field.cellsPerSide);
   for (int iz = z0; iz <= z1; ++iz) {
     for (int ix = x0; ix <= x1; ++ix) {
       const std::size_t index = static_cast<std::size_t>(iz) * field.cellsPerSide + static_cast<std::size_t>(ix);
@@ -147,7 +151,7 @@ Field& state() {
   return *bound;
 }
 
-bool configure(Field& field, float origin, float cellSize) {
+bool configure(Field& field, double origin, float cellSize) {
   if (!std::isfinite(origin) || !std::isfinite(cellSize) || !(cellSize > 0.0f)) return false;
   clear(field);
   field.origin = origin;
@@ -160,10 +164,10 @@ int place(Field& field, float x, float y, float z, float yaw, float scale, std::
   if (!field.configured) return kNotConfigured;
   if (!std::isfinite(x) || !std::isfinite(y) || !std::isfinite(z) || !std::isfinite(yaw)) return kRange;
   if (!(scale > 0.0f && scale <= kMaxScale) || cls > kClassPass) return kRange;
-  const float side = static_cast<float>(field.cellsPerSide);
-  const float tx = std::floor((x - field.origin) / field.cellSize);
-  const float tz = std::floor((z - field.origin) / field.cellSize);
-  if (!(tx >= 0.0f && tx < side && tz >= 0.0f && tz < side)) return kRange;
+  const double side = static_cast<double>(field.cellsPerSide);
+  const double tx = std::floor((static_cast<double>(x) - field.origin) / field.cellSize);
+  const double tz = std::floor((static_cast<double>(z) - field.origin) / field.cellSize);
+  if (!(tx >= 0.0 && tx < side && tz >= 0.0 && tz < side)) return kRange;
   const std::size_t index = static_cast<std::size_t>(tz) * field.cellsPerSide + static_cast<std::size_t>(tx);
   std::uint32_t& count = field.counts[index];
   if (count == field.instancesPerCell) return kFull;

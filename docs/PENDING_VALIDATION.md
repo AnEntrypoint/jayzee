@@ -3494,3 +3494,35 @@ Open for Phase B, not decided in Phase A:
 - Jolt bodies are float32 absolute at source, so physics precision at planet scale is not fixed.
 - The WebGPU visibility path does not draw vegetation, so the vegetation relative origin is witnessed on the forward path only.
 - Instances beyond 4096 m of the eye are not gated. The derivation in ENGINE.md gives the bound for a larger reach.
+
+## Stretch 7, Phase A: the residuals of stretch 6
+
+Code, docs and gates only. No build, test, gate or witness run in Phase A. Phase B runs the gate and the browser pages, and measures the bytes and copies below.
+
+| change | files | witness (Phase B) |
+|---|---|---|
+| Light positions stored as float64 and made relative in double; `setLight` writes the double block | `engine/src/exports_render.cpp`, `src/engine/renderer.js` | `npm run check:relative-residuals` (gates "a light stored in float64" and its float32 control) |
+| One physics origin (`engine::physicsOrigin()`), shared by the body store, planet contact, gravity, vegetation field and render | `engine/src/physics_origin.h` (new), `engine/src/world.cpp`, `engine/src/planet_shape.cpp`, `engine/src/vegetation.cpp`, `engine/src/vegetation.h`, `engine/src/engine_core.cpp` | `npm run check:relative-residuals` (gate "the C++ body store, planet contact, gravity and vegetation field") |
+| Rebase when the eye is more than 1024 m from the origin: `World::follow`, `World::rebase`, the rebase counter `engine_world_rebase_count()` | `engine/src/world.h`, `engine/src/world.cpp`, `engine/src/exports_render.cpp`, `engine/src/engine_core.cpp`, `engine/CMakeLists.txt` | `npm run check:relative-residuals` (gates "a body that the physics origin follows" and its control, and "the rebase cost") |
+| Render places bodies at transform + (physics origin − frame origin), in double | `engine/src/render/camera_relative.h`, `engine/src/render/render_frame.h`, `engine/src/render/render_frame.cpp`, `engine/src/exports_render.cpp` | `npm run check:relative-residuals` (gate "the render path places each body") and `npm run check:camera-relative` (updated witness) |
+| WebGPU visibility culling, identification and resolve use the relative offsets (`modelRel`), not the hard-coded placement | `engine/src/render/render_webgpu.cpp` | `npm run check:relative-residuals` (gate "the WebGPU visibility path") |
+| JS mirror of the rebase arithmetic, with the cost accounting | `src/engine/physicsOrigin.js` (new) | `npm run check:relative-residuals` (gates "the rebase threshold", "the rebase cost") |
+| Gate in npm test and the package script | `scripts/check-relative-residuals.mjs` (new), `package.json` | `npm test` |
+
+Bytes and copies, for the Phase B measurement:
+
+| quantity | when | formula | Phase B measurement |
+|---|---|---|---|
+| Light position storage | on every `setLight` | 24 bytes per light (was 12 as float32): +12 bytes per light, at most +3072 bytes for 256 lights | count the double writes on `engine_render_light_positions` |
+| Light relative build | every frame | 24 bytes read and 32 bytes written per light (the 32 bytes are the existing `LightSlot` copy) | count the lights per frame; no new GPU bytes |
+| Rebase position writes | per rebase | 12 bytes × Jolt bodies (planet and vegetation excluded) | read `engine_world_rebase_count()` before and after a run, and multiply by the body count |
+| Rebase readback | per rebase | 76 bytes × live slots (positions 24, velocities 24, transform 28) | the same count, multiplied by the live slots |
+| Rebase frequency | in steady travel | one per 1024 m of eye travel, about one every 34 s at 30 m/s | the rebase count divided by the run's travel |
+| Per-frame readback | every frame, unchanged | 76 bytes × live slots, as before, with the transform now relative | no change expected; the stretch 5 counts still hold |
+| WebGPU visibility offsets | every frame | 16 bytes × 64 slots (`modelRel`), written once by `uploadModelOffsets`; now read by three passes instead of none | no new writes; bind count +1 for the cull, identification and resolve groups |
+| Hard-coded placement | removed | none; the placeholder read no bytes | confirm by the gate's text check |
+
+Open for Phase B, not decided in Phase A:
+
+- The WebGPU visibility path does not draw vegetation. This is a missing feature, not a precision defect. It is not done here, and it stays open.
+- Rebase rounding accumulates at most 3e-5 m per rebase over a long session. The Phase B run measures the worst error over a real session, and does not rely on the gate's 4 km walk alone.

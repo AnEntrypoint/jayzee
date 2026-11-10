@@ -200,9 +200,9 @@ void planFrame(const SceneView& scene, Camera& camera, FramePlan& plan) {
   for (std::uint32_t i = 0; i < scene.bodyCount; ++i) {
     std::uint32_t out[kRecordWords];
     const Transform& t = scene.transforms[i];
-    const float absolute[3] = {t.x, t.y, t.z};
+    const float body[3] = {t.x, t.y, t.z};
     float rel[3];
-    relativeOfFloat(absolute, scene.origin, rel);
+    relativeOfBody(body, scene.bodyOrigin, scene.origin, rel);
     const float words[kRecordWords - 1] = {rel[0], rel[1], rel[2], t.qx, t.qy, t.qz, t.qw};
     for (std::uint32_t k = 0; k < kRecordWords - 1; ++k) out[k] = bitsOf(words[k]);
     const std::uint32_t cls = scene.bodyClass[i];

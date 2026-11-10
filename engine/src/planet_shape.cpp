@@ -5,6 +5,7 @@
 #include <Jolt/Physics/Collision/CollisionDispatch.h>
 #include <Jolt/Physics/Collision/Shape/SphereShape.h>
 
+#include "physics_origin.h"
 #include "sphere_contact.h"
 
 namespace engine::planet {
@@ -13,16 +14,20 @@ namespace {
 
 bool sphereContact(Planet& terrain, JPH::Vec3Arg center, float radius, float maxSeparation, JPH::Vec3& surface, JPH::Vec3& axis,
                    float& depth) {
-  const double x = center.GetX();
-  const double y = center.GetY();
-  const double z = center.GetZ();
+  const PhysicsOrigin& o = physicsOrigin();
+  const double x = center.GetX() + o.x;
+  const double y = center.GetY() + o.y;
+  const double z = center.GetZ() + o.z;
   const double distance = std::sqrt(x * x + y * y + z * z);
   if (!(distance > 0.0)) return false;
   const double reach = terrain.radius + heightAt(terrain, x, y, z);
   const double penetration = reach + radius - distance;
   if (penetration < -maxSeparation) return false;
-  axis = JPH::Vec3(static_cast<float>(x / distance), static_cast<float>(y / distance), static_cast<float>(z / distance));
-  surface = axis * static_cast<float>(reach);
+  const double ax = x / distance;
+  const double ay = y / distance;
+  const double az = z / distance;
+  axis = JPH::Vec3(static_cast<float>(ax), static_cast<float>(ay), static_cast<float>(az));
+  surface = JPH::Vec3(static_cast<float>(ax * reach - o.x), static_cast<float>(ay * reach - o.y), static_cast<float>(az * reach - o.z));
   depth = static_cast<float>(penetration);
   return true;
 }

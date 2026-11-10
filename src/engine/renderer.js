@@ -89,6 +89,8 @@ export const createRenderer = (module, backend, { modelTier = -1, device = null,
   const camera = module._engine_render_camera() >> 2
   const placements = module._engine_render_placements() >> 2
   const lights = module._engine_render_lights() >> 2
+  const lightPositions = module._engine_render_light_positions() >> 3
+  const f64 = module.HEAPF64
   const materials = module._engine_render_material_table() >> 2
   const classes = module._engine_render_body_classes()
   const albedo = module._engine_render_albedo_staging()
@@ -141,7 +143,7 @@ export const createRenderer = (module, backend, { modelTier = -1, device = null,
       expectWords(position, 3, 'light position')
       expectWords(colour, 3, 'light colour')
       const base = lights + slot * L.LIGHT_WORDS
-      for (let i = 0; i < 3; i++) f32[base + i] = finite(position[i], 'light position')
+      for (let i = 0; i < 3; i++) f64[lightPositions + slot * 3 + i] = finite(position[i], 'light position')
       f32[base + 3] = finite(radius, 'light radius')
       for (let i = 0; i < 3; i++) f32[base + 4 + i] = finite(colour[i], 'light colour')
       f32[base + 7] = finite(intensity, 'light intensity')

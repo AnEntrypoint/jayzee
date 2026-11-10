@@ -25,6 +25,12 @@ inline void relativeOfFloat(const float world[3], const FrameOrigin& origin, flo
   out[2] = relativeComponent(static_cast<double>(world[2]), origin.z);
 }
 
+inline void relativeOfBody(const float body[3], const FrameOrigin& bodyOrigin, const FrameOrigin& origin, float out[3]) {
+  out[0] = relativeComponent(static_cast<double>(body[0]) + (bodyOrigin.x - origin.x), 0.0);
+  out[1] = relativeComponent(static_cast<double>(body[1]) + (bodyOrigin.y - origin.y), 0.0);
+  out[2] = relativeComponent(static_cast<double>(body[2]) + (bodyOrigin.z - origin.z), 0.0);
+}
+
 }
 
 #endif

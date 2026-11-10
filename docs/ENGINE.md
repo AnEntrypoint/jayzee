@@ -687,7 +687,7 @@ Single shared transform. The vegetation pool's float64 `origins` (per slot) and 
 
 Per-frame work. One `_engine_render_set_origin` call per frame (three doubles). On WebGPU, 16 bytes per resident vegetation slot and 16 bytes per model slot (at most 64) are written to their buffers each frame. These buffers are sized once from the device (`planVegetationPool` for vegetation, 64 slots for models) and reused. Nothing is allocated per frame: `renderedPosition` and `relativeOf` write into caller arrays, and the gate checks that the same `out` comes back.
 
-Residuals, not claimed by this stretch:
+Residuals, each closed in stretch 7 (see the next section):
 
 - Light positions stored as float32 in `LightSlot` are about 0.5 m at planet radius before the relative build. The relative build fixes the copy into the shader, but not the stored value.
 - Jolt bodies are float32 absolute at source, so physics precision at planet scale is not fixed here.
@@ -695,3 +695,29 @@ Residuals, not claimed by this stretch:
 - Instances beyond 4096 m of the eye are outside the gate's range. A host that draws past that must rerun the bound with its own reach, which is the derivation above.
 
 Witness: `scripts/check-camera-relative.mjs` (`npm run check:camera-relative`, in `npm test`). It checks the tolerance and its range against the real vegetation pool, a negative control that the absolute path misses it, the allocation-free return, the relative look-at, and the C++, renderer and page wiring as text.
+
+## Stretch 7: the residuals of stretch 6 (Phase A)
+
+Three residuals of stretch 6 are fixed in code. Each has a gate that fails when the defect returns: `scripts/check-relative-residuals.mjs` (`npm run check:relative-residuals`, in `npm test`).
+
+Light positions. Each light position is stored as float64 in `RenderState::lightPositions`. `setLight` writes it through `engine_render_light_positions()` (`src/engine/renderer.js`), and `engine_render_frame` builds the relative position from it in double before the float cast. The light and the geometry it lights now share one origin, the eye. Before, a float32 absolute position was rounded by up to 0.125 m at planet radius, and the gate's negative control shows that storage misses 1e-3 m.
+
+Jolt bodies. One physics origin, `engine::physicsOrigin()` in `engine/src/physics_origin.h`, is the single shared offset for the body store, the planet contact, radial gravity, the vegetation field and the render path.
+
+- Jolt keeps float32 positions relative to the physics origin. The API stays in planet-centred coordinates. Spawn, `setPosition`, boxes and trunks subtract the origin in double before the float cast (`toBody` and the box and trunk centres in `world.cpp`).
+- Readback is `positions_ = Jolt + origin` in double. The transform is the relative float, so it is small and exact.
+- The planet centre is at minus the origin in Jolt coordinates. `sphereContact` and `applyRadialGravity` compute the distance from the planet centre in double, and the surface point is returned in Jolt coordinates. The planet body and the vegetation body stay at the Jolt origin.
+- The vegetation field stores its origin as double in planetary coordinates. Its contact query converts the Jolt centre to planetary coordinates in double before it looks up cells.
+- The render path places each body at `transform + (physics origin − frame origin)`, computed in double (`relativeOfBody`).
+
+Rebase trigger. Each frame, `engine_render_set_origin(eye)` calls `World::follow(eye)`. When the eye is more than `kRebaseMetres` (1024 m) from the physics origin, `World::rebase` moves the origin to the eye. The check is on the eye, so the threshold applies to the camera's travel, not to the bodies'.
+
+Rebase cost. A rebase does one `SetPosition` per Jolt body, except the planet and vegetation bodies. It writes 12 bytes per body, and it re-reads every live slot: 76 bytes per slot (positions 24, velocities 24, transform 28). A rebase happens once per 1024 m of eye travel, which is about every 34 seconds at 30 m/s. The rebase count is exported as `engine_world_rebase_count()` for Phase B.
+
+Rebase error. A rebase rounds each body's relative position once, to float32. The rounding is at most half a float32 ulp of that position, which is at most 3e-5 m for a body within 1024 m. Physics integration already rounds each step at the same order, so a rebase adds no new kind of error. The gate walks a body through 4 km of rebased motion and checks that the worst error stays within 1e-3 m. Over a long session the rounding of many rebases adds up at most linearly, at 3e-5 m per rebase.
+
+WebGPU visibility path. The culling and identification passes used a hard-coded placement, `(slot * 4 − 8, 0, −20)`, that was not the model offset. The cull (binding 9), the identification pass (binding 6) and the resolve pass (binding 6) read the per-slot relative offset `modelRel`, the same 64-slot buffer that the model draw uses, written each frame by `uploadModelOffsets`. The culling and drawing paths now use one offset each frame, and the gate fails if the placeholder returns.
+
+Not in this stretch. The WebGPU visibility path draws models but not vegetation. Vegetation has no identification pass, so adding it is a feature, not a precision fix. It is left open and recorded in `docs/PENDING_VALIDATION.md`.
+
+Witness: `scripts/check-relative-residuals.mjs` (`npm run check:relative-residuals`, in `npm test`). It covers the light round trip and its control, the rebase threshold and its constant, the walk and its control, the rebase cost, the C++ wiring of the physics origin, and the WebGPU offsets.
