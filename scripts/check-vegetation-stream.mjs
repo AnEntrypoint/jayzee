@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { finish, gate } from './lib/gate.mjs'
 import { PLANET_RADIUS_M } from '../src/engine/sphere.js'
 import { capAreaKm2 } from '../src/engine/population.js'
@@ -12,13 +13,15 @@ const clock = () => { let t = 0; return () => (t += 1) }
 const patchCentre = (id) => ({ latRad: 0.1 * (id % 5), lonRad: 0.2 * (id % 7), capRad: CAP_RAD })
 const expectedCount = Math.round(densityFor('trees') * capAreaKm2(CAP_RAD))
 
-const makePool = ({ slots = 4, heightAt = () => 3, seed = 42, budget } = {}) => createVegetationPool({
+const makePool = ({ slots = 4, heightAt = () => 3, seed = 42, budget, allocate } = {}) => createVegetationPool({
   plan: planVegetationPool({ maxBufferBytes: 1e12, residentPatches: slots, capacityPerPatch: CAP }),
   worldSeed: seed,
   heightAt,
   patchCentre,
   now: clock(),
   generatePerFrame: budget,
+  cullRadiusM: 64,
+  allocate,
 })
 
 gate('the device limit is read once into a plan: a count bound by patches, a count bound by the device, and a refusal when no patch fits', () => {
@@ -35,7 +38,8 @@ gate('the device limit is read once into a plan: a count bound by patches, a cou
 
 gate('the pool refuses construction without its height store, its patch centres, its clock, or a budget that cannot hold one patch', () => {
   const plan = planVegetationPool({ maxBufferBytes: 1e12, residentPatches: 2, capacityPerPatch: CAP })
-  const base = { plan, worldSeed: 1, heightAt: () => 0, patchCentre, now: clock() }
+  const base = { plan, worldSeed: 1, heightAt: () => 0, patchCentre, now: clock(), cullRadiusM: 64 }
+  assert.throws(() => createVegetationPool({ ...base, cullRadiusM: undefined }), TypeError)
   assert.throws(() => createVegetationPool({ ...base, heightAt: undefined }), TypeError)
   assert.throws(() => createVegetationPool({ ...base, patchCentre: undefined }), TypeError)
   assert.throws(() => createVegetationPool({ ...base, now: undefined }), TypeError)
@@ -157,6 +161,62 @@ gate('the sharing accounting counts the patch copies and the instance copies tha
   assert.equal(acc.copiesSaved, 2 + 2 * expectedCount)
   assert.equal(acc.bytesSaved, 2 * 400 + 2 * expectedCount * 12)
   assert.equal(acc.sharedBytes, acc.renderBytes)
+})
+
+gate('the pool memory is one block per species, the counts, the dirty flags and the float64 origins, in the layout the C++ bind reads', () => {
+  const pool = makePool({ slots: 3 })
+  const m = pool.memory()
+  assert.equal(m.block.length, 1 * 3 * CAP * 16)
+  assert.equal(m.counts.length, 1 * 3)
+  assert.equal(m.dirty.length, 3)
+  assert.equal(m.origins.length, 3 * 3)
+  assert.equal(m.species, 1)
+  assert.equal(m.slots, 3)
+  assert.equal(m.capacity, CAP)
+  assert.equal(m.radius, 64)
+  pool.sync([5])
+  pool.step()
+  assert.equal(pool.buffers()[0][0].buffer, m.block.buffer)
+  assert.equal(pool.buffers()[0][1].byteOffset, 1 * CAP * 16 * 4)
+  assert.equal(m.dirty[pool.slotOf(5)], 1)
+  assert.equal(m.dirty[pool.slotOf(5) === 0 ? 1 : 0], 0)
+})
+
+gate('the allocator is injected: every block the pool needs comes from it, by kind', () => {
+  const kinds = []
+  const allocate = (kind, length) => { kinds.push(kind); return kind === 'f32' ? new Float32Array(length) : kind === 'u32' ? new Uint32Array(length) : kind === 'u8' ? new Uint8Array(length) : new Float64Array(length) }
+  makePool({ slots: 2, allocate })
+  assert.deepEqual(kinds.sort(), ['f32', 'f64', 'u32', 'u8'])
+})
+
+gate('the C++ side reads the same constants and symbols that the JS pool writes', () => {
+  const root = new URL('..', import.meta.url)
+  const h = readFileSync(new URL('engine/src/render/vegetation_draw.h', root), 'utf8')
+  assert.match(h, /kMatrixBytes = 64;/)
+  assert.match(h, /kMatrixFloats = 16;/)
+  assert.match(h, /kMaxSpecies = 4;/)
+  const gl = readFileSync(new URL('engine/src/render/render_webgl2.cpp', root), 'utf8')
+  assert.ok(gl.includes('void ensureVegetationBuffers('))
+  assert.ok(gl.includes('std::uint32_t drawVegetation(const Camera& camera) {'))
+  assert.ok(gl.includes('if (engine::render::vegetation::bound()) drawVegetation(camera);'))
+  assert.ok(gl.includes('glDrawArraysInstanced(GL_TRIANGLES, 0, kPropVertices, static_cast<GLsizei>(d.count)));'))
+  assert.ok(gl.includes('glVertexAttribDivisor(location, 1);'))
+  const gpu = readFileSync(new URL('engine/src/render/render_webgpu.cpp', root), 'utf8')
+  assert.ok(gpu.includes('fn vsVeg('))
+  assert.ok(gpu.includes('fn fsVeg('))
+  assert.ok(gpu.includes('uploadVegetation(camera);'))
+  assert.ok(gpu.includes('drawVegetation(pass);'))
+  assert.ok(gpu.includes('pass.Draw(kPropVertices, d.count)') || gpu.includes('pass.Draw(kPropVertices, d.count);'))
+  const cm = readFileSync(new URL('engine/CMakeLists.txt', root), 'utf8')
+  assert.ok(cm.includes('_engine_vegetation_bind'))
+  const core = readFileSync(new URL('engine/src/engine_core.cpp', root), 'utf8')
+  assert.ok(core.includes('EMSCRIPTEN_KEEPALIVE int engine_vegetation_bind('))
+})
+
+gate('a patch is drawn only if its bounding sphere is inside every plane (text witness of the C++ cull)', () => {
+  const h = readFileSync(new URL('engine/src/render/vegetation_draw.h', new URL('..', import.meta.url)), 'utf8')
+  assert.ok(h.includes('outsidePlane(planes, b.origins + slot * 3, b.radius)'))
+  assert.ok(h.includes('if (d < -static_cast<double>(radius)) return true;'))
 })
 
 finish()

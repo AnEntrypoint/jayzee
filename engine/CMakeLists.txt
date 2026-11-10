@@ -145,6 +145,7 @@ set(ENGINE_EXPORTS
   _engine_device_tier_budget
   _engine_planet_scratch
   _engine_planet_height
+  _engine_vegetation_bind
   _engine_planet_gap_queries
   _engine_planet_resident
   _engine_page_stage

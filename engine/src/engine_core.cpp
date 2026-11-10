@@ -12,6 +12,7 @@
 #include "model_pool.h"
 #include "materials.h"
 #include "textures.h"
+#include "render/vegetation_draw.h"
 #include "planet_frame.h"
 #include "pool_alloc.h"
 #include "vegetation.h"
@@ -343,6 +344,19 @@ EMSCRIPTEN_KEEPALIVE std::int64_t engine_planet_key(int face, int cx, int cy) {
 
 EMSCRIPTEN_KEEPALIVE std::int32_t* engine_planet_scratch() {
   return planetScratch;
+}
+
+EMSCRIPTEN_KEEPALIVE int engine_vegetation_bind(float* block, std::uint32_t* counts, std::uint8_t* dirty, double* origins, float radius, std::uint32_t species, std::uint32_t slots, std::uint32_t capacity) {
+  engine::render::vegetation::Bound bound;
+  bound.block = block;
+  bound.counts = counts;
+  bound.dirty = dirty;
+  bound.origins = origins;
+  bound.radius = radius;
+  bound.species = species;
+  bound.slots = slots;
+  bound.capacity = capacity;
+  return engine::render::vegetation::bind(bound) ? 1 : 0;
 }
 
 EMSCRIPTEN_KEEPALIVE double engine_planet_height(double x, double y, double z) {

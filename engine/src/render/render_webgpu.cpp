@@ -1,4 +1,5 @@
 #include "render_webgpu.h"
+#include "vegetation_draw.h"
 
 #include <algorithm>
 #include <cstddef>
@@ -91,6 +92,99 @@ fn vsProps(@builtin(vertex_index) vid: u32, @builtin(instance_index) iid: u32) -
 
 @fragment
 fn fsProps(vin: PropOut) -> @location(0) vec4f {
+  let mi = cam.classMaterial[min(vin.cls, 3u)];
+  let m = mi * 10u;
+  let colour = vec3f(matF(m), matF(m + 1u), matF(m + 2u));
+  let layer = materials[m + 9u];
+  let texel = vec2i(clamp(fract(vin.world.xz) * 16.0, vec2f(0.0), vec2f(15.0)));
+  let albedoColour = textureLoad(albedo, texel, i32(layer), 0).rgb;
+  let n = normalize(vin.normal);
+  var lit = vec3f(0.2);
+  for (var i = 0u; i < cam.counts.x; i = i + 1u) {
+    let lp = lights[i * 2u];
+    let lc = lights[i * 2u + 1u];
+    let d = lp.xyz - vin.world;
+    let dist = max(length(d), 1e-6);
+    let att = max(0.0, 1.0 - dist / max(lp.w, 1e-6));
+    lit = lit + lc.xyz * lc.w * att * max(dot(n, d / dist), 0.0);
+  }
+  return vec4f(albedoColour * colour * lit, 1.0);
+}
+)WGSL";
+
+constexpr char kVegWgsl[] = R"WGSL(
+struct Camera {
+  planes: array<vec4f, 6>,
+  viewProj: mat4x4f,
+  eye: vec4f,
+  counts: vec4u,
+  classRadius: vec4f,
+  classMaterial: vec4u,
+};
+
+@group(0) @binding(0) var<uniform> cam: Camera;
+@group(0) @binding(1) var<storage, read> mats: array<f32>;
+@group(0) @binding(2) var<storage, read> materials: array<u32>;
+@group(0) @binding(3) var<storage, read> lights: array<vec4f>;
+@group(0) @binding(4) var albedo: texture_2d_array<f32>;
+@group(0) @binding(5) var<storage, read> slotOrigin: vec4f;
+
+struct VegOut {
+  @builtin(position) clip: vec4f,
+  @location(0) world: vec3f,
+  @location(1) normal: vec3f,
+  @location(2) @interpolate(flat) cls: u32,
+};
+
+fn matF(i: u32) -> f32 {
+  return bitcast<f32>(materials[i]);
+}
+
+fn clipOf(p: vec4f) -> vec4f {
+  return vec4f(p.xy, (p.z + p.w) * 0.5, p.w);
+}
+
+fn cubeCorner(vid: u32) -> vec3f {
+  let face = vid / 6u;
+  let k = vid % 6u;
+  let axis = face / 2u;
+  let sgn = select(-0.5, 0.5, (face & 1u) == 0u);
+  let tu = select(-0.5, 0.5, k == 1u || k == 2u || k == 4u);
+  let tv = select(-0.5, 0.5, k == 2u || k == 4u || k == 5u);
+  var p = vec3f(0.0);
+  p[axis] = sgn;
+  p[(axis + 1u) % 3u] = tu;
+  p[(axis + 2u) % 3u] = tv;
+  return p;
+}
+
+fn cubeNormal(vid: u32) -> vec3f {
+  let face = vid / 6u;
+  var n = vec3f(0.0);
+  n[face / 2u] = select(-1.0, 1.0, (face & 1u) == 0u);
+  return n;
+}
+
+@vertex
+fn vsVeg(@builtin(vertex_index) vid: u32, @builtin(instance_index) iid: u32) -> VegOut {
+  let base = iid * 16u;
+  let m0 = vec3f(mats[base], mats[base + 1u], mats[base + 2u]);
+  let m1 = vec3f(mats[base + 4u], mats[base + 5u], mats[base + 6u]);
+  let m2 = vec3f(mats[base + 8u], mats[base + 9u], mats[base + 10u]);
+  let t = vec3f(mats[base + 12u], mats[base + 13u], mats[base + 14u]);
+  let c = cubeCorner(vid);
+  let world = slotOrigin.xyz + m0 * c.x + m1 * c.y + m2 * c.z + t;
+  let n = cubeNormal(vid);
+  var out: VegOut;
+  out.clip = clipOf(cam.viewProj * vec4f(world, 1.0));
+  out.world = world;
+  out.normal = m0 * n.x + m1 * n.y + m2 * n.z;
+  out.cls = 0u;
+  return out;
+}
+
+@fragment
+fn fsVeg(vin: VegOut) -> @location(0) vec4f {
   let mi = cam.classMaterial[min(vin.cls, 3u)];
   let m = mi * 10u;
   let colour = vec3f(matF(m), matF(m + 1u), matF(m + 2u));
@@ -547,6 +641,8 @@ fn fsTerrain(vin: TerrainOut) -> @location(0) vec4f {
 )WGSL";
 
 constexpr std::uint32_t kPropBindings = 5;
+constexpr std::uint32_t kVegBindings = 6;
+constexpr std::uint64_t kVegOriginStride = 256;
 constexpr std::uint32_t kTerrainBindings = 3;
 constexpr std::uint32_t kModelBindings = 1;
 constexpr std::uint32_t kCullBindings = 9;
@@ -597,6 +693,14 @@ wgpu::Buffer modelVertexBuf;
 wgpu::Buffer modelIndexBuf;
 engine::models::Range modelRuns[engine::models::kMaxClustersPerSlot];
 wgpu::BindGroup propGroup[kPropClasses];
+wgpu::RenderPipeline vegPipe;
+wgpu::BindGroupLayout vegLayout;
+wgpu::Buffer vegBuf[engine::render::vegetation::kMaxSpecies];
+wgpu::Buffer vegOriginBuf;
+wgpu::BindGroup vegGroup[engine::render::vegetation::kMaxSpecies * engine::render::vegetation::kMaxSlots];
+bool vegReady = false;
+engine::render::vegetation::Draw vegDraws[engine::render::vegetation::kMaxSpecies * engine::render::vegetation::kMaxSlots];
+std::uint32_t vegDrawCount = 0;
 wgpu::BindGroup terrainGroup;
 wgpu::TextureFormat surfaceFormat = wgpu::TextureFormat::BGRA8Unorm;
 bool ready = false;
@@ -730,6 +834,15 @@ wgpu::BindGroupEntry bufferBinding(std::uint32_t binding, wgpu::Buffer buffer, s
   return entry;
 }
 
+wgpu::BindGroupEntry bufferBindingAt(std::uint32_t binding, wgpu::Buffer buffer, std::uint64_t offset, std::uint64_t size) {
+  wgpu::BindGroupEntry entry{};
+  entry.binding = binding;
+  entry.buffer = buffer;
+  entry.offset = offset;
+  entry.size = size;
+  return entry;
+}
+
 wgpu::BindGroupEntry viewBinding(std::uint32_t binding, wgpu::TextureView view) {
   wgpu::BindGroupEntry entry{};
   entry.binding = binding;
@@ -823,6 +936,34 @@ int buildPipelines() {
   propDesc.primitive.topology = wgpu::PrimitiveTopology::TriangleList;
   propDesc.primitive.cullMode = wgpu::CullMode::None;
   propPipe = device.CreateRenderPipeline(&propDesc);
+
+  wgpu::ShaderModule vegModule = makeModule(kVegWgsl);
+  if (!vegModule) return engine::kNotConfigured;
+  wgpu::BindGroupLayoutEntry vegEntries[kVegBindings];
+  vegEntries[0] = bufferEntry(0, vertexFragment, wgpu::BufferBindingType::Uniform);
+  vegEntries[1] = bufferEntry(1, vertex, wgpu::BufferBindingType::ReadOnlyStorage);
+  vegEntries[2] = bufferEntry(2, fragment, wgpu::BufferBindingType::ReadOnlyStorage);
+  vegEntries[3] = bufferEntry(3, fragment, wgpu::BufferBindingType::ReadOnlyStorage);
+  vegEntries[4] = arrayTextureEntry(4, fragment, wgpu::TextureSampleType::UnfilterableFloat);
+  vegEntries[5] = bufferEntry(5, vertex, wgpu::BufferBindingType::ReadOnlyStorage);
+  vegLayout = makeLayout(vegEntries, kVegBindings);
+  wgpu::PipelineLayout vegPipeLayout = makePipelineLayout(vegLayout);
+
+  wgpu::FragmentState vegFragment{};
+  vegFragment.module = vegModule;
+  vegFragment.entryPoint = "fsVeg";
+  vegFragment.targetCount = 1;
+  vegFragment.targets = &colour;
+  wgpu::RenderPipelineDescriptor vegDesc{};
+  vegDesc.layout = vegPipeLayout;
+  vegDesc.vertex.module = vegModule;
+  vegDesc.vertex.entryPoint = "vsVeg";
+  vegDesc.fragment = &vegFragment;
+  vegDesc.depthStencil = &depth;
+  vegDesc.primitive.topology = wgpu::PrimitiveTopology::TriangleList;
+  vegDesc.primitive.cullMode = wgpu::CullMode::None;
+  vegPipe = device.CreateRenderPipeline(&vegDesc);
+  if (!vegPipe) return engine::kNotConfigured;
 
   wgpu::BindGroupLayoutEntry terrainEntries[kTerrainBindings];
   terrainEntries[0] = bufferEntry(0, vertex, wgpu::BufferBindingType::Uniform);
@@ -1116,6 +1257,57 @@ void drawProps(wgpu::RenderPassEncoder& pass) {
   }
 }
 
+bool ensureVegetation(const engine::render::vegetation::Bound& b) {
+  if (vegReady) return true;
+  const std::uint64_t slotBytes = static_cast<std::uint64_t>(b.capacity) * engine::render::vegetation::kMatrixBytes;
+  for (std::uint32_t sp = 0; sp < b.species; ++sp) vegBuf[sp] = makeBuffer(static_cast<std::uint64_t>(b.slots) * slotBytes, wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst);
+  vegOriginBuf = makeBuffer(static_cast<std::uint64_t>(b.slots) * kVegOriginStride, wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst);
+  for (std::uint32_t sp = 0; sp < b.species; ++sp) {
+    for (std::uint32_t slot = 0; slot < b.slots; ++slot) {
+      wgpu::BindGroupEntry vegBindings[kVegBindings];
+      vegBindings[0] = bufferBinding(0, cameraBuf, kCameraBytes);
+      vegBindings[1] = bufferBindingAt(1, vegBuf[sp], slot * slotBytes, slotBytes);
+      vegBindings[2] = bufferBinding(2, materialBuf, kMaterialBytes);
+      vegBindings[3] = bufferBinding(3, lightBuf, kLightBytes);
+      vegBindings[4] = viewBinding(4, albedoView);
+      vegBindings[5] = bufferBindingAt(5, vegOriginBuf, static_cast<std::uint64_t>(slot) * kVegOriginStride, 16);
+      vegGroup[engine::render::vegetation::indexOf(b, sp, slot)] = makeGroup(vegLayout, vegBindings, kVegBindings);
+      if (!vegGroup[engine::render::vegetation::indexOf(b, sp, slot)]) return false;
+    }
+  }
+  vegReady = true;
+  return true;
+}
+
+void uploadVegetation(const Camera& camera) {
+  namespace veg = engine::render::vegetation;
+  vegDrawCount = 0;
+  veg::Bound& b = veg::state();
+  if (!veg::bound() || !ensureVegetation(b)) return;
+  static veg::Upload uploads[veg::kMaxSpecies * veg::kMaxSlots];
+  const std::uint32_t uploadCount = veg::planUploads(b, uploads, veg::kMaxSpecies * veg::kMaxSlots, veg::kUploadBytesPerFrame);
+  for (std::uint32_t i = 0; i < uploadCount; ++i) {
+    const veg::Upload& u = uploads[i];
+    writeBuffer(vegBuf[u.species], u.byteOffset, veg::rangeOf(b, u.species, u.slot), u.bytes);
+    float origin[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+    veg::originFloat(b, u.slot, origin);
+    writeBuffer(vegOriginBuf, static_cast<std::uint64_t>(u.slot) * kVegOriginStride, origin, sizeof(origin));
+  }
+  const std::uint32_t drawCount = veg::planDraws(b, reinterpret_cast<const float*>(camera.planes), vegDraws, veg::kMaxSpecies * veg::kMaxSlots);
+  vegDrawCount = drawCount == veg::kPlanBad ? 0 : drawCount;
+}
+
+void drawVegetation(wgpu::RenderPassEncoder& pass) {
+  if (vegDrawCount == 0 || !vegReady) return;
+  const engine::render::vegetation::Bound& b = engine::render::vegetation::state();
+  ENGINE_RENDER_CALL(pass.SetPipeline(vegPipe));
+  for (std::uint32_t i = 0; i < vegDrawCount; ++i) {
+    const engine::render::vegetation::Draw& d = vegDraws[i];
+    ENGINE_RENDER_CALL(pass.SetBindGroup(0, vegGroup[engine::render::vegetation::indexOf(b, d.species, d.slot)]));
+    ENGINE_RENDER_CALL(pass.Draw(kPropVertices, d.count));
+  }
+}
+
 void drawTerrain(wgpu::RenderPassEncoder& pass) {
   ENGINE_RENDER_CALL(pass.SetPipeline(terrainPipe));
   ENGINE_RENDER_CALL(pass.SetBindGroup(0, terrainGroup));
@@ -1150,6 +1342,7 @@ void encodeForward(wgpu::CommandEncoder& encoder, wgpu::TextureView target, cons
 
   wgpu::RenderPassEncoder pass = ENGINE_RENDER_CALL(encoder.BeginRenderPass(&passDesc));
   drawProps(pass);
+  drawVegetation(pass);
   if (engine::models::bound()) {
     ENGINE_RENDER_CALL(pass.SetPipeline(modelPipe));
     ENGINE_RENDER_CALL(pass.SetBindGroup(0, modelGroup));
@@ -1345,6 +1538,7 @@ int frame(const SceneView& scene, const FramePlan& plan, const Camera& camera) {
   {
     engine::phase::Scope scope(engine::phase::kUpload);
     writeBuffer(cameraBuf, 0, &camera, kCameraBytes);
+    uploadVegetation(camera);
     std::uint32_t propArgs[kPropClasses * 4];
     for (std::uint32_t c = 0; c < kPropClasses; ++c) {
       const std::uint32_t count = plan.propCount[c];

@@ -4,6 +4,13 @@ import { TRANSFORM_STRIDE_FLOATS, copyAccounting } from './sharedData.js'
 import { densityFor } from './populationDensity.js'
 
 export const VEG_SPECIES = Object.freeze(['trees'])
+export const defaultAllocate = (kind, length) => {
+  if (kind === 'f32') return new Float32Array(length)
+  if (kind === 'f64') return new Float64Array(length)
+  if (kind === 'u32') return new Uint32Array(length)
+  if (kind === 'u8') return new Uint8Array(length)
+  throw new RangeError('unknown allocation kind: ' + kind)
+}
 export const VEG_GEN_INSTANCES_PER_FRAME = 4096
 export const MATRIX_BYTES = TRANSFORM_STRIDE_FLOATS * 4
 
@@ -41,7 +48,10 @@ export const createVegetationPool = ({
   generatePerFrame = VEG_GEN_INSTANCES_PER_FRAME,
   now,
   radiusM = PLANET_RADIUS_M,
+  cullRadiusM,
+  allocate = defaultAllocate,
 }) => {
+  if (!(cullRadiusM >= 0) || !Number.isFinite(cullRadiusM)) throw new TypeError('createVegetationPool needs cullRadiusM, the bounding radius of one patch in metres')
   if (!plan || !Number.isInteger(plan.slots)) throw new TypeError('createVegetationPool needs a plan from planVegetationPool')
   if (typeof heightAt !== 'function') throw new TypeError('createVegetationPool needs heightAt(n), the patch height store')
   if (typeof patchCentre !== 'function') throw new TypeError('createVegetationPool needs patchCentre(patchId) returning { latRad, lonRad, capRad }')
@@ -51,8 +61,12 @@ export const createVegetationPool = ({
   if (generatePerFrame < plan.capacityPerPatch) throw new RangeError('generatePerFrame must be at least one patch capacity, or a full patch never generates')
   const slots = plan.slots
   const capacity = plan.capacityPerPatch
-  const buffers = species.map(() => Array.from({ length: slots }, () => new Float32Array(capacity * TRANSFORM_STRIDE_FLOATS)))
-  const counts = species.map(() => new Uint32Array(slots))
+  const block = allocate('f32', species.length * slots * capacity * TRANSFORM_STRIDE_FLOATS)
+  const perPatch = capacity * TRANSFORM_STRIDE_FLOATS
+  const buffers = species.map((_, s) => Array.from({ length: slots }, (__, slot) => block.subarray((s * slots + slot) * perPatch, (s * slots + slot + 1) * perPatch)))
+  const countsBlock = allocate('u32', species.length * slots)
+  const counts = species.map((_, s) => countsBlock.subarray(s * slots, (s + 1) * slots))
+  const dirty = allocate('u8', slots)
   const owner = new Int32Array(slots).fill(-1)
   const stamp = new Uint32Array(slots)
   const freeStack = new Int32Array(slots)
@@ -66,7 +80,7 @@ export const createVegetationPool = ({
   let generatedInstances = 0
   let generateMs = 0
   const nrm = new Float64Array(3)
-  const origins = new Float64Array(slots * 3)
+  const origins = allocate('f64', slots * 3)
 
   const expectedCount = (s, cap) => Math.round(densityOf(s) * capAreaKm2(cap.capRad, radiusM))
 
@@ -122,6 +136,7 @@ export const createVegetationPool = ({
       }
       counts[s][slot] = count
     }
+    dirty[slot] = 1
     generated += 1
     generatedInstances += counts.reduce((acc, arr) => acc + arr[slot], 0)
   }
@@ -197,6 +212,7 @@ export const createVegetationPool = ({
     drawRanges,
     readWorld,
     origin: (slot) => [origins[slot * 3], origins[slot * 3 + 1], origins[slot * 3 + 2]],
+    memory: () => ({ block, counts: countsBlock, dirty, origins, species: species.length, slots, capacity, radius: cullRadiusM }),
     buffers: () => buffers,
     counts: () => counts,
     slotOf: (id) => slotOf.get(id),

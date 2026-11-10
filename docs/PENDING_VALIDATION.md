@@ -3426,9 +3426,14 @@ Code, docs and gates only. No build, test, gate or witness run in Phase A. Phase
 | Gate wired into npm test, and an npm script | `scripts/check-vegetation-stream.mjs` (new), `package.json` | `npm test` |
 | Stretch 4 section in ENGINE.md: spoint's path, seven changes with reasons, work per patch and budget, sharing with stretch 3 | `docs/ENGINE.md` | Phase B fills the measured ms per patch and the sharing counts |
 
+| Instanced vegetation draw, WebGL2: one vertex buffer per species, a range per slot, four mat4 attributes with divisor 1, origin uniform, culled per patch against the frustum planes | `engine/src/render/render_webgl2.cpp`, `engine/src/render/vegetation_draw.h` | `npm run check:vegetation-stream` (gates "the C++ side reads the same constants and symbols" and "a patch is drawn only if its bounding sphere"); Phase B also builds the module and runs the fly-over on WebGL2 |
+| Instanced vegetation draw, WebGPU: storage buffer per species, one bind group per slot with its range as the offset, origin buffer at a 256-byte stride, vsVeg and fsVeg | `engine/src/render/render_webgpu.cpp` | `npm run check:vegetation-stream` (gate "the C++ side reads the same constants and symbols"); Phase B also builds and runs the fly-over on WebGPU |
+| Planning and upload budget in C++: draws skip zero counts, a count above capacity is refused, a slot's dirty flag clears only when all of its ranges fit the upload budget | `engine/src/render/vegetation_draw.h` | Phase B: a C++ test of `planDraws` and `planUploads` (not written in Phase A) |
+| Pool memory as one block per species, counts, dirty flags and float64 origins, with an injected allocator; the bind export | `src/engine/vegetation.js`, `engine/src/engine_core.cpp`, `engine/CMakeLists.txt` | `npm run check:vegetation-stream` (gates "the pool memory is one block per species" and "the allocator is injected") |
+
 Open for Phase B, not decided in Phase A:
 
-- The GPU draw call. `drawRanges` gives the list, and the render path (WebGL2 `frame()` or WebGPU) consumes it. Not written in Phase A.
+- The instanced draw, WebGL2 and WebGPU: written in Phase A (`engine/src/render/render_webgl2.cpp`, `render_webgpu.cpp`, `vegetation_draw.h`, `engine_core.cpp`), not built or run. Phase B builds it and checks it on both backends.
 - The budget of 4096 instances per frame is a starting value. Phase B measures the milliseconds per patch and sets the number against the frame budget.
 - The witness walk and fly-over on the 64, 512 and 1024 tiers with KTX2 assets, on both backends.
 - The "no per-frame allocation" claim is a Phase B measurement (heap sampling over a run), not a Phase A claim. The Phase A code does not allocate in the generation loop, but that is read from the code, not measured.

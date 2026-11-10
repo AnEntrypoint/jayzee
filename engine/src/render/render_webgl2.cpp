@@ -8,6 +8,7 @@
 #include "../model_pool.h"
 #include "../page_cache.h"
 #include "../phase_timer.h"
+#include "vegetation_draw.h"
 
 namespace engine::render::webgl2 {
 
@@ -116,6 +117,59 @@ void main() {
 }
 )GLSL";
 
+constexpr char kVegVertex[] = R"GLSL(#version 300 es
+precision highp float;
+precision highp int;
+layout(std140) uniform Frame {
+  vec4 planes[6];
+  mat4 viewProj;
+  vec4 eye;
+  uvec4 counts;
+  vec4 classRadius;
+  uvec4 classMaterial;
+};
+uniform vec3 uOffset;
+layout(location = 1) in vec4 aM0;
+layout(location = 2) in vec4 aM1;
+layout(location = 3) in vec4 aM2;
+layout(location = 4) in vec4 aM3;
+flat out uint vClass;
+out vec3 vWorld;
+out vec3 vNormal;
+
+vec3 cubeCorner(int vid) {
+  int face = vid / 6;
+  int k = vid - face * 6;
+  int axis = face / 2;
+  float sgn = ((face & 1) == 0) ? 0.5 : -0.5;
+  float tu = (k == 1 || k == 2 || k == 4) ? 0.5 : -0.5;
+  float tv = (k == 2 || k == 4 || k == 5) ? 0.5 : -0.5;
+  vec3 p = vec3(0.0);
+  p[axis] = sgn;
+  p[(axis + 1) % 3] = tu;
+  p[(axis + 2) % 3] = tv;
+  return p;
+}
+
+vec3 cubeNormal(int vid) {
+  int face = vid / 6;
+  vec3 n = vec3(0.0);
+  n[face / 2] = ((face & 1) == 0) ? 1.0 : -1.0;
+  return n;
+}
+
+void main() {
+  vec3 c = cubeCorner(gl_VertexID);
+  vec3 local = c.x * aM0.xyz + c.y * aM1.xyz + c.z * aM2.xyz;
+  vec3 world = local + aM3.xyz + uOffset;
+  vec3 n = cubeNormal(gl_VertexID);
+  vWorld = world;
+  vNormal = n.x * aM0.xyz + n.y * aM1.xyz + n.z * aM2.xyz;
+  vClass = 0u;
+  gl_Position = viewProj * vec4(world, 1.0);
+}
+)GLSL";
+
 constexpr char kTerrainVertex[] = R"GLSL(#version 300 es
 precision highp float;
 precision highp int;
@@ -216,6 +270,11 @@ GLuint pageVbo = 0;
 GLuint propVao = 0;
 GLuint terrainVao = 0;
 GLuint propProgram = 0;
+GLuint vegProgram = 0;
+GLuint vegVao = 0;
+GLuint vegVbo[engine::render::vegetation::kMaxSpecies] = {};
+GLint vegOffsetLocation = -1;
+bool vegBuffersReady = false;
 GLuint terrainProgram = 0;
 GLuint modelProgram = 0;
 GLuint modelVbo = 0;
@@ -284,6 +343,47 @@ GLuint makeUniformBuffer(std::uint32_t bytes, GLuint binding) {
   return buffer;
 }
 
+void ensureVegetationBuffers(const engine::render::vegetation::Bound& b) {
+  if (vegBuffersReady) return;
+  for (std::uint32_t s = 0; s < b.species; ++s) {
+    glGenBuffers(1, &vegVbo[s]);
+    glBindBuffer(GL_ARRAY_BUFFER, vegVbo[s]);
+    glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(b.slots) * b.capacity * engine::render::vegetation::kMatrixBytes, nullptr, GL_DYNAMIC_DRAW);
+  }
+  vegBuffersReady = true;
+}
+
+std::uint32_t drawVegetation(const Camera& camera) {
+  namespace veg = engine::render::vegetation;
+  veg::Bound& b = veg::state();
+  ensureVegetationBuffers(b);
+  static veg::Upload uploads[veg::kMaxSpecies * veg::kMaxSlots];
+  static veg::Draw draws[veg::kMaxSpecies * veg::kMaxSlots];
+  const std::uint32_t uploadCount = veg::planUploads(b, uploads, veg::kMaxSpecies * veg::kMaxSlots, veg::kUploadBytesPerFrame);
+  for (std::uint32_t i = 0; i < uploadCount; ++i) {
+    const veg::Upload& u = uploads[i];
+    ENGINE_RENDER_CALL(glBindBuffer(GL_ARRAY_BUFFER, vegVbo[u.species]));
+    ENGINE_RENDER_CALL(glBufferSubData(GL_ARRAY_BUFFER, static_cast<GLintptr>(u.byteOffset), static_cast<GLsizeiptr>(u.bytes), veg::rangeOf(b, u.species, u.slot)));
+  }
+  const std::uint32_t drawCount = veg::planDraws(b, reinterpret_cast<const float*>(camera.planes), draws, veg::kMaxSpecies * veg::kMaxSlots);
+  if (drawCount == veg::kPlanBad) return 0;
+  ENGINE_RENDER_CALL(glUseProgram(vegProgram));
+  ENGINE_RENDER_CALL(glBindVertexArray(vegVao));
+  for (std::uint32_t i = 0; i < drawCount; ++i) {
+    const veg::Draw& d = draws[i];
+    const std::uint32_t local = d.slot * b.capacity * veg::kMatrixBytes;
+    ENGINE_RENDER_CALL(glBindBuffer(GL_ARRAY_BUFFER, vegVbo[d.species]));
+    for (GLuint k = 0; k < 4; ++k) {
+      ENGINE_RENDER_CALL(glVertexAttribPointer(1 + k, 4, GL_FLOAT, GL_FALSE, veg::kMatrixBytes, offsetPointer(local + k * 16)));
+    }
+    float origin[3];
+    veg::originFloat(b, d.slot, origin);
+    ENGINE_RENDER_CALL(glUniform3f(vegOffsetLocation, origin[0], origin[1], origin[2]));
+    ENGINE_RENDER_CALL(glDrawArraysInstanced(GL_TRIANGLES, 0, kPropVertices, static_cast<GLsizei>(d.count)));
+  }
+  return drawCount;
+}
+
 std::uint32_t drawModels(const Camera& camera) {
   const std::uint32_t stride = engine::models::layout().vertexStrideBytes;
   ENGINE_RENDER_CALL(glUseProgram(modelProgram));
@@ -342,6 +442,21 @@ int init(const char* selector, std::uint32_t width, std::uint32_t height) {
   glUniform1i(glGetUniformLocation(propProgram, "albedo"), 0);
   glUseProgram(terrainProgram);
   glUniform1i(glGetUniformLocation(terrainProgram, "heights"), 1);
+  vegProgram = linkProgram(kVegVertex, kPropFragment);
+  if (vegProgram == 0) return engine::kNotConfigured;
+  bindBlock(vegProgram, "Frame", kFrameBinding);
+  bindBlock(vegProgram, "Materials", kMaterialBinding);
+  bindBlock(vegProgram, "Lights", kLightBinding);
+  glUseProgram(vegProgram);
+  glUniform1i(glGetUniformLocation(vegProgram, "albedo"), 0);
+  vegOffsetLocation = glGetUniformLocation(vegProgram, "uOffset");
+  glGenVertexArrays(1, &vegVao);
+  glBindVertexArray(vegVao);
+  for (GLuint location = 1; location < 5; ++location) {
+    glEnableVertexAttribArray(location);
+    glVertexAttribDivisor(location, 1);
+  }
+  glBindVertexArray(0);
 
   frameUbo = makeUniformBuffer(sizeof(Camera), kFrameBinding);
   materialUbo = makeUniformBuffer(kMaterialBlockBytes, kMaterialBinding);
@@ -487,6 +602,7 @@ int frame(const SceneView& scene, const FramePlan& plan, const Camera& camera) {
     ENGINE_RENDER_CALL(glDrawArraysInstanced(GL_TRIANGLES, 0, kPropVertices, static_cast<GLsizei>(count)));
   }
 
+  if (engine::render::vegetation::bound()) drawVegetation(camera);
   const std::uint32_t drawn = modelsReady && engine::models::bound() ? drawModels(camera) : 0;
   engine::render::counters().cullPassA = drawn;
   engine::render::counters().cullCandidates = 0;
