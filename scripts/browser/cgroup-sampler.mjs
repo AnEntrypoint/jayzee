@@ -28,8 +28,10 @@ if (process.argv[1] && process.argv[1].endsWith('/browser/cgroup-sampler.mjs')) 
   const durationMs = Number(durationArg)
   const intervalMs = Number(intervalArg ?? 2)
   const lines = []
+  let stopping = false
+  process.on('SIGTERM', () => { stopping = true })
   const end = Date.now() + durationMs
-  while (Date.now() < end) {
+  while (!stopping && Date.now() < end) {
     const stat = readCpuStat(readFileSync(CPU_STAT, 'utf8'))
     const pressure = readCpuPressure(readFileSync(CPU_PRESSURE, 'utf8'))
     lines.push(`${Date.now()} ${stat.throttledUs} ${stat.usageUs} ${pressure.someUs} ${pressure.fullUs}`)

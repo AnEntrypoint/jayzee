@@ -70,7 +70,7 @@ const sampleOnce = (ts) => {
 let ticks = 0
 scan()
 setInterval(() => {
-  if (ticks % 100 === 0) scan()
+  if (ticks % 10 === 0) scan()
   ticks += 1
   sampleOnce(Date.now())
 }, period)

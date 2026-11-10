@@ -2547,3 +2547,32 @@ Items, as they stand:
 - 1024-tier long-frame stalls: not fixed. The recorded cause is host CPU sharing, which the record itself calls not proven. The data supports no code change. Settling it needs a per-thread run-queue wait from `/proc/<tid>/schedstat` on the host during a stall frame, which this queue does not run, so the item stays blocked.
 - Launcher null adapter: left as recorded.
 - Phase 6 cube-sphere keying and the ENGINE.md decisions: decided in the Phase A section, with the reasoning recorded there.
+
+
+## Controlled 1024 run: pause and pinning (Phase A, pre-registered before any run)
+
+Question. The 1024-tier long-frame stalls have a recorded cause, host CPU sharing, that no run has proven ("Host CPU sharing as the cause of the remaining stall" and "Stalls at 1024, Phase B diagnosis"). This section tests it with a controlled job.
+
+Harness. `scripts/browser/controlled-run.mjs` runs one WebGPU timed page at tier 1024 with draw on, one page at a time, through the project browser. Its inputs are a label, a round, a condition, an optional pin list and an explicit pause list. It records the host load and the busy share of the whole machine over the second after pausing. It SIGSTOPs the paused pids and SIGCONTs them in a finally block and on SIGINT or SIGTERM. It runs the cgroup sampler and the renderer thread sampler on CPU 15, and when a pin is given it pins every renderer thread of the project profile with `taskset -a`, then reads back each thread's allowed list. `scripts/browser/controlled-report.mjs` turns a directory of runs into per-cell summaries and the two verdicts below.
+
+Conditions. PAUSED unpinned, PAUSED pinned to CPUs 0-7, and LIVE unpinned. PAUSED runs stop the foreign CPU-heavy jobs named in the Phase B record. LIVE runs stop nothing and measure the co-tenant load as it is. A PAUSED run is refused when the host busy share in the second after pausing is above 0.2. Three rounds, with the order of the three conditions alternated by round.
+
+Measures. A stall is a frame above 1.5 times its run's median frame (`stall-attribution.mjs`). For each stall, run-queue wait, run time and sleep come from the renderer main thread's schedstat (`stall-off-cpu.mjs`). A run whose stalls the probe cannot cover, or whose pin did not apply (`pinApplied` not true), is reported and kept out of its cell.
+
+Predictions, each of which can fail, fixed before the runs.
+- P1 (co-tenant load): the LIVE cell has more stall frames in total than the PAUSED unpinned cell. If it does not, the load is not what the stalls track here.
+- P2 (run-queue wait): if P1 holds, at least 25% of the LIVE stall time is run-queue wait. Below that, the stall time is not mostly CPU contention, and the cause is not proven.
+- P3 (pinning): the PAUSED pinned cell differs from the PAUSED unpinned cell in stall frames. The verdict is one of pinning reduces, pinning adds, or no difference. A verdict needs three valid runs in each cell.
+
+Decision rules. The cause is recorded as proven only if P1 and P2 both hold. A code change is made only from a measured cause inside the product (for example a phase that stalls with no contention). Host load and pinning are environment facts: they are recorded in the stall-causes record and in the witness procedure, not made into product code. Spoint is not touched.
+
+## Streamer comparison against spoint (Phase A status: blocked, OPEN)
+
+ENGINE.md phase 5 asks for frame-time p99 against spoint's streamer on the same path. The spoint side needs a per-step timing entry point on HeightfieldStreamer, which spoint is adding with its push. Checked at origin/main 6c7f266: `src/terrain/HeightfieldStreamer.js` exports `createTerrainStreamer` and `cover()` only enqueues, and no per-step timing entry point exists. spoint's working tree holds another peer's uncommitted edits (`src/netcode/RewindSpatialIndex.js`, `src/netcode/SnapshotEncoder.js`, `src/sdk/TickHandler.js`, two witness scripts), so nothing in spoint is changed here. The existing `scripts/streamer-spoint-p99.mjs` measures `cover()` call time against a stub and is not the per-step comparison. Status stays OPEN until the entry point is on origin/main.
+
+Phase A pending lines.
+- scripts/browser/controlled-run.mjs. Witness: `npm run check:controlled-run` PASS, then the Phase B matrix in the stall-causes record, with pinApplied and the paused pid states.
+- scripts/browser/controlled-report.mjs. Witness: the same gate, plus the verdict lines printed from the matrix directory.
+- scripts/check-controlled-run.mjs, in the npm test chain after check:paired-report. Witness: `RESULT: PASS` with the gate count printed.
+- scripts/browser/cgroup-sampler.mjs stops on SIGTERM and writes its lines, so a run can end the sampler at the page's end. Witness: the matrix cgroup files are non-empty and cover the page window.
+- scripts/browser/thread-cpu-sampler.mjs scans for renderers every 500 ms, not every 5 s, so a page's first seconds are sampled. Witness: the matrix threads file holds the page renderer's rows from its start.
