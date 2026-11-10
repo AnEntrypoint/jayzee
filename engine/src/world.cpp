@@ -472,7 +472,7 @@ int World::allocateSlot() {
 }
 
 void World::sync(std::uint32_t slot) {
-  JPH::BodyInterface& bodies = runtime_->physics.GetBodyInterface();
+  JPH::BodyInterface& bodies = runtime_->physics.GetBodyInterfaceNoLock();
   const JPH::BodyID id(bodyIds_[slot]);
   const JPH::RVec3 p = bodies.GetPosition(id);
   const JPH::Vec3 v = bodies.GetLinearVelocity(id);

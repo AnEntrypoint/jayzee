@@ -211,30 +211,48 @@ const setupPlanet = (module, renderer, placed) => {
   return surface
 }
 
-const PATH = QUERY.get('path') === 'planet' ? 'planet' : 'orbit'
-const PATH_SPEED_M_PER_S = 30
+const FLYOVER = QUERY.get('path') === 'flyover'
+const PATH = FLYOVER || QUERY.get('path') === 'planet' ? 'planet' : 'orbit'
+const PATH_SPEED_M_PER_S = FLYOVER ? 300 : 30
 const PATH_STEP_M = PATH_SPEED_M_PER_S / 60
+const PATH_HEIGHT_M = FLYOVER ? 250 : CAMERA_HEIGHT
 const pagePlacement = new Map()
 const pathStats = { restages: 0, restageMs: [], cellChanges: 0 }
 let pathRef = null
 let pathCell = null
 const PATH_CELL_NOW = { face: 0, cx: 0, cy: 0 }
 
-const restageWindow = (module, renderer, cell) => {
-  const started = performance.now()
+const PATH_WINDOW = Math.max(1, Math.min(8, Number(QUERY.get('window') ?? 2)))
+const PAGES_PER_FRAME = Math.max(1, Number(QUERY.get('streamPerFrame') ?? 8))
+const pageQueue = { stage: [], release: [] }
+
+const planWindow = (module, cell) => {
   const wanted = new Map()
-  for (let dy = -2; dy <= 1; dy++) {
-    for (let dx = -2; dx <= 1; dx++) {
+  for (let dy = -PATH_WINDOW; dy < PATH_WINDOW; dy++) {
+    for (let dx = -PATH_WINDOW; dx < PATH_WINDOW; dx++) {
       wanted.set(module._engine_planet_key(cell.face, cell.cx + dx, cell.cy + dy), [cell.cx + dx - pathRef.cx, cell.cy + dy - pathRef.cy])
     }
   }
-  for (const [key, held] of pagePlacement) {
-    if (wanted.has(key)) continue
+  pageQueue.release = [...pagePlacement.keys()].filter((key) => !wanted.has(key))
+  pageQueue.stage = [...wanted].filter(([key]) => !pagePlacement.has(key))
+  pathStats.restages += 1
+}
+
+const streamPages = (module, renderer, limit) => {
+  if (pageQueue.release.length === 0 && pageQueue.stage.length === 0) return
+  const started = performance.now()
+  let budget = limit
+  while (budget > 0 && pageQueue.release.length > 0) {
+    const key = pageQueue.release.pop()
+    const held = pagePlacement.get(key)
+    if (held === undefined) continue
     renderer.unplacePage(held.slot)
     module._engine_page_release(key)
     pagePlacement.delete(key)
+    budget -= 1
   }
-  for (const [key, [dx, dy]] of wanted) {
+  while (budget > 0 && pageQueue.stage.length > 0) {
+    const [key, [dx, dy]] = pageQueue.stage.pop()
     if (pagePlacement.has(key)) continue
     const slot = module._engine_page_stage(key)
     if (slot < 0) throw new Error('page stage refused at window cell ' + dx + ',' + dy)
@@ -246,8 +264,8 @@ const restageWindow = (module, renderer, cell) => {
     module._engine_page_commit(slot)
     renderer.placePage(slot, cellOrigin(dx, dy), PAGE_U_EDGE, PAGE_V_EDGE)
     pagePlacement.set(key, { slot })
+    budget -= 1
   }
-  pathStats.restages += 1
   pathStats.restageMs.push(performance.now() - started)
 }
 
@@ -255,7 +273,8 @@ const setupPlanetPath = (module, renderer) => {
   const surface = configurePlanet(module)
   pathRef = cellOf(module, 0, PLANET.radius, 0)
   pathCell = { face: pathRef.face, cx: pathRef.cx, cy: pathRef.cy }
-  restageWindow(module, renderer, pathRef)
+  planWindow(module, pathRef)
+  streamPages(module, renderer, Infinity)
   pathStats.restages = 0
   pathStats.restageMs = []
   return surface
@@ -268,13 +287,14 @@ const planetCamera = (module, renderer, frame, aspect, surface) => {
   const cell = locateCell(module, x, PLANET.radius, z, PATH_CELL_NOW)
   if (cell.face !== pathCell.face || cell.cx !== pathCell.cx || cell.cy !== pathCell.cy) {
     pathStats.cellChanges += 1
-    restageWindow(module, renderer, cell)
+    planWindow(module, cell)
     pathCell.face = cell.face
     pathCell.cx = cell.cx
     pathCell.cy = cell.cy
   }
+  streamPages(module, renderer, PAGES_PER_FRAME)
   CAMERA.eye[0] = x
-  CAMERA.eye[1] = surface(x, z) + CAMERA_HEIGHT
+  CAMERA.eye[1] = surface(x, z) + PATH_HEIGHT_M
   CAMERA.eye[2] = z
   lookAt(CAMERA.eye, ORIGIN, UP, VIEW)
   perspective(CAMERA_FOV, aspect, NEAR, FAR, PROJ)
@@ -415,7 +435,7 @@ const run = async () => {
 
   const aspect = canvas.width / canvas.height
   const frameTimes = []
-  const PHASE_NAMES = ['pages', 'inputs', 'physics', 'readback', 'plan', 'backend', 'acquire', 'upload', 'submit']
+  const PHASE_NAMES = ['pages', 'inputs', 'physics', 'readback', 'plan', 'backend', 'acquire', 'upload', 'submit', 'encode']
   const phaseCount = TIMED && module._engine_phase_count ? module._engine_phase_count() : 0
   const ROW_FIELDS = 7
   const ROW_WIDTH = ROW_FIELDS + phaseCount
@@ -494,6 +514,10 @@ const run = async () => {
   result.path = PATH
   if (PATH === 'planet') {
     result.pathSpeedMps = PATH_SPEED_M_PER_S
+    result.flyover = FLYOVER
+    result.pageWindow = PATH_WINDOW
+    result.pagesPerFrame = PAGES_PER_FRAME
+    result.pagesPlaced = pagePlacement.size
     result.cellChanges = pathStats.cellChanges
     result.restages = pathStats.restages
     if (pathStats.restageMs.length > 0) {

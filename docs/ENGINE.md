@@ -494,9 +494,22 @@ Measured: three interleaved rounds give a WebGPU median of 16.9 ms and a WebGL2 
 
 Open for this decision: a tick that is clearly under 16.7 ms at 1024 needs a physics change, not a renderer change, because the render side is under 0.5 ms on both backends.
 
-Scenario and streaming witnesses (open)
+Minimum arena for the 1024 plan (decision)
 
-Not done in this pass. The owner asked for repeatable physics scenarios from spoint's example games (character controller, deathrun, combat bots, lockstep RTS, boss fights) with tick and frame budgets on every tier and both backends, and for a walk and fast fly-over across the sphere with real vegetation assets and no hitch. Neither exists yet. Recorded as open.
+Decision: `engine_init` keeps refusing a budget that cannot hold the planned tier. It returns -2 (range) and binds nothing. The device decides the budget, so the engine does not quietly boot a smaller plan that would break the tier contract. The host chooses a budget at or above the floor, and the floor is what the gate measures: `scripts/check-engine-budget-floor.mjs` asserts 16 MiB is refused, 48 MiB boots, and bisects the smallest booting arena between them, printing it as an INFO line. The floor value is recorded in docs/PENDING_VALIDATION.md from the Phase B run, not assumed here.
+
+Real vegetation and streaming (Phase A)
+
+- Asset prep. `tools/asset-pipeline/prep.mjs` runs meshopt at level `medium` through the pinned `@gltf-transform/*` 4.5.1 and `meshoptimizer` 1.2.0, and encodes each embedded texture to KTX2 with the pinned `basisu` 1.16.3 binary (ETC1S, mipmaps). The output is validated by `tools/asset-pipeline/validate.mjs`. The source vegetation (`/workspace/hy3d/output/relay-prepped`: tree, tall_tree, grass_large, flowers) is PNG and not meshopt-compressed, so prep is required before any engine path can use it. `scripts/check-vegetation-assets.mjs` runs prep and checks each output for validity, at least one KTX2 texture, the medium level and a size no more than twice the source.
+- What is not done. The engine has no instanced GLB draw path. Props are 36-vertex cubes by class, and models draw one slot per asset at a fixed offset. Dense real-asset vegetation therefore needs an instanced draw path in the renderer, and no such path exists yet. Until it does, the vegetation gate proves the assets are valid, not that they draw.
+- KTX2 transcode is not witnessed. Prep writes KTX2 bytes, and the decode worker's transcode witness covers only a KTX2 header with no content.
+- Streaming. The planet render page streams pages in a bounded queue: a window of 8 pages around the camera cell and at most 8 staged or released pages per frame (`streamPerFrame`). It replaces the earlier restage that placed every new page in one frame, which was a hitch. `scripts/browser/stream-witness-run.mjs` runs the planet walk and the 250 m flyover on the four tiers and both backends, and writes a per-run record and a summary. Its verdict needs more than 64 placed pages, frame p99 and worst frame at or below 16.7 ms, and per-frame page streaming at or below 2 ms, with no allocation after warm-up and no creation after the seal.
+- Encode phase. The render phase timers gain `kEncode`, covering command encoding (`encodeVisibility` or `encodeForward`) and `Finish`, so the backend cost can be read apart from the submit. The page reports it as `encode`.
+- Physics sync. `World::sync` reads body positions through `GetBodyInterfaceNoLock()`. It is called on the step thread between steps, and nothing else touches bodies then, so the lock is not needed. This is unmeasured and must be confirmed by the threaded determinism hashes in Phase B.
+
+Scenario witnesses (open)
+
+Not done in this pass. The owner asked for repeatable physics scenarios from spoint's example games (character controller, deathrun, combat bots, lockstep RTS, boss fights) with tick and frame budgets on every tier and both backends. None exists yet. Recorded as open.
 
 ### Status
 

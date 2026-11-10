@@ -3228,3 +3228,27 @@ Phase A: no code change. Phase B: `node scripts/spoint-streamer-compare.mjs 200`
 Result, like for like (sample a 33 by 33 height grid over 256 m, once per build, same host): spoint p99 0.340 ms, jayzee p99 0.316 ms, ratio 1.08. The earlier record of 2.53 (spoint 0.759 ms) is not reproduced in this run, and this run replaces it.
 
 Not a frame-time comparison. The script's second ratio (148.6) divides a streamer step by a render frame, which are different operations, so it is not used. The call boundary also differs (spoint calls a JavaScript function, jayzee calls the engine export), which the script's caveat states. A frame-time comparison over a walk, with both sides rendering, is not done and stays open.
+
+## Stretch: vegetation streaming, 1024 budget, encode phase, arena decision (Phase A)
+
+Phase A: code, docs and gates only. No build, test or witness run in this phase. Each change below is listed with the witness that Phase B must run.
+
+| change | files | witness (Phase B) |
+|---|---|---|
+| Asset prep: meshopt medium through pinned @gltf-transform 4.5.1 and meshoptimizer 1.2.0; KTX2 through pinned basisu 1.16.3 (linux x64 binary in the package) | `tools/asset-pipeline/prep.mjs`, `package.json`, `package-lock.json` | `npm run check:vegetation-assets` (runs prep into build/assets/vegetation and validates each output) |
+| Vegetation gate: sources present, validator accepts, at least one KTX2 texture per asset, medium level recorded, output at most 2x source | `scripts/check-vegetation-assets.mjs` | same as above |
+| Arena floor gate: 16 MiB refused with -2, 48 MiB boots, bisected floor printed as INFO | `scripts/check-engine-budget-floor.mjs`, appended to npm test | `npm run check:engine-budget-floor` |
+| Arena decision recorded: refusal stays, floor measured | `docs/ENGINE.md` ("Minimum arena for the 1024 plan") | the gate above |
+| Bounded page streaming in the planet page: window 8, streamPerFrame 8, `planWindow` and `streamPages`, flyover path at 250 m | `scripts/browser/engine-render-browser.js` | `node scripts/browser/stream-witness-run.mjs` (both backends, four tiers, planet and flyover) |
+| Stream runner and verdict (p99 and worst frame at or below 16.7 ms, restage at or below 2 ms, pages placed above 64, no allocation after warm-up, no creation after seal) | `scripts/browser/stream-witness-run.mjs` | same as above |
+| Encode phase timer `kEncode` (9), covering encodeVisibility or encodeForward and Finish; page reports `encode` | `engine/src/phase_timer.h`, `engine/src/render/render_webgpu.cpp`, `scripts/browser/engine-render-browser.js` | 64-tier WebGPU timed run; read the `encode` field next to `backend` and `submit` |
+| Physics sync through the NoLock body interface, on the step thread between steps | `engine/src/world.cpp` | threaded determinism hashes (b6675ee2, 21494c4d unchanged) and the 1024 before and after timed runs |
+| Repinned artifacts after the wasm change | `engine/artifacts.json` | `npm run check:engine-artifacts` after the Phase B builds |
+
+Not done in Phase A, recorded as open in docs/ENGINE.md:
+
+- No instanced GLB draw path. Dense real-asset vegetation cannot draw until one exists. The vegetation gate proves validity only.
+- KTX2 transcode of the prepped assets is not witnessed.
+- The null adapter launcher fix (the seeding in `scripts/browser/webgpu-profile.mjs` is in place, but the launcher-level retry is not written).
+- The 1024 budget (16.7 ms) is not reached by a renderer change. The NoLock sync is only a first step, and the solver iteration count is the larger lever. It changes the determinism hash, so it needs an owner decision.
+- The physics scenario witnesses (spoint example games) are not started.

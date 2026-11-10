@@ -1429,13 +1429,16 @@ int frame(const SceneView& scene, const FramePlan& plan, const Camera& camera) {
     target = ENGINE_RENDER_CALL(surfaceTexture.texture.CreateView());
   }
 
-  if (visible) {
-    encodeVisibility(encoder, target);
-  } else {
-    encodeForward(encoder, target, camera);
+  wgpu::CommandBuffer commands;
+  {
+    engine::phase::Scope scope(engine::phase::kEncode);
+    if (visible) {
+      encodeVisibility(encoder, target);
+    } else {
+      encodeForward(encoder, target, camera);
+    }
+    commands = ENGINE_RENDER_CALL(encoder.Finish());
   }
-
-  wgpu::CommandBuffer commands = ENGINE_RENDER_CALL(encoder.Finish());
   {
     engine::phase::Scope scope(engine::phase::kSubmit);
     ENGINE_RENDER_CALL(queue.Submit(1, &commands));
