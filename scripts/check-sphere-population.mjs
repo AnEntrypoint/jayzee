@@ -123,7 +123,7 @@ gate('the density per category is derived from spoint: trees 53,125 and rocks 15
 gate('the population heights come from the engine patch height store: each object sits at _engine_planet_height at its own point', () => {
   const calls = []
   const module = { _engine_planet_height: (x, y, z) => { calls.push([x, y, z]); return 0.001 * x + 0.002 * y - 0.003 * z + 4 } }
-  const pop = placeOnPlanet({ module, seed: 9, category: 'trees', centreLatRad: 0.2, centreLonRad: 0.5, capRad: 0.002 })
+  const pop = placeOnPlanet({ module, seed: 9, category: 'trees', centreLatRad: 0.2, centreLonRad: 0.5, capRad: 1.0e-5 })
   assert.equal(calls.length, pop.count)
   for (let i = 0; i < pop.count; i++) {
     const n = [pop.normals[i * 3], pop.normals[i * 3 + 1], pop.normals[i * 3 + 2]]

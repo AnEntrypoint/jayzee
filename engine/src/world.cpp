@@ -430,8 +430,9 @@ void World::rebase(double x, double y, double z) {
   if (runtime_ != nullptr) {
     JPH::BodyInterface& bodies = runtime_->physics.GetBodyInterfaceNoLock();
     const JPH::RVec3 shift(static_cast<float>(x - o.x), static_cast<float>(y - o.y), static_cast<float>(z - o.z));
-    for (const JPH::Body* body : runtime_->physics.GetBodies()) {
-      const JPH::BodyID id = body->GetID();
+    JPH::BodyIDVector ids;
+    runtime_->physics.GetBodies(ids);
+    for (const JPH::BodyID id : ids) {
       const std::uint32_t index = id.GetIndexAndSequenceNumber();
       if (index == planetBody_ || index == vegetationBody_) continue;
       bodies.SetPosition(id, bodies.GetPosition(id) - shift, JPH::EActivation::DontActivate);

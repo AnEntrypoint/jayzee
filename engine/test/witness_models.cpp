@@ -46,6 +46,8 @@ bool refusedWith(double value, Status status) {
 
 }
 
+constexpr double kOrigin[3] = {0.0, 0.0, 0.0};
+
 void modelsAndTiers() {
   device::Plan planned{};
 
@@ -209,7 +211,7 @@ void modelsAndTiers() {
   float everything[6][4];
   unitPlanes(everything);
   models::Range runs[models::kMaxClustersPerSlot];
-  check(models::visibleRuns(slot, everything, runs) == 1 && runs[0].indexCount == 768 && runs[0].firstIndex == geometryRange.firstIndex &&
+  check(models::visibleRuns(slot, everything, runs, nullptr, kOrigin) == 1 && runs[0].indexCount == 768 && runs[0].firstIndex == geometryRange.firstIndex &&
             runs[0].firstVertex == geometryRange.firstVertex,
         "with every plane passing, the two adjacent clusters merge into one run of 768 indices");
 
@@ -217,7 +219,7 @@ void modelsAndTiers() {
   unitPlanes(leftOnly);
   leftOnly[0][0] = -1.0f;
   leftOnly[0][3] = 400.0f;
-  const std::uint32_t kept = models::visibleRuns(slot, leftOnly, runs);
+  const std::uint32_t kept = models::visibleRuns(slot, leftOnly, runs, nullptr, kOrigin);
   check(kept == 1 && runs[0].indexCount == 384 && runs[0].firstIndex == geometryRange.firstIndex,
         "a plane that cuts off the right cluster leaves the left cluster as one run of 384 indices");
   float placed[3];
@@ -233,13 +235,13 @@ void modelsAndTiers() {
   unitPlanes(nothing);
   nothing[0][0] = 1.0f;
   nothing[0][3] = -10000.0f;
-  check(models::visibleRuns(slot, nothing, runs) == 0, "a plane every cluster fails culls the whole slot");
-  check(models::visibleRuns(models::slotCount() + 3, everything, runs) == 0, "a slot index past the layout has no runs");
+  check(models::visibleRuns(slot, nothing, runs, nullptr, kOrigin) == 0, "a plane every cluster fails culls the whole slot");
+  check(models::visibleRuns(models::slotCount() + 3, everything, runs, nullptr, kOrigin) == 0, "a slot index past the layout has no runs");
 
   check(models::slotClusterCount(strayPlace) == 1, "an out-of-range index slot still holds one cluster");
   const std::uint32_t stray[3] = {0, 1, 9};
   check(models::upload(outOfRange, clusterVertices, 4, stray, 3) == kOk, "upload with an index past the vertex count is accepted");
-  check(models::visibleRuns(strayPlace, nothing, runs) == 1 && runs[0].indexCount == 3,
+  check(models::visibleRuns(strayPlace, nothing, runs, nullptr, kOrigin) == 1 && runs[0].indexCount == 3,
         "a cluster whose indices leave the slot's vertices is never culled");
 
   check(models::release(geometry) == kOk && models::release(outOfRange) == kOk, "the cluster witness slots release");

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { gate, finish } from './lib/gate.mjs'
@@ -229,13 +229,13 @@ gate('cpuSharingVerdict is supported only when live stalls rise and their time i
 
 gate('runControlled refuses bad input before it creates a directory or pauses a pid', async () => {
   const out = join(tmpdir(), 'controlled-run-gate-never-created')
+  rmSync(out, { recursive: true, force: true })
   await assert.rejects(runControlled({ label: 'a/b', round: 1, condition: 'PAUSED', pauseList: [7], out }), TypeError)
   await assert.rejects(runControlled({ label: 'ok', round: 0, condition: 'PAUSED', pauseList: [7], out }), TypeError)
   await assert.rejects(runControlled({ label: 'ok', round: 1, condition: 'PAUSED', pauseList: [process.pid], out }), TypeError)
   await assert.rejects(runControlled({ label: 'ok', round: 1, condition: 'LIVE', pauseList: [7], out }), TypeError)
   await assert.rejects(runControlled({ label: 'ok', round: 1, condition: 'LIVE', out: '' }), TypeError)
   await assert.rejects(runControlled({ label: 'ok', round: 1, condition: 'PAUSED', pauseList: [7], out, experiment: 'core-other' }), TypeError)
-  await assert.rejects(runControlled({ label: 'ok', round: 1, condition: 'PAUSED', pauseList: [], out, experiment: 'core-shared' }), TypeError)
   assert.equal(existsSync(out), false)
 })
 

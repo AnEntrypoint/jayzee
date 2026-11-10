@@ -88,7 +88,11 @@ add_executable(engine_core
   src/exports_render.cpp)
 target_link_libraries(engine_core PRIVATE Jolt)
 target_compile_options(engine_core PRIVATE --use-port=emdawnwebgpu)
-math(EXPR ENGINE_ARENA_BYTES "${ENGINE_TIER_BYTES} - 4 * 1024 * 1024")
+set(ENGINE_POOL_STACK_BYTES 0)
+if(ENGINE_THREADS)
+  math(EXPR ENGINE_POOL_STACK_BYTES "3 * 512 * 1024")
+endif()
+math(EXPR ENGINE_ARENA_BYTES "${ENGINE_TIER_BYTES} - 4 * 1024 * 1024 - ${ENGINE_POOL_STACK_BYTES}")
 target_compile_definitions(engine_core PRIVATE JPH_CROSS_PLATFORM_DETERMINISTIC ENGINE_ARENA_BYTES=${ENGINE_ARENA_BYTES}ull)
 
 set(ENGINE_EXPORTS

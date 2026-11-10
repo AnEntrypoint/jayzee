@@ -146,14 +146,7 @@ export const createVegetationPool = ({
     for (const id of patchIds) {
       if (!Number.isInteger(id)) throw new TypeError('patch ids must be integers')
       const existing = slotOf.get(id)
-      if (existing !== undefined) { stamp[existing] = epoch; continue }
-      if (freeTop === 0) { deferred += 1; continue }
-      freeTop -= 1
-      const slot = freeStack[freeTop]
-      slotOf.set(id, slot)
-      owner[slot] = id
-      stamp[slot] = epoch
-      pending.push(slot)
+      if (existing !== undefined) stamp[existing] = epoch
     }
     for (let slot = 0; slot < slots; slot++) {
       if (owner[slot] === -1 || stamp[slot] === epoch) continue
@@ -164,6 +157,16 @@ export const createVegetationPool = ({
       freeTop += 1
       const queued = pending.indexOf(slot)
       if (queued !== -1) pending.splice(queued, 1)
+    }
+    for (const id of patchIds) {
+      if (slotOf.has(id)) continue
+      if (freeTop === 0) { deferred += 1; continue }
+      freeTop -= 1
+      const slot = freeStack[freeTop]
+      slotOf.set(id, slot)
+      owner[slot] = id
+      stamp[slot] = epoch
+      pending.push(slot)
     }
   }
 
