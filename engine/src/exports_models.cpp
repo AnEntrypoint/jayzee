@@ -51,15 +51,21 @@ EMSCRIPTEN_KEEPALIVE double engine_models_load(std::uint32_t vertices, std::uint
 }
 
 EMSCRIPTEN_KEEPALIVE int engine_models_bind_plan(std::uint32_t maxTextureDimension, std::uint32_t maxTextureLayers, double maxBufferBytes, std::uint32_t texelBytes, double deviceMemoryBytes) {
+  if (engine::models::bound()) return -4;
   engine::device::Limits limits{maxTextureDimension, maxTextureLayers, static_cast<std::uint64_t>(maxBufferBytes), texelBytes, static_cast<std::uint64_t>(deviceMemoryBytes)};
   engine::device::Plan planned{};
   if (!engine::device::plan(limits, planned)) return -1;
-  const engine::models::Layout layout{planned.modelSlots, planned.verticesPerModel, planned.indicesPerModel, planned.vertexStrideBytes, planned.uploadBytesPerFrame};
-  const std::size_t bytes = engine::models::bytesFor(layout);
-  void* base = engine::arena::carve(bytes, engine::models::kAlignment);
-  if (base == nullptr) return -2;
-  if (engine::models::bind(base, bytes, layout) != engine::kOk) return -3;
-  return static_cast<int>(planned.tier);
+  for (std::uint32_t tier = planned.tier + 1; tier-- > 0;) {
+    engine::device::Plan candidate{};
+    if (!engine::device::planTier(tier, texelBytes, candidate)) return -3;
+    const engine::models::Layout layout{candidate.modelSlots, candidate.verticesPerModel, candidate.indicesPerModel, candidate.vertexStrideBytes, candidate.uploadBytesPerFrame};
+    const std::size_t bytes = engine::models::bytesFor(layout);
+    void* base = engine::arena::carve(bytes, engine::models::kAlignment);
+    if (base == nullptr) continue;
+    if (engine::models::bind(base, bytes, layout) != engine::kOk) return -3;
+    return static_cast<int>(tier);
+  }
+  return -2;
 }
 
 EMSCRIPTEN_KEEPALIVE std::uint32_t engine_models_vertex_ptr(double handle) {
