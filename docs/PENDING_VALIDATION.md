@@ -3438,3 +3438,25 @@ Open for Phase B, not decided in Phase A:
 - The witness walk and fly-over on the 64, 512 and 1024 tiers with KTX2 assets, on both backends.
 - The "no per-frame allocation" claim is a Phase B measurement (heap sampling over a run), not a Phase A claim. The Phase A code does not allocate in the generation loop, but that is read from the code, not measured.
 - The patch centres come from the quadtree's leaves through the caller's `patchCentre`. The mapping from quadtree leaf to patch id is the Phase B wiring.
+
+## Stretch 5, Phase A: planet-scale witnesses
+
+Code, docs and gates only. No build, test, gate or witness run in Phase A. Phase B runs the planet witness on both backends, and it must pass before stretch 5 closes.
+
+| change | files | witness (Phase B) |
+|---|---|---|
+| Planet scene from the existing modules: 1024 distributed objects with the population, three collider layers, and the stretch 4 vegetation pool on the same height store; no second copy of data | `src/engine/planetScene.js` (new) | `npm run check:planet-witness` (gates "the planet scene has the entity count" and "the scene refuses a missing clock") |
+| Verdict with the 16.7 ms budget required on p99 and worst frame, a 600-frame minimum, the adapter, the allocations, and the scene requirements; it lists every frame over the budget | `src/engine/planetWitness.js` (new) | `npm run check:planet-witness` (gates "the verdict fails when the p99 is over", "the verdict fails on the 362.9 ms outlier", "the verdict fails with no adapter") |
+| Run plan: 1024 and 64 tiers on WebGPU and WebGL2, all timed | `src/engine/planetWitness.js` | `npm run check:planet-witness` (gate "the run plan covers both tiers") |
+| Runner, non-zero exit on any missed run | `scripts/browser/planet-witness-run.mjs` (new) | `npm run planet-witness` (Phase B run; the exit code is the witness) |
+| Render page exports the per-frame times, the player count and the scene report | `scripts/browser/engine-render-browser.js` | `npm run check:planet-witness` (gate "the render page exports") |
+| Comparison with spoint: refuses unlike inputs; rows for median, p99 and worst frame against the same budget | `src/engine/planetWitness.js` | `npm run check:planet-witness` (gate "the comparison refuses runs whose inputs differ") |
+| Open items as rows with a cause, a hook and a gate: 362.9 ms outlier, launcher null adapter, 64-tier untimed, spoint frame harness | `src/engine/planetWitness.js` | `npm run check:planet-witness` (gate "each open item from the earlier reports") |
+| Gate in npm test, and the package scripts | `scripts/check-planet-witness.mjs` (new), `package.json` | `npm test` |
+| Stretch 5 section in ENGINE.md: scene, required budget table, runs, comparison table layout, open items | `docs/ENGINE.md` | Phase B fills the TBD cells |
+
+Open for Phase B, not decided in Phase A:
+
+- The page does not yet bind the vegetation pool through `engine_vegetation_bind`, so the 1024 witness fails on `vegetationBound` until that is wired (wasm-heap allocator views, then the call). This is the stretch 4 open wiring item, and the witness makes it a hard failure.
+- The planet witness has not been run. Its frame numbers, the 362.9 ms outlier, the adapter and the 64-tier row are measured in Phase B, not claimed here.
+- The spoint frame-time harness does not exist. Phase B writes it on the spoint side with the same inputs, or the comparison stays unfilled and the table says so.

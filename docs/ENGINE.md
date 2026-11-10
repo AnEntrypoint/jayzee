@@ -624,3 +624,45 @@ Precision. The origin is rounded to float32 when it is passed to the shader, as 
 Not yet done, for Phase B. The JS side is not wired to the module: the vegetation pool needs an `allocate` that returns views into the wasm heap, and a call to `_engine_vegetation_bind`. The C++ planning functions have no compiled test yet (the gate checks the wiring as text). The WebGPU vegetation draw is in the forward pass only, not the visibility pass. The witness walk and fly-over on the 64, 512 and 1024 tiers with KTX2 assets is a Phase B measurement.
 
 Witness: `scripts/check-vegetation-stream.mjs` (`npm run check:vegetation-stream`, in `npm test`). Its gates cover the device plan, the pool refusals, allocation once, the slot lifecycle and deferral, the budget, determinism and re-entry, orthonormal matrices, the origin and float32 translation, the draw ranges and the sharing accounting.
+
+## Stretch 5: planet-scale witnesses (Phase A)
+
+Scene. `src/engine/planetScene.js` builds the planet-scale scene from the existing modules and copies no data. The planet is the 6,360,000 m sphere of `src/engine/sphere.js`. Its heights come from the engine's patch height store through `createEngineHeightAt`. Distributed objects come from `placePopulation` (stretch 2), with the same height function. Colliders come from `createColliderSet`, with the terrain very static, the 1024 distributed objects dynamic, and the trees static (stretch 3). The vegetation pool is the stretch 4 pool, drawn from the same height store and the same transform layout. `buildPlanetScene` returns `report()`, which the render page exports as `result.scene`.
+
+Entity count. The witness counts 1024 distributed objects, which the scene sets with the cap density (`entities / cap area`). The engine's 1024 tier has 1024 players, which the page exports as `result.players`. The page runs 10,240 bodies in its 1024 tier (`BODIES`), so the 1024 witness checks both counts and does not treat the body capacity as the entity count.
+
+Budget, required. 16.7 ms per frame for 1024 entities on both backends, with `PLANET_FRAME_BUDGET_MS = 16.7` in `src/engine/planetWitness.js`. A run needs at least 600 timed frames. `planetVerdict` recomputes p99 and the worst frame from `frameTimesMs`, and it fails when either is over the budget. The verdict also lists every frame over the budget, so an outlier is recorded and not averaged away. The runner `scripts/browser/planet-witness-run.mjs` (`npm run planet-witness`) exits non-zero on any failed run.
+
+| requirement | value | where it is checked |
+|---|---|---|
+| frame p99 | at most 16.7 ms | `planetVerdict` |
+| worst frame | at most 16.7 ms | `planetVerdict` |
+| timed frames | at least 600 | `planetVerdict` |
+| entities | 1024 distributed objects, 1024 dynamic colliders | `planetVerdict`, `buildPlanetScene` |
+| players, 1024 tier | 1024 | `planetVerdict` |
+| vegetation | bound to the draw path (`vegetationBound` true) | `planetVerdict` |
+| adapter | present, and not a fallback on WebGPU | `planetVerdict` |
+| allocations after warm-up, creates after seal | 0 | `planetVerdict` |
+
+Runs. `PLANET_RUNS` lists the 1024 tier with threads on WebGPU (phase 10) and WebGL2 (phase 11), and the 64 tier without threads on both backends. All four are timed, which closes the untimed 64-tier row.
+
+Comparison with spoint. The spoint side needs a frame-time planet path that takes the same inputs. Spoint has no such harness yet (`scripts/planet-multiplayer-harness.mjs` is a netcode harness). The comparison is `comparePlanetRuns(engine, spoint)`. It refuses runs whose inputs differ (`COMPARISON_INPUTS`: radius, seed, cap, entities, trees, tier, frames, budget). Its rows are recorded in this table layout:
+
+| metric | budget ms | engine WebGPU | engine WebGL2 | spoint | inputs |
+|---|---|---|---|---|---|
+| frame median ms | 16.7 | TBD | TBD | TBD | the same for all three |
+| frame p99 ms | 16.7 | TBD | TBD | TBD | |
+| worst frame ms | 16.7 | TBD | TBD | TBD | |
+
+Open items, each with a cause, a hook and a gate. Their rows are in `OPEN_ITEMS`, and `scripts/check-planet-witness.mjs` checks that each gate file exists.
+
+| item | cause | hook |
+|---|---|---|
+| 362.9 ms outlier (WebGL2, 1024) | one frame in an earlier single run; the page result was read and not saved, so no frame record exists | `longFrames` from `frameTimesMs` (the outlier is recorded by frame index) |
+| launcher null adapter | after a browser restart the launcher got no WebGPU adapter; not reproduced since | the adapter check in `planetVerdict`, and `scripts/browser/chromium-webgpu.sh` |
+| 64-tier untimed, 0.04 ms residual | the earlier 64-tier rows had no timed flag | `PLANET_RUNS` runs the 64 tier with `timed=1` on both backends |
+| spoint frame-time harness | spoint has no planet frame-time path harness | `comparePlanetRuns` refuses unlike inputs |
+
+Not done in Phase A. The vegetation binding is not called from the page, so the 1024 witness fails on `vegetationBound` until the page binds the pool through `engine_vegetation_bind` with wasm-heap views. The planet witness has not been run, so its frame numbers are unknown until Phase B. The spoint harness is not written. The four open items stay open until their Phase B runs.
+
+Witness: `scripts/check-planet-witness.mjs` (`npm run check:planet-witness`, in `npm test`). It covers the scene counts, the refusals, the budget verdict on passing and failing runs, the 362.9 ms outlier, the adapter cases, the run plan, the comparison refusal, the open-item hooks, and the page exports.

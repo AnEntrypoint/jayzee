@@ -2,6 +2,7 @@ import { loadRenderer, RENDER_LAYOUT } from '../../src/engine/renderer.js'
 import { cellOrigin, PAGE_SIDE, PAGE_U_EDGE, PAGE_V_EDGE, planetCellSize } from '../../src/engine/pageLayout.js'
 import { solverIterationsFor } from '../../src/engine/solverIterations.js'
 import { readLayout } from '../../src/engine/bridge.js'
+import { buildPlanetScene } from '../../src/engine/planetScene.js'
 
 const QUERY = new URLSearchParams(location.search)
 const PHASE = QUERY.get('phase') === '11' ? 11 : 10
@@ -527,6 +528,9 @@ const run = async () => {
   result.frameTimeP99Ms = p99(timed)
   result.frameTimeMedianMs = median(timed)
   result.frameTimeMaxMs = Math.max(...timed)
+  result.frameTimesMs = timed.map(roundTo2)
+  result.players = readLayout(module).players
+  if (TIER === 1024) result.scene = buildPlanetScene({ module, now: () => performance.now() }).report()
   result.path = PATH
   if (PATH === 'planet') {
     result.pathSpeedMps = PATH_SPEED_M_PER_S
