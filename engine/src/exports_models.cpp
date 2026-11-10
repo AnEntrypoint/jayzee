@@ -55,6 +55,10 @@ EMSCRIPTEN_KEEPALIVE std::uint32_t engine_models_clusters_ptr() {
   return static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(engine::models::clusterTable()));
 }
 
+EMSCRIPTEN_KEEPALIVE int engine_models_slot_of(double handle) {
+  return engine::models::slotOf(handle);
+}
+
 EMSCRIPTEN_KEEPALIVE double engine_models_load(std::uint32_t vertices, std::uint32_t indices, std::uint32_t seed) {
   const double handle = engine::models::acquire(vertices, indices);
   if (handle <= 0.0) return handle;

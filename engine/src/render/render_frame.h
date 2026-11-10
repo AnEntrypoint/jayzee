@@ -140,6 +140,11 @@ struct Counters {
   std::uint32_t sealed;
   std::uint32_t createsAfterSeal;
   std::uint32_t modelPath;
+  std::uint32_t cullPassA;
+  std::uint32_t cullCandidates;
+  std::uint32_t cullPassB;
+  std::uint32_t cullFresh;
+  std::uint32_t countReadback;
 };
 
 Counters& counters();

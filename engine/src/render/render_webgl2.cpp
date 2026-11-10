@@ -284,14 +284,17 @@ GLuint makeUniformBuffer(std::uint32_t bytes, GLuint binding) {
   return buffer;
 }
 
-void drawModels(const Camera& camera) {
+std::uint32_t drawModels(const Camera& camera) {
   const std::uint32_t stride = engine::models::layout().vertexStrideBytes;
   ENGINE_RENDER_CALL(glUseProgram(modelProgram));
   ENGINE_RENDER_CALL(glBindVertexArray(modelVao));
   ENGINE_RENDER_CALL(glBindBuffer(GL_ARRAY_BUFFER, modelVbo));
+  std::uint32_t drawn = 0;
   for (std::uint32_t s = 0; s < engine::models::slotCount(); ++s) {
     if (!engine::models::slotReady(s)) continue;
-    const std::uint32_t runs = engine::models::visibleRuns(s, camera.planes, modelRuns);
+    std::uint32_t kept = 0;
+    const std::uint32_t runs = engine::models::visibleRuns(s, camera.planes, modelRuns, &kept);
+    drawn += kept;
     if (runs == 0) continue;
     float offset[3];
     engine::models::modelOffset(s, offset);
@@ -302,6 +305,7 @@ void drawModels(const Camera& camera) {
       ENGINE_RENDER_CALL(glDrawElements(GL_TRIANGLES, run.indexCount, GL_UNSIGNED_INT, offsetPointer(run.firstIndex * engine::models::kIndexBytes)));
     }
   }
+  return drawn;
 }
 
 }
@@ -483,7 +487,11 @@ int frame(const SceneView& scene, const FramePlan& plan, const Camera& camera) {
     ENGINE_RENDER_CALL(glDrawArraysInstanced(GL_TRIANGLES, 0, kPropVertices, static_cast<GLsizei>(count)));
   }
 
-  if (modelsReady && engine::models::bound()) drawModels(camera);
+  const std::uint32_t drawn = modelsReady && engine::models::bound() ? drawModels(camera) : 0;
+  engine::render::counters().cullPassA = drawn;
+  engine::render::counters().cullCandidates = 0;
+  engine::render::counters().cullPassB = 0;
+  engine::render::counters().cullFresh = 1;
 
   if (plan.pageCount > 0) {
     ENGINE_RENDER_CALL(glUseProgram(terrainProgram));

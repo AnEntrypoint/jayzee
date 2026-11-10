@@ -1,6 +1,8 @@
 #include "render_webgpu.h"
 
 #include <algorithm>
+#include <cstddef>
+#include <cstring>
 
 #include <webgpu/webgpu_cpp.h>
 
@@ -608,6 +610,9 @@ wgpu::Buffer clusterBuf;
 wgpu::Buffer slotReadyBuf;
 wgpu::Buffer listBuf[3];
 wgpu::Buffer counterBuf;
+wgpu::Buffer cullStaging;
+bool cullCopied = false;
+bool cullPending = false;
 wgpu::Buffer visArgsBuf;
 wgpu::Buffer paramBuf;
 wgpu::RenderPipeline idPipe;
@@ -927,7 +932,8 @@ bool buildVisibility(std::uint32_t width, std::uint32_t height) {
   for (std::uint32_t i = 0; i < 3; ++i) {
     listBuf[i] = makeBuffer(static_cast<std::uint64_t>(visTotal) * 4, wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst);
   }
-  counterBuf = makeBuffer(kCounterBytes, wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst);
+  counterBuf = makeBuffer(kCounterBytes, wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::CopySrc);
+  cullStaging = makeBuffer(kCounterBytes, wgpu::BufferUsage::MapRead | wgpu::BufferUsage::CopyDst);
   visArgsBuf = makeBuffer(kVisArgsBytes, wgpu::BufferUsage::Storage | wgpu::BufferUsage::Indirect | wgpu::BufferUsage::CopyDst);
   paramBuf = makeBuffer(kParamBytes, wgpu::BufferUsage::Uniform | wgpu::BufferUsage::CopyDst);
 
@@ -1174,6 +1180,34 @@ void dispatchCull(wgpu::CommandEncoder& encoder, std::uint32_t pipeline) {
   ENGINE_RENDER_CALL(compute.End());
 }
 
+bool changedSince(std::uint8_t* shadow, const void* data, std::uint64_t size) {
+  if (std::memcmp(shadow, data, static_cast<std::size_t>(size)) == 0) return false;
+  std::memcpy(shadow, data, static_cast<std::size_t>(size));
+  return true;
+}
+
+static_assert(sizeof(FramePlan::materialWords) == kMaterialBytes);
+static_assert(sizeof(FramePlan::pageRecords) == kPageBytes);
+
+std::uint8_t lightShadow[kLightBytes];
+std::uint8_t materialShadow[kMaterialBytes];
+std::uint8_t pageShadow[kPageBytes];
+std::uint32_t propArgsShadow[kPropClasses * 4];
+std::uint32_t terrainArgsShadow[4];
+
+void onCullMapped(wgpu::MapAsyncStatus status, wgpu::StringView message, void*) {
+  cullPending = false;
+  if (status != wgpu::MapAsyncStatus::Success) return;
+  const std::uint32_t* words = static_cast<const std::uint32_t*>(cullStaging.GetConstMappedRange(0, kCounterBytes));
+  if (words != nullptr) {
+    engine::render::counters().cullPassA = words[0];
+    engine::render::counters().cullCandidates = words[1];
+    engine::render::counters().cullPassB = words[2];
+    engine::render::counters().cullFresh = 1;
+  }
+  cullStaging.Unmap();
+}
+
 void drawVisible(wgpu::CommandEncoder& encoder, std::uint32_t pass, bool first) {
   wgpu::RenderPassColorAttachment colour = colourFor(idView, first, wgpu::Color{0.0, 0.0, 0.0, 0.0});
   wgpu::RenderPassDepthStencilAttachment depth = depthFor(first);
@@ -1212,6 +1246,12 @@ void encodeVisibility(wgpu::CommandEncoder& encoder, wgpu::TextureView target) {
   drawVisible(encoder, 0, true);
   buildHzb(encoder);
   dispatchCull(encoder, 1);
+  const bool countReadback = engine::render::counters().countReadback != 0;
+  cullCopied = false;
+  if (countReadback && !cullPending) {
+    encoder.CopyBufferToBuffer(counterBuf, 0, cullStaging, 0, kCounterBytes);
+    cullCopied = true;
+  }
   drawVisible(encoder, 1, false);
 
   wgpu::RenderPassColorAttachment resolveColour = colourFor(target, true, wgpu::Color{kClearRed, kClearGreen, kClearBlue, 1.0});
@@ -1316,12 +1356,18 @@ int frame(const SceneView& scene, const FramePlan& plan, const Camera& camera) {
       propArgs[c * 4 + 2] = 0;
       propArgs[c * 4 + 3] = 0;
     }
-    writeBuffer(argsBuf, kArgsPropWord * 4, propArgs, sizeof propArgs);
+    if (std::memcmp(propArgsShadow, propArgs, sizeof propArgs) != 0) {
+      std::memcpy(propArgsShadow, propArgs, sizeof propArgs);
+      writeBuffer(argsBuf, kArgsPropWord * 4, propArgs, sizeof propArgs);
+    }
     const std::uint32_t terrainArgs[4] = {kPageVertices, plan.pageCount, 0, 0};
-    writeBuffer(argsBuf, kArgsTerrainWord * 4, terrainArgs, sizeof terrainArgs);
-    writeBuffer(lightBuf, 0, scene.lights, kLightBytes);
-    writeBuffer(materialBuf, 0, plan.materialWords, kMaterialBytes);
-    writeBuffer(pageBuf, 0, plan.pageRecords, kPageBytes);
+    if (std::memcmp(terrainArgsShadow, terrainArgs, sizeof terrainArgs) != 0) {
+      std::memcpy(terrainArgsShadow, terrainArgs, sizeof terrainArgs);
+      writeBuffer(argsBuf, kArgsTerrainWord * 4, terrainArgs, sizeof terrainArgs);
+    }
+    if (changedSince(lightShadow, scene.lights, kLightBytes)) writeBuffer(lightBuf, 0, scene.lights, kLightBytes);
+    if (changedSince(materialShadow, plan.materialWords, kMaterialBytes)) writeBuffer(materialBuf, 0, plan.materialWords, kMaterialBytes);
+    if (changedSince(pageShadow, plan.pageRecords, kPageBytes)) writeBuffer(pageBuf, 0, plan.pageRecords, kPageBytes);
 
     std::uint64_t modelBudget = engine::models::layout().uploadBytesPerFrame;
     for (std::uint32_t s = 0; s < engine::models::slotCount(); ++s) {
@@ -1393,6 +1439,11 @@ int frame(const SceneView& scene, const FramePlan& plan, const Camera& camera) {
   {
     engine::phase::Scope scope(engine::phase::kSubmit);
     ENGINE_RENDER_CALL(queue.Submit(1, &commands));
+  }
+  if (cullCopied) {
+    cullCopied = false;
+    cullPending = true;
+    cullStaging.MapAsync(wgpu::MapMode::Read, 0, kCounterBytes, wgpu::CallbackMode::AllowSpontaneous, onCullMapped, static_cast<void*>(nullptr));
   }
   if (visible) hzbValid = true;
   return engine::kOk;

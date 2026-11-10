@@ -3068,3 +3068,47 @@ At 64 the WebGPU median is slower: 2.68 / 3.16 = 0.85, so WebGL2 is 1.18 times f
 - The WebGPU 64-tier outliers (8 frames over the outlier threshold) are not explained.
 - The 1024 p99 stalls recorded in earlier sections (a WebGPU 705 ms frame and a WebGL2 362.9 ms outlier) are not reproduced in these runs. They remain unexplained in their earlier sections.
 - The full `npm test` chain was not run. The gates above were run directly, and the host witness was run as `check:engine-host-witness`.
+
+## Stretch: occlusion efficiency, readback and the Dawn record (this pass)
+
+Phase A changes, each committed with its witness:
+
+- `engine/src/render/render_webgpu.cpp`: the cull readback. `onCullMapped` takes the Dawn callback types (`wgpu::MapAsyncStatus`, `wgpu::StringView`, `void*`); the first build failed on the callback signature and the userdata type. The copy into the staging buffer runs only when `countReadback` is on and no map is pending. Uploads of light, material, page and draw-argument words skip unchanged data; the skip was tested and is not the cause of any regression below.
+- `engine/src/model_pool.cpp`, `model_pool.h`, `exports_models.cpp`: `slotOf` and the survivor count from `visibleRuns`.
+- `engine/src/render/render_webgl2.cpp`: the WebGL2 counters report the CPU cluster survivors.
+- `engine/src/exports_render.cpp`, `render_frame.h`: `engine_render_set_count_readback`, `engine_render_cull_ready`, `engine_render_cull_counts`.
+- `engine/CMakeLists.txt`, `engine/build.sh`: `ENGINE_WASM_SIMD` and the `-simd` artifact name; `JOLT_SOURCE` pass-through.
+- `scripts/browser/visibility-browser.js`: the occluded scene (`scene=occluded`), cluster totals, and the per-configuration cull record. Three bugs were found and fixed in this pass:
+  1. The cluster totals read `cluster_stride` as bytes. It is the cluster count per slot, and `cluster_bytes` is the whole pool. The address was out of range, which gave a triangle total of 1.2e11. Corrected to 24-byte records and an index-count field at byte 20; the total is now 2,304 triangles for 24 clusters.
+  2. Any `await` between the last `frame()` and `grab()` blanked the WebGPU frame, because `getCurrentTexture()` returns a fresh cleared swapchain texture once the task yields. The visibility image was white in both scenes. The count read now happens after `grab()` has submitted its copy, and no await sits between the frame and the copy.
+  3. A count read taken before the final frame reported no occlusion culls, so the count is read from the frame the copy was submitted in.
+- `scripts/check-engine-visibility.mjs`: the WebGL2 gate expected the old `visibleRuns` call. It now checks `visibleRuns(s, camera.planes, modelRuns, &kept)` and `drawn += kept`. The code was already correct; the gate was stale.
+- `engine/artifacts.json`: repinned to the rebuilt wasm for 64, 128, 512 and leak 64.
+- `docs/ENGINE.md`: the occlusion efficiency table, the WebGL2 deferred list, the baseline feature checklist (a first audit by reading, not measured), and the open landscape-dataset and scenario items.
+- `scripts/browser/gpu-backend-run.mjs`: the Dawn record, read through CDP `SystemInfo.getInfo`.
+
+Phase B: each variant built once after the last change, then the witnesses below.
+
+| step | result | wall time |
+|---|---|---|
+| variant builds (fixed 64 after the MapAsync fix, fixed 128, fixed 512, leak 64, timed 64, timed 128, threads 64, threads timed 128 SIMD) | rc 0 for all eight. The threads timed SIMD build took 23 s with Jolt already cached | 8, 8, 8, 7, 8, 7, 8, 23 s |
+| `check:engine-artifacts` | PASS 6 after repin | part of the 72 s gate batch |
+| `visibility-run.mjs ... webgpu dump` (walls) | ok true. Forward and visibility are pixel-identical (0 of 518,400 differ), HZB on and off identical; visibility draws 24 of 24 clusters | 3.2 s |
+| `visibility-run.mjs ... webgpu dump occluded` | ok true. Forward, visibility HZB off and visibility HZB on are all identical (0 of 518,400 pixels differ). HZB off draws 24 of 24 clusters; HZB on draws 12 of 24 and culls 12 by HZB | 3.1 s |
+| `visibility-run.mjs ... webgl2 dump` (walls) | ok true. Requested visibility runs as forward (no GPU culling or HZB on WebGL2); both images hash 0x401aff46 | 2.2 s |
+| `visibility-run.mjs ... webgl2 dump occluded` | ok true. Both images hash 0xeec1ee81; CPU culling draws 24 of 24 | 2.2 s |
+| `npm run check:engine-render`, `check:engine-visibility` (after the stale-gate fix), `check:engine-core`, `check:engine-leak`, `check:engine-tiers`, `check:engine-pools`, `check:engine-materials`, `check:engine-bridge`, `check:engine-threads`, `check:engine-world`, `check:engine-planet`, `check:engine-codecs`, `check:engine-interest`, `check:engine-isolation`, `check:engine-vegetation`, `check:render`, `check:render-1024-visible`, `check:ci-engine-glue`, `check:decode-path`, `check:asset-pipeline`, `check:hygiene`, `check:engine-artifacts` | all rc 0; PASS counts 18, 13, 3, 3, 6, 7, 15, 9, 5, 13, 9, 11, 4, 9, 7, 49, 4, 3, 8, 14, 39, 6 | 72 s for the batch |
+| `npm run check:engine-host-witness` | rc 0, PASS 292, FAIL 0 | 17 s |
+| `npm test` | EXIT 0, PASS 4971, FAIL 0 | 130 s |
+
+Dawn record, `build/diag/gpu-backend.json` (Chrome 155.0.8059.39 on the project browser): `skiaBackendType` GaneshVulkan, `hardwareSupportsVulkan` true, `featureStatus.vulkan` enabled_on, `webgpu` enabled, adapter NVIDIA GeForce RTX 3060 Laptop GPU with driver 580.178.04. This witnesses the Vulkan path for WebGPU on this host.
+
+Stale processes stopped by PID: 3881547 (`collect.mjs`), 3881549 (`sampler.mjs`), 3881551 (`throttle.mjs`). They had run for more than a day and were writing `build/diag/load-run2.log` and `throttle-run2.log`, which loaded the machine during timings. Nothing in the current stretch reads those logs.
+
+Open after this stretch:
+
+- The 64-tier WebGPU median and the 1024-tier frame budget were not re-measured in this pass. The earlier 64-tier numbers stand as recorded above.
+- Landscape dataset (one store for collider and renderer, with memory and build time against two copies): not started.
+- Scenario physics witnesses from spoint's example games, and the vegetation and terrain streaming walk and fly-over with real assets: not started.
+- The Nanite path is complete on WebGPU; WebGL2 has CPU culling only and no HZB or GPU culling, recorded as deferred.
+- The static-pool witnesses (models-run, models-vram-run, device-loss-run, planet-path-run, decode-worker-run, spoint-streamer-compare) were not re-run in this pass.

@@ -25,15 +25,19 @@ const WEBGL2_CONFIGS = [
   { name: 'forward', path: 'forward', occlusion: false },
   { name: 'visibility-requested', path: 'visibility', occlusion: true },
 ]
-const BACKEND = new URLSearchParams(location.search).get('backend') === 'webgl2' ? 'webgl2' : 'webgpu'
-const DUMP = new URLSearchParams(location.search).has('dump')
+const QUERY = new URLSearchParams(location.search)
+const BACKEND = QUERY.get('backend') === 'webgl2' ? 'webgl2' : 'webgpu'
+const DUMP = QUERY.has('dump')
+const SCENE = QUERY.get('scene') === 'occluded' ? 'occluded' : 'walls'
+const CULL_READY_TRIES = 400
+const CULL_READY_GAP_MS = 5
 const toBase64 = (bytes) => {
   let text = ''
   for (let i = 0; i < bytes.length; i += 0x8000) text += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
   return btoa(text)
 }
 
-const result = { done: false, error: null, backend: null, adapter: null, models: [], configs: [], comparisons: {}, ok: false }
+const result = { done: false, error: null, backend: null, adapter: null, scene: SCENE, models: [], configs: [], comparisons: {}, totals: null, ok: false }
 window.visibilityResult = result
 const report = (line) => {
   const el = document.getElementById('result')
@@ -92,19 +96,25 @@ const multiply = (a, b) => {
   return out
 }
 
+const layoutOf = (slot) => {
+  if (SCENE === 'occluded') {
+    return slot < 4 ? { sx: 8, sy: 3, depth: 4 } : { sx: 1, sy: 1, depth: -4 }
+  }
+  return { sx: 1, sy: slot % 2 === 1 ? 1.5 : 1, depth: slot % 2 === 1 ? -2 : 0 }
+}
+
 const writeModel = (renderer, handle, slot) => {
   const module = renderer.module
   const vertexWords = module._engine_models_vertex_ptr(handle) >> 2
   const indexWords = module._engine_models_index_ptr(handle) >> 2
-  const heightScale = slot % 2 === 1 ? 1.5 : 1
-  const depth = slot % 2 === 1 ? -2 : 0
+  const layout = layoutOf(slot)
   for (let j = 0; j <= GRID; j++) {
     for (let i = 0; i <= GRID; i++) {
       const v = j * (GRID + 1) + i
       const base = vertexWords + v * VERTEX_STRIDE_WORDS
-      module.HEAPF32[base] = -1 + (2 * i) / GRID
-      module.HEAPF32[base + 1] = (-1 + (2 * j) / GRID) * heightScale
-      module.HEAPF32[base + 2] = depth
+      module.HEAPF32[base] = (-1 + (2 * i) / GRID) * layout.sx
+      module.HEAPF32[base + 1] = (-1 + (2 * j) / GRID) * layout.sy
+      module.HEAPF32[base + 2] = layout.depth
       for (let w = 3; w < VERTEX_STRIDE_WORDS; w++) module.HEAPU32[base + w] = 0
     }
   }
@@ -131,8 +141,30 @@ const buildScene = (renderer) => {
     const handle = renderer.module._engine_models_acquire(MODEL_VERTICES, MODEL_INDICES)
     if (!(handle > 0)) throw new Error('engine_models_acquire refused slot ' + slot + ' with ' + handle)
     writeModel(renderer, handle, slot)
-    result.models.push({ slot, handle })
+    const engineSlot = renderer.module._engine_models_slot_of(handle)
+    result.models.push({ slot, handle, engineSlot })
   }
+}
+
+const CLUSTER_RECORD_BYTES = 24
+const CLUSTER_INDEX_COUNT_BYTE = 20
+const clusterTotals = (renderer) => {
+  const module = renderer.module
+  const perSlot = module._engine_models_cluster_stride()
+  const base = module._engine_models_clusters_ptr()
+  let clusters = 0
+  let triangles = 0
+  for (const model of result.models) {
+    for (let c = 0; c < perSlot; c++) {
+      const at = base + (model.engineSlot * perSlot + c) * CLUSTER_RECORD_BYTES + CLUSTER_INDEX_COUNT_BYTE
+      const indexCount = module.HEAPU32[at >> 2]
+      if (indexCount > 0) {
+        clusters += 1
+        triangles += indexCount / 3
+      }
+    }
+  }
+  return { models: result.models.length, clustersPerSlot: perSlot, clusters, triangles }
 }
 
 const viewProjection = () => {
@@ -196,13 +228,25 @@ const compare = (a, b) => {
   return { pixels: a.length / 4, differing, maxDelta }
 }
 
+const readCullCounts = async (renderer) => {
+  const module = renderer.module
+  for (let i = 0; i < CULL_READY_TRIES; i++) {
+    if (module._engine_render_cull_ready() === 1) break
+    await new Promise((done) => setTimeout(done, CULL_READY_GAP_MS))
+  }
+  const at = module._engine_render_cull_counts() >> 2
+  return { passA: module.HEAPU32[at], candidates: module.HEAPU32[at + 1], passB: module.HEAPU32[at + 2], frame: module.HEAPU32[at + 3] }
+}
+
 const renderConfig = async (renderer, canvas, config) => {
   renderer.setModelPath(config.path)
   renderer.setOcclusion(config.occlusion)
   renderer.setCamera({ viewProj: viewProjection(), eye: EYE })
   let status = 0
   for (let f = 0; f < FRAMES; f++) status = renderer.frame()
+  status = renderer.frame()
   const pending = grab(renderer, canvas)
+  const cull = config.path === 'visibility' || renderer.backendName === 'webgl2' ? await readCullCounts(renderer) : null
   const stats = renderer.stats()
   const pixels = await pending
   return {
@@ -214,7 +258,22 @@ const renderConfig = async (renderer, canvas, config) => {
     statsPath: stats.modelPath,
     nonBackground: countBackground(pixels),
     hash: hashOf(pixels),
+    cull,
     pixels,
+  }
+}
+
+const cullRecord = (shot, totals) => {
+  if (!shot.cull) return null
+  const { passA, candidates, passB } = shot.cull
+  const drawn = passA + passB
+  return {
+    drawnClusters: drawn,
+    frustumCulledClusters: totals.clusters - (passA + candidates),
+    occlusionCulledClusters: candidates - passB,
+    drawnFraction: drawn / totals.clusters,
+    passACandidates: candidates,
+    passBSurvivors: passB,
   }
 }
 
@@ -230,12 +289,15 @@ const run = async () => {
     uploadFrames += 1
   }
   result.uploadFrames = uploadFrames
+  result.totals = clusterTotals(renderer)
+  if (renderer.backendName === 'webgpu') renderer.module._engine_render_set_count_readback(1)
   const rendered = []
   for (const config of BACKEND === 'webgl2' ? WEBGL2_CONFIGS : CONFIGS) {
     const shot = await renderConfig(renderer, canvas, config)
     rendered.push(shot)
-    result.configs.push({ name: shot.name, status: shot.status, requestedPath: shot.requestedPath, effectivePath: shot.effectivePath, occlusion: shot.occlusion, statsPath: shot.statsPath, nonBackground: shot.nonBackground, hash: shot.hash })
+    result.configs.push({ name: shot.name, status: shot.status, requestedPath: shot.requestedPath, effectivePath: shot.effectivePath, occlusion: shot.occlusion, statsPath: shot.statsPath, nonBackground: shot.nonBackground, hash: shot.hash, cull: cullRecord(shot, result.totals) })
   }
+  if (renderer.backendName === 'webgpu') renderer.module._engine_render_set_count_readback(0)
   if (DUMP) result.dumps = Object.fromEntries(rendered.map((shot) => [shot.name, toBase64(shot.pixels)]))
   if (BACKEND === 'webgl2') {
     const [forward, requested] = rendered

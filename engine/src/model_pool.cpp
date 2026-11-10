@@ -251,6 +251,11 @@ bool uploaded(double handle) {
   return resolveSlot(handle, slot) && gMeta[slot].dirty == 0;
 }
 
+std::int32_t slotOf(double handle) {
+  std::uint32_t slot = 0;
+  return resolveSlot(handle, slot) ? static_cast<std::int32_t>(slot) : -1;
+}
+
 std::uint32_t slotCount() {
   return gBound ? gLayout.slots : 0;
 }
@@ -315,7 +320,8 @@ void modelOffset(std::uint32_t slot, float out[3]) {
   out[2] = -20.0f;
 }
 
-std::uint32_t visibleRuns(std::uint32_t slot, const float planes[6][4], Range* out) {
+std::uint32_t visibleRuns(std::uint32_t slot, const float planes[6][4], Range* out, std::uint32_t* kept) {
+  if (kept != nullptr) *kept = 0;
   if (!held(slot)) return 0;
   const std::uint32_t count = slotClusterCount(slot);
   const Cluster* clusters = slotClusters(slot);
@@ -323,11 +329,13 @@ std::uint32_t visibleRuns(std::uint32_t slot, const float planes[6][4], Range* o
   float offset[3];
   modelOffset(slot, offset);
   std::uint32_t runs = 0;
+  std::uint32_t survivors = 0;
   for (std::uint32_t c = 0; c < count; ++c) {
     const Cluster& cluster = clusters[c];
     const float centre[3] = {cluster.centre[0] * kModelScale + offset[0], cluster.centre[1] * kModelScale + offset[1],
                              cluster.centre[2] * kModelScale + offset[2]};
     if (outsideFrustum(planes, centre, cluster.radius * kModelScale)) continue;
+    survivors += 1;
     const std::uint32_t first = base.firstIndex + cluster.firstIndex;
     if (runs > 0 && out[runs - 1].firstIndex + out[runs - 1].indexCount == first) {
       out[runs - 1].indexCount += cluster.indexCount;
@@ -336,6 +344,7 @@ std::uint32_t visibleRuns(std::uint32_t slot, const float planes[6][4], Range* o
       runs += 1;
     }
   }
+  if (kept != nullptr) *kept = survivors;
   return runs;
 }
 

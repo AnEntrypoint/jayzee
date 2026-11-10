@@ -16,6 +16,10 @@ const NEW_EXPORTS = [
   'engine_render_model_path_effective',
   'engine_render_set_occlusion',
   'engine_render_occlusion',
+  'engine_models_slot_of',
+  'engine_render_set_count_readback',
+  'engine_render_cull_ready',
+  'engine_render_cull_counts',
 ]
 const EXPORT_SOURCES = ['engine/src/exports_models.cpp', 'engine/src/exports_render.cpp']
 const WEBGPU = 'engine/src/render/render_webgpu.cpp'
@@ -82,7 +86,8 @@ gate('the surface is configured for copy-out and the storage binding limit is re
 
 gate('the WebGL2 renderer draws models forward with CPU cluster culling and reports the forward path', () => {
   if (!webgl2.includes('drawModels(camera)')) throw new Error('the WebGL2 frame does not draw models')
-  if (!webgl2.includes('visibleRuns(s, camera.planes, modelRuns)')) throw new Error('the WebGL2 model draw does not use the CPU cluster culling')
+  if (!webgl2.includes('visibleRuns(s, camera.planes, modelRuns, &kept)')) throw new Error('the WebGL2 model draw does not use the CPU cluster culling')
+  if (!webgl2.includes('drawn += kept')) throw new Error('the WebGL2 model draw does not count the clusters it keeps')
   if (!webgl2.includes('counters().modelPath = engine::render::kModelPathForward')) throw new Error('the WebGL2 frame does not report the forward path')
 })
 

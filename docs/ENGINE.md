@@ -316,6 +316,152 @@ Memory, in VRAM. Wasm memory is unchanged: the cluster table is already part of 
 
 Witnesses for this pass are listed in docs/PENDING_VALIDATION.md under the Phase C section.
 
+### Phase C: occlusion efficiency, measured
+
+The occluded scene (`visibility.html?scene=occluded`) puts four large quads behind four small quads, 8 model slots of 256 clusters each, 24 live clusters in total and 2,304 triangles. The WebGPU run reports three configurations from the same camera:
+
+| configuration | path | clusters drawn | frustum culled | HZB culled | image |
+|---|---|---|---|---|---|
+| forward | forward | all | n/a | n/a | baseline |
+| visibility, HZB off | visibility | 24 of 24 | 0 | 0 | identical to forward on the walls scene, identical to the HZB run on the occluded scene |
+| visibility, HZB on | visibility | 12 of 24 | 0 | 12 | identical to the HZB-off run (0 of 518,400 pixels differ) |
+
+Derived from the cluster totals: the HZB run keeps about 1,152 of 2,304 triangles, so the culled share is 50 percent of the triangles in this scene. The triangle count per cluster is not uniform, so this is the share of the cluster-weighted triangle total and not an exact per-triangle count.
+
+The walls scene (larger quads, nothing hidden) draws 24 of 24 clusters with and without HZB, which is the control: the HZB never culls a visible cluster.
+
+WebGL2 has no compute and no HZB, so its requested visibility path runs as forward (`effectivePath` forward, `drawn` 24 of 24 on both scenes). This is the deferred item listed under "Deferred on WebGL2" below.
+
+The readback that produces these numbers is a staging buffer copied in the frame and mapped asynchronously. The count is the frame the copy was submitted in, so it is one frame behind the pixels that were drawn in the same call. The readback is off unless a witness turns it on (`engine_render_set_count_readback`).
+
+Deferred on WebGL2, recorded here and not hidden: GPU cluster culling, the HZB, the id target and the resolve are not built on WebGL2. The WebGL2 visibility request is accepted and reported as forward. The per-cluster frustum cull on the CPU runs on WebGL2 and is witnessed by the same counts (24 of 24 drawn in both scenes).
+
+### Baseline feature set, bottom line
+
+The checklist below is the Phase 1 baseline the owner asked for: what jayzee must support, read from the documentation of the two sibling engines (spoint and the flat-landscape engine spawn, plus the upstream notes in this repo) and from this repo's sources. Status is supported, partial or missing. The statuses are a first audit by reading, and they have not been measured. A row is "supported" only where a witness in docs/PENDING_VALIDATION.md names it, and every other row is a claim to verify. The spawn engine is flat; jayzee's landscapes are spherical, so every terrain row is judged for the sphere.
+
+Physics
+
+- [ ] Rigid bodies, pooled, batch add and remove, generation-checked handles: partial (world.cpp; pool witness recorded in phase 4)
+- [ ] Radial planet gravity toward the centre, world gravity zero: partial
+- [ ] Character capsule with ground, 60-degree slope, step-up and wall planes: partial (JS characterManager only; no C++ CharacterVirtual)
+- [ ] Character against the planet shape: missing
+- [ ] CCD swept stop for fast bodies: partial (box-only pure logic)
+- [ ] Sleeping islands and warm-started contacts: partial
+- [ ] Vehicles (wheels, suspension, slip, chassis pinning): partial (JS only)
+- [ ] Joints and friction and restitution combine modes: partial
+- [ ] Triggers and sensors (enter and exit without response): partial (pure logic)
+- [ ] Ray and overlap queries with layer filters and hit normals: partial
+- [ ] Planet-surface ray and shape cast: missing (surface_shape.h CastRay returns false)
+- [ ] Moving platforms that carry riders: partial (velocity only; rider carry not witnessed)
+- [ ] Deterministic physics with equal hashes across client and server: partial (cross-thread hash witness open)
+
+Terrain and landscape
+
+- [ ] Cube-sphere frame: faces, cells, face pick, local-to-planet mapping: partial
+- [ ] Height at any planet point: coarse procedural far field, resident pages near: partial
+- [ ] Ground height and normal query for physics and gameplay: partial
+- [ ] One height source read by physics and renderer: partial (see "Landscape dataset decision")
+- [ ] Collision and visual sharing from the same samples: partial
+- [ ] Terrain LOD by altitude with geomorph seams: missing
+- [ ] Page streaming: workers decode into free slots and commit by epoch at the tick: partial
+- [ ] Bounded request queues with low-priority drop: partial
+- [ ] Chart re-anchor at face boundaries with hysteresis: partial
+- [ ] Fail-loud heightfield bake, no silent fallback: supported (heightfieldPhysics.js, check gate)
+- [ ] Terrain paint and sculpt at runtime: partial (pure logic)
+- [ ] Caves, carving and erosion in the query path: partial (pure logic)
+- [ ] Sky and atmosphere LUTs: partial (JS only)
+- [ ] Floating origin on the large planet: partial (pure logic)
+
+Vegetation
+
+- [ ] Instance table per cube-sphere cell: partial (vegetation.cpp; phase 6 witness)
+- [ ] One body for all vegetation through a custom shape: partial
+- [ ] Placement streaming with no allocation as the player moves: partial
+- [ ] Collision classes: trunk capsule, rock hull, pass-through: partial
+- [ ] Promotion of touched instances to pooled dynamic bodies: missing
+- [ ] Placement rules (slope caps, snow, footprint exclusion): partial
+- [ ] Vegetation LOD bands with hysteresis: missing
+- [ ] Grass density and wind from one law on CPU and shader: partial (no wind in C++)
+
+Rendering
+
+- [ ] WebGPU renderer with slots on a device created at boot: partial (phase 10 witness recorded)
+- [ ] WebGL2 fallback drawing the same slots: partial (phase 11 recorded; no GPU culling or HZB)
+- [ ] Light slot buffer, adding a light writes a slot: supported
+- [ ] Every pipeline built before the seal, creates-after-seal stays 0: supported
+- [ ] CPU frustum culling on both backends: supported
+- [ ] Occlusion culling with an HZB: supported on WebGPU (see "Phase C: occlusion efficiency, measured"); missing on WebGL2
+- [ ] Shadows: missing in C++ (JS only)
+- [ ] Materials as slots: partial
+- [ ] Device-loss recovery: partial (witnessed for destroy and reload)
+- [ ] Model pool and per-frame upload budget: supported
+- [ ] Screen-size LOD with hysteresis: missing
+
+Assets
+
+- [ ] GLB only, lengths checked, no external URIs: supported (validate.mjs)
+- [ ] Meshopt geometry, Draco refused: supported (validate.mjs, decodeCore.js)
+- [ ] KTX2 with Basis transcode on a worker: partial (no real transcode witnessed)
+- [ ] Validation gate blocks the build on rejected assets: supported
+- [ ] Progressive LOD and meshlets: partial
+- [ ] Named asset resolution through one 302 with content checks: supported
+- [ ] Spawn terrain store import, re-keyed to cube-sphere cells: missing
+
+Netcode and simulation
+
+- [ ] Fixed tick with catch-up limits and shed fraction: partial
+- [ ] One tick call per frame from JS: supported (engine_tick once)
+- [ ] Authoritative profile with starvation hold: partial
+- [ ] Rollback profile (input delay 1, 12 ticks of rollback): partial (WebRTC wiring not ported)
+- [ ] Lockstep profile (input delay 3, checksum every 30 ticks): partial
+- [ ] Binary snapshots, 29-byte entity and 22-byte player records: partial
+- [ ] Snapshot delta against an acknowledged baseline: partial
+- [ ] Snapshot LOD (full near, 5 Hz beyond 120 m): partial
+- [ ] Interest management with cell keys that throw rather than wrap: partial
+- [ ] Per-tick bandwidth budget with priority decay: partial
+- [ ] Prediction and interpolation with bounded extrapolation: partial
+- [ ] Lag compensation with a rewind ring and capsule hit test: partial
+- [ ] Replay record and play back with magic and version: partial
+- [ ] Desync checks, consensus vote and input rate limit: partial
+- [ ] Transports (WebSocket, WebTransport, WebRTC, worker): partial
+
+Game systems
+
+- [ ] Projectiles with gravity and hit resolution: partial
+- [ ] Pickups with trigger and respawn: partial
+- [ ] Crowds and steering under a per-tick budget: partial
+- [ ] Bots and decision pipeline: partial
+- [ ] Finite state machine interpreter: partial
+- [ ] Pathfinding corridor search with budget and partial results: partial
+- [ ] Navmesh query on the sphere by chart: partial
+- [ ] Quests and event chains: partial
+- [ ] Stats, progression and abilities: partial
+- [ ] Health and timed buffs with death events: partial
+- [ ] Character animation with blend trees, IK and ragdoll: partial (JS only)
+- [ ] Fire and fluid kernels: partial
+- [ ] Script limits (memory, op count, time): supported
+
+Memory and budgets
+
+- [ ] Every region carved at boot, allocations since warm-up stay 0: partial (phase 4 and tier witnesses)
+- [ ] One wasm memory sized from the device budget, no growth in tier builds: supported (artifacts gate)
+- [ ] Device tier planner from adapter limits and RAM: supported
+- [ ] VRAM accounting against the tier budget: partial (WebGPU reports no VRAM; planned bytes only)
+- [ ] Per-frame upload budget per tier: supported
+- [ ] Body and vegetation pools with generation ids: partial
+- [ ] Fixed rings for input, snapshot, transform and events: partial
+- [ ] Budget degradation (lower LOD, fewer slots) instead of allocation: partial
+- [ ] Jolt heap and caps that fail rather than grow: partial
+
+Landscape dataset decision (open)
+
+Not done in this pass. The owner asked for one landscape store read by both collider and renderer, with a measured memory and build-time comparison against two copies. The current code has a shared page source, but the collider and the vertex stream are built from separate passes, so the measurement has not been made. Recorded as open, to be decided by that measurement.
+
+Scenario and streaming witnesses (open)
+
+Not done in this pass. The owner asked for repeatable physics scenarios from spoint's example games (character controller, deathrun, combat bots, lockstep RTS, boss fights) with tick and frame budgets on every tier and both backends, and for a walk and fast fly-over across the sphere with real vegetation assets and no hitch. Neither exists yet. Recorded as open.
+
 ### Status
 
 - The renderer draws model slots. Uploads reach the GPU on the planned tier's per-frame budget, and only slots whose upload is complete are drawn. The model pipeline is built before the seal (createsAfterSeal stays 0).

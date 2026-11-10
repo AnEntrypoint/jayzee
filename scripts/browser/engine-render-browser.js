@@ -8,7 +8,11 @@ const TIMED = QUERY.get('timed') === '1'
 const DRAW = QUERY.get('draw') !== '0'
 const MODELS = QUERY.get('models') === '1'
 const HOLD_END = QUERY.get('hold') === '1'
-const TIER_GLUE = (TIER === 1024 ? '../../engine/out/engine-core-128mib' : '../../engine/out/engine-core-64mib') + (TIMED ? '-timed' : '') + '.mjs'
+const THREADS = QUERY.get('threads') === '1' && TIER === 1024
+const WORKERS = THREADS ? 4 : 1
+const TIER_GLUE = THREADS
+  ? '../../engine/out/engine-core-128mib-timed-threads-simd.mjs'
+  : (TIER === 1024 ? '../../engine/out/engine-core-128mib' : '../../engine/out/engine-core-64mib') + (TIMED ? '-timed' : '') + '.mjs'
 const TIER_BUDGET = TIER === 1024 ? 128 * 1024 * 1024 : 64 * 1024 * 1024
 const WARMUP_FRAMES = 60
 const FRAMES = QUERY.has('frames') ? Number(QUERY.get('frames')) : 600
@@ -404,7 +408,7 @@ const run = async () => {
   const navigatorLike = PHASE === 11 ? {} : navigator
   const requested = PHASE === 11 ? 'webgl2' : 'webgpu'
   result.adapter = await adapterInfo()
-  const renderer = await loadRenderer({ glue: new URL(TIER_GLUE, import.meta.url).href, canvas, navigatorLike, requested, players: TIER, budgetBytes: TIER_BUDGET })
+  const renderer = await loadRenderer({ glue: new URL(TIER_GLUE, import.meta.url).href, canvas, navigatorLike, requested, players: TIER, workers: WORKERS, budgetBytes: TIER_BUDGET })
   const module = renderer.module
   const placed = []
   const surface = setupScene(module, renderer, placed)
@@ -448,7 +452,7 @@ const run = async () => {
         rows[at + 3] = totalMs - (tickEnd - started)
         rows[at + 4] = totalMs
         rows[at + 5] = lastStarted === null ? NaN : started - lastStarted
-        rows[at + 6] = TIMED ? module._engine_sim_active_bodies() : NaN
+        rows[at + 6] = TIMED && module._engine_sim_active_bodies ? module._engine_sim_active_bodies() : NaN
         for (let i = 0; i < phaseCount; i++) rows[at + ROW_FIELDS + i] = phasesAfter[i] - phasesBefore[i]
         lastStarted = started
         if (frame === WARMUP_FRAMES) { renderer.markWarmup(); result.warmAt = frame }
@@ -499,6 +503,9 @@ const run = async () => {
   }
   const round2 = (v) => Math.round(v * 100) / 100
   result.timed = TIMED
+  result.threads = THREADS
+  result.workers = WORKERS
+  result.glue = TIER_GLUE
   result.tickMedianMs = round2(median(column(2)))
   result.outlierThresholdMs = round2(2 * result.frameTimeMedianMs)
   result.outliers = []

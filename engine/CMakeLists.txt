@@ -9,6 +9,7 @@ set(ENGINE_TIER_MIB 64 CACHE STRING "Fixed memory tier in MiB")
 option(ENGINE_LEAK_ON_TICK "Retain one block per tick, the witness that the memory gate catches growth" OFF)
 option(ENGINE_PHASE_TIMERS "Per-phase timers inside engine_tick, for the diagnostic build only" OFF)
 option(ENGINE_THREADS "Multithreaded Jolt job system on pthreads, a separate artifact from the single-threaded build" OFF)
+option(ENGINE_WASM_SIMD "Jolt SSE4.2 intrinsics compiled to wasm SIMD, a separate artifact from the scalar build" OFF)
 
 math(EXPR ENGINE_TIER_BYTES "${ENGINE_TIER_MIB} * 1024 * 1024")
 set(ENGINE_NAME "engine-core-${ENGINE_TIER_MIB}mib")
@@ -20,6 +21,9 @@ if(ENGINE_PHASE_TIMERS)
 endif()
 if(ENGINE_THREADS)
   string(APPEND ENGINE_NAME "-threads")
+endif()
+if(ENGINE_WASM_SIMD)
+  string(APPEND ENGINE_NAME "-simd")
 endif()
 
 set(CMAKE_CXX_STANDARD 20)
@@ -37,7 +41,7 @@ set(INTERPROCEDURAL_OPTIMIZATION OFF CACHE BOOL "" FORCE)
 set(DOUBLE_PRECISION OFF CACHE BOOL "" FORCE)
 set(CPP_EXCEPTIONS_ENABLED OFF CACHE BOOL "" FORCE)
 set(CPP_RTTI_ENABLED OFF CACHE BOOL "" FORCE)
-set(USE_WASM_SIMD OFF CACHE BOOL "" FORCE)
+set(USE_WASM_SIMD ${ENGINE_WASM_SIMD} CACHE BOOL "" FORCE)
 set(GENERATE_DEBUG_SYMBOLS OFF CACHE BOOL "" FORCE)
 set(ENABLE_OBJECT_STREAM OFF CACHE BOOL "" FORCE)
 set(TARGET_UNIT_TESTS OFF CACHE BOOL "" FORCE)
@@ -212,6 +216,10 @@ set(ENGINE_EXPORTS
   _engine_render_model_path_effective
   _engine_render_set_occlusion
   _engine_render_occlusion
+  _engine_render_set_count_readback
+  _engine_render_cull_ready
+  _engine_render_cull_counts
+  _engine_models_slot_of
   _engine_render_unplace_page
   _engine_render_uploads
   _engine_render_visible

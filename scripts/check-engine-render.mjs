@@ -34,6 +34,9 @@ const EXPECT_EXPORTS = [
   'engine_render_light_count',
   'engine_render_creates_after_seal',
   'engine_render_allocations_since_warmup',
+  'engine_render_set_count_readback',
+  'engine_render_cull_ready',
+  'engine_render_cull_counts',
 ]
 
 const EXPECT_LAYOUT = {
@@ -51,7 +54,7 @@ const EXPECT_ALLOCATIONS_SINCE_WARMUP = '0'
 const EXPECT_FRAMES = 600
 const PHASE10_MAX_API_CALLS_PER_FRAME = 64
 const PHASE11_MAX_API_CALLS_PER_FRAME = 64
-const FORBIDDEN_IN_RENDER = [/wgpuBufferGetMappedRange/, /MapAsync/, /WaitAny/, /\bmalloc\s*\(/, /std::vector/, /\bnew\s+[A-Za-z_]/]
+const FORBIDDEN_IN_RENDER = [/wgpuBufferGetMappedRange/, /WaitAny/, /\bmalloc\s*\(/, /std::vector/, /\bnew\s+[A-Za-z_]/]
 
 const sources = Object.fromEntries(RENDER_FILES.map((file) => [file, read(file)]))
 const cmake = read('engine/CMakeLists.txt')
@@ -187,6 +190,20 @@ gate('a recorded witness result meets the phase budgets when one is given', () =
   assert.ok(result.apiCallsPerFrame <= limit, 'api calls per frame ' + result.apiCallsPerFrame + ' exceed ' + limit)
   assert.equal(result.backend, result.phase === 11 ? 'webgl2' : 'webgpu')
   assert.equal(result.errors.length, 0)
+})
+
+gate('the one buffer map in the render sources is the cull counts readback, issued after submit and gated by the witness knob', () => {
+  const webgpu = sources['engine/src/render/render_webgpu.cpp']
+  assert.equal([...webgpu.matchAll(/MapAsync\(/g)].length, 1, 'exactly one MapAsync call')
+  const frameStart = webgpu.indexOf('int frame(')
+  const submit = webgpu.indexOf('queue.Submit(', frameStart)
+  const map = webgpu.indexOf('MapAsync(', frameStart)
+  assert.ok(submit > frameStart && map > submit, 'the map follows the submit inside frame()')
+  assert.ok(webgpu.includes('if (cullCopied)'), 'the map runs only after a counts copy')
+  assert.ok(webgpu.includes('if (countReadback && !cullPending)'), 'the copy runs only with the knob on and no map in flight')
+  for (const file of RENDER_FILES.filter((f) => f.endsWith('.cpp') && f !== 'engine/src/render/render_webgpu.cpp')) {
+    assert.doesNotMatch(sources[file], /MapAsync\(/, file + ' maps a buffer')
+  }
 })
 
 finish()

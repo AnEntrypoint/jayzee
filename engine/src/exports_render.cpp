@@ -256,6 +256,25 @@ EMSCRIPTEN_KEEPALIVE std::uint32_t engine_render_occlusion() {
   return rnd::modelSettings().occlusion;
 }
 
+EMSCRIPTEN_KEEPALIVE void engine_render_set_count_readback(std::uint32_t on) {
+  rnd::counters().countReadback = on != 0 ? 1u : 0u;
+}
+
+EMSCRIPTEN_KEEPALIVE int engine_render_cull_ready() {
+  if (rnd::counters().cullFresh == 0) return 0;
+  rnd::counters().cullFresh = 0;
+  return 1;
+}
+
+EMSCRIPTEN_KEEPALIVE const std::uint32_t* engine_render_cull_counts() {
+  static std::uint32_t words[4];
+  words[0] = rnd::counters().cullPassA;
+  words[1] = rnd::counters().cullCandidates;
+  words[2] = rnd::counters().cullPassB;
+  words[3] = static_cast<std::uint32_t>(rnd::counters().frames);
+  return words;
+}
+
 EMSCRIPTEN_KEEPALIVE std::uint32_t engine_render_api_calls_last_frame() {
   return rnd::counters().apiCallsLast;
 }
