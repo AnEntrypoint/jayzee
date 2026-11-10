@@ -65,7 +65,7 @@ const TIER_BUDGET = 67108864
 await gate('a device that plans tier 2 binds tier 0 on the 64 MiB arena, which is the highest tier the arena holds', () => {
   assert.equal(engineGlue._engine_init(64, 1, TIER_BUDGET), 0)
   assert.equal(engineGlue._engine_models_bind_plan(8192, 2048, 268435456, 1, 0), 0)
-  assert.equal(Number(engineGlue._engine_models_pool_bytes()), 23071104)
+  assert.equal(Number(engineGlue._engine_models_pool_bytes()), 23169408)
 })
 
 await gate('a second bind is refused and reports the model pool is already bound', () => {

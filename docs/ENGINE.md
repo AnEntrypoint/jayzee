@@ -213,7 +213,7 @@ Taken in the Phase A pass that followed the measurements. They supersede the Siz
 
 The 64 MiB build's arena is 60 MiB, which holds the tier 0 pool and the budget together, as it did when the pool was carved inside `engine_init`. A 128 MiB build would not hold tier 2, so it is not used for the device path.
 
-- `engine_init` no longer carves the model pool. `engine_models_bind_plan(maxDim, maxLayers, maxBuffer, texel, deviceMemory)` runs `device::plan` on the adapter's limits, then carves `bytesFor` of the planned tier's layout. When the arena cannot hold that pool, it steps down to the next smaller tier and carves again, so the bound tier is the highest one that both the device and the arena hold. It returns the bound tier (0 to 2), or −1 when no tier fits the limits, −2 when no tier's pool fits the arena, −3 when the pool refuses its layout, or −4 when the pool is already bound. On the 64 MiB build, a device that plans tier 2 binds tier 0 (23,071,104 B, measured).
+- `engine_init` no longer carves the model pool. `engine_models_bind_plan(maxDim, maxLayers, maxBuffer, texel, deviceMemory)` runs `device::plan` on the adapter's limits, then carves `bytesFor` of the planned tier's layout. When the arena cannot hold that pool, it steps down to the next smaller tier and carves again, so the bound tier is the highest one that both the device and the arena hold. It returns the bound tier (0 to 2), or −1 when no tier fits the limits, −2 when no tier's pool fits the arena, −3 when the pool refuses its layout, or −4 when the pool is already bound. On the 64 MiB build, a device that plans tier 2 binds tier 0 (23,071,104 B, measured before the cluster table; 23,169,408 B after it, see the Nanite section).
 - Slots are fixed at bind. Nothing grows: a slot count, a vertex count and an index count are set once, and the render path only reads them.
 - The upload budget per frame comes from the planned tier (`uploadBytesPerFrame`: 512 KiB, 1 MiB, 2 MiB), not from a constant. Each tier's budget is unchanged.
 - The browser default glue is the 512 MiB build (`engine-core-512mib.mjs`). The device tier is chosen by the planner after the module exists, so the glue cannot depend on the tier. The 64 MiB build remains for the gates and the tier 0 measurements.
@@ -258,13 +258,13 @@ The article is a RenderDoc capture of Unreal's Nanite preview. It gives the pass
 
 Sizes, in the layout in `engine/src/model_pool.cpp`. A cluster record is 24 bytes: a centre (three floats), a radius, a first index and an index count. A slot holds ceil(indicesPerSlot / 384) clusters, at most 256, so the table is slots × clusters × 24 bytes. These rows replace the pool rows of the ranks 3 to 6 table above:
 
-| tier | cluster table | pool with the table | budget plus pool |
-|---|---|---|---|
-| 0 | 98,304 B (128 slots × 32 clusters) | 23,166,976 B | — |
-| 1 | 786,432 B (256 slots × 128 clusters) | 185,335,808 B | — |
-| 2 | 1,572,864 B (256 slots × 256 clusters) | 370,671,616 B | 437,780,480 B, headroom 94,896,128 B in the 512 MiB build |
+| tier | cluster table | formula pool (vertices, indices, clusters) | carved pool (`engine_models_pool_bytes`) | carved pool plus 64 MiB budget |
+|---|---|---|---|---|
+| 0 | 98,304 B (128 slots × 32 clusters) | 23,166,976 B | 23,169,408 B | — |
+| 1 | 786,432 B (256 slots × 128 clusters) | 185,335,808 B | 185,340,672 B | — |
+| 2 | 1,572,864 B (256 slots × 256 clusters) | 370,671,616 B | 370,676,480 B | 437,785,344 B, headroom 94,891,264 B in the 512 MiB build |
 
-The table is in wasm memory, not VRAM, so `vramBytesOf` is unchanged. The earlier measured tier 0 carve was 23,071,104 B, against the formula's 23,068,672 B. That 2,432 B gap is not accounted for in the table above, so Phase B reads the carved bytes back and records them beside these figures.
+The carved figure is the formula plus the meta array and the handle table, which the formula leaves out: 2,432 B at 128 slots and 4,864 B at 256 slots. The earlier measured tier 0 carve of 23,071,104 B is the same value before the cluster table, so the 2,432 B gap is the meta and handle table and no alignment term. The carved values come from `engine_models_pool_bytes` on the 512 MiB build, measured by a one-off run in Phase B. The table is in wasm memory, not VRAM, so `vramBytesOf` is unchanged.
 
 - Bounds are built in `upload` and in `markDirty`, after the slot's data is final, so a decoded slot is culled from its real geometry. Nothing is built per frame.
 - A cluster is unbounded (never culled) when an index is past the slot's vertex count, or when a position is not finite. The unbounded case is the safe one: a bad index draws, and it does not vanish.

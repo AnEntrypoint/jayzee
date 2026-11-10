@@ -2904,3 +2904,32 @@ Phase B also owes:
 - Rebuild each variant that includes model_pool.cpp (64 MiB fixed, leak, timed, threads, 128 MiB fixed and 512 MiB fixed) and update engine/artifacts.json with the new hashes.
 - Read the carved tier 0 pool back and record it beside the formula (ENGINE.md, the 2,432 B gap).
 - Run engine/test/build_host.sh in the foreground and every engine gate in the list in the ranks 3 to 6 section, then the browser runs listed there.
+
+## Nanite macro view: Phase B result
+
+Built and run in the foreground on this host (NVIDIA GeForce RTX 3060 Laptop GPU, WebGPU, texture-compression-bc true).
+
+Witnesses:
+
+- Host witness (`engine/test/build_host.sh`): 279 PASS, 0 FAIL, no warnings. It was 257 before the cluster checks. N1 to N6 pass, including the cluster sphere containment, the adjacent merge into one 768-index run, the cutting plane, the conservative cut, the plane that rejects every cluster, the unbounded slot, and the layout limits.
+- Variants rebuilt with `engine/build.sh`: 64 MiB fixed (sha256 20b8027c…), 128 MiB fixed (a5581a75…), 512 MiB fixed (2d9c2e20…), 64 MiB leak (aad7a9b4…), 64 MiB timed (bf8aa8e8…), 64 MiB threads (cc675efa…). The four in `engine/artifacts.json` are repinned; timed and threads are built but not pinned there, as before.
+- Carved model pools on the 512 MiB build (`engine_models_pool_bytes`): tier 0 23,169,408 B, tier 1 185,340,672 B, tier 2 370,676,480 B. Each is the formula in ENGINE.md plus the meta array and handle table (2,432 B at 128 slots, 4,864 B at 256).
+- Gates: check:engine-artifacts, core, world, bridge, threads, sleep, pools, tiers, materials, leak, render, hygiene, asset-pipeline, ci-engine-glue all PASS. check:decode-path PASS 8 of 8 after its one expected value changed.
+- Browser runs, all through the project playwriter browser:
+  - models-run: ok true. Pool bytes 23169408, 270 churn loads and 258 unloads, 0 failures, 0 allocations after warm-up, 0 dirty slots at the end, newcomer uploaded, steady-frame p99 3.51 ms.
+  - planet-path-run: backend webgpu, errors none, createsAfterSeal 0, frame-time p99 3.35 ms, 36 restages.
+  - models-vram-run: errors none. Two rows are over budget and not selected by the planner: tier 1 RGBA8 (900,377,258 B against a 536,870,912 B budget) and tier 2 RGBA8 (2,516,582,400 B against 1,073,741,824 B). The planner picks tier 0 for RGBA8, which the device-tier witness checks. The VRAM accounting in `device_tier.cpp` is unchanged here.
+  - device-loss-run: ok true.
+  - decode-worker-run: ok true.
+  - spoint-streamer-compare: exit 0. Like-for-like sample p99 spoint 0.390 ms against jayzee 0.228 ms, a ratio of 1.71 with the call-boundary caveat in its output.
+
+Defects fixed in this pass:
+
+- `scripts/check-decode-path.mjs` pinned the tier 0 carve at 23,071,104 B, the value before the cluster table. The cluster table adds 98,304 B (128 slots × 32 clusters × 24 B), so the pin is now 23,169,408 B. This is a changed measured value, not a relaxed check. The gate still fails on any other pool size.
+
+Open after Phase B:
+
+- The browser runs check that the model path uploads, draws and reports no errors. They do not check that a culled model draw reaches the screen. Culling correctness is checked natively only (the cluster block of `witness_models.cpp`).
+- The CPU cost of `visibleRuns` per frame is not measured. The bound is at most slots × clusters sphere tests (65,536 at tier 2).
+- WebGL2 draws no models, so the culling is not on that path.
+- The full `npm test` chain was not run. The gates above were run directly.
