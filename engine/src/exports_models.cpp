@@ -3,6 +3,7 @@
 
 #include <emscripten/emscripten.h>
 
+#include "arena.h"
 #include "device_tier.h"
 #include "model_pool.h"
 
@@ -47,6 +48,48 @@ EMSCRIPTEN_KEEPALIVE double engine_models_load(std::uint32_t vertices, std::uint
   fillModel(vertexOut, indexOut, vertices, indices, seed);
   engine::models::markDirty(handle);
   return handle;
+}
+
+EMSCRIPTEN_KEEPALIVE int engine_models_bind_plan(std::uint32_t maxTextureDimension, std::uint32_t maxTextureLayers, double maxBufferBytes, std::uint32_t texelBytes, double deviceMemoryBytes) {
+  engine::device::Limits limits{maxTextureDimension, maxTextureLayers, static_cast<std::uint64_t>(maxBufferBytes), texelBytes, static_cast<std::uint64_t>(deviceMemoryBytes)};
+  engine::device::Plan planned{};
+  if (!engine::device::plan(limits, planned)) return -1;
+  const engine::models::Layout layout{planned.modelSlots, planned.verticesPerModel, planned.indicesPerModel, planned.vertexStrideBytes, planned.uploadBytesPerFrame};
+  const std::size_t bytes = engine::models::bytesFor(layout);
+  void* base = engine::arena::carve(bytes, engine::models::kAlignment);
+  if (base == nullptr) return -2;
+  if (engine::models::bind(base, bytes, layout) != engine::kOk) return -3;
+  return static_cast<int>(planned.tier);
+}
+
+EMSCRIPTEN_KEEPALIVE std::uint32_t engine_models_vertex_ptr(double handle) {
+  std::uint8_t* vertices = nullptr;
+  std::uint8_t* indices = nullptr;
+  if (engine::models::mutableSlot(handle, vertices, indices) != engine::kOk) return 0;
+  return static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(vertices));
+}
+
+EMSCRIPTEN_KEEPALIVE std::uint32_t engine_models_index_ptr(double handle) {
+  std::uint8_t* vertices = nullptr;
+  std::uint8_t* indices = nullptr;
+  if (engine::models::mutableSlot(handle, vertices, indices) != engine::kOk) return 0;
+  return static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(indices));
+}
+
+EMSCRIPTEN_KEEPALIVE std::uint32_t engine_models_vertex_count(double handle) {
+  engine::models::Range range{};
+  if (engine::models::ranges(handle, range) != engine::kOk) return 0;
+  return range.vertexCount;
+}
+
+EMSCRIPTEN_KEEPALIVE std::uint32_t engine_models_index_count(double handle) {
+  engine::models::Range range{};
+  if (engine::models::ranges(handle, range) != engine::kOk) return 0;
+  return range.indexCount;
+}
+
+EMSCRIPTEN_KEEPALIVE int engine_models_mark_dirty(double handle) {
+  return static_cast<int>(engine::models::markDirty(handle));
 }
 
 EMSCRIPTEN_KEEPALIVE int engine_models_unload(double handle) {

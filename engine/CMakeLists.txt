@@ -126,6 +126,12 @@ set(ENGINE_EXPORTS
   _engine_models_pool_bytes
   _engine_models_dirty
   _engine_models_uploaded
+  _engine_models_bind_plan
+  _engine_models_vertex_ptr
+  _engine_models_index_ptr
+  _engine_models_vertex_count
+  _engine_models_index_count
+  _engine_models_mark_dirty
   _engine_device_plan_tier
   _engine_device_tier_vram
   _engine_device_tier_budget

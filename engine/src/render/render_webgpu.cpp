@@ -140,7 +140,6 @@ fn fsModel(vin: ModelOut) -> @location(0) vec4f {
 )WGSL";
 
 constexpr std::uint32_t kModelBindings = 1;
-constexpr std::uint64_t kModelUploadBudgetBytes = 512ull * 1024ull;
 
 constexpr char kTerrainWgsl[] = R"WGSL(
 struct Camera {
@@ -554,7 +553,7 @@ int frame(const SceneView& scene, const FramePlan& plan, const Camera& camera) {
     writeBuffer(materialBuf, 0, plan.materialWords, kMaterialBytes);
     writeBuffer(pageBuf, 0, plan.pageRecords, kPageBytes);
 
-    std::uint64_t modelBudget = kModelUploadBudgetBytes;
+    std::uint64_t modelBudget = engine::models::layout().uploadBytesPerFrame;
     for (std::uint32_t s = 0; s < engine::models::slotCount(); ++s) {
       if (!engine::models::slotDirty(s)) continue;
       const std::uint64_t vertexSlotBytes = engine::models::slotVertexBytes();

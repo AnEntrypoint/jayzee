@@ -64,6 +64,11 @@ void modelsAndTiers() {
 
   check(device::planTier(2, 1, planned) && planned.vramBytes == 905969664ull, "planTier fills the accounted bytes without the fit test");
   check(!device::planTier(2, 2, planned), "planTier refuses a texel size other than 1 or 4");
+  check(device::planTier(0, 1, planned) && planned.uploadBytesPerFrame == 512u * 1024u, "tier 0 carries a 512 KiB upload budget per frame");
+  check(device::planTier(2, 1, planned) && planned.uploadBytesPerFrame == 2u * 1024u * 1024u, "tier 2 carries a 2 MiB upload budget per frame");
+  const models::Layout tierTwo{planned.modelSlots, planned.verticesPerModel, planned.indicesPerModel, planned.vertexStrideBytes, planned.uploadBytesPerFrame};
+  check(models::bytesFor(tierTwo) >= 369098752ull, "the tier 2 pool holds its 369098752 vertex and index bytes");
+  check(models::bytesFor(tierTwo) < 512ull * kMiB, "the tier 2 pool fits the 512 MiB build's arena");
   check(models::validLayout(kLayout), "a four-slot layout with 32-byte vertices is valid");
   check(!models::validLayout({0, 8, 12, 32}), "a layout with no slots is refused");
   check(!models::validLayout({handles::kMaxSlots + 1, 8, 12, 32}), "a layout above the slot maximum is refused");

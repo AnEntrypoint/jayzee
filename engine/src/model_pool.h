@@ -16,6 +16,7 @@ struct Layout {
   std::uint32_t verticesPerSlot;
   std::uint32_t indicesPerSlot;
   std::uint32_t vertexStrideBytes;
+  std::uint32_t uploadBytesPerFrame = 0;
 };
 
 struct Range {
