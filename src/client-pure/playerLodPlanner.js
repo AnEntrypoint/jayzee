@@ -45,12 +45,13 @@ export function createPlayerLodPlanner() {
       dots.list = serverDots
       return
     }
-    fallback.length = 0
+    let kept = 0
     for (let i = 0; i < scratch.count; i++) {
-      if (scratch.tiers[i] === TIER_DOT) fallback.push(entries[i])
+      if (scratch.tiers[i] === TIER_DOT) fallback[kept++] = entries[i]
     }
-    dots.mode = fallback.length > 0 ? 'fallback' : 'none'
-    dots.list = fallback.length > 0 ? fallback : null
+    if (fallback.length !== kept) fallback.length = kept
+    dots.mode = kept > 0 ? 'fallback' : 'none'
+    dots.list = kept > 0 ? fallback : null
   }
   return {
     setFullCountOverride(value) {

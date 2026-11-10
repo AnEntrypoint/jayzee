@@ -1,4 +1,4 @@
-import { slerpQuat } from './interpolation.js'
+import { slerpQuatAt } from './interpolation.js'
 import { reexpressPlayerRecord } from './reexpressRecords.js'
 
 const MAX_BUFFERED_SNAPSHOTS = 32
@@ -35,10 +35,15 @@ const makePlayerOut = () => ({
   weapon: 0,
 })
 
-const writePlayer = (out, from, to, t, extraSeconds) => {
+const BLEND_T = 0
+const BLEND_EXTRA_S = 1
+
+const writePlayer = (out, from, to, blend) => {
+  const t = blend[BLEND_T]
+  const extraSeconds = blend[BLEND_EXTRA_S]
   out.id = to.id
   for (let i = 0; i < 3; i++) out.position[i] = lerp(from.position[i], to.position[i], t) + to.velocity[i] * extraSeconds
-  slerpQuat(out.rotation, from.rotation, to.rotation, t)
+  slerpQuatAt(out.rotation, from.rotation, to.rotation, blend, BLEND_T)
   for (let i = 0; i < 3; i++) out.velocity[i] = lerp(from.velocity[i], to.velocity[i], t)
   out.onGround = to.onGround
   out.health = to.health
@@ -67,6 +72,8 @@ export class SnapshotTimeline {
   #playerPool = []
   #byIdA = new Map()
   #indexedSnap = null
+  #blend = new Float64Array(2)
+  #held = new Float64Array(2)
 
   constructor({ tickRate = 60 } = {}) {
     this.tickMs = 1000 / tickRate
@@ -161,15 +168,21 @@ export class SnapshotTimeline {
       for (const player of a.players) byIdA.set(player.id, player)
       this.#indexedSnap = a
     }
-    dst.length = 0
+    const blend = this.#blend, held = this.#held
+    blend[BLEND_T] = t
+    blend[BLEND_EXTRA_S] = extraS
+    held[BLEND_T] = 1
+    held[BLEND_EXTRA_S] = extraS
+    let written = 0
     for (const playerB of b.players) {
       if (!playerB.position) continue
       const playerA = byIdA.get(playerB.id) || playerB
-      while (pool.length <= dst.length) pool.push(makePlayerOut())
-      const o = pool[dst.length]
-      writePlayer(o, playerA, playerB, playerA === playerB ? 1 : t, extraS)
-      dst.push(o)
+      while (pool.length <= written) pool.push(makePlayerOut())
+      const o = pool[written]
+      writePlayer(o, playerA, playerB, playerA === playerB ? held : blend)
+      dst[written++] = o
     }
+    if (dst.length !== written) dst.length = written
     return out
   }
 

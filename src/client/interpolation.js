@@ -1,4 +1,5 @@
-export function slerpQuat(out, q1, q2, t) {
+export function slerpQuatAt(out, q1, q2, blend, at) {
+  const t = blend[at]
   if (!q1 || !q2) {
     const source = q2 || q1 || [0, 0, 0, 1]
     out[0] = source[0]
@@ -42,4 +43,11 @@ export function slerpQuat(out, q1, q2, t) {
   out[1] = y1 * s1 + y2 * s2
   out[2] = z1 * s1 + z2 * s2
   out[3] = w1 * s1 + w2 * s2
+}
+
+const single = new Float64Array(1)
+
+export function slerpQuat(out, q1, q2, t) {
+  single[0] = t
+  slerpQuatAt(out, q1, q2, single, 0)
 }

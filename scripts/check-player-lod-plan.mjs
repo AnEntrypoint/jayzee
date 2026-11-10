@@ -107,13 +107,25 @@ gate('server dots that are not an array are refused', () => {
   assert.throws(() => planner.plan([], origin, 'abc'), TypeError)
 })
 
-gate('a fallback list from one plan is unchanged by the next plan', () => {
+gate('the fallback list is held by the planner: the next plan overwrites it, and a copy keeps the earlier one', () => {
   const planner = createPlanner()
   planner.setFullCountOverride(0)
   const first = planner.plan([at(1, 200), at(2, 5)], origin, null).dots.list
-  const before = clone(first)
-  planner.plan([at(3, 300), at(4, 4)], origin, null)
-  assert.deepEqual(clone(first), before)
+  const kept = clone(first)
+  assert.deepEqual(kept, [at(1, 200)])
+  const second = planner.plan([at(3, 300), at(4, 4)], origin, null).dots.list
+  assert.equal(second, first)
+  assert.deepEqual(clone(first), [at(3, 300)])
+  assert.deepEqual(kept, [at(1, 200)])
+})
+
+gate('tierOf reads the last plan only, and a player that left has no tier', () => {
+  const planner = createPlanner()
+  planner.setFullCountOverride(1)
+  planner.plan([at(1, 200), at(2, 5)], origin, null)
+  assert.deepEqual([planner.tierOf(2), planner.tierOf(1), planner.tierOf(9)], [0, 2, undefined])
+  planner.plan([at(1, 3)], origin, null)
+  assert.deepEqual([planner.tierOf(1), planner.tierOf(2)], [0, undefined])
 })
 
 gate('getTiers reports the last plan', () => {

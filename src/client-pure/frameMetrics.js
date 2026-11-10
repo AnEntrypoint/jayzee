@@ -108,6 +108,7 @@ export function createVsyncMonitor() {
   const deltas = new Float32Array(REFRESH_MEDIAN_WINDOW)
   const sortBuf = new Float32Array(REFRESH_MEDIAN_WINDOW)
   const recentMisses = []
+  let sortView = sortBuf.subarray(0, 0)
   let idx = 0, filled = 0
   let lastTs = -1
   let inferredIntervalMs = SIXTY_HZ_INTERVAL_MS
@@ -115,28 +116,25 @@ export function createVsyncMonitor() {
   let missCount = 0, frameCount = 0
   let lastExpectedMs = 0, lastDeltaMs = 0, lastIsMiss = false, lastIsCompositorStall = false, lastMissedFrames = 0
   const ticked = { isMiss: false, isCompositorStall: false, deltaMs: 0, expectedMs: 0, missedFrames: 0 }
-  const writeTick = (isMiss, isCompositorStall, deltaMs, expectedMs, missedFrames) => {
-    ticked.isMiss = isMiss
-    ticked.isCompositorStall = isCompositorStall
-    ticked.deltaMs = deltaMs
-    ticked.expectedMs = expectedMs
-    ticked.missedFrames = missedFrames
-    return ticked
-  }
 
   function median() {
     if (filled === 0) return inferredIntervalMs
     for (let i = 0; i < filled; i++) sortBuf[i] = deltas[i]
-    const a = sortBuf.subarray(0, filled)
-    a.sort()
-    return a[Math.floor(filled / 2)]
+    if (sortView.length !== filled) sortView = sortBuf.subarray(0, filled)
+    sortView.sort()
+    return sortView[Math.floor(filled / 2)]
   }
 
   function tick(ts, jsMs) {
     frameCount++
     if (lastTs < 0) {
       lastTs = ts
-      return writeTick(false, false, 0, inferredIntervalMs, 0)
+      ticked.isMiss = false
+      ticked.isCompositorStall = false
+      ticked.deltaMs = 0
+      ticked.expectedMs = inferredIntervalMs
+      ticked.missedFrames = 0
+      return ticked
     }
     const deltaMs = ts - lastTs
     lastTs = ts
@@ -165,7 +163,12 @@ export function createVsyncMonitor() {
     lastIsMiss = isMiss
     lastIsCompositorStall = isCompositorStall
     lastMissedFrames = missedFrames
-    return writeTick(isMiss, isCompositorStall, deltaMs, expectedMs, missedFrames)
+    ticked.isMiss = isMiss
+    ticked.isCompositorStall = isCompositorStall
+    ticked.deltaMs = deltaMs
+    ticked.expectedMs = expectedMs
+    ticked.missedFrames = missedFrames
+    return ticked
   }
 
   function state() {
