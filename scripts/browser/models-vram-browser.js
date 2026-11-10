@@ -11,6 +11,9 @@ const VERTEX_STRIDE = 32
 const INDEX_BYTES = 4
 const IDLE_MS = 1000
 const HOLD_MS = 1500
+const QUERY = new URLSearchParams(location.search)
+const ONLY_TIER = QUERY.has('tier') ? Number(QUERY.get('tier')) : null
+const ONLY_FORMAT = QUERY.get('format')
 const log = []
 const sleep = (ms) => new Promise((done) => setTimeout(done, ms))
 const mark = (tier, format, stage) => log.push({ tier, format, stage, epochMs: performance.timeOrigin + performance.now() })
@@ -34,21 +37,23 @@ const report = (line) => {
 }
 
 const run = async () => {
-  const factory = (await import('../../engine/out/engine-core-64mib.mjs')).default
+  const factory = (await import('../../engine/out/engine-core-64mib-timed.mjs')).default
   const engine = await factory({})
   const adapter = navigator.gpu ? await navigator.gpu.requestAdapter() : null
   if (!adapter) throw new Error('no WebGPU adapter')
   const bcSupported = adapter.features.has('texture-compression-bc')
   result.adapter = { bcSupported, description: adapter.info ? adapter.info.description : null }
-  const device = await adapter.requestDevice({ requiredFeatures: bcSupported ? ['texture-compression-bc'] : [] })
   for (const t of TIERS) {
     for (const f of FORMATS) {
+      if (ONLY_TIER !== null && t.tier !== ONLY_TIER) continue
+      if (ONLY_FORMAT !== null && f.name !== ONLY_FORMAT) continue
       const plannedBytes = engine._engine_device_tier_vram(t.tier, f.texel)
       const budgetBytes = engine._engine_device_tier_budget(t.tier)
       if (f.feature && !bcSupported) {
         result.rows.push({ tier: t.tier, format: f.name, skipped: 'texture-compression-bc is not on this adapter', plannedBytes, budgetBytes })
         continue
       }
+      const device = await adapter.requestDevice({ requiredFeatures: f.feature ? [f.feature] : [] })
       mark(t.tier, f.name, 'idle')
       await sleep(IDLE_MS)
       mark(t.tier, f.name, 'allocating')
@@ -72,6 +77,7 @@ const run = async () => {
       await device.queue.onSubmittedWorkDone()
       mark(t.tier, f.name, 'freed')
       await sleep(IDLE_MS)
+      device.destroy()
       result.rows.push({ tier: t.tier, format: f.name, plannedBytes, budgetBytes, createdBytes, outOfMemory: oom ? oom.message : null })
     }
   }

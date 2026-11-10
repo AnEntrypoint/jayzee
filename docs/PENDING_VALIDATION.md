@@ -2692,3 +2692,48 @@ Phase A wrote code and scripts only. Nothing was built, run or witnessed in this
 | scripts/browser/models-run.mjs (new) | runner | runs the page at tier 64 timed with models=1 and writes build/diag/models/run.json with the wall time | Phase B: node scripts/browser/models-run.mjs |
 | scripts/browser/models-vram.html, models-vram-browser.js, models-vram-run.mjs (new) | allocated VRAM per tier | the page reads the planner's bytes and budget from the wasm, creates each tier's vertex pool, index pool and texture array (BC7 at 1 byte per texel, RGBA8 at 4), holds them, and frees them. The Node runner samples nvidia-smi every 100 ms and reports the peak above the idle baseline per row | Phase B: node scripts/browser/models-vram-run.mjs (exit 0, no out-of-memory row) |
 | scripts/spoint-streamer-compare.mjs (new) | item 1 | runs spoint's PhysicsWorld with real Jolt and spoint's timeFieldSteps for each build, and reports sample, add and total p50, p99 and max, next to jayzee's phase 5 flight frame-time p99 from the native witness | Phase B: node scripts/spoint-streamer-compare.mjs 200 (writes build/diag/item1/compare.json) |
+
+## In-wasm measurements and item 1: Phase B result
+
+Ran in this pass, in the project browser (the playwriter Chrome on debug port 10221, on an NVIDIA GeForce RTX 3060 Laptop GPU, WebGPU, no fallback adapter). Builds: fixed 64 MiB `846d966f…`, leak 64 MiB `cd654294…`, fixed 128 MiB `edbdacebb…`, timed 64 MiB `dd5c5ac5…`. Native host witness: 253 PASS, 0 FAIL, 0 compiler warnings.
+
+(a) RAM across churn, `node scripts/browser/models-run.mjs build/diag/models/run.json 8843 600`, wall 12,406 ms, exit 0, models.ok true. Wasm memory is fixed at 67,108,864 B at the start (frame 61) and at the end. Allocations since warm-up are 0 at both ends. 270 churn loads and 258 unloads, with 11 newcomers, failures 0. The pool is 23,071,104 B of the 67,108,864 B. Live models: 1 at the start, 0 at the end, and dirty slots 0 at the end. JS heap went from 1,769,783 B to 2,082,583 B. This is a Chrome heap figure without a forced GC, so it is observed and not a claim.
+
+(b) First-frame cost of a newly added model, same run. Quiet frames (no load, odd frames): 259 frames, median 2.630 ms, p99 3.520 ms. Newcomer frames (11, each adds a 4096-vertex, 12288-index model, which includes the CPU fill): median 2.930 ms, max 3.740 ms. First-frame cost 0.300 ms, ratio 1.11. Upload phase median: quiet 0.040 ms, churn frames 0.090 ms, newcomer 0.130 ms. createsAfterSeal 0 and apiCallsPerFrame 56. No newcomer frame is above 2× the quiet median, so no compile hitch shows. The steady frame in the models block (all non-newcomer frames, churn included) is 2.66 ms median and 3.72 ms p99.
+
+(c) Allocated VRAM per tier, `node scripts/browser/models-vram-run.mjs build/diag/models/vram.json 8843`, wall 26,303 ms, exit 0, no errors, no out-of-memory. Each row is its own page. "planned" is the wasm planner, "created" is the sum of the sizes the page created, "nvidia" is the peak of nvidia-smi above the idle median (100 ms sampling, MiB resolution):
+
+| tier | format | planned B | created B | nvidia B | budget B | within budget |
+|---|---|---|---|---|---|---|
+| 0 | bc7 (1 B/texel) | 45,438,293 | 45,440,000 | 52,428,800 | 268,435,456 | yes |
+| 0 | rgba8 (4 B/texel) | 112,547,157 | 112,547,072 | 118,489,088 | 268,435,456 | yes |
+| 1 | bc7 | 363,506,346 | 363,509,760 | 364,904,448 | 536,870,912 | yes |
+| 1 | rgba8 | 900,377,258 | 900,377,088 | 905,969,664 | 536,870,912 | no (planner refuses texel 4 here) |
+| 2 | bc7 | 905,969,664 | 905,972,224 | 908,066,816 | 1,073,741,824 | yes |
+| 2 | rgba8 | 2,516,582,400 | 2,516,582,272 | 2,517,630,976 | 1,073,741,824 | no (planner refuses texel 4 here) |
+
+The planner's bytes match the created sizes to within 0.01%. The driver's view matches them to within about 2% for the rows the planner selects, and the tier 0 BC7 row carries about 7 MB of allocation overhead. The two rows over budget are the texel-4 cases the planner excludes. This is the device-tier budget assumption checked on this device: the tiers the planner selects fit their budgets.
+
+(item 1) `node scripts/spoint-streamer-compare.mjs 200 build/diag/item1/compare.json`, wall 629 ms, exit 0. spoint at 03f107f, `src/terrain` and `src/physics` clean. Spoint's PhysicsWorld with real Jolt in Node, spoint's `timeFieldSteps` over 200 builds of a 33 by 33 field, 256 m, same corner. Result (run 2; run 1 gave 0.794 ms total p99 and 0.003397 ms phase 5):
+
+| quantity | p50 ms | p99 ms | max ms |
+|---|---|---|---|
+| spoint sample | - | 0.338 | - |
+| spoint Jolt add | - | 0.180 | - |
+| spoint total per step | 0.109 | 0.772 | 2.283 |
+| jayzee phase 5 flight frame p99 (native witness) | - | 0.003376 | - |
+
+Ratio of spoint's total p99 to jayzee's phase 5 p99: 229. The unit is the same (ms) but the operations are not. spoint's number is one streaming step; jayzee's is one frame of the native planet flight. This is not a like-for-like comparison. The closer jayzee figure is the browser planet path's restage p99 (`restageMsP99` in `engine-render-browser.js`), which the models run does not record. Recording it on the same field is open.
+
+Defects found in this pass and fixed at their cause:
+1. models-run: the RAM begin snapshot was taken before markWarmup, so it reported 2,411 pre-warm-up allocations. Fixed by taking it at frame 61. Witness: begin.allocationsSinceWarmup "0".
+2. models-run: every newcomer landed on an even frame, which is also a churn-load frame, so the first-frame cost included a churn load. Fixed by placing newcomers on odd frames (frame − 60 is 1 mod 50). Witness: newcomer frames 61, 111, …, 561.
+3. models-vram-browser.js loaded the fixed glue, which predates the new exports ("engine._engine_device_tier_vram is not a function"). Fixed by loading the timed glue, the same build as models-run.
+4. models-vram-run: one page for all rows let the driver hold each freed allocation, so tier 2's idle baseline was 1,444 MiB, the peak left by tier 1. Fixed by one page per row. Witness: every row's baseline is 597 to 602 MiB.
+5. engine/artifacts.json: the pins for the three variants were rebuilt and updated, since check:engine-core compares each pin to its file. Not a failure seen, a required update.
+
+Gates run in this pass, all foreground, all exit 0: check:engine-core, check:engine-artifacts, check:hygiene, check:engine-pools, check:engine-tiers, check:engine-materials, check:engine-leak, check:engine-bridge, check:engine-world, check:engine-sleep, check:engine-threads, check:engine-render (17 PASS).
+
+Not run in this pass: the full npm test chain. check:engine-threads runs the threads artifact, which was not rebuilt in this pass, so it covers the older binary. check:asset-pipeline was not re-run; its last run was 14 PASS and its files are unchanged.
+
+Open after this pass: in-wasm first-frame measurement uses the existing fixed tier-0 pool, not device::plan at startup. Context-loss recovery and worker decode are not implemented (docs/ENGINE.md status).

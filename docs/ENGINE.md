@@ -197,8 +197,8 @@ Enforced by `tools/asset-pipeline/validate.mjs`, which exits 1 on any REJECT.
 
 ### Status
 
-- The renderer does not draw model slots yet. `models::` stores and uploads geometry, and nothing in `render_webgpu.cpp` reads its ranges. Measurement (b) therefore uses the existing prop path, and the result is labelled that way.
-- `device::plan` is not yet called from startup. Phase B wires it, or the gap is reported.
-- Decode is not yet on a worker. The render thread does no decode, because the decoder is not in the engine yet.
+- The renderer draws model slots. Uploads reach the GPU on a 512 KiB per-frame budget, and only slots whose upload is complete are drawn. The model pipeline is built before the seal (createsAfterSeal stays 0).
+- The wasm binds a fixed tier-0 layout at init (128 slots, 4096 vertices, 12288 indices, 32-byte stride). Startup planning from adapter limits with device::plan is not wired yet, so the bound pool does not yet follow the device.
+- Decode is not yet on a worker. KTX2 transcode and meshopt decode are not in the engine, so the render thread does no decode and has no decoder to feed it.
 - Context-loss recovery is designed above and not implemented.
-- In-wasm RAM under churn, first-frame timing for a model, and allocated VRAM against the tier budget are not yet measured. The Phase B result in docs/PENDING_VALIDATION.md has the figures that are measured.
+- Phase B measurements (RAM under churn, first-frame cost of a newcomer model, allocated VRAM per tier, and the item 1 comparison) are in docs/PENDING_VALIDATION.md under the Phase B result for this pass.

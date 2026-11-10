@@ -4,15 +4,15 @@
   "artifacts": {
     "engine-core-64mib": {
       "wasm": "engine/out/engine-core-64mib.wasm",
-      "sha256": "f892b2c9fdb1e3eaaf548b607ee3568fb205e0ffe1b4f8cbcf76f4930731c270"
+      "sha256": "846d966f5da095f8250bd918d4be8f827bc62b6f2360d2ed6198a0a896861496"
     },
     "engine-core-128mib": {
       "wasm": "engine/out/engine-core-128mib.wasm",
-      "sha256": "55a0acd2574cc883c748225543ff71d18d4d09b2991acf0eee317e6f45aea8c8"
+      "sha256": "edbdacebbedc1c680e5da494351101d313baf115258f7ae0944c2b3383b1d06b"
     },
     "engine-core-64mib-leak": {
       "wasm": "engine/out/engine-core-64mib-leak.wasm",
-      "sha256": "2ec59bddc24a62704a3e486338b34c24347c2424df3f053b039c526847c4d89e"
+      "sha256": "cd6542940fdf83a84f628dbea9726cfd7ac30f5557612c60dada3fdcc9eff70b"
     }
   }
 }

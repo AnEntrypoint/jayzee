@@ -338,7 +338,7 @@ const memorySnapshot = (module) => ({
 })
 
 const modelsStep = (module, frame) => {
-  if (frame === WARMUP_FRAMES) models.begin = memorySnapshot(module)
+  if (frame === WARMUP_FRAMES + 1) models.begin = memorySnapshot(module)
   if (frame < WARMUP_FRAMES) return
   if (frame % 2 === 0) {
     const handle = module._engine_models_load(MODEL_CHURN_VERTICES, MODEL_CHURN_INDICES, frame)
@@ -350,7 +350,7 @@ const modelsStep = (module, frame) => {
       models.unloads += 1
     }
   }
-  if ((frame - WARMUP_FRAMES) % MODEL_EVENT_EVERY === 0) {
+  if ((frame - WARMUP_FRAMES) % MODEL_EVENT_EVERY === 1) {
     const handle = module._engine_models_load(MODEL_NEW_VERTICES, MODEL_NEW_INDICES, 1000 + frame)
     if (handle > 0) models.events.push({ frame, handle })
     else models.failures += 1
