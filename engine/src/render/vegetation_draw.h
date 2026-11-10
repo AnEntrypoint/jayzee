@@ -57,19 +57,20 @@ inline bool bound() { return valid(state()); }
 
 inline std::uint32_t indexOf(const Bound& b, std::uint32_t species, std::uint32_t slot) { return species * b.slots + slot; }
 
-inline bool outsidePlane(const float* planes, const double* origin, float radius) {
+inline bool outsidePlane(const float* planes, const double* rel, float radius) {
   for (std::uint32_t p = 0; p < 6; ++p) {
     const float* q = planes + p * 4;
-    const double d = static_cast<double>(q[0]) * origin[0] + static_cast<double>(q[1]) * origin[1] + static_cast<double>(q[2]) * origin[2] + static_cast<double>(q[3]);
+    const double d = static_cast<double>(q[0]) * rel[0] + static_cast<double>(q[1]) * rel[1] + static_cast<double>(q[2]) * rel[2] + static_cast<double>(q[3]);
     if (d < -static_cast<double>(radius)) return true;
   }
   return false;
 }
 
-inline std::uint32_t planDraws(const Bound& b, const float* planes, Draw* out, std::uint32_t maxOut) {
+inline std::uint32_t planDraws(const Bound& b, const float* planes, const double frameOrigin[3], Draw* out, std::uint32_t maxOut) {
   std::uint32_t n = 0;
   for (std::uint32_t slot = 0; slot < b.slots; ++slot) {
-    if (planes != nullptr && outsidePlane(planes, b.origins + slot * 3, b.radius)) continue;
+    const double rel[3] = {b.origins[slot * 3] - frameOrigin[0], b.origins[slot * 3 + 1] - frameOrigin[1], b.origins[slot * 3 + 2] - frameOrigin[2]};
+    if (planes != nullptr && outsidePlane(planes, rel, b.radius)) continue;
     for (std::uint32_t s = 0; s < b.species; ++s) {
       const std::uint32_t count = b.counts[indexOf(b, s, slot)];
       if (count == 0) continue;
@@ -111,10 +112,10 @@ inline const float* rangeOf(const Bound& b, std::uint32_t species, std::uint32_t
   return b.block + static_cast<std::uint64_t>(indexOf(b, species, slot)) * b.capacity * kMatrixFloats;
 }
 
-inline void originFloat(const Bound& b, std::uint32_t slot, float out[3]) {
-  out[0] = static_cast<float>(b.origins[slot * 3]);
-  out[1] = static_cast<float>(b.origins[slot * 3 + 1]);
-  out[2] = static_cast<float>(b.origins[slot * 3 + 2]);
+inline void relativeOriginFloat(const Bound& b, std::uint32_t slot, const double frameOrigin[3], float out[3]) {
+  out[0] = static_cast<float>(b.origins[slot * 3] - frameOrigin[0]);
+  out[1] = static_cast<float>(b.origins[slot * 3 + 1] - frameOrigin[1]);
+  out[2] = static_cast<float>(b.origins[slot * 3 + 2] - frameOrigin[2]);
 }
 
 }

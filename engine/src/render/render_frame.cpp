@@ -70,12 +70,15 @@ void releaseSlot(FramePlan& plan, std::uint32_t slot) {
   plan.dirty[slot] = 0;
 }
 
-void writePageRecord(FramePlan& plan, std::uint32_t index, const PagePlacement& placement, std::uint32_t layer) {
+void writePageRecord(FramePlan& plan, std::uint32_t index, const PagePlacement& placement, std::uint32_t layer, const FrameOrigin& origin) {
   std::uint32_t* out = plan.pageRecords + index * kPageRecordWords;
   std::memset(out, 0, kPageRecordBytes);
   out[0] = layer;
+  const double pageOrigin[3] = {placement.origin[0], placement.origin[1], placement.origin[2]};
+  float rel[3];
+  relativeOf(pageOrigin, origin, rel);
   for (int k = 0; k < 3; ++k) {
-    out[4 + k] = bitsOf(placement.origin[k]);
+    out[4 + k] = bitsOf(rel[k]);
     out[8 + k] = bitsOf(placement.uEdge[k]);
     out[12 + k] = bitsOf(placement.vEdge[k]);
   }
@@ -104,7 +107,7 @@ void syncPages(const SceneView& scene, FramePlan& plan) {
       plan.uploadCount += 1;
     }
     if (scene.placements[slot].placed != 0) {
-      writePageRecord(plan, plan.pageCount, scene.placements[slot], plan.slotLayer[slot]);
+      writePageRecord(plan, plan.pageCount, scene.placements[slot], plan.slotLayer[slot], scene.origin);
       plan.pageCount += 1;
     }
   }
@@ -197,14 +200,16 @@ void planFrame(const SceneView& scene, Camera& camera, FramePlan& plan) {
   for (std::uint32_t i = 0; i < scene.bodyCount; ++i) {
     std::uint32_t out[kRecordWords];
     const Transform& t = scene.transforms[i];
-    const float words[kRecordWords - 1] = {t.x, t.y, t.z, t.qx, t.qy, t.qz, t.qw};
+    const float absolute[3] = {t.x, t.y, t.z};
+    float rel[3];
+    relativeOfFloat(absolute, scene.origin, rel);
+    const float words[kRecordWords - 1] = {rel[0], rel[1], rel[2], t.qx, t.qy, t.qz, t.qw};
     for (std::uint32_t k = 0; k < kRecordWords - 1; ++k) out[k] = bitsOf(words[k]);
     const std::uint32_t cls = scene.bodyClass[i];
     out[kRecordWords - 1] = cls;
     for (std::uint32_t k = 0; k < kRecordWords; ++k) hash = mixWord(hash, out[k]);
     if (cls >= kPropClasses) continue;
-    const float centre[3] = {t.x, t.y, t.z};
-    if (!inFrustum(camera.planes, centre, kPropRadius)) continue;
+    if (!inFrustum(camera.planes, rel, kPropRadius)) continue;
     const std::uint32_t index = plan.propCount[cls];
     plan.propCount[cls] = index + 1;
     std::memcpy(plan.propRecords + (cls * kBodySlots + index) * kRecordWords, out, kRecordBytes);

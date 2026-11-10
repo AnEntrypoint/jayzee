@@ -320,7 +320,7 @@ void modelOffset(std::uint32_t slot, float out[3]) {
   out[2] = -20.0f;
 }
 
-std::uint32_t visibleRuns(std::uint32_t slot, const float planes[6][4], Range* out, std::uint32_t* kept) {
+std::uint32_t visibleRuns(std::uint32_t slot, const float planes[6][4], Range* out, std::uint32_t* kept, const double frameOrigin[3]) {
   if (kept != nullptr) *kept = 0;
   if (!held(slot)) return 0;
   const std::uint32_t count = slotClusterCount(slot);
@@ -332,8 +332,9 @@ std::uint32_t visibleRuns(std::uint32_t slot, const float planes[6][4], Range* o
   std::uint32_t survivors = 0;
   for (std::uint32_t c = 0; c < count; ++c) {
     const Cluster& cluster = clusters[c];
-    const float centre[3] = {cluster.centre[0] * kModelScale + offset[0], cluster.centre[1] * kModelScale + offset[1],
-                             cluster.centre[2] * kModelScale + offset[2]};
+    const float centre[3] = {static_cast<float>(cluster.centre[0] * kModelScale + offset[0] - frameOrigin[0]),
+                             static_cast<float>(cluster.centre[1] * kModelScale + offset[1] - frameOrigin[1]),
+                             static_cast<float>(cluster.centre[2] * kModelScale + offset[2] - frameOrigin[2])};
     if (outsideFrustum(planes, centre, cluster.radius * kModelScale)) continue;
     survivors += 1;
     const std::uint32_t first = base.firstIndex + cluster.firstIndex;

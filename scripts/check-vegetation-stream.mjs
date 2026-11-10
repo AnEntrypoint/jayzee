@@ -197,14 +197,14 @@ gate('the C++ side reads the same constants and symbols that the JS pool writes'
   assert.match(h, /kMaxSpecies = 4;/)
   const gl = readFileSync(new URL('engine/src/render/render_webgl2.cpp', root), 'utf8')
   assert.ok(gl.includes('void ensureVegetationBuffers('))
-  assert.ok(gl.includes('std::uint32_t drawVegetation(const Camera& camera) {'))
-  assert.ok(gl.includes('if (engine::render::vegetation::bound()) drawVegetation(camera);'))
+  assert.ok(gl.includes('std::uint32_t drawVegetation(const Camera& camera, const engine::render::FrameOrigin& origin) {'))
+  assert.ok(gl.includes('if (engine::render::vegetation::bound()) drawVegetation(camera, scene.origin);'))
   assert.ok(gl.includes('glDrawArraysInstanced(GL_TRIANGLES, 0, kPropVertices, static_cast<GLsizei>(d.count)));'))
   assert.ok(gl.includes('glVertexAttribDivisor(location, 1);'))
   const gpu = readFileSync(new URL('engine/src/render/render_webgpu.cpp', root), 'utf8')
   assert.ok(gpu.includes('fn vsVeg('))
   assert.ok(gpu.includes('fn fsVeg('))
-  assert.ok(gpu.includes('uploadVegetation(camera);'))
+  assert.ok(gpu.includes('uploadVegetation(camera, scene.origin);'))
   assert.ok(gpu.includes('drawVegetation(pass);'))
   assert.ok(gpu.includes('pass.Draw(kPropVertices, d.count)') || gpu.includes('pass.Draw(kPropVertices, d.count);'))
   const cm = readFileSync(new URL('engine/CMakeLists.txt', root), 'utf8')
@@ -215,7 +215,8 @@ gate('the C++ side reads the same constants and symbols that the JS pool writes'
 
 gate('a patch is drawn only if its bounding sphere is inside every plane (text witness of the C++ cull)', () => {
   const h = readFileSync(new URL('engine/src/render/vegetation_draw.h', new URL('..', import.meta.url)), 'utf8')
-  assert.ok(h.includes('outsidePlane(planes, b.origins + slot * 3, b.radius)'))
+  assert.ok(h.includes('outsidePlane(planes, rel, b.radius)'))
+  assert.ok(h.includes('const double frameOrigin[3], Draw* out, std::uint32_t maxOut)'))
   assert.ok(h.includes('if (d < -static_cast<double>(radius)) return true;'))
 })
 

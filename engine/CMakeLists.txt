@@ -209,6 +209,7 @@ set(ENGINE_EXPORTS
   _engine_render_material_table
   _engine_render_pages
   _engine_render_place_page
+  _engine_render_set_origin
   _engine_render_placements
   _engine_render_seal
   _engine_render_set_light_count

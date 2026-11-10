@@ -3,6 +3,7 @@ import { cellOrigin, PAGE_SIDE, PAGE_U_EDGE, PAGE_V_EDGE, planetCellSize } from 
 import { solverIterationsFor } from '../../src/engine/solverIterations.js'
 import { readLayout } from '../../src/engine/bridge.js'
 import { buildPlanetScene } from '../../src/engine/planetScene.js'
+import { relativeLookAt } from '../../src/engine/cameraRelative.js'
 
 const QUERY = new URLSearchParams(location.search)
 const PHASE = QUERY.get('phase') === '11' ? 11 : 10
@@ -44,26 +45,6 @@ const report = (line) => {
 }
 window.addEventListener('error', (event) => result.errors.push('uncaught ' + event.message))
 
-const normalise = (v, out) => {
-  const l = Math.hypot(v[0], v[1], v[2]) || 1
-  out[0] = v[0] / l
-  out[1] = v[1] / l
-  out[2] = v[2] / l
-  return out
-}
-const cross = (a, b, out) => {
-  out[0] = a[1] * b[2] - a[2] * b[1]
-  out[1] = a[2] * b[0] - a[0] * b[2]
-  out[2] = a[0] * b[1] - a[1] * b[0]
-  return out
-}
-const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
-
-const DIRECTION = new Float64Array(3)
-const AXIS_X = new Float64Array(3)
-const AXIS_Y = new Float64Array(3)
-const AXIS_Z = new Float64Array(3)
-
 const perspective = (fovY, aspect, near, far, out) => {
   const f = 1 / Math.tan(fovY / 2)
   const nf = 1 / (near - far)
@@ -73,33 +54,6 @@ const perspective = (fovY, aspect, near, far, out) => {
   out[10] = (far + near) * nf
   out[11] = -1
   out[14] = 2 * far * near * nf
-  return out
-}
-
-const lookAt = (eye, target, up, out) => {
-  DIRECTION[0] = eye[0] - target[0]
-  DIRECTION[1] = eye[1] - target[1]
-  DIRECTION[2] = eye[2] - target[2]
-  normalise(DIRECTION, AXIS_Z)
-  cross(up, AXIS_Z, AXIS_X)
-  normalise(AXIS_X, AXIS_X)
-  cross(AXIS_Z, AXIS_X, AXIS_Y)
-  out[0] = AXIS_X[0]
-  out[1] = AXIS_Y[0]
-  out[2] = AXIS_Z[0]
-  out[3] = 0
-  out[4] = AXIS_X[1]
-  out[5] = AXIS_Y[1]
-  out[6] = AXIS_Z[1]
-  out[7] = 0
-  out[8] = AXIS_X[2]
-  out[9] = AXIS_Y[2]
-  out[10] = AXIS_Z[2]
-  out[11] = 0
-  out[12] = -dot(AXIS_X, eye)
-  out[13] = -dot(AXIS_Y, eye)
-  out[14] = -dot(AXIS_Z, eye)
-  out[15] = 1
   return out
 }
 
@@ -313,7 +267,7 @@ const planetCamera = (module, renderer, frame, aspect, surface) => {
   CAMERA.eye[0] = x
   CAMERA.eye[1] = surface(x, z) + PATH_HEIGHT_M
   CAMERA.eye[2] = z
-  lookAt(CAMERA.eye, ORIGIN, UP, VIEW)
+  relativeLookAt(CAMERA.eye, ORIGIN, UP, VIEW)
   perspective(CAMERA_FOV, aspect, NEAR, FAR, PROJ)
   multiply(PROJ, VIEW, CAMERA.viewProj)
   return CAMERA
@@ -350,7 +304,7 @@ const orbitCamera = (frame, aspect, surface) => {
   CAMERA.eye[0] = ex
   CAMERA.eye[1] = surface(ex, ez) + CAMERA_HEIGHT
   CAMERA.eye[2] = ez
-  lookAt(CAMERA.eye, ORIGIN, UP, VIEW)
+  relativeLookAt(CAMERA.eye, ORIGIN, UP, VIEW)
   perspective(CAMERA_FOV, aspect, NEAR, FAR, PROJ)
   multiply(PROJ, VIEW, CAMERA.viewProj)
   return CAMERA

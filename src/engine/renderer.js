@@ -105,8 +105,9 @@ export const createRenderer = (module, backend, { modelTier = -1, device = null,
     setCamera({ viewProj, eye }) {
       expectWords(viewProj, 16, 'viewProj')
       expectWords(eye, 3, 'eye')
+      status(module._engine_render_set_origin(finite(eye[0], 'eye'), finite(eye[1], 'eye'), finite(eye[2], 'eye')), 'set origin')
       for (let i = 0; i < 16; i++) f32[camera + L.CAMERA_VIEW_PROJ_WORD + i] = finite(viewProj[i], 'viewProj')
-      for (let i = 0; i < 3; i++) f32[camera + L.CAMERA_EYE_WORD + i] = finite(eye[i], 'eye')
+      for (let i = 0; i < 3; i++) f32[camera + L.CAMERA_EYE_WORD + i] = 0
     },
 
     setClassMaterial(cls, material) {

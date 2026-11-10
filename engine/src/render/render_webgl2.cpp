@@ -353,7 +353,7 @@ void ensureVegetationBuffers(const engine::render::vegetation::Bound& b) {
   vegBuffersReady = true;
 }
 
-std::uint32_t drawVegetation(const Camera& camera) {
+std::uint32_t drawVegetation(const Camera& camera, const engine::render::FrameOrigin& origin) {
   namespace veg = engine::render::vegetation;
   veg::Bound& b = veg::state();
   ensureVegetationBuffers(b);
@@ -365,7 +365,8 @@ std::uint32_t drawVegetation(const Camera& camera) {
     ENGINE_RENDER_CALL(glBindBuffer(GL_ARRAY_BUFFER, vegVbo[u.species]));
     ENGINE_RENDER_CALL(glBufferSubData(GL_ARRAY_BUFFER, static_cast<GLintptr>(u.byteOffset), static_cast<GLsizeiptr>(u.bytes), veg::rangeOf(b, u.species, u.slot)));
   }
-  const std::uint32_t drawCount = veg::planDraws(b, reinterpret_cast<const float*>(camera.planes), draws, veg::kMaxSpecies * veg::kMaxSlots);
+  const double frameOrigin[3] = {origin.x, origin.y, origin.z};
+  const std::uint32_t drawCount = veg::planDraws(b, reinterpret_cast<const float*>(camera.planes), frameOrigin, draws, veg::kMaxSpecies * veg::kMaxSlots);
   if (drawCount == veg::kPlanBad) return 0;
   ENGINE_RENDER_CALL(glUseProgram(vegProgram));
   ENGINE_RENDER_CALL(glBindVertexArray(vegVao));
@@ -376,15 +377,15 @@ std::uint32_t drawVegetation(const Camera& camera) {
     for (GLuint k = 0; k < 4; ++k) {
       ENGINE_RENDER_CALL(glVertexAttribPointer(1 + k, 4, GL_FLOAT, GL_FALSE, veg::kMatrixBytes, offsetPointer(local + k * 16)));
     }
-    float origin[3];
-    veg::originFloat(b, d.slot, origin);
-    ENGINE_RENDER_CALL(glUniform3f(vegOffsetLocation, origin[0], origin[1], origin[2]));
+    float uOrigin[3];
+    veg::relativeOriginFloat(b, d.slot, frameOrigin, uOrigin);
+    ENGINE_RENDER_CALL(glUniform3f(vegOffsetLocation, uOrigin[0], uOrigin[1], uOrigin[2]));
     ENGINE_RENDER_CALL(glDrawArraysInstanced(GL_TRIANGLES, 0, kPropVertices, static_cast<GLsizei>(d.count)));
   }
   return drawCount;
 }
 
-std::uint32_t drawModels(const Camera& camera) {
+std::uint32_t drawModels(const Camera& camera, const engine::render::FrameOrigin& origin) {
   const std::uint32_t stride = engine::models::layout().vertexStrideBytes;
   ENGINE_RENDER_CALL(glUseProgram(modelProgram));
   ENGINE_RENDER_CALL(glBindVertexArray(modelVao));
@@ -393,12 +394,15 @@ std::uint32_t drawModels(const Camera& camera) {
   for (std::uint32_t s = 0; s < engine::models::slotCount(); ++s) {
     if (!engine::models::slotReady(s)) continue;
     std::uint32_t kept = 0;
-    const std::uint32_t runs = engine::models::visibleRuns(s, camera.planes, modelRuns, &kept);
+    const double frameOrigin[3] = {origin.x, origin.y, origin.z};
+    const std::uint32_t runs = engine::models::visibleRuns(s, camera.planes, modelRuns, &kept, frameOrigin);
     drawn += kept;
     if (runs == 0) continue;
     float offset[3];
     engine::models::modelOffset(s, offset);
-    ENGINE_RENDER_CALL(glUniform3f(modelOffsetLocation, offset[0], offset[1], offset[2]));
+    float relative[3];
+    engine::render::relativeOfFloat(offset, origin, relative);
+    ENGINE_RENDER_CALL(glUniform3f(modelOffsetLocation, relative[0], relative[1], relative[2]));
     for (std::uint32_t r = 0; r < runs; ++r) {
       const engine::models::Range& run = modelRuns[r];
       ENGINE_RENDER_CALL(glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, offsetPointer(run.firstVertex * stride)));
@@ -602,8 +606,8 @@ int frame(const SceneView& scene, const FramePlan& plan, const Camera& camera) {
     ENGINE_RENDER_CALL(glDrawArraysInstanced(GL_TRIANGLES, 0, kPropVertices, static_cast<GLsizei>(count)));
   }
 
-  if (engine::render::vegetation::bound()) drawVegetation(camera);
-  const std::uint32_t drawn = modelsReady && engine::models::bound() ? drawModels(camera) : 0;
+  if (engine::render::vegetation::bound()) drawVegetation(camera, scene.origin);
+  const std::uint32_t drawn = modelsReady && engine::models::bound() ? drawModels(camera, scene.origin) : 0;
   engine::render::counters().cullPassA = drawn;
   engine::render::counters().cullCandidates = 0;
   engine::render::counters().cullPassB = 0;

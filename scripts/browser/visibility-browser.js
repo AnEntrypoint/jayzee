@@ -1,4 +1,5 @@
 import { loadRenderer } from '../../src/engine/renderer.js'
+import { relativeLookAt } from '../../src/engine/cameraRelative.js'
 
 const WIDTH = 960
 const HEIGHT = 540
@@ -44,14 +45,6 @@ const report = (line) => {
   if (el) el.textContent += line + '\n'
 }
 
-const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
-const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
-const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
-const normalize = (a) => {
-  const length = Math.hypot(a[0], a[1], a[2])
-  return [a[0] / length, a[1] / length, a[2] / length]
-}
-
 const perspective = (fovY, aspect, near, far) => {
   const f = 1 / Math.tan(fovY / 2)
   const out = new Float32Array(16)
@@ -60,27 +53,6 @@ const perspective = (fovY, aspect, near, far) => {
   out[10] = (far + near) / (near - far)
   out[11] = -1
   out[14] = (2 * far * near) / (near - far)
-  return out
-}
-
-const lookAt = (eye, target, up) => {
-  const f = normalize(sub(target, eye))
-  const s = normalize(cross(f, up))
-  const u = cross(s, f)
-  const out = new Float32Array(16)
-  out[0] = s[0]
-  out[4] = s[1]
-  out[8] = s[2]
-  out[12] = -dot(s, eye)
-  out[1] = u[0]
-  out[5] = u[1]
-  out[9] = u[2]
-  out[13] = -dot(u, eye)
-  out[2] = -f[0]
-  out[6] = -f[1]
-  out[10] = -f[2]
-  out[14] = dot(f, eye)
-  out[15] = 1
   return out
 }
 
@@ -168,7 +140,7 @@ const clusterTotals = (renderer) => {
 }
 
 const viewProjection = () => {
-  const view = lookAt(EYE, TARGET, UP)
+  const view = relativeLookAt(EYE, TARGET, UP, new Float64Array(16))
   const proj = perspective(FOV_Y, WIDTH / HEIGHT, 0.1, 200)
   return multiply(proj, view)
 }

@@ -3460,3 +3460,37 @@ Open for Phase B, not decided in Phase A:
 - The page does not yet bind the vegetation pool through `engine_vegetation_bind`, so the 1024 witness fails on `vegetationBound` until that is wired (wasm-heap allocator views, then the call). This is the stretch 4 open wiring item, and the witness makes it a hard failure.
 - The planet witness has not been run. Its frame numbers, the 362.9 ms outlier, the adapter and the 64-tier row are measured in Phase B, not claimed here.
 - The spoint frame-time harness does not exist. Phase B writes it on the spoint side with the same inputs, or the comparison stays unfilled and the table says so.
+
+## Stretch 6, Phase A: camera-relative rendering
+
+Code, docs and gates only. No build, test, gate or witness run in Phase A. Phase B runs the gate and the browser pages, and measures the bytes and copies below.
+
+| change | files | witness (Phase B) |
+|---|---|---|
+| Tolerance 1e-3 m within 4096 m of the eye, and its derivation; the render and collision positions of every resident instance agree within it at planet radius, for three frame origins | `src/engine/cameraRelative.js` (new), `scripts/check-camera-relative.mjs` (new) | `npm run check:camera-relative` (gate "the render position of every resident instance matches its collision position") |
+| Negative control: the absolute float32 path misses the tolerance at planet radius | `scripts/check-camera-relative.mjs` | `npm run check:camera-relative` (gate "negative control") |
+| Relative look-at with zero translation, used by both browser pages | `src/engine/cameraRelative.js`, `scripts/browser/engine-render-browser.js`, `scripts/browser/visibility-browser.js` | `npm run check:camera-relative` (gates "the relative look-at carries no translation" and "the browser pages build their view") |
+| Per-frame relative offsets for props, page records, lights, models and vegetation in C++ | `engine/src/render/camera_relative.h` (new), `render_frame.h`, `render_frame.cpp`, `exports_render.cpp`, `model_pool.h`, `model_pool.cpp` | `npm run check:camera-relative` (gate "the C++ side computes the render origin") and `npm run check:vegetation-stream` (cull witness, updated to the relative signatures) |
+| WebGL2 draws vegetation and models with the relative origin | `engine/src/render/render_webgl2.cpp` | `npm run check:camera-relative` (gate "the WebGL2 and WebGPU paths") and `npm run check:vegetation-stream` |
+| WebGPU vegetation and model offsets in the relative frame, with the model shader on binding 1 | `engine/src/render/render_webgpu.cpp` | `npm run check:camera-relative` (gate "the WebGL2 and WebGPU paths") |
+| `_engine_render_set_origin` export; `setCamera` sends the eye as the origin and zeroes the Camera block's eye words | `engine/src/exports_render.cpp`, `engine/CMakeLists.txt`, `src/engine/renderer.js` | `npm run check:camera-relative` (gate "the renderer sends the eye as the origin") |
+| Shared transform: one float64 origin per slot and one float32 block, read by collision and render | `src/engine/vegetation.js` (stretch 4, unchanged here), `engine/src/render/vegetation_draw.h` | `npm run check:camera-relative` (round trip against `readWorld`) |
+| Vegetation cull and draw signatures take the frame origin | `engine/src/render/vegetation_draw.h`, `scripts/check-vegetation-stream.mjs` | `npm run check:vegetation-stream` (gates "a patch is drawn only if its bounding sphere" and "the C++ side reads the same constants") |
+| Gate in npm test and the package script | `scripts/check-camera-relative.mjs`, `package.json` | `npm test` |
+
+Bytes and copies, for the Phase B measurement:
+
+| quantity | per frame | formula | Phase B measurement |
+|---|---|---|---|
+| Relative origin written, WebGPU vegetation | 16 bytes per resident slot | `16 × resident slots` (slots from `planVegetationPool`) | count the `writeBuffer` calls and bytes on the `slotOrigin` buffer, per frame |
+| Relative offset written, WebGPU models | 16 bytes per model slot, at most 64 | `16 × live models`, at most 1024 bytes | count `uploadModelOffsets` bytes per frame |
+| Render-side absolute origin copy avoided | 12 bytes per slot, once per dirty upload (three float32) | `12 × slots` on each dirty upload, not stored on the render side | count dirty-upload origin copies that no longer happen |
+| Net effect on the WebGPU queue | the relative write is a new per-frame cost; the avoided copy is per dirty upload | net bytes per frame = relative writes − avoided copies, per frame | Phase B reports the net, with the frame times from the planet witness |
+| Copies of patch data | unchanged | `copyAccounting` (stretch 3) and `sharing` (stretch 4) | the stretch 4 sharing counts still hold |
+
+Open for Phase B, not decided in Phase A:
+
+- The float32 light positions in `LightSlot` (about 0.5 m at planet radius) are not fixed by the relative build. Phase B measures the light mismatch with the same harness; it is not claimed here.
+- Jolt bodies are float32 absolute at source, so physics precision at planet scale is not fixed.
+- The WebGPU visibility path does not draw vegetation, so the vegetation relative origin is witnessed on the forward path only.
+- Instances beyond 4096 m of the eye are not gated. The derivation in ENGINE.md gives the bound for a larger reach.

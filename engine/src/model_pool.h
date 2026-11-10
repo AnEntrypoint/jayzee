@@ -70,7 +70,7 @@ std::uint64_t clusterSlotBytes();
 std::uint64_t clusterPoolBytes();
 const Cluster* clusterTable();
 void modelOffset(std::uint32_t slot, float out[3]);
-std::uint32_t visibleRuns(std::uint32_t slot, const float planes[6][4], Range* out, std::uint32_t* clusters = nullptr);
+std::uint32_t visibleRuns(std::uint32_t slot, const float planes[6][4], Range* out, std::uint32_t* clusters, const double frameOrigin[3]);
 const std::uint8_t* slotVertices(std::uint32_t slot);
 const std::uint8_t* slotIndices(std::uint32_t slot);
 std::uint64_t slotVertexBytes();

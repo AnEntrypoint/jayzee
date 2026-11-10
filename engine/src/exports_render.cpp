@@ -1,3 +1,4 @@
+#include <cmath>
 #include <cstdint>
 #include <cstring>
 
@@ -26,6 +27,8 @@ struct RenderState {
   Camera camera;
   PagePlacement placements[kMaxPageLayers];
   LightSlot lights[kLightSlots];
+  LightSlot relLights[kLightSlots];
+  FrameOrigin origin;
   MaterialSlot materials[kMaterialSlots];
   std::uint8_t albedoReady[kAlbedoLayers];
   std::uint8_t albedoPixels[kAlbedoLayers * kAlbedoBytes];
@@ -131,7 +134,19 @@ EMSCRIPTEN_KEEPALIVE int engine_render_frame() {
   scene.placements = state.placements;
   scene.materials = state.boundMaterials;
   scene.materialCount = state.boundCount;
-  scene.lights = state.lights;
+  scene.origin = state.origin;
+  for (std::uint32_t i = 0; i < state.lightCount && i < rnd::kLightSlots; ++i) {
+    const rnd::LightSlot& light = state.lights[i];
+    const double absolute[3] = {light.position[0], light.position[1], light.position[2]};
+    float rel[3];
+    rnd::relativeOf(absolute, state.origin, rel);
+    rnd::LightSlot& out = state.relLights[i];
+    out = light;
+    out.position[0] = rel[0];
+    out.position[1] = rel[1];
+    out.position[2] = rel[2];
+  }
+  scene.lights = state.relLights;
   scene.lightCount = state.lightCount;
   scene.albedoReady = state.albedoReady;
   scene.albedoPixels = state.albedoPixels;
@@ -200,7 +215,14 @@ EMSCRIPTEN_KEEPALIVE int engine_render_commit_albedo(std::uint32_t layer) {
   return engine::kOk;
 }
 
-EMSCRIPTEN_KEEPALIVE int engine_render_place_page(std::uint32_t slot, float ox, float oy, float oz, float ux, float uy, float uz, float vx, float vy,
+EMSCRIPTEN_KEEPALIVE int engine_render_set_origin(double x, double y, double z) {
+  if (rnd::renderState == nullptr) return engine::kNotConfigured;
+  if (!std::isfinite(x) || !std::isfinite(y) || !std::isfinite(z)) return engine::kRange;
+  rnd::renderState->origin = rnd::FrameOrigin{x, y, z};
+  return engine::kOk;
+}
+
+EMSCRIPTEN_KEEPALIVE int engine_render_place_page(std::uint32_t slot, double ox, double oy, double oz, float ux, float uy, float uz, float vx, float vy,
                                                   float vz) {
   if (rnd::renderState == nullptr || slot >= rnd::pageLayers()) return engine::kRange;
   rnd::PagePlacement& placement = rnd::renderState->placements[slot];

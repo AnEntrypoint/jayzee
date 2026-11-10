@@ -666,3 +666,32 @@ Open items, each with a cause, a hook and a gate. Their rows are in `OPEN_ITEMS`
 Not done in Phase A. The vegetation binding is not called from the page, so the 1024 witness fails on `vegetationBound` until the page binds the pool through `engine_vegetation_bind` with wasm-heap views. The planet witness has not been run, so its frame numbers are unknown until Phase B. The spoint harness is not written. The four open items stay open until their Phase B runs.
 
 Witness: `scripts/check-planet-witness.mjs` (`npm run check:planet-witness`, in `npm test`). It covers the scene counts, the refusals, the budget verdict on passing and failing runs, the 362.9 ms outlier, the adapter cases, the run plan, the comparison refusal, the open-item hooks, and the page exports.
+
+## Stretch 6: camera-relative rendering (Phase A)
+
+Defect. The camera origin reached the shader as a float32 value. At planet radius (6,360,000 m) float32 spacing is 0.5 m, so the origin was rounded by up to 0.25 m, while collision read the float64 origin. Render and collision for the same object could differ by up to about 0.25 m.
+
+Design. Each frame the float64 eye is the frame origin. Every float64 world position has the origin subtracted on the CPU, and only the small offset is cast to float32 and sent. The shader adds the float32 translation to that offset. Nothing at planet scale reaches the GPU.
+
+- Props and page records: `engine::render::relativeOf` and `relativeOfFloat` (`engine/src/render/camera_relative.h`) give each page origin and each prop position relative to the frame origin. `writePageRecord` takes the origin, and `planFrame` tests the frustum on the relative position.
+- Models: the WebGL2 path passes the relative offset as a uniform (`drawModels`). The WebGPU path writes the relative offsets to `modelRelBuf` (64 slots of 16 bytes) once per frame, and `vsModel` reads them from binding 1.
+- Vegetation: `planDraws` takes the frame origin, and `outsidePlane` tests the relative patch centre. Both backends compute each patch's relative origin from the one float64 `origins` array (`relativeOriginFloat`). WebGL2 sends it as `uOrigin`, and WebGPU writes it to `slotOrigin` (binding 5) once per frame per resident slot.
+- Lights: `engine_render_frame` builds the relative light positions into `relLights` before the frame.
+- Camera: `setCamera({ viewProj, eye })` in `src/engine/renderer.js` calls `_engine_render_set_origin(eye)`, and the Camera block's eye words are written as 0. `viewProj` is built with zero translation by `relativeLookAt` (`src/engine/cameraRelative.js`), used by both browser pages.
+
+Tolerance: 1e-3 m, with the range it holds for. `RENDER_COLLISION_TOLERANCE_M` is 1e-3 and `RENDER_COLLISION_RANGE_M` is 4096 m, both in `src/engine/cameraRelative.js`. The gate `scripts/check-camera-relative.mjs` checks every resident instance within 4096 m of the eye.
+
+Cause of the bound. A float32 significand has 24 bits, so the spacing is 2^(e−23) for a value in [2^e, 2^(e+1)). The relative position is rounded twice: once for `o − F` and once for the sum with the translation. At 4096 m (range [2048, 4096) and [4096, 8192)) the spacing is at most 2^−11 ≈ 4.9e-4 m, so each step is at most half that, and the two together are at most 4.9e-4 m. That is a 2× margin under 1e-3 m. At 1 km the bound is about 6e-5 m. The float64 origin and the float32 translation are the same values on both paths, so they add no error. The absolute path (`fround(origin) + t`) misses the tolerance at planet radius, and the gate's negative control shows it.
+
+Single shared transform. The vegetation pool's float64 `origins` (per slot) and its float32 translation block are the only store. Collision reads them through `readWorld` (origin plus translation in float64). Render derives its relative origin from the same arrays each frame. No render-side absolute origin copy exists, so the layout is recorded in one place: `createVegetationPool` and `memory()`.
+
+Per-frame work. One `_engine_render_set_origin` call per frame (three doubles). On WebGPU, 16 bytes per resident vegetation slot and 16 bytes per model slot (at most 64) are written to their buffers each frame. These buffers are sized once from the device (`planVegetationPool` for vegetation, 64 slots for models) and reused. Nothing is allocated per frame: `renderedPosition` and `relativeOf` write into caller arrays, and the gate checks that the same `out` comes back.
+
+Residuals, not claimed by this stretch:
+
+- Light positions stored as float32 in `LightSlot` are about 0.5 m at planet radius before the relative build. The relative build fixes the copy into the shader, but not the stored value.
+- Jolt bodies are float32 absolute at source, so physics precision at planet scale is not fixed here.
+- The WebGPU visibility path does not draw vegetation, so the vegetation relative origin is checked on the forward path only.
+- Instances beyond 4096 m of the eye are outside the gate's range. A host that draws past that must rerun the bound with its own reach, which is the derivation above.
+
+Witness: `scripts/check-camera-relative.mjs` (`npm run check:camera-relative`, in `npm test`). It checks the tolerance and its range against the real vegetation pool, a negative control that the absolute path misses it, the allocation-free return, the relative look-at, and the C++, renderer and page wiring as text.

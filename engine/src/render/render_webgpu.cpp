@@ -217,6 +217,8 @@ struct Camera {
 
 @group(0) @binding(0) var<uniform> cam: Camera;
 
+@group(0) @binding(1) var<storage, read> modelRel: array<vec4f>;
+
 struct ModelOut {
   @builtin(position) clip: vec4f,
   @location(0) shade: f32,
@@ -228,7 +230,7 @@ fn clipOf(p: vec4f) -> vec4f {
 
 @vertex
 fn vsModel(@location(0) pos: vec3f, @builtin(instance_index) iid: u32) -> ModelOut {
-  let world = pos * 2.0 + vec3f(f32(iid) * 4.0 - 8.0, 0.0, -20.0);
+  let world = pos * 2.0 + modelRel[iid].xyz;
   var out: ModelOut;
   out.clip = clipOf(cam.viewProj * vec4f(world, 1.0));
   out.shade = 0.5 + 0.5 * pos.y;
@@ -644,7 +646,8 @@ constexpr std::uint32_t kPropBindings = 5;
 constexpr std::uint32_t kVegBindings = 6;
 constexpr std::uint64_t kVegOriginStride = 256;
 constexpr std::uint32_t kTerrainBindings = 3;
-constexpr std::uint32_t kModelBindings = 1;
+constexpr std::uint32_t kModelBindings = 2;
+constexpr std::uint32_t kModelRelSlots = 64;
 constexpr std::uint32_t kCullBindings = 9;
 constexpr std::uint32_t kIdBindings = 6;
 constexpr std::uint32_t kResolveBindings = 6;
@@ -697,6 +700,7 @@ wgpu::RenderPipeline vegPipe;
 wgpu::BindGroupLayout vegLayout;
 wgpu::Buffer vegBuf[engine::render::vegetation::kMaxSpecies];
 wgpu::Buffer vegOriginBuf;
+wgpu::Buffer modelRelBuf;
 wgpu::BindGroup vegGroup[engine::render::vegetation::kMaxSpecies * engine::render::vegetation::kMaxSlots];
 bool vegReady = false;
 engine::render::vegetation::Draw vegDraws[engine::render::vegetation::kMaxSpecies * engine::render::vegetation::kMaxSlots];
@@ -994,6 +998,7 @@ int buildPipelines() {
     wgpu::ShaderModule modelModule = makeModule(kModelWgsl);
     wgpu::BindGroupLayoutEntry modelEntries[kModelBindings];
     modelEntries[0] = bufferEntry(0, vertex, wgpu::BufferBindingType::Uniform);
+    modelEntries[1] = bufferEntry(1, vertex, wgpu::BufferBindingType::ReadOnlyStorage);
     wgpu::BindGroupLayout modelLayout = makeLayout(modelEntries, kModelBindings);
     wgpu::PipelineLayout modelPipeLayout = makePipelineLayout(modelLayout);
 
@@ -1027,8 +1032,10 @@ int buildPipelines() {
     modelDesc.primitive.cullMode = wgpu::CullMode::None;
     modelPipe = device.CreateRenderPipeline(&modelDesc);
 
+    modelRelBuf = makeBuffer(static_cast<std::uint64_t>(kModelRelSlots) * 16, wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst);
     wgpu::BindGroupEntry modelBindings[kModelBindings];
     modelBindings[0] = bufferBinding(0, cameraBuf, kCameraBytes);
+    modelBindings[1] = bufferBinding(1, modelRelBuf, static_cast<std::uint64_t>(kModelRelSlots) * 16);
     modelGroup = makeGroup(modelLayout, modelBindings, kModelBindings);
     if (!modelPipe || !modelGroup) return engine::kNotConfigured;
   }
@@ -1279,21 +1286,27 @@ bool ensureVegetation(const engine::render::vegetation::Bound& b) {
   return true;
 }
 
-void uploadVegetation(const Camera& camera) {
+void uploadVegetation(const Camera& camera, const engine::render::FrameOrigin& origin) {
   namespace veg = engine::render::vegetation;
   vegDrawCount = 0;
   veg::Bound& b = veg::state();
   if (!veg::bound() || !ensureVegetation(b)) return;
+  const double frameOrigin[3] = {origin.x, origin.y, origin.z};
   static veg::Upload uploads[veg::kMaxSpecies * veg::kMaxSlots];
   const std::uint32_t uploadCount = veg::planUploads(b, uploads, veg::kMaxSpecies * veg::kMaxSlots, veg::kUploadBytesPerFrame);
   for (std::uint32_t i = 0; i < uploadCount; ++i) {
     const veg::Upload& u = uploads[i];
     writeBuffer(vegBuf[u.species], u.byteOffset, veg::rangeOf(b, u.species, u.slot), u.bytes);
-    float origin[4] = {0.0f, 0.0f, 0.0f, 0.0f};
-    veg::originFloat(b, u.slot, origin);
-    writeBuffer(vegOriginBuf, static_cast<std::uint64_t>(u.slot) * kVegOriginStride, origin, sizeof(origin));
   }
-  const std::uint32_t drawCount = veg::planDraws(b, reinterpret_cast<const float*>(camera.planes), vegDraws, veg::kMaxSpecies * veg::kMaxSlots);
+  for (std::uint32_t slot = 0; slot < b.slots; ++slot) {
+    bool resident = false;
+    for (std::uint32_t s = 0; s < b.species; ++s) resident = resident || b.counts[veg::indexOf(b, s, slot)] != 0;
+    if (!resident) continue;
+    float relOrigin[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+    veg::relativeOriginFloat(b, slot, frameOrigin, relOrigin);
+    writeBuffer(vegOriginBuf, static_cast<std::uint64_t>(slot) * kVegOriginStride, relOrigin, sizeof(relOrigin));
+  }
+  const std::uint32_t drawCount = veg::planDraws(b, reinterpret_cast<const float*>(camera.planes), frameOrigin, vegDraws, veg::kMaxSpecies * veg::kMaxSlots);
   vegDrawCount = drawCount == veg::kPlanBad ? 0 : drawCount;
 }
 
@@ -1332,7 +1345,19 @@ wgpu::RenderPassDepthStencilAttachment depthFor(bool clear) {
   return depth;
 }
 
-void encodeForward(wgpu::CommandEncoder& encoder, wgpu::TextureView target, const Camera& camera) {
+void uploadModelOffsets(const engine::render::FrameOrigin& origin) {
+  if (!engine::models::bound()) return;
+  const std::uint32_t slots = engine::models::slotCount() < kModelRelSlots ? engine::models::slotCount() : kModelRelSlots;
+  for (std::uint32_t s = 0; s < slots; ++s) {
+    float offset[3];
+    engine::models::modelOffset(s, offset);
+    float rel[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+    engine::render::relativeOfFloat(offset, origin, rel);
+    writeBuffer(modelRelBuf, static_cast<std::uint64_t>(s) * 16, rel, sizeof(rel));
+  }
+}
+
+void encodeForward(wgpu::CommandEncoder& encoder, wgpu::TextureView target, const Camera& camera, const engine::render::FrameOrigin& origin) {
   wgpu::RenderPassColorAttachment colour = colourFor(target, true, wgpu::Color{kClearRed, kClearGreen, kClearBlue, 1.0});
   wgpu::RenderPassDepthStencilAttachment depth = depthFor(true);
   wgpu::RenderPassDescriptor passDesc{};
@@ -1350,7 +1375,8 @@ void encodeForward(wgpu::CommandEncoder& encoder, wgpu::TextureView target, cons
     ENGINE_RENDER_CALL(pass.SetIndexBuffer(modelIndexBuf, wgpu::IndexFormat::Uint32, 0, engine::models::indexPoolBytes()));
     for (std::uint32_t s = 0; s < engine::models::slotCount(); ++s) {
       if (!engine::models::slotReady(s)) continue;
-      const std::uint32_t runs = engine::models::visibleRuns(s, camera.planes, modelRuns);
+      const double frameOrigin[3] = {origin.x, origin.y, origin.z};
+      const std::uint32_t runs = engine::models::visibleRuns(s, camera.planes, modelRuns, nullptr, frameOrigin);
       for (std::uint32_t r = 0; r < runs; ++r) {
         const engine::models::Range& run = modelRuns[r];
         ENGINE_RENDER_CALL(pass.DrawIndexed(run.indexCount, 1, run.firstIndex, static_cast<std::int32_t>(run.firstVertex), s));
@@ -1538,7 +1564,8 @@ int frame(const SceneView& scene, const FramePlan& plan, const Camera& camera) {
   {
     engine::phase::Scope scope(engine::phase::kUpload);
     writeBuffer(cameraBuf, 0, &camera, kCameraBytes);
-    uploadVegetation(camera);
+    uploadVegetation(camera, scene.origin);
+    uploadModelOffsets(scene.origin);
     std::uint32_t propArgs[kPropClasses * 4];
     for (std::uint32_t c = 0; c < kPropClasses; ++c) {
       const std::uint32_t count = plan.propCount[c];
@@ -1629,7 +1656,7 @@ int frame(const SceneView& scene, const FramePlan& plan, const Camera& camera) {
     if (visible) {
       encodeVisibility(encoder, target);
     } else {
-      encodeForward(encoder, target, camera);
+      encodeForward(encoder, target, camera, scene.origin);
     }
     commands = ENGINE_RENDER_CALL(encoder.Finish());
   }

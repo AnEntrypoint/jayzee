@@ -3,6 +3,8 @@
 
 #include <cstdint>
 
+#include "camera_relative.h"
+
 #include "../budget.h"
 #include "../page_cache.h"
 #include "../world.h"
@@ -51,7 +53,7 @@ struct LightSlot {
 };
 
 struct PagePlacement {
-  float origin[3];
+  double origin[3];
   float uEdge[3];
   float vEdge[3];
   std::uint32_t placed;
@@ -68,7 +70,7 @@ struct Camera {
 
 static_assert(sizeof(MaterialSlot) == 40);
 static_assert(sizeof(LightSlot) == 32);
-static_assert(sizeof(PagePlacement) == 40);
+static_assert(sizeof(PagePlacement) == 56);
 static_assert(sizeof(Camera) == 224);
 static_assert(sizeof(Transform) == 28);
 
@@ -101,6 +103,7 @@ struct SceneView {
   const std::uint8_t* albedoReady;
   const std::uint8_t* albedoPixels;
   std::int32_t (*albedoLayerOf)(double handle);
+  FrameOrigin origin;
 };
 
 constexpr std::uint32_t kModelPathForward = 0;
