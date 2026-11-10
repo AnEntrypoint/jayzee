@@ -201,3 +201,4 @@ Enforced by `tools/asset-pipeline/validate.mjs`, which exits 1 on any REJECT.
 - `device::plan` is not yet called from startup. Phase B wires it, or the gap is reported.
 - Decode is not yet on a worker. The render thread does no decode, because the decoder is not in the engine yet.
 - Context-loss recovery is designed above and not implemented.
+- In-wasm RAM under churn, first-frame timing for a model, and allocated VRAM against the tier budget are not yet measured. The Phase B result in docs/PENDING_VALIDATION.md has the figures that are measured.

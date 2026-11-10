@@ -2657,3 +2657,22 @@ Phase A wrote code, docs and gates only. Nothing was built, run, gated or witnes
 | package.json | scripts | adds `check:asset-pipeline`, and puts it in the test chain before `check:hygiene` | Phase B: npm test exit code |
 | docs/ENGINE.md | design section | decisions with reasons, tier table, accounting formula, asset rules, Phase B measurements, status | read in the commit; Phase B adds the measured numbers |
 | engine/src/device_tier.*, engine/src/model_pool.*, scripts/check-asset-pipeline.mjs | overwritten | these paths were untracked when the session began, and this phase overwrote them without reading them first. The earlier content was not recovered; the transcript has no earlier write to these paths | none possible; reported to the owner |
+
+## Web bottlenecks: Phase B result
+
+Ran in this pass. The figures are from the runs listed here.
+
+| check | command | result |
+| asset-pipeline gate | node scripts/check-asset-pipeline.mjs | 14 PASS lines, RESULT: PASS, exit 0 |
+| native host witness | bash engine/test/build_host.sh | 248 PASS lines, 0 FAIL lines, 0 compiler warnings, RESULT: PASS, exit 0 |
+| wasm build, fixed, 64 MiB | ENGINE_VARIANT=fixed ENGINE_TIER_MIB=64 bash engine/build.sh | exit 0, zero errors, model_pool.cpp and device_tier.cpp compile and link, sha256 f892b2c9f1e3eaaf548b607ee3568fb205e0ffe1b4f8cbcf76f4930731c270 |
+
+Measured:
+
+- (a) RAM, native: 10000 acquire, upload and release cycles on one slot all succeed; liveCount is 0 after them; the witness pool stays 1280 bytes. Not measured in the wasm. The models pool is not bound by the wasm init, so memory.buffer.byteLength across a churn is open.
+- (b) First-appearance hitch: not measured. No model draw path exists yet (docs/ENGINE.md status). Open.
+- (c) VRAM, accounted by the planner (not allocated): tier 0 at 1 byte per texel 45438293 B; tier 0 at 4 bytes per texel 112547157 B (107.3 MiB, budget 256 MiB); tier 1 at 1 byte per texel 363506346 B (346.7 MiB, budget 512 MiB); tier 2 at 1 byte per texel 905969664 B (864.0 MiB, budget 1024 MiB). Each is within its tier budget. The renderer does not yet allocate the tiered texture array, so allocated VRAM against the budget is open.
+
+Defects: none in the engine. Two faults in the new witness were fixed before the first run and in its compile, not in the engine: the vertex byte check read the wrapped value 0 at the last byte, and a double was compared with an enum, which warns. Both are fixed in engine/test/witness_models.cpp.
+
+Not run in this pass: the full npm test chain. check:asset-pipeline was run on its own. The rest of the chain was not run.
