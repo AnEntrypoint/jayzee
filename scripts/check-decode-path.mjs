@@ -62,9 +62,14 @@ await gate('the basis transcoder runs and refuses a KTX2 identifier with no vali
 const engineGlue = await (await import(pathToFileURL(join(root, 'engine/out/engine-core-64mib.mjs')).href)).default()
 const TIER_BUDGET = 67108864
 
-await gate('a device that plans tier 2 binds tier 0 on the 64 MiB arena, which is the highest tier the arena holds', () => {
+await gate('a device that plans tier 2 is refused on the 64 MiB arena, which holds tier 0 at most, and binds nothing', () => {
   assert.equal(engineGlue._engine_init(64, 1, TIER_BUDGET), 0)
-  assert.equal(engineGlue._engine_models_bind_plan(8192, 2048, 268435456, 1, 0), 0)
+  assert.equal(engineGlue._engine_models_bind_plan(8192, 2048, 268435456, 1, 0), -5)
+  assert.equal(Number(engineGlue._engine_models_pool_bytes()), 0)
+})
+
+await gate('a device at tier 0 binds the model pool on the 64 MiB arena, which is the highest tier it holds', () => {
+  assert.equal(engineGlue._engine_models_bind_plan(...TIER0_LIMITS), 0)
   assert.equal(Number(engineGlue._engine_models_pool_bytes()), 23169408)
 })
 

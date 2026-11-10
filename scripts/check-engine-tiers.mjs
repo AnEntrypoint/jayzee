@@ -8,32 +8,40 @@ import { readLayout } from '../src/engine/bridge.js'
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const glue64 = pathToFileURL(join(root, 'engine/out/engine-core-64mib.mjs')).href
 const glue128 = pathToFileURL(join(root, 'engine/out/engine-core-128mib.mjs')).href
+const glue512 = pathToFileURL(join(root, 'engine/out/engine-core-512mib.mjs')).href
 const MIB = 1024 * 1024
 
-gate('a 64 MiB build given 1024 players and a 64 MiB budget runs the 256 tier and reports it', async () => {
+gate('a 64 MiB build given 1024 players and a 64 MiB budget runs the 64 tier and reports it', async () => {
   const plan = resolvePlan({ players: 1024, budgetBytes: 64 * MIB })
   const layout = readLayout(await loadEngineModule(glue64, plan))
-  assert.equal(layout.players, 256)
-  assert.equal(layout.bodies, 5120)
+  assert.equal(layout.players, 64)
+  assert.equal(layout.bodies, 2048)
   assert.ok(layout.usedBytes <= 64 * MIB, 'the plan allocates above its budget: ' + layout.usedBytes)
 })
 
-gate('a 128 MiB build given 1024 players and a 128 MiB budget runs the 1024 tier with 10240 bodies', async () => {
+gate('a 128 MiB build given 1024 players and a 128 MiB budget steps down to the 256 tier, since the 1024 tier needs more', async () => {
   const plan = resolvePlan({ players: 1024, budgetBytes: 128 * MIB })
   const layout = readLayout(await loadEngineModule(glue128, plan))
-  assert.equal(layout.players, 1024)
-  assert.equal(layout.bodies, 10240)
+  assert.equal(layout.players, 256)
   assert.ok(layout.usedBytes <= 128 * MIB, 'the plan allocates above its budget: ' + layout.usedBytes)
 })
 
-gate('a 128 MiB build given 1024 players and only a 64 MiB budget falls back to the 256 tier', async () => {
+gate('a 512 MiB build given 1024 players and a 512 MiB budget runs the 1024 tier with 10240 bodies', async () => {
+  const plan = resolvePlan({ players: 1024, budgetBytes: 512 * MIB })
+  const layout = readLayout(await loadEngineModule(glue512, plan))
+  assert.equal(layout.players, 1024)
+  assert.equal(layout.bodies, 10240)
+  assert.ok(layout.usedBytes <= 512 * MIB, 'the plan allocates above its budget: ' + layout.usedBytes)
+})
+
+gate('a 128 MiB build given 1024 players and only a 64 MiB budget falls back to the 64 tier', async () => {
   const plan = resolvePlan({ players: 1024, budgetBytes: 64 * MIB })
   const layout = readLayout(await loadEngineModule(glue128, plan))
-  assert.equal(layout.players, 256)
+  assert.equal(layout.players, 64)
 })
 
 gate('the 1024 tier holds 10240 bodies: a full world spawns, steps and keeps its memory fixed', async () => {
-  const world = await createEngineWorld({ players: 1024, budgetBytes: 128 * MIB, capacity: 10240, gravity: -9.8 }, glue128)
+  const world = await createEngineWorld({ players: 1024, budgetBytes: 512 * MIB, capacity: 10240, gravity: -9.8 }, glue512)
   const before = world.memoryBytes()
   const rows = Array.from({ length: 10240 }, (_, i) => ({ position: [(i % 128) * 2, 3 + (i % 7), Math.floor(i / 128) * 2], velocity: [0, 0, 0] }))
   const handles = world.spawnMany(rows)
@@ -45,7 +53,7 @@ gate('the 1024 tier holds 10240 bodies: a full world spawns, steps and keeps its
 })
 
 gate('the 1024 tier carves nothing from the arena after warm-up, with 10240 bodies settling', async () => {
-  const world = await createEngineWorld({ players: 1024, budgetBytes: 128 * MIB, capacity: 10240, gravity: -9.8 }, glue128)
+  const world = await createEngineWorld({ players: 1024, budgetBytes: 512 * MIB, capacity: 10240, gravity: -9.8 }, glue512)
   const rows = Array.from({ length: 10240 }, (_, i) => ({ position: [(i % 100) * 0.6 - 30, 1 + (i % 5), Math.floor(i / 100) * 0.6 - 30], velocity: [0, 0, 0] }))
   world.spawnMany(rows)
   for (let i = 0; i < 60; i++) world.step()
@@ -55,7 +63,7 @@ gate('the 1024 tier carves nothing from the arena after warm-up, with 10240 bodi
 })
 
 gate('the 1024 tier refuses a world larger than its 10240 bodies', async () => {
-  await assert.rejects(() => createEngineWorld({ players: 1024, budgetBytes: 128 * MIB, capacity: 10241 }, glue128), RangeError)
+  await assert.rejects(() => createEngineWorld({ players: 1024, budgetBytes: 512 * MIB, capacity: 10241 }, glue512), RangeError)
 })
 
 finish()

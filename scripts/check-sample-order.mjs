@@ -8,7 +8,7 @@ import { finish, gate } from './lib/gate.mjs'
 const root = fileURLToPath(new URL('..', import.meta.url))
 const read = (path) => readFileSync(join(root, path), 'utf8')
 const RADIUS = 6371000
-const GLUE = join(root, 'engine/out/engine-core-128mib-timed.mjs')
+const GLUE = join(root, 'engine/out/engine-core-512mib.mjs')
 const TOL = 0.25
 const CELLS = []
 for (let dy = -3; dy <= 2; dy++) for (let dx = -3; dx <= 2; dx++) CELLS.push({ dx, dy })
@@ -51,7 +51,7 @@ gate('the planet cell size makes one cell span one page near the pole, and the a
 
 const probe = async (mirror) => {
   const mod = await (await import(pathToFileURL(GLUE).href)).default()
-  assert.equal(mod._engine_init(1024, 1, 128 * 1024 * 1024), 0)
+  assert.equal(mod._engine_init(1024, 1, 512 * 1024 * 1024), 0)
   assert.equal(mod._engine_world_configure(10240, 60, -9.8, 0, 0.5, 0, 8), 0)
   assert.equal(mod._engine_planet_configure(RADIUS, planetCellSize(RADIUS), 9.8, 8000), 0)
   mod._engine_planet_locate(0, RADIUS, 0)
