@@ -10,6 +10,16 @@ export class CdpTimeoutError extends Error {
   }
 }
 
+export class CdpTargetCrashedError extends Error {
+  constructor(method, sessionId) {
+    super('the page crashed, so ' + method + ' has no reply (session ' + sessionId + ')')
+    this.name = 'CdpTargetCrashedError'
+    this.code = 'CDP_TARGET_CRASHED'
+    this.method = method
+    this.sessionId = sessionId
+  }
+}
+
 export const connectCdp = async (debugPort, { sendTimeoutMs = DEFAULT_SEND_TIMEOUT_MS } = {}) => {
   if (!(sendTimeoutMs > 0)) throw new RangeError('sendTimeoutMs must be positive: ' + sendTimeoutMs)
   const version = await (await fetch('http://127.0.0.1:' + debugPort + '/json/version')).json()
@@ -21,10 +31,21 @@ export const connectCdp = async (debugPort, { sendTimeoutMs = DEFAULT_SEND_TIMEO
   let nextId = 0
   const waiting = new Map()
   const listeners = new Map()
+  const crashed = new Set()
+  const failSession = (sessionId) => {
+    crashed.add(sessionId)
+    for (const [id, settle] of waiting) {
+      if (settle.sessionId !== sessionId) continue
+      waiting.delete(id)
+      clearTimeout(settle.timer)
+      settle.reject(new CdpTargetCrashedError(settle.method, sessionId))
+    }
+  }
   socket.addEventListener('message', (event) => {
     const message = JSON.parse(event.data)
     if (message.id === undefined) {
-      for (const listener of listeners.get(message.method) ?? []) listener(message.params)
+      if (message.method === 'Inspector.targetCrashed' && message.sessionId) failSession(message.sessionId)
+      for (const listener of listeners.get(message.method) ?? []) listener(message.params, message.sessionId)
       return
     }
     const settle = waiting.get(message.id)
@@ -35,12 +56,16 @@ export const connectCdp = async (debugPort, { sendTimeoutMs = DEFAULT_SEND_TIMEO
     else settle.resolve(message.result)
   })
   const send = (method, params = {}, sessionId, timeoutMs = sendTimeoutMs) => new Promise((resolveSend, rejectSend) => {
+    if (sessionId && crashed.has(sessionId)) {
+      rejectSend(new CdpTargetCrashedError(method, sessionId))
+      return
+    }
     const id = ++nextId
     const timer = setTimeout(() => {
       waiting.delete(id)
       rejectSend(new CdpTimeoutError(method, timeoutMs))
     }, timeoutMs)
-    waiting.set(id, { resolve: resolveSend, reject: rejectSend, timer })
+    waiting.set(id, { resolve: resolveSend, reject: rejectSend, timer, method, sessionId })
     socket.send(JSON.stringify(sessionId ? { id, method, params, sessionId } : { id, method, params }))
   })
   const on = (name, listener) => listeners.set(name, [...(listeners.get(name) ?? []), listener])

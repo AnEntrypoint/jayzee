@@ -25,6 +25,7 @@ const RENDER_PATH = '/scripts/browser/engine-render.html?phase=10&tier=1024&time
 const RENDER_TIMEOUT_MS = 1200000
 const POLL_MS = 2000
 const SEND_TIMEOUT_MS = 60000
+const RENDER_ATTEMPTS = 2
 const MAX_BUFFER = 256 * 1024 * 1024
 const WASM_NAME = 'engine-core-128mib-timed.wasm'
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.json': 'application/json', '.wasm': 'application/wasm', '.css': 'text/css' }
@@ -74,7 +75,7 @@ const serve = (dir, listenPort) => new Promise((ready, failed) => {
   server.listen(listenPort, '127.0.0.1', () => ready(server))
 })
 
-const renderInPlaywriterBrowser = async (url) => {
+const renderOnce = async (url) => {
   const { send, close } = await connectCdp(debugPort, { sendTimeoutMs: SEND_TIMEOUT_MS })
   let targetId = null
   try {
@@ -95,6 +96,19 @@ const renderInPlaywriterBrowser = async (url) => {
   }
 }
 
+const renderInPlaywriterBrowser = async (url) => {
+  const crashes = []
+  for (let attempt = 1; attempt <= RENDER_ATTEMPTS; attempt += 1) {
+    try {
+      return { ...(await renderOnce(url)), attempts: attempt, crashes }
+    } catch (error) {
+      if (error.code !== 'CDP_TARGET_CRASHED') throw error
+      crashes.push(error.message)
+    }
+  }
+  return { error: 'the page crashed in each of ' + RENDER_ATTEMPTS + ' attempts', attempts: RENDER_ATTEMPTS, crashes }
+}
+
 const buildEngine = (engineDir, buildDir) => spawnSync('bash', ['-c', BUILD_SCRIPT, 'bisect', emsdkDir, engineDir, buildDir, joltDir], { encoding: 'utf8', maxBuffer: MAX_BUFFER })
 
 const runJob = async (job, site, buildDir) => {
@@ -110,8 +124,8 @@ const runJob = async (job, site, buildDir) => {
     if (built.status !== 0) return { error: 'engine build exit ' + built.status, tail: (built.stderr + built.stdout).slice(-800) }
     const wasmSha256 = sha256(readFileSync(join(site, 'engine', 'out', WASM_NAME)))
     const run = await renderInPlaywriterBrowser('http://127.0.0.1:' + port + RENDER_PATH)
-    if (run.error) return { wasmSha256, error: run.error }
-    return { wasmSha256, tier: run.tier, checksum: run.checksum, visible: run.visible, ok: run.ok, errors: run.errors, backend: run.backend, adapter: run.adapter, frameTimeMedianMs: run.frameTimeMedianMs, frameTimeP99Ms: run.frameTimeP99Ms, result: run }
+    if (run.error) return { wasmSha256, error: run.error, attempts: run.attempts, crashes: run.crashes }
+    return { wasmSha256, tier: run.tier, checksum: run.checksum, visible: run.visible, ok: run.ok, errors: run.errors, backend: run.backend, adapter: run.adapter, frameTimeMedianMs: run.frameTimeMedianMs, frameTimeP99Ms: run.frameTimeP99Ms, attempts: run.attempts, crashes: run.crashes, result: run }
   } catch (error) {
     return { error: error.message }
   }
