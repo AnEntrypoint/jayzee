@@ -70,6 +70,8 @@ add_executable(engine_core
   src/vegetation.cpp
   src/codec.cpp
   src/textures.cpp
+  src/model_pool.cpp
+  src/device_tier.cpp
   src/materials.cpp
   src/exports_materials.cpp
   src/interest.cpp
