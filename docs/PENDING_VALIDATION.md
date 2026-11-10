@@ -2382,3 +2382,42 @@ Each change is its own local commit, lanmower, no trailer. The allocation audit 
 | 2. `launch-witness.mjs` and `timed-run.mjs` | `scripts/browser/page-witness.mjs` (new: `runPageWitness`, CLI), `scripts/browser/render-witness.mjs` (now a thin caller), `scripts/browser/launch-witness.mjs`, `scripts/browser/timed-run.mjs`, `scripts/browser/paired-run.mjs`, `scripts/browser/quota-gap-probe.mjs`, `AGENTS.md` (the stale WebGPU line) | e300a48 | Phase B: `node scripts/browser/launch-witness.mjs phaseH` (five adapter tries, all ok, no errors), `node scripts/browser/timed-run.mjs 10 build/diag/phaseH-timed.json` and `node scripts/browser/render-witness.mjs build/diag/phaseH-render.json 8843` (checksum `-3826851758512048142`). Browser processes and pages must be the same before and after. | Changed. Every browser witness script now opens its page in the project playwriter browser, in a browser context it creates and disposes, over the port in `.playwriter/debug-port`. No script in `scripts/` imports playwright-core or starts Chromium. The scripts are node programs, so they reach the browser through its debug port and not through gm verbs. |
 | 3. Per-frame buffers | `src/client-pure/playerTierSplit.js` (`rankPlayerTiers`, `createTierScratch`, `tierSetsOf`), `src/client-pure/playerLodPlanner.js`, `src/client/playerLodRenderer.js`, `src/client-pure/frameMetrics.js`, `src/motion-pure/movement.js`, `src/motion-pure/characterStep.js`, `src/client/PredictionEngine.js`, `src/client/SnapshotTimeline.js`, `scripts/alloc-audit.mjs` (new gate, `check:alloc-audit`, last in the test chain), `AGENTS.md` (the planner line) | 2606b2a | Phase B: `npm run check:alloc-audit`, which counts garbage collections over 50000 calls of each per-frame path after warm-up, in a 1 MiB young generation, against the baseline in `build/diag/alloc-before.json`. Also the gates of the changed modules: client-pure, player-lod-plan, player-lod-renderer, client-tier-split, prediction-engine, client-loops, movement. | Changed. Baseline, collections per 50000 calls: planner `plan` 587, renderer `tick` 588 (fallback dots) and 561 (server dots), vsync `tick` 12, prediction `predict` plus `getRenderState` 6, snapshot timeline `sample` 11; perf tracker, `tickBatch` and the crowd-dot decode 0. |
 | 4. Defect B, the limit | `scripts/browser/cpu-load.mjs` (`quotaCores`), `scripts/browser/frequency-runs.mjs` (`workersUnderQuota`, default workers), `scripts/check-frequency-runs.mjs` (one gate) | 5dd0102 | Phase B: `node scripts/browser/quota-gap-probe.mjs --workers=<9, 10, 11> --duration=60000` to find where throttling starts, then `node scripts/browser/frequency-runs.mjs --n=2 --duration=60000` with the new default. | Changed. The frequency runs used 12 workers under a 12-core quota, which is what throttled them. The default is now the quota minus two cores (10 here). |
+
+### Phase B results: WebGPU witnesses, the browser route, the per-frame buffers and the Defect B limit (run 2026-11-10-00-28-06-af66f9, second batch)
+
+Wall time is given for each witness. Commits made in this phase to fix what the witnesses showed: 7fdfcbb (per-frame fixes and the fallback-list gate) and dd0d55f (adapter probe icon).
+
+- WebGPU witnesses in the project browser, `run-player-webgpu.mjs`: `player-webgpu.html` (1.5 s), `player-bloom-webgpu.html` (1.0 s), `player-probes-webgpu.html` (0.9 s). Each: `gpu` adapter, NVIDIA GeForce RTX 3060 Laptop GPU, `isFallbackAdapter` false, backend `webgpu`, `ok` true, page errors `[]`, exit 0. They showed no defect in the WebGPU code.
+- `launch-witness.mjs phaseH` (3.4 s): labs `enable-unsafe-webgpu`, `enable-vulkan@1`, `enable-webgpu-developer-features`; five adapter tries, all ok, same NVIDIA adapter. The first run showed one page error, a 404 for the favicon. Fixed in dd0d55f with an empty icon link, as the other pages have; the rerun shows `errors` `[]`.
+- `timed-run.mjs 10 build/diag/phaseH-timed.json` (32.9 s): exit 0, backend `webgpu`, checksum `-3826851758512048142`, 600 frames, `allocationsSinceWarmup` 0, frame median 47.7 ms, p99 60.9 ms.
+- `render-witness.mjs build/diag/phaseH-render.json 8843` (32.8 s): exit 0, checksum `-3826851758512048142`, NVIDIA GeForce RTX 3060 Laptop GPU. After the browser witnesses: 1 browser process on the project profile, 1 page in `/json/list`, 0 `serve-root` processes.
+- `check:alloc-audit` (1.6 s), garbage collections per 50000 calls, before and after:
+
+| per-frame path | before | after |
+|---|---|---|
+| player LOD planner, `plan()` over 64 remote players | 587 (about 12310 bytes per call) | 0 |
+| player LOD renderer, `tick()` with fallback dots | 588 | 0 |
+| player LOD renderer, `tick()` with server dots | 561 | 1 |
+| vsync monitor, `tick()` | 12 (about 252 bytes per call) | 1 |
+| perf tracker, `sample()` | 0 | 0 |
+| transform lerp, `tickBatch()` over 64 records | 0 | 0 |
+| crowd dots, `decodeCrowdDotPoses()` | 0 | 0 |
+| prediction engine, `predict()` and `getRenderState()` | 6 | 1 |
+| snapshot timeline, `sample()` with 16 players | 11 | 0 |
+
+  The gate allows one collection per 50000 calls. A lone collection also shows in a 200000-call run of `getRenderState` with its parts stubbed, so it is background work of the process, not the path. What the first Phase B run showed and 7fdfcbb fixed: `list.length = 0` followed by `push` frees and regrows the backing store every call (planner fallback list, timeline player list), so both now write by index and set the length only when it changes; a double passed to a function that is not inlined is boxed on every call (`slerpQuat(…, t)` once per player), so the blend factors travel in a held Float64Array through the new `slerpQuatAt`; the vsync median made a `subarray` view per tick, now cached. The planner's fallback list is held and overwritten by the next plan, so the gate `a fallback list from one plan is unchanged by the next plan` was replaced by one that states the held contract, with a new gate for `tierOf`. The audit covers nine paths; `applyMovement` is covered through the prediction engine. Not audited: the animation system, spring bones, the IK solver and `SnapshotProcessor.processSnapshot`.
+- Gates of the changed modules (under 0.2 s each): check-frequency-runs, check-client-pure, check-player-lod-plan, check-player-lod-renderer, check-client-tier-split, check-prediction-engine, check-client-loops and check-movement all RESULT PASS.
+- Defect B, the measured limit. `quota-gap-probe.mjs`, 60 s per arm, samplers pinned to CPU 15, workers on CPUs 0 to 14, render page running, quota 12 cores (60 s, 63 s and 76 s):
+
+| workers | cgroup usage | throttled periods | throttled ms | sampler stalls over 20 ms | longest stall | gaps over 100 ms |
+|---|---|---|---|---|---|---|
+| 6 (earlier run, 120 s) | 6.75 cores | 0 of 1200 | 0 | 1 | 21 ms | 0 |
+| 9 | 11.61 cores | 357 of 601 | 50864 | 37 | 26 ms | 0 |
+| 10 | 12.00 cores | 599 of 601 | 107055 | 161 | 47 ms | 0 |
+| 11 | 11.99 cores | 601 of 601 | 216401 | 570 | 124 ms | 1 (141 ms, `host-cfs-quota`, throttle 743.062 ms) |
+
+  The over-100 ms gap is now reproduced live, at 11 workers, and it is labelled `host-cfs-quota` by the fix in 512272a. The render page and the samplers take about 2.6 cores, so with the page running throttling starts at 9 workers and the first gap over 100 ms is at 11.
+- `frequency-runs.mjs --n=2 --duration=60000` with the new default of 10 workers and no page (292 s): four valid runs, pinned 0 gaps, unpinned 0 gaps. The same runs at 12 workers had a gap in two of eight.
+- Defect B state: closed as a measured limit. The gap is the cgroup quota, the attribution names it, and the frequency runs now stay under it. The limit depends on what else runs: quota minus two cores is enough without the page, and a run with the page needs quota minus about three for no throttling at all.
+- `npm test` at dd0d55f (123 s): exit 0, 4797 PASS lines, 238 RESULT PASS lines, 0 FAIL lines. `bash engine/test/build_host.sh` (17 s): exit 0, 196 PASS, 0 FAIL, `RESULT: PASS`.
+- Push: origin main, once, after this section is committed. No CI was checked.
