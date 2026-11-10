@@ -30,8 +30,9 @@ const WEBGL2_MODEL_LIMITS = Object.freeze([2048, 256, 268435456, 4, 0])
 
 const MODEL_BIND_REFUSALS = Object.freeze({
   '-1': 'the device limits fit no device tier',
-  '-2': 'the arena cannot hold the planned tier pool',
+  '-2': 'the arena cannot hold the pool of any tier the device fits',
   '-3': 'the model pool refused the planned layout',
+  '-4': 'the model pool is already bound',
 })
 
 const modelLimits = (device, navigatorLike) => {
@@ -54,7 +55,8 @@ export const chooseBackend = (requested, hasWebGpu) => {
 const requestWebGpuDevice = async (gpu) => {
   const adapter = await gpu.requestAdapter()
   if (!adapter) throw new Error('WebGPU returned no adapter')
-  return adapter.requestDevice()
+  const requiredFeatures = adapter.features.has('texture-compression-bc') ? ['texture-compression-bc'] : []
+  return adapter.requestDevice({ requiredFeatures, requiredLimits: { maxBufferSize: adapter.limits.maxBufferSize } })
 }
 
 const ensureCanvasId = (canvas) => {

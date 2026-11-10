@@ -15,6 +15,8 @@ const run = async () => {
   const canvas = document.getElementById('engine-canvas')
   const started = performance.now()
   let renderer = await loadRenderer({ canvas, navigatorLike: navigator, requested: 'webgpu', players: 64, budgetBytes: 67108864 })
+  const limits = renderer.device.limits
+  result.limits = { maxTextureDimension2D: limits.maxTextureDimension2D, maxTextureArrayLayers: limits.maxTextureArrayLayers, maxBufferSize: limits.maxBufferSize, textureCompressionBc: renderer.device.features.has('texture-compression-bc'), deviceMemory: navigator.deviceMemory ?? null }
   result.before = { modelTier: renderer.modelTier, backend: renderer.backendName, statuses: drawFrames(renderer, FRAMES_BEFORE), frames: renderer.stats().frames }
 
   const lostAt = performance.now()
@@ -26,11 +28,12 @@ const run = async () => {
   const reloadAt = performance.now()
   const recovered = await loadRenderer({ canvas, navigatorLike: navigator, requested: 'webgpu', players: 64, budgetBytes: 67108864 })
   result.reloadMs = Math.round(performance.now() - reloadAt)
+  recovered.markWarmup()
   const statuses = drawFrames(recovered, FRAMES_AFTER)
   const stats = recovered.stats()
-  result.after = { modelTier: recovered.modelTier, statuses, frames: stats.frames, createsAfterSeal: stats.createsAfterSeal, allocationsSinceWarmup: stats.allocationsSinceWarmup }
+  result.after = { modelTier: recovered.modelTier, statuses, frames: Number(stats.frames), createsAfterSeal: Number(stats.createsAfterSeal), allocationsSinceWarmup: String(stats.allocationsSinceWarmup) }
   result.wallMs = Math.round(performance.now() - started)
-  result.ok = result.lost.reason === 'destroyed' && result.before.statuses.every((s) => s === 0) && statuses.every((s) => s === 0) && stats.createsAfterSeal === 0
+  result.ok = result.lost.reason === 'destroyed' && result.before.statuses.every((s) => s === 0) && statuses.every((s) => s === 0) && Number(stats.createsAfterSeal) === 0
   result.done = true
 }
 
