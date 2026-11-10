@@ -261,6 +261,8 @@ export async function runControlled({ label, round, condition, pin = '', pauseLi
   if (!Number.isInteger(round) || round < 1) throw new TypeError('round must be a whole number from 1')
   if (typeof out !== 'string' || out === '') throw new TypeError('out must name a directory')
   if (!Number.isFinite(durationMs) || durationMs <= 0) throw new TypeError('duration must be a positive number of ms')
+  if (experiment !== null && !EXPERIMENTS.includes(experiment)) throw new TypeError('unknown experiment: ' + experiment)
+  pinPlan({ condition, pin, pauseList, selfPid: process.pid, parentPid: process.ppid, experiment: null })
   const layout = experiment === null ? null : coreLayout(readTopology(), main)
   const settings = experimentSettings(experiment, layout)
   const plan = pinPlan({ condition, pin, pauseList, selfPid: process.pid, parentPid: process.ppid, experiment, ...settings })

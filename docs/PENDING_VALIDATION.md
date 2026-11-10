@@ -3344,3 +3344,9 @@ Findings from Phase B:
 9. Instanced GLB vegetation: not built (see the Phase A entry). The spoint walk comparison, the physics scenario witnesses and the 362.9 ms outlier stay OPEN, as recorded in Phase A.
 
 Full `npm test` after the fixes above: EXIT 0, PASS 4985, FAIL 0 (wall about 5 min). The first run, before `check-webgpu-profile.mjs` was updated, failed one assertion. That assertion expected the wrapper to forward its arguments alone, and the launcher change adds two flags. The assertion now expects the two flags first, then the forwarded arguments.
+
+## Phase A (2026-11-10): CI fix for the controlled-run gate
+
+- Defect: CI run 42778647706 (push 118c72b) and run 42783197645 (push 9a86d4f) failed `runControlled refuses bad input before it creates a directory or pauses a pid`. The experiment cases read the core topology before the input checks, so a runner with fewer than three physical cores threw RangeError ("the host has fewer than three physical cores") instead of TypeError.
+- Change: `scripts/browser/controlled-run.mjs` refuses an unknown experiment name, and runs `pinPlan` (with no experiment) on the condition, pause list and pids, before `coreLayout` reads the topology.
+- Witness (Phase B): `node scripts/check-controlled-run.mjs` on this host, then the CI run on the pushed commit. Expected: the gate reports PASS and the `ci` job is green.
