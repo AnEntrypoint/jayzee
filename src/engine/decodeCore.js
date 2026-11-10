@@ -1,6 +1,10 @@
-import { MeshoptDecoder } from 'meshoptimizer/decoder'
+import { MeshoptDecoder } from '../../node_modules/meshoptimizer/meshopt_decoder.mjs'
 
 export const TRANSCODE_RGBA32 = 13
+
+const KTX2_IDENTIFIER = [0xab, 0x4b, 0x54, 0x58, 0x20, 0x32, 0x30, 0xbb, 0x0d, 0x0a, 0x1a, 0x0a]
+
+const hasKtx2Identifier = (bytes) => bytes.length >= KTX2_IDENTIFIER.length && KTX2_IDENTIFIER.every((byte, i) => bytes[i] === byte)
 
 export const decodeVertices = async (bytes, count, size, filter) => {
   await MeshoptDecoder.ready
@@ -18,9 +22,9 @@ export const decodeIndices = async (bytes, count, size) => {
   return target
 }
 
-export const loadBasisFactory = (source) => {
+export const loadBasisFactory = (source, host = {}) => {
   const holder = { exports: {} }
-  return new Function('module', 'exports', source + '\nreturn module.exports;')(holder, holder.exports)
+  return new Function('module', 'exports', 'require', '__dirname', '__filename', source + '\nreturn module.exports;')(holder, holder.exports, host.require, host.dirname, host.filename)
 }
 
 export const createTranscoder = (basisFactory, wasmBinary) => {
@@ -44,6 +48,7 @@ export const createTranscoder = (basisFactory, wasmBinary) => {
 
   return {
     async transcodeKtx2(bytes) {
+      if (!hasKtx2Identifier(bytes)) throw new Error('not a valid KTX2 file')
       const module = await basis()
       const file = new module.KTX2File(new Uint8Array(bytes))
       try {

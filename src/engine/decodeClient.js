@@ -10,16 +10,36 @@ export const createDecodeWorker = (url = new URL('./decodeWorker.js', import.met
     else waiting.resolve(data.result)
   }
 
+  worker.onerror = (event) => {
+    const failure = new Error('decode worker failed: ' + (event.message || 'unknown error'))
+    for (const waiting of pending.values()) waiting.reject(failure)
+    pending.clear()
+  }
+
   const call = (message, transfer) => new Promise((resolve, reject) => {
     const id = nextId++
     pending.set(id, { resolve, reject })
     worker.postMessage({ ...message, id }, transfer)
   })
 
+  const copyOf = (bytes) => {
+    const copy = bytes.slice()
+    return { copy, transfer: [copy.buffer] }
+  }
+
   return {
-    decodeVertices: (bytes, count, size, filter) => call({ kind: 'vertices', bytes, count, size, filter }, [bytes.buffer]).then((result) => result.bytes),
-    decodeIndices: (bytes, count, size) => call({ kind: 'indices', bytes, count, size }, [bytes.buffer]).then((result) => result.bytes),
-    transcodeKtx2: (bytes) => call({ kind: 'ktx2', bytes }, [bytes.buffer]),
+    decodeVertices: (bytes, count, size, filter) => {
+      const { copy, transfer } = copyOf(bytes)
+      return call({ kind: 'vertices', bytes: copy, count, size, filter }, transfer).then((result) => result.bytes)
+    },
+    decodeIndices: (bytes, count, size) => {
+      const { copy, transfer } = copyOf(bytes)
+      return call({ kind: 'indices', bytes: copy, count, size }, transfer).then((result) => result.bytes)
+    },
+    transcodeKtx2: (bytes) => {
+      const { copy, transfer } = copyOf(bytes)
+      return call({ kind: 'ktx2', bytes: copy }, transfer)
+    },
     close: () => worker.terminate(),
   }
 }
