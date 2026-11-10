@@ -20,10 +20,21 @@ gate('parseCgroupSamples reads five numbers per line and refuses a short line', 
   assert.deepEqual(parseCgroupSamples('1000 5 6 7 8\n')[0], { t: 1000, throttledUs: 5, usageUs: 6, someUs: 7, fullUs: 8 })
   assert.throws(() => parseCgroupSamples('1000 0 0 0'), TypeError)
 })
-gate('cgroupBetween takes the throttle delta between the last samples at or before each end', () => {
+gate('cgroupBetween reads from the last sample at or before the start to the first sample at or after the end', () => {
   const samples = parseCgroupSamples('1000 0 0 0 0\n1050 0 0 0 0\n1200 500000 2000 0 0\n')
   assert.equal(cgroupBetween(samples, 1050, 1200).throttleMs, 500)
   assert.equal(cgroupBetween(parseCgroupSamples('1100 0 0 0 0\n'), 1000, 1200), null)
+})
+gate('a cgroup sampler that stalls with the gap and wakes after it still shows the throttle', () => {
+  const samples = parseCgroupSamples('1000 0 0 0 0\n1040 0 0 0 0\n1205 290499 0 0 0\n1207 290499 0 0 0\n')
+  assert.equal(cgroupBetween(samples, 1050, 1200).throttleMs, 290.499)
+  const [gap] = attributeOverLimit(rows, samples)
+  assert.equal(gap.cause, 'host-cfs-quota')
+  assert.equal(gap.cgroupThrottleMs, 290.499)
+})
+gate('with no sample after the end, cgroupBetween falls back to the last sample before it', () => {
+  const samples = parseCgroupSamples('1000 0 0 0 0\n1100 7000 0 0 0\n')
+  assert.equal(cgroupBetween(samples, 1000, 1200).throttleMs, 7)
 })
 gate('an over-limit gap with cgroup throttle is attributed to the host quota and keeps its numbers', () => {
   const samples = parseCgroupSamples('1000 0 0 0 0\n1050 0 0 0 0\n1200 500000 2000 0 0\n')

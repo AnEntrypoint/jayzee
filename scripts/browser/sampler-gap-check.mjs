@@ -37,9 +37,11 @@ const cgroupAt = (samples, t) => {
   return hit
 }
 
+const cgroupAtOrAfter = (samples, t) => samples.find((sample) => sample.t >= t) ?? null
+
 export const cgroupBetween = (samples, t0, t1) => {
   const from = cgroupAt(samples, t0)
-  const to = cgroupAt(samples, t1)
+  const to = cgroupAtOrAfter(samples, t1) ?? cgroupAt(samples, t1)
   if (!from || !to) return null
   return {
     throttleMs: (to.throttledUs - from.throttledUs) / 1000,
