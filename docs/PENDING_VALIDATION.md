@@ -3362,3 +3362,21 @@ Phase A, code and gates only. Each row is witnessed in Phase B.
 | CI fix 2296095 (local, goes out in the Phase B push) | `scripts/browser/controlled-run.mjs`, `docs/PENDING_VALIDATION.md` | CI on the Phase B push |
 
 Not yet done in Phase A, recorded here so none is silently dropped: the tail cause fix itself (needs the Phase B measurement first); the sphere, population and collision placement decision; the instanced vegetation path; the planet-scale witnesses; the spoint comparison; the 362.9 ms outlier, whose recorded cause is load and throttling class, unchanged; the launcher, whose fix is in `chromium-webgpu.sh` and gated by `check:chromium-launcher` but not shown to change the adapter.
+
+## Stretch 2, Phase A (2026-11-10): the sphere and the distributed population
+
+Code, docs and gates only. No build, test or witness run in Phase A. Phase B runs each witness.
+
+| change | files | witness (Phase B) |
+|---|---|---|
+| Sphere geometry: radius 6,360,000 m, surface points, unit normals, gravity to the centre at 9.8 m/s², surface frames at any yaw, altitude, wrapped yaw | `src/engine/sphere.js` (new) | `npm run check:sphere-population` (radius equal to spoint and the mapspinner port; altitude; normal; gravity direction; frame orthonormal) |
+| Population on a spherical cap: seeded, count = round(density × cap area), each object on the surface with up = normal, optional height function | `src/engine/population.js` (new) | `npm run check:sphere-population` (count, on-surface, normal, inside cap, bit-for-bit repeat, height offset, zero density, input refusals, generator uniformity) |
+| Three collider layers: very static built once and refuses changes; static refit on change only; dynamic returned every step | `src/engine/colliderLayers.js` (new) | `npm run check:collider-layers` |
+| Gates added to npm test | `package.json` | `npm test` |
+| Stretch 2 section in ENGINE.md: planet and engine reuse, population, colliders, streaming, witness scene and asset order | `docs/ENGINE.md` | Phase B records the witness scene counts |
+
+Not done in this Phase A, so they are open for stretch 2 and are not dropped:
+
+- Terrain from the mapspinner quadtree patches. The population takes a height function. Wiring the patch heights into it is not done in Phase A.
+- Spoint's population density. It was searched for in `/workspace/spoint` and not found, so the density is an input and the witness must record the value it uses.
+- Streaming and collider updates on the witness scene. The witness scene itself runs in Phase B, and its object, collider, triangle and patch counts are recorded then.
