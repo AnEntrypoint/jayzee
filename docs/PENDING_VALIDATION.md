@@ -2780,3 +2780,28 @@ Ranks 3 to 6: blocked on a decision the owner makes, with the evidence for each.
 | A6 | Item 1 like-for-like | The planet path already records `restageMsP99` (`engine-render-browser.js`, the result keys near `restageMsMax`), but on a path that restages 16 pages per cell change, not one 33 by 33 field. spoint's number is one `timeFieldSteps` step on a 33 by 33 field, 256 m. | Agree the operation: either a per-page restage time against spoint's per-field step, or a spoint timing on the same page size as the engine. Phase B records `restageMsP99` on `path=planet` once the operation is agreed. |
 
 Rank 7 items are recorded in the table above as run-only. None of them was run in this pass.
+
+## Ranks 3 to 6: decisions taken and Phase A changes
+
+The owner asked for these decisions to be made here, not held. The arithmetic and each decision are in docs/ENGINE.md under "Decisions for ranks 3 to 6". Phase A wrote the code and the gate, and changed nothing that runs. Phase B builds, runs and witnesses it.
+
+| row | file | section | change | witness (Phase B) |
+|---|---|---|---|---|
+| R3-1 | engine/src/model_pool.h | Layout | `uploadBytesPerFrame` added with default 0; the planned tier fills it | engine/test/witness_models.cpp: "tier 0 carries a 512 KiB upload budget per frame", "tier 2 carries a 2 MiB upload budget per frame" |
+| R3-2 | engine/src/exports_models.cpp | engine_models_bind_plan | plans the tier from the limits, carves `bytesFor` of the planned layout, binds it; returns the tier or −1, −2, −3 | scripts/check-decode-path.mjs "the tier 0 pool is bound from the device limits and the arena holds it"; scripts/browser/models-run.mjs (poolBytes) |
+| R3-3 | engine/src/engine_core.cpp | initialize | the model pool carve is removed from `engine_init`; the pool is bound by `engine_models_bind_plan` | scripts/check-engine-core.mjs and the other gates that call `_engine_init` (run in Phase B) |
+| R3-4 | engine/src/render/render_webgpu.cpp | frame | `kModelUploadBudgetBytes` removed; the per-frame budget is `models::layout().uploadBytesPerFrame` | scripts/browser/models-run.mjs (newcomerUploaded, first-frame cost) |
+| R3-5 | engine/test/witness_models.cpp | modelsAndTiers | three checks: the tier 0 and tier 2 budgets, and the tier 2 pool holds 369098752 bytes and fits the 512 MiB build | native host witness, bash engine/test/build_host.sh (PASS count) |
+| R3-6 | engine/CMakeLists.txt | ENGINE_EXPORTS | adds `_engine_models_bind_plan`, `_engine_models_vertex_ptr`, `_engine_models_index_ptr`, `_engine_models_vertex_count`, `_engine_models_index_count`, `_engine_models_mark_dirty` | the three pinned builds link (Phase B) |
+| R3-7 | src/engine/renderer.js | DEFAULT_GLUE, loadRenderer, createRenderer | the default glue is the 512 MiB build; `loadRenderer` plans and binds the pool after `engine_init` from the device limits, and refuses with the named reason; `renderer.modelTier` and `renderer.device` are exposed | scripts/browser/device-loss-run.mjs (modelTier in before and after); scripts/browser/models-run.mjs (passes its own 64 MiB glue, so it binds tier 0 on that arena) |
+| R4-1 | src/engine/renderer.js | loadRenderer | `renderer.deviceLost` resolves with `{ reason, message }` when the device is lost | scripts/browser/device-loss-run.mjs ("lost" reason is "destroyed") |
+| R4-2 | scripts/browser/device-loss.html, device-loss-browser.js, device-loss-run.mjs (new) | device loss witness | destroys the device, awaits `deviceLost`, re-runs `loadRenderer`, draws five frames each side, and checks createsAfterSeal 0 | `node scripts/browser/device-loss-run.mjs` exit 0 and `"ok": true` |
+| R5-1 | src/engine/decodeCore.js (new) | meshopt and KTX2 | `decodeVertices`, `decodeIndices` (meshoptimizer 1.2.0 decoder); `loadBasisFactory`, `createTranscoder` (three 0.185.1 Basis transcoder, RGBA32 output) | scripts/check-decode-path.mjs: meshopt vertex and index round trips; the transcoder refuses non-KTX2 bytes |
+| R5-2 | src/engine/decodeWorker.js (new) | worker | routes vertex, index and KTX2 requests to decodeCore and transfers the result | Phase B does not run a browser worker; the worker's logic is the decodeCore path the gate runs |
+| R5-3 | src/engine/decodeClient.js (new) | client, upload | `createDecodeWorker`; `uploadModelSlot` checks the byte counts against the slot and writes the bytes into the pool memory, then marks the slot dirty | scripts/check-decode-path.mjs: "an upload writes the decoded bytes into the slot and marks it dirty", "an upload with the wrong byte count is refused and writes nothing" |
+| R5-4 | engine/src/exports_models.cpp | slot pointers and counts | `engine_models_vertex_ptr`, `_index_ptr`, `_vertex_count`, `_index_count`, `_mark_dirty` | the same gate |
+| R5-5 | scripts/check-decode-path.mjs (new), package.json | check:decode-path, npm test | the gate runs in the test chain after check:engine-threads | `npm run check:decode-path` exit 0 with RESULT: PASS |
+| R6-1 | scripts/spoint-streamer-compare.mjs | likeForLike row, jayzee sampleGridMs | samples the 33 by 33 grid over 256 m with `engine_planet_height` in the 64 MiB build, once per build, and reports the sample p99 ratio to spoint's sample p99 | `node scripts/spoint-streamer-compare.mjs 200` exit 0; the likeForLike row in build/diag/item1/compare.json |
+| R6-2 | docs/ENGINE.md | decisions for ranks 3 to 6, status | arithmetic and the decisions | read in the commit |
+
+The Phase B result for these rows is in the section below.

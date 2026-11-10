@@ -195,10 +195,49 @@ Enforced by `tools/asset-pipeline/validate.mjs`, which exits 1 on any REJECT.
 - **(b) No first-appearance hitch.** Time the first frame after the first `acquire` and `upload` of a new drawn item, and compare it with the median steady frame time from the same run. The pass is an `engine_render_creates_after_seal` delta of 0 across that first frame. Report both times and the ratio.
 - **(c) VRAM within budget.** `vramBytesOf` of the chosen plan is at most `vramBudgetBytes`. Report it for the tier the browser device selects, and the planner's result for each texel size.
 
+### Decisions for ranks 3 to 6
+
+Taken in the Phase A pass that followed the measurements. They supersede the Sizing, Threads and Context loss rows of the table above. Each number is a byte count from the layout in `engine/src/device_tier.cpp` and `engine/src/model_pool.cpp`, or from the build in `engine/CMakeLists.txt`.
+
+**Arena size and pool sizing (rank 3).** The wasm memory cannot grow (`ALLOW_MEMORY_GROWTH=0`), so the arena is fixed at build. It is sized from the largest tier pool plus the engine budget, then the planned tier's pool is carved at startup.
+
+| quantity | bytes | MiB |
+|---|---|---|
+| tier 0 pool: 128 slots × (4096 × 32 + 12288 × 4) | 23,068,672 | 22 |
+| tier 1 pool: 256 slots × (16384 × 32 + 49152 × 4) | 184,549,376 | 176 |
+| tier 2 pool: 256 slots × (32768 × 32 + 98304 × 4) | 369,098,752 | 352 |
+| engine budget (`budgetBytes`, the most the non-model arena may use) | 67,108,864 | 64 |
+| 512 MiB build arena: 512 MiB − 4 MiB | 532,676,608 | 508 |
+| tier 2 pool + engine budget | 436,207,616 | 416 |
+| headroom in the 512 MiB build for tier 2 | 96,468,992 | 92 |
+
+The 64 MiB build's arena is 60 MiB, which holds the tier 0 pool and the budget together, as it did when the pool was carved inside `engine_init`. A 128 MiB build would not hold tier 2, so it is not used for the device path.
+
+- `engine_init` no longer carves the model pool. `engine_models_bind_plan(maxDim, maxLayers, maxBuffer, texel, deviceMemory)` runs `device::plan` on the adapter's limits, carves exactly `bytesFor` of the planned layout, and binds it. It returns the tier (0 to 2), or −1 when no tier fits the limits, −2 when the arena cannot hold the pool, or −3 when the pool refuses its layout.
+- Slots are fixed at bind. Nothing grows: a slot count, a vertex count and an index count are set once, and the render path only reads them.
+- The upload budget per frame comes from the planned tier (`uploadBytesPerFrame`: 512 KiB, 1 MiB, 2 MiB), not from a constant. Each tier's budget is unchanged.
+- The browser default glue is the 512 MiB build (`engine-core-512mib.mjs`). The device tier is chosen by the planner after the module exists, so the glue cannot depend on the tier. The 64 MiB build remains for the gates and the tier 0 measurements.
+- The device limits come from the WebGPU device the loader already requests: `maxTextureDimension2D`, `maxTextureArrayLayers`, `maxBufferSize`, texel 1 when `texture-compression-bc` is present and 4 otherwise, and `navigator.deviceMemory` in bytes when reported. WebGL2 uses 2048, 256, 256 MiB, texel 4 and no device memory, which the planner maps to tier 0.
+
+**Context loss (rank 4).** The design planned to rebuild from the arena copies. That is not done. The device reaches the module only through the factory options (`preinitializedWebGPUDevice`), and this build has no path that rebinds a new device on a live instance, so the arena copies cannot be reused on a new device without that path, which is not verified here.
+
+- Decision: when `device.lost` fires, the loader's `deviceLost` promise resolves with `{ reason, message }`, and the caller re-runs `loadRenderer` to get a new module and device. The host re-stages its content. The arena copies do not survive.
+- Cost: a second 512 MiB instance exists until the first is collected. `scripts/browser/device-loss-run.mjs` measures whether the reload succeeds while the first instance is still referenced.
+- Witness: `device.destroy()` in the page resolves `deviceLost` with reason `destroyed`, the reloaded renderer draws with status 0, and `createsAfterSeal` stays 0.
+
+**Decode (rank 5).** Decoding runs on a worker. The render thread copies into slots that already exist.
+
+- meshopt: `meshoptimizer` 1.2.0 (pinned, MIT), its `./decoder` export, `MeshoptDecoder.decodeVertexBuffer` and `decodeIndexBuffer`, run in `src/engine/decodeWorker.js`. The same package's `./encoder` drives the round-trip witness.
+- KTX2: the Basis Universal transcoder shipped in `three` 0.185.1 (pinned, MIT), `node_modules/three/examples/jsm/libs/basis/basis_transcoder.js` and `.wasm` (515 KiB). Its source is loaded as a function with `module` and `exports` as parameters, so the worker and Node run the same file without `importScripts`. The worker transcodes level 0 of layer 0 to RGBA32 (transcoder format 13), which is the RGBA8 albedo layer the renderer already takes. BC7 output (the tier texel 1 format) waits for the tiered texture array, which the renderer does not allocate yet.
+- No KTX2 encoder is on the host (`toktx` and `basisu` are absent), so a real KTX2 transcode is not witnessed here. The witness checks the transcoder's initialisation and its refusal of non-KTX2 bytes.
+- Upload: the decode client writes decoded bytes straight into the slot's pool memory, through `engine_models_vertex_ptr` and `engine_models_index_ptr`, after the byte counts match `engine_models_vertex_count` and `engine_models_index_count`. It then calls `engine_models_mark_dirty`. No staging buffer, so no per-model allocation in wasm.
+
+**Like-for-like with spoint (rank 6).** The operation is the same on both sides: sample a 33 by 33 height grid over 256 m, once per build, timed per build, on the same host. spoint samples with its JavaScript height function inside `timeFieldSteps`. jayzee samples with `engine_planet_height` in the 64 MiB build, under Node. The call boundary differs, and the row says so. `scripts/spoint-streamer-compare.mjs` writes both rows, and the ratio of the two p99 values is the like-for-like figure. The one-frame phase 5 comparison stays as a separate, labelled row.
+
 ### Status
 
-- The renderer draws model slots. Uploads reach the GPU on a 512 KiB per-frame budget, and only slots whose upload is complete are drawn. The model pipeline is built before the seal (createsAfterSeal stays 0).
-- The wasm binds a fixed tier-0 layout at init (128 slots, 4096 vertices, 12288 indices, 32-byte stride). Startup planning from adapter limits with device::plan is not wired yet, so the bound pool does not yet follow the device.
-- Decode is not yet on a worker. KTX2 transcode and meshopt decode are not in the engine, so the render thread does no decode and has no decoder to feed it.
-- Context-loss recovery is designed above and not implemented.
-- Phase B measurements (RAM under churn, first-frame cost of a newcomer model, allocated VRAM per tier, and the item 1 comparison) are in docs/PENDING_VALIDATION.md under the Phase B result for this pass.
+- The renderer draws model slots. Uploads reach the GPU on the planned tier's per-frame budget, and only slots whose upload is complete are drawn. The model pipeline is built before the seal (createsAfterSeal stays 0).
+- The model pool is planned and carved at startup by `engine_models_bind_plan` from the device limits. The tier is `renderer.modelTier`.
+- Decode runs on a worker. meshopt decodes in the worker. KTX2 transcodes to RGBA32 in the worker, and the real transcode is not witnessed here (no encoder on the host).
+- Device loss is detected and reported through `renderer.deviceLost`. Recovery re-creates the renderer. The arena copies do not survive a device loss.
+- Phase B measurements are in docs/PENDING_VALIDATION.md under the Phase B result for this pass.

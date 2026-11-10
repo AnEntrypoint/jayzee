@@ -24,14 +24,29 @@ for (let i = 0; i < builds; i++) {
   steps.push(await timeFieldSteps({ physics: world, heightFn, N, extent: EXTENT, cornerX: CORNER, cornerZ: CORNER }))
 }
 
+const { planetCellSize } = await import(pathToFileURL(join(root, 'src/engine/pageLayout.js')).href)
+const PLANET = { radius: 6371000, gravity: 9.8, maxHeight: 8000 }
+const engineGlue = await import(pathToFileURL(join(root, 'engine/out/engine-core-64mib.mjs')).href)
+const engine = await engineGlue.default()
+if (engine._engine_init(64, 1, 67108864) !== 0) throw new Error('engine_init failed')
+if (engine._engine_planet_configure(PLANET.radius, planetCellSize(PLANET.radius), PLANET.gravity, PLANET.maxHeight) !== 0) throw new Error('engine_planet_configure failed')
+const sampleGrid = () => {
+  const started = performance.now()
+  const step = EXTENT / (N - 1)
+  for (let j = 0; j < N; j++) {
+    for (let i = 0; i < N; i++) engine._engine_planet_height(CORNER + i * step, PLANET.radius, CORNER + j * step)
+  }
+  return performance.now() - started
+}
+const jayzeeSamples = []
+for (let i = 0; i < builds; i++) jayzeeSamples.push(sampleGrid())
+
 const quantile = (values, q) => {
   const sorted = [...values].sort((a, b) => a - b)
   return sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))]
 }
-const summarise = (key) => {
-  const values = steps.map((s) => s[key])
-  return { p50: quantile(values, 0.5), p99: quantile(values, 0.99), max: Math.max(...values), mean: values.reduce((a, b) => a + b, 0) / values.length }
-}
+const summariseValues = (values) => ({ p50: quantile(values, 0.5), p99: quantile(values, 0.99), max: Math.max(...values), mean: values.reduce((a, b) => a + b, 0) / values.length })
+const summarise = (key) => summariseValues(steps.map((s) => s[key]))
 
 const witness = execFileSync(join(root, 'build/engine-host-witness/engine-witness'), { encoding: 'utf8', timeout: 120000 })
 const phase5Line = witness.split('\n').find((line) => line.startsWith('INFO phase 5: flight frame-time p99 in ms'))
@@ -43,9 +58,20 @@ const spointDirty = execFileSync('git', ['-C', spoint, 'status', '--short', '--'
 
 const out = {
   spoint: { head: spointHead, dirtyInStreamerPaths: spointDirty === '' ? [] : spointDirty.split('\n'), field: { N, extentM: EXTENT, builds }, timeMs: { sample: summarise('sampleMs'), add: summarise('addMs'), total: summarise('totalMs') } },
-  jayzee: { phase5FlightFrameP99Ms: jayzeePhase5P99Ms, source: 'build/engine-host-witness/engine-witness, INFO phase 5 line' },
+  jayzee: {
+    phase5FlightFrameP99Ms: jayzeePhase5P99Ms,
+    source: 'build/engine-host-witness/engine-witness, INFO phase 5 line',
+    sampleGridMs: summariseValues(jayzeeSamples),
+    sampleGridOperation: 'engine_planet_height at the 33 by 33 grid over 256 m, 64 MiB build, Node, same host as spoint',
+  },
+  likeForLike: {
+    operation: 'sample a 33 by 33 height grid over 256 m, once per build',
+    spointSampleP99Ms: summarise('sampleMs').p99,
+    jayzeeSampleP99Ms: summariseValues(jayzeeSamples).p99,
+    ratioSpointOverJayzee: summarise('sampleMs').p99 / summariseValues(jayzeeSamples).p99,
+  },
   ratio: { spointStepP99OverPhase5P99: summarise('totalMs').p99 / jayzeePhase5P99Ms },
-  caveat: 'Different operations: spoint is one HeightfieldStreamer step (sample and Jolt add) per build; jayzee phase 5 is the per-frame flight time of the native planet witness. The unit is the same (ms), the path is not.',
+  caveat: 'The likeForLike row compares the same sampling operation on the same grid, on the same host. spoint samples with a JavaScript height function and jayzee samples with the engine export, so the call boundary differs. The ratio row compares one streamer step with one native flight frame, which are different operations. The unit is ms in both.',
 }
 mkdirSync(dirname(outPath), { recursive: true })
 writeFileSync(outPath, JSON.stringify(out, null, 1) + '\n')
