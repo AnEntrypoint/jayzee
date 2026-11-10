@@ -5,6 +5,8 @@ import { fileURLToPath } from 'node:url'
 import { finish, gate } from './lib/gate.mjs'
 import { GRAVITY_M_PER_S2, PLANET_RADIUS_M, altitudeOf, frameOnSurface, gravityAt, normalise, surfacePoint, upAt, wrapAngle } from '../src/engine/sphere.js'
 import { capAreaKm2, mulberry32, placePopulation } from '../src/engine/population.js'
+import { POPULATION_DENSITY_PER_KM2, densityFor } from '../src/engine/populationDensity.js'
+import { createEngineHeightAt, placeOnPlanet } from '../src/engine/terrainHeight.js'
 
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)))
 const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
@@ -107,6 +109,34 @@ gate('the seeded generator is uniform on [0, 1) and repeats for the same seed', 
   const mean = values.reduce((s, v) => s + v, 0) / values.length
   assert.ok(Math.abs(mean - 0.5) < 0.03, 'mean ' + mean)
   assert.deepEqual(Array.from({ length: 3 }, () => mulberry32(42)()), [mulberry32(42)(), mulberry32(42)(), mulberry32(42)()])
+})
+
+gate('the density per category is derived from spoint: trees 53,125 and rocks 15,625 per km2 as upper bounds, buildings and props zero with a source', () => {
+  assert.equal(POPULATION_DENSITY_PER_KM2.trees.value, 53125)
+  assert.equal(POPULATION_DENSITY_PER_KM2.rocks.value, 15625)
+  assert.equal(POPULATION_DENSITY_PER_KM2.buildings.value, 0)
+  assert.equal(POPULATION_DENSITY_PER_KM2.props.value, 0)
+  for (const entry of Object.values(POPULATION_DENSITY_PER_KM2)) assert.ok(entry.source.startsWith('/workspace/spoint') && entry.method.length > 0)
+  assert.throws(() => densityFor('bridges'), RangeError)
+})
+
+gate('the population heights come from the engine patch height store: each object sits at _engine_planet_height at its own point', () => {
+  const calls = []
+  const module = { _engine_planet_height: (x, y, z) => { calls.push([x, y, z]); return 0.001 * x + 0.002 * y - 0.003 * z + 4 } }
+  const pop = placeOnPlanet({ module, seed: 9, category: 'trees', centreLatRad: 0.2, centreLonRad: 0.5, capRad: 0.002 })
+  assert.equal(calls.length, pop.count)
+  for (let i = 0; i < pop.count; i++) {
+    const n = [pop.normals[i * 3], pop.normals[i * 3 + 1], pop.normals[i * 3 + 2]]
+    const expected = module._engine_planet_height(n[0] * PLANET_RADIUS_M, n[1] * PLANET_RADIUS_M, n[2] * PLANET_RADIUS_M)
+    assert.ok(Math.abs(altitudeOf([pop.positions[i * 3], pop.positions[i * 3 + 1], pop.positions[i * 3 + 2]]) - expected) < 1e-6, 'object ' + i)
+  }
+})
+
+gate('the terrain height wiring refuses a module without the patch height store, and a zero category places nothing', () => {
+  assert.throws(() => createEngineHeightAt({}), TypeError)
+  assert.throws(() => placeOnPlanet({ module: {}, seed: 1, category: 'trees', centreLatRad: 0, centreLonRad: 0, capRad: 0.01 }), TypeError)
+  const module = { _engine_planet_height: () => 0 }
+  assert.equal(placeOnPlanet({ module, seed: 1, category: 'buildings', centreLatRad: 0, centreLonRad: 0, capRad: 0.01 }).count, 0)
 })
 
 finish()

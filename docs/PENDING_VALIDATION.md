@@ -3374,9 +3374,11 @@ Code, docs and gates only. No build, test or witness run in Phase A. Phase B run
 | Three collider layers: very static built once and refuses changes; static refit on change only; dynamic returned every step | `src/engine/colliderLayers.js` (new) | `npm run check:collider-layers` |
 | Gates added to npm test | `package.json` | `npm test` |
 | Stretch 2 section in ENGINE.md: planet and engine reuse, population, colliders, streaming, witness scene and asset order | `docs/ENGINE.md` | Phase B records the witness scene counts |
+| Population density derived from spoint's placement rules, one value per category with source and method: trees 53,125 per km² (4 m cell ceiling 0.85, upper bound), rocks 15,625 per km² (8 m cell, upper bound), buildings 0 (no placement path), props 0 (4 authored entries, no area recorded) | `src/engine/populationDensity.js` (new), `docs/ENGINE.md` | `npm run check:sphere-population` (gate "the density per category is derived from spoint"); Phase B also runs `/workspace/spoint` to count realised vegetation per km² over a known area and records it |
+| Population heights from the engine patch height store: `createEngineHeightAt` calls `_engine_planet_height` (the function that reads `terrain.pages`, the store the rendered terrain uses), so each object samples the same heights; a module without it is refused | `src/engine/terrainHeight.js` (new), `src/engine/population.js` (unchanged) | `npm run check:sphere-population` (gates "the population heights come from the engine patch height store" and "the terrain height wiring refuses a module without the patch height store") |
 
 Not done in this Phase A, so they are open for stretch 2 and are not dropped:
 
-- Terrain from the mapspinner quadtree patches. The population takes a height function. Wiring the patch heights into it is not done in Phase A.
-- Spoint's population density. It was searched for in `/workspace/spoint` and not found, so the density is an input and the witness must record the value it uses.
+- Realised spoint vegetation density per km² (the tree and rock values above are ceilings, the grove and soil multipliers are not in the repo). Phase B measures it.
+- The procedural props count is zero because spoint's props are authored (4 entries, no area recorded). Revisit if spoint gains a scattered prop layer.
 - Streaming and collider updates on the witness scene. The witness scene itself runs in Phase B, and its object, collider, triangle and patch counts are recorded then.
