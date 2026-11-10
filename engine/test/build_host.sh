@@ -22,6 +22,7 @@ c++ -std=c++20 -O2 -DNDEBUG -ffp-contract=off -fno-fast-math -fno-exceptions -fn
   "$engine/test/witness_phase7_codecs.cpp" \
   "$engine/test/witness_phase8_resources.cpp" \
   "$engine/test/witness_phase10_plan.cpp" \
+  "$engine/test/witness_models.cpp" \
   "$engine/src/render/render_frame.cpp" \
   "$engine/src/world.cpp" \
   "$engine/src/bridge.cpp" \
@@ -32,6 +33,8 @@ c++ -std=c++20 -O2 -DNDEBUG -ffp-contract=off -fno-fast-math -fno-exceptions -fn
   "$engine/src/codec.cpp" \
   "$engine/src/materials.cpp" \
   "$engine/src/textures.cpp" \
+  "$engine/src/model_pool.cpp" \
+  "$engine/src/device_tier.cpp" \
   "$engine/src/arena.cpp" \
   "$engine/src/budget.cpp" \
   "$engine/src/pool_alloc.cpp" \
