@@ -72,6 +72,7 @@ export const createPlanetStreamer = (module, { sink = null, window = PATH_WINDOW
     surface,
     placed,
     step(frame) {
+      module._engine_page_apply()
       const spot = cameraEngineSpot(frame, surface, stepM, heightM)
       const cell = locateCell(module, spot.x, PLANET.radius, spot.z, probe)
       if (cell.face !== current.face || cell.cx !== current.cx || cell.cy !== current.cy) {

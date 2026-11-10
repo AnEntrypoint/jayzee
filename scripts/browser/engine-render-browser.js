@@ -253,6 +253,7 @@ const setupPlanetPath = (module, renderer) => {
 }
 
 const planetCamera = (module, renderer, frame, aspect, surface) => {
+  module._engine_page_apply()
   const angle = frame * (PATH_STEP_M / CAMERA_RADIUS)
   const x = Math.sin(angle) * CAMERA_RADIUS
   const z = Math.cos(angle) * CAMERA_RADIUS
@@ -407,7 +408,7 @@ const run = async () => {
   const module = renderer.module
   const placed = []
   const surface = setupScene(module, renderer, placed, worldReady)
-  const handoff = TIER === 1024 ? createPhysicsHandoff({ module, glue: new URL(THREADS ? '../../engine/out/engine-core-512mib-threads.mjs' : '../../engine/out/engine-core-512mib.mjs', import.meta.url).href, players: TIER, budgetBytes: TIER_BUDGET, solverIterations: runConfig.solverIterations, path: { window: PATH_WINDOW, perFrame: PAGES_PER_FRAME, stepM: PATH_STEP_M, heightM: PATH_HEIGHT_M } }) : null
+  const handoff = TIER === 1024 ? createPhysicsHandoff({ module, glue: new URL(TIER_GLUE, import.meta.url).href, players: TIER, budgetBytes: TIER_BUDGET, solverIterations: runConfig.solverIterations, path: { window: PATH_WINDOW, perFrame: PAGES_PER_FRAME, stepM: PATH_STEP_M, heightM: PATH_HEIGHT_M } }) : null
   if (handoff) await handoff.ready
 
   const aspect = canvas.width / canvas.height

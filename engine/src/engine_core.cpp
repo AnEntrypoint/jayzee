@@ -404,6 +404,10 @@ EMSCRIPTEN_KEEPALIVE int engine_page_lookup(std::int64_t key) {
   return engine::planet::state().pages.lookup(key);
 }
 
+EMSCRIPTEN_KEEPALIVE void engine_page_apply() {
+  engine::planet::state().pages.applyPending();
+}
+
 EMSCRIPTEN_KEEPALIVE double engine_world_rebase_count() { return static_cast<double>(engine::world().rebases()); }
 
 EMSCRIPTEN_KEEPALIVE int engine_veg_configure(double origin, double cellSize) {
