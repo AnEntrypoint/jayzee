@@ -2760,3 +2760,12 @@ Rank 1 rows:
 | A1 | scripts/browser/engine-render-browser.js | planet camera | `cellOf` returned a new object every frame. `locateCell` writes into a reused object (`PATH_CELL_NOW`) and `pathCell` is copied field by field. `cellOf` remains for setup, which runs once. | grep shows `cellOf(` only at setup call sites; the planet path run (`path=planet`) still restages on the same cell changes (`cellChanges` in the result) |
 
 Rank 1 checked and found clean: the C++ render, model pool, device tier and export code have no heap container, `new` or `malloc` on the frame path (`engine_core.cpp` `malloc` is only in the `ENGINE_LEAK_ON_TICK` variant). `restageWindow` still allocates one Map and small arrays per cell change; that is an event rate, not a per-frame rate, and is left as it is.
+
+Rank 2, gm defect for the owner to route to gm (not fixed from jayzee):
+
+| row | defect | evidence | expected |
+|---|---|---|---|
+| A2 | `next_context` refuses a task replacement after the first step with "a task replacement after the first step needs owner:true", so the run keeps its existing task. The refusal does not say how to reach owner:true from this caller. | run `2026-11-10-03-26-43-250472`, already at 2 steps when this pass called `next_context` with `task` set; reply `{"ok":false,"refused":true,"error":"refused: a task replacement after the first step needs owner:true","actionSeq":151}`. The same refusal occurred earlier in the session (the earlier pass's summary). The follow-up call with no `task` returned `{"ok":true,"unchanged":true,"run":"2026-11-10-03-26-43-250472","steps":2,"stepsLeft":48}`. | a run already in progress should either accept the task it was given, or name the call that sets owner:true, so a caller that restarts after compaction does not hit this |
+| A2 | The tool description says `task` is for the first step "when a host cut the slash-command task to its first word". This pass did not hit that case, and the run was not new. | the description text in the `next_context` schema | no change requested; recorded so the owner can check whether the first-step rule applies to a resumed run |
+
+Witness for A2 is the actionSeq 151 reply above, which is the evidence the owner needs to reproduce it. No gm code was changed.
