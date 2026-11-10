@@ -118,7 +118,7 @@ if (process.argv[1] && process.argv[1].endsWith('/browser/paired-run.mjs')) {
   let page = null
   if (withPage) {
     const pageFile = join(outDir, label + '.page.json')
-    const witness = await runRenderWitness({ root: ROOT, port: PAGE_PORT, pageUrl: 'http://127.0.0.1:' + PAGE_PORT + '/scripts/browser/engine-render.html?' + PAGE_QUERY, live: [] })
+    const witness = await runRenderWitness({ root: ROOT, port: PAGE_PORT, query: PAGE_QUERY })
     writeFileSync(pageFile, JSON.stringify(witness.result ?? { error: witness.error }, null, 1) + '\n')
     page = { file: pageFile, error: witness.error ?? null }
   }

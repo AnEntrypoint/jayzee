@@ -39,7 +39,7 @@ const sampler = pinned(SAMPLER, [samplerFile, String(durationMs), '2'])
 const samplerDone = exited(sampler)
 const threadSampler = pinned(THREAD_SAMPLER, [threadsFile, '50', join(ROOT, '.playwriter', 'browser-profile')])
 const threadDone = exited(threadSampler)
-const page = runRenderWitness({ root: ROOT, port: PAGE_PORT, pageUrl: 'http://127.0.0.1:' + PAGE_PORT + '/scripts/browser/engine-render.html?phase=10&tier=1024&timed=1', live: [] })
+const page = args.page === '0' ? Promise.resolve({ error: 'no page asked for' }) : runRenderWitness({ root: ROOT, port: PAGE_PORT })
 const generator = workers > 0 ? await burn({ workers, durationMs, cpus: cpusExcept(SAMPLER_CPU) }) : null
 await samplerDone
 threadSampler.kill('SIGTERM')
