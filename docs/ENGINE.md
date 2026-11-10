@@ -130,3 +130,74 @@ Each phase ends with a red witness on the old code and a green witness on the ne
 - Measured cost of the wasm-to-JS glue per WebGPU call. The research found no published number, so benchmark 10 000 `wgpuRenderPassEncoderDraw` calls against the same loop in JavaScript.
 - Whether the emdawnwebgpu port in use presents correctly from a pthread with an OffscreenCanvas.
 - Whether Safari has JSPI.
+
+## Web bottlenecks and the decisions taken (2026-11-10)
+
+Phase A wrote this design and its code. Nothing here has been built or run. Phase B measures it, and the numbers go in docs/PENDING_VALIDATION.md.
+
+| Area | Decision | Reason |
+|---|---|---|
+| Sizing | `engine::device::plan` runs once at startup from the adapter limits (`maxTextureDimension2D`, `maxTextureArrayLayers`, `maxBufferSize`), the texel size, and `deviceMemoryBytes / 4` when the host reports it. It picks the highest tier that fits. Nothing grows after that. | A growth step after load is a hitch, and it moves RAM and VRAM past the ceiling the device was sized for. |
+| Texture slots | One fixed texture array per tier (side and layer count from the tier). Content takes a slot through the existing generation table (`handles::Table`). | A fixed layer index means no reallocation and no bind-group rebuild when content changes. |
+| Model geometry | One vertex pool and one index pool. `models::acquire` takes a slot sized `verticesPerModel` and `indicesPerModel`. `models::upload` copies into that slot and nothing else. | New content reuses a pool that already exists. Nothing is created on arrival. |
+| Vertex format | 32-byte vertex stride and 4-byte indices for every model. | One layout is what lets every model share one shader setup. |
+| Art pipeline | Textures must be KTX2 (Basis). Geometry must be GLB with meshopt-encoded bufferViews. `tools/asset-pipeline/validate.mjs` refuses everything else. | Basis transcodes to the device's compressed format, and meshopt decodes without a per-model layout. |
+| Pipelines | Every pipeline and bind layout is built in `buildPipelines()` at init, before `engine_render_seal`. `engine_render_creates_after_seal` must stay 0. | Nothing compiles when a model first appears. |
+| Threads | Decode (KTX2 transcode, meshopt decode) belongs on a worker. The render thread only copies into slots that already exist. | Decode cost stays out of frame time. Status: not yet implemented, see the status note. |
+| GC pressure | No allocation per frame in JS. Slot handles are plain doubles. In C++, slots are carved from the arena at bind. | A GC pause is a hitch, and the arena is the only allocation path. |
+| Upload budget | Each tier has a byte budget per frame (table below). An upload that does not fit waits for the next frame. | A large model is spread over frames instead of landing in one. |
+| Context loss | Not implemented in Phase A. The design keeps the CPU copies in the arena, so a device-lost event rebuilds the pipelines and re-uploads the slots from those copies. | Recovery needs no content reload from the network. |
+| VRAM | WebGPU and WebGL2 do not report VRAM. The measured quantity is the accounted pool size from `device::vramBytesOf`. | Accounted bytes are the only figure that can be checked against the budget. |
+
+### Tiers
+
+From `engine/src/device_tier.cpp`. The VRAM columns are for the texel size noted. They are computed by hand from the formula below, and Phase B confirms them against the planner's output.
+
+| Tier | Texture side | Layers | Model slots | Vertices per model | Indices per model | Upload per frame | VRAM budget | Accounted, 1 byte per texel | Accounted, 4 bytes per texel |
+|---|---|---|---|---|---|---|---|---|---|
+| 0 | 512 | 64 | 128 | 4096 | 12288 | 512 KiB | 256 MiB | 43.3 MiB | 107.3 MiB |
+| 1 | 1024 | 128 | 256 | 16384 | 49152 | 1 MiB | 512 MiB | 346.7 MiB | over budget |
+| 2 | 2048 | 96 | 256 | 32768 | 98304 | 2 MiB | 1024 MiB | 864.0 MiB | over budget |
+
+With 4 bytes per texel (the RGBA8 fallback for a device with no compressed format), only tier 0 fits. Tier 2 has fewer layers than tier 1. At 128 layers, the texture pool alone with the vertex and index pools would pass the 1024 MiB budget.
+
+### Pool accounting
+
+`vramBytes = textureBytes + vertexBytes + indexBytes`, where:
+
+- `textureBytes = base + floor(base / 3)`, `base = layers × side² × texelBytes` (the one-third is the mip chain).
+- `vertexBytes = slots × verticesPerModel × 32`.
+- `indexBytes = slots × indicesPerModel × 4`.
+
+The plan fits a tier when every item below holds, and it picks the highest tier that fits:
+
+- `side ≤ maxTextureDimension2D`, `layers ≤ maxTextureArrayLayers`.
+- The vertex pool and the index pool are each `≤ maxBufferSize`.
+- `vramBytes ≤ vramBudgetBytes`, where the budget is the tier budget, or `min(tier budget, deviceMemoryBytes / 4)` when the host reports device memory.
+
+The texel size must be 1 (a block-compressed format) or 4 (RGBA8). Any other value is refused.
+
+### Asset rules
+
+Enforced by `tools/asset-pipeline/validate.mjs`, which exits 1 on any REJECT.
+
+- A texture is a KTX2 file. The identifier and the 80-byte header are checked.
+- A model is a GLB file. Its JSON chunk and BIN chunk are parsed, and its length fields must match the file size.
+- Every bufferView a mesh accessor uses carries `EXT_meshopt_compression`, with a buffer index in range, a positive `byteLength`, `byteStride` and `count`, and a mode of ATTRIBUTES, TRIANGLES or INDICES. `extensionsUsed` lists the extension.
+- No buffer and no image may use an external `uri`.
+- Every image is a KTX2 bufferView in the BIN chunk, with `mimeType` `image/ktx2`.
+- A file whose name ends `.ktx2` must hold KTX2 bytes, and a file whose name ends `.glb` must hold GLB bytes.
+- JSON glTF, PNG, JPEG, and any geometry without meshopt (including Draco) are refused.
+
+### Measurements for Phase B
+
+- **(a) RAM flat.** Across N load and unload cycles of models, after warm-up: the wasm `memory.buffer.byteLength` is the same at the end as at the start, `allocations_since_warmup()` stays 0, and `models::liveCount()` returns to 0 after the last release. The JS heap is sampled at the same points. Report the start, end and peak values.
+- **(b) No first-appearance hitch.** Time the first frame after the first `acquire` and `upload` of a new drawn item, and compare it with the median steady frame time from the same run. The pass is an `engine_render_creates_after_seal` delta of 0 across that first frame. Report both times and the ratio.
+- **(c) VRAM within budget.** `vramBytesOf` of the chosen plan is at most `vramBudgetBytes`. Report it for the tier the browser device selects, and the planner's result for each texel size.
+
+### Status
+
+- The renderer does not draw model slots yet. `models::` stores and uploads geometry, and nothing in `render_webgpu.cpp` reads its ranges. Measurement (b) therefore uses the existing prop path, and the result is labelled that way.
+- `device::plan` is not yet called from startup. Phase B wires it, or the gap is reported.
+- Decode is not yet on a worker. The render thread does no decode, because the decoder is not in the engine yet.
+- Context-loss recovery is designed above and not implemented.

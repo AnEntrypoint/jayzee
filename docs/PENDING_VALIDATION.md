@@ -2643,3 +2643,17 @@ Phase B fixes (defects, not stall fixes):
 | scripts/browser/controlled-report.mjs | analyseRunData stallWindows | window taken from report.stalls, which carries startMs; offCpuForStalls does not | gate "analyseRunData counts the one stall ..." PASS |
 | scripts/browser/controlled-run.mjs | pinApplied | pinOutcome ignores renderers not alive at the end; stored run.json values unchanged, recomputed from the pinned lists: all nine true | gate "pinOutcome reads the readback ..." PASS (node scripts/check-controlled-run.mjs, RESULT: PASS) |
 | docs/stall-causes/core-1024.md (new) | result | counts, predictions, cause open, harness defects | read in the commit |
+
+## Web bottlenecks: Phase A changes (not built, not run)
+
+Phase A wrote code, docs and gates only. Nothing was built, run, gated or witnessed. Each witness below names the check that Phase B runs.
+
+| file | section | change | witness |
+| engine/src/device_tier.h, engine/src/device_tier.cpp (new) | device sizing | `Limits`, `Plan`, `plan`, `vramBytesOf`; three tiers; highest fitting tier, never grows | Phase B: native witness engine/test/witness_models.cpp (to write) checks tier 0 for texel 4 and tier 2 for texel 1 at 2048 limits, and refusal for a texel size other than 1 or 4 |
+| engine/src/model_pool.h, engine/src/model_pool.cpp (new) | model slot pool | `Layout`, `Range`, `validLayout`, `bytesFor`, `bind`, `acquire`, `upload`, `ranges`, `release`, `isLive`, `liveCount`; reuses the `handles::Table` generation table | Phase B: engine/test/witness_models.cpp (to write) checks bind refusals, acquire to full returning kFull, a released handle reading kBadId, reuse with a new generation, and an upload with the wrong count refused |
+| engine/CMakeLists.txt | engine_core sources | adds src/model_pool.cpp and src/device_tier.cpp after src/textures.cpp | Phase B: engine/build.sh links the module and prints its sha256 |
+| tools/asset-pipeline/validate.mjs (new) | asset rules | `isKtx2`, `parseGlb`, `validateKtx2`, `validateGlb`, `validateAsset`; CLI prints ACCEPT or REJECT and exits 1 on a reject | Phase B: scripts/check-asset-pipeline.mjs, run by npm test |
+| scripts/check-asset-pipeline.mjs (new) | gate | builds GLB files in the gate and checks KTX2 acceptance and refusal, PNG, meshopt on and off, missing meshopt fields, unknown mode, PNG image in a GLB, non-KTX2 image bytes, external buffer and image uri, truncated and bad-length GLB | Phase B: `npm run check:asset-pipeline` exit code and its PASS and FAIL lines |
+| package.json | scripts | adds `check:asset-pipeline`, and puts it in the test chain before `check:hygiene` | Phase B: npm test exit code |
+| docs/ENGINE.md | design section | decisions with reasons, tier table, accounting formula, asset rules, Phase B measurements, status | read in the commit; Phase B adds the measured numbers |
+| engine/src/device_tier.*, engine/src/model_pool.*, scripts/check-asset-pipeline.mjs | overwritten | these paths were untracked when the session began, and this phase overwrote them without reading them first. The earlier content was not recovered; the transcript has no earlier write to these paths | none possible; reported to the owner |
