@@ -3112,3 +3112,24 @@ Open after this stretch:
 - Scenario physics witnesses from spoint's example games, and the vegetation and terrain streaming walk and fly-over with real assets: not started.
 - The Nanite path is complete on WebGPU; WebGL2 has CPU culling only and no HZB or GPU culling, recorded as deferred.
 - The static-pool witnesses (models-run, models-vram-run, device-loss-run, planet-path-run, decode-worker-run, spoint-streamer-compare) were not re-run in this pass.
+
+## Stretch: 64-tier WebGPU against WebGL2, interleaved (this pass)
+
+Phase A: no code change. The earlier 64-tier record (WebGPU median 3.16 ms, WebGL2 2.68 ms) was taken while two stale diagnostic loggers from a previous session ran on the host (`collect.mjs`, `sampler.mjs`, `throttle.mjs`, load 5 to 9). Those three processes were stopped by PID in the stretch above, and the earlier numbers are withdrawn as a current measure.
+
+Phase B: three interleaved rounds, WebGPU then WebGL2, each `render-witness.mjs` run with `phase=10&tier=64&timed=1` (WebGPU) or `phase=11&tier=64&timed=1` (WebGL2), 600 frames, `engine-core-64mib-timed` glue, load 3.8 to 5.5 during the runs. Each run 12 to 13 s wall.
+
+| run | frame median (ms) | frame p99 (ms) | frame max (ms) | tick median (ms) | backend phase median (ms) | outliers | ok | checksum | api per frame |
+|---|---|---|---|---|---|---|---|---|---|
+| WebGPU r1 | 2.38 | 4.07 | 6.74 | 2.15 | 0.17 | 1 | true | -5415737363265412373 | 32 |
+| WebGPU r2 | 2.49 | 3.37 | 3.59 | 2.26 | 0.17 | 0 | true | same | 32 |
+| WebGPU r3 | 2.48 | 3.43 | 4.76 | 2.23 | 0.17 | 0 | true | same | 32 |
+| WebGL2 r1 | 2.21 | 3.18 | 3.67 | 2.09 | 0.07 | 0 | true | same | 48 |
+| WebGL2 r2 | 2.35 | 3.48 | 12.25 | 2.22 | 0.08 | 3 | true | same | 48 |
+| WebGL2 r3 | 2.34 | 3.03 | 3.19 | 2.20 | 0.07 | 0 | true | same | 48 |
+
+Medians of the three rounds: WebGPU 2.45 ms, WebGL2 2.30 ms, a ratio of 1.065 (WebGPU about 0.15 ms slower per frame). Both backends draw the same visible slots (`[18, 20, 21, 20]`), and the checksum matches on every run. `allocationsSinceWarmup` is 0 on every run and `createsAfterSeal` is 0.
+
+Decomposition of the WebGPU excess, from the phase medians: backend 0.17 against 0.07 ms (0.10 ms), acquire 0.03 ms, upload 0.04 ms and submit 0.03 ms, all of which are zero on WebGL2. The tick is the same on both sides within noise (2.15 to 2.26 ms against 2.09 to 2.22 ms). The WebGPU frame carries 32 API calls against WebGL2's 48, so the extra cost is per-call work in the WebGPU backend phase, not the number of calls.
+
+Status: the 64-tier slowdown is reduced from 0.48 ms (the withdrawn earlier figure) to a measured residual of about 0.15 ms. The residual is attributed to the WebGPU backend phase and to acquire, upload and submit. It is not fixed. The next measure is a per-call trace of the backend phase, which is open.
