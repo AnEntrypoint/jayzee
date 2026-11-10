@@ -26,7 +26,7 @@ Each entry names the file, the ENGINE.md phase and the witness it needs. The sta
 | Paired host-sharing runs (round 1 and round 2, G0 and G1), the project-profile page probe, and the 64-tier timed build | `paired-run.mjs` x4 with a page result each, `paired-report.mjs`, `npm test`, and 23 named check gates | PASS for the witnesses: four run records and four page results, each page with `errors` empty, zero allocations after warm-up and the expected checksum. Verdict `mixed` on two pairs. See "Phase B: paired host-sharing rows, closed". |
 | Memory, arena and allocator | `check-engine-core`, `check-engine-tiers` 6 PASS, native host witness | PASS. Post-warm-up carves are zero at 64 and 1024 players. |
 
-Still OPEN after Phase B: the phase 5 frame-time comparison against spoint (the engine side is measured in the Phase B pass of run 2026-11-10-01-38-00-f8d9be); the 1024-tier long-frame stalls in both backends (up to 705 ms in WebGPU, not reproduced; the largest of six diagnosed runs was 251 ms): the cause is recorded in "Stalls at 1024, Phase B diagnosis", with no code fix verified; the 362.9 ms WebGL2 outlier is not reproduced and is covered by the same section; the `requestAdapter()` null after a browser restart: the cause is recorded in "Null adapter after the browser restart", and the flag fix is verified, while a launcher-level fix is still open.
+Still OPEN after Phase B: the phase 5 frame-time comparison against spoint (the engine side is measured in the Phase B pass of run 2026-11-10-01-38-00-f8d9be); the 1024-tier long-frame stalls in both backends (up to 705 ms in WebGPU, not reproduced; the largest of six diagnosed runs was 251 ms): the cause is recorded in "Stalls at 1024, Phase B diagnosis", with no code fix verified; the controlled pause and pinning run is recorded in "Controlled 1024 run: result (Phase B)" (host CPU sharing in its run-queue form is not supported, the cause is OPEN, no fix); the 362.9 ms WebGL2 outlier is not reproduced and is covered by the same section; the `requestAdapter()` null after a browser restart: the cause is recorded in "Null adapter after the browser restart", and the flag fix is verified, while a launcher-level fix is still open.
 
 ## Problems in docs/ENGINE.md (for the dispatcher)
 
@@ -2576,3 +2576,18 @@ Phase A pending lines.
 - scripts/check-controlled-run.mjs, in the npm test chain after check:paired-report. Witness: `RESULT: PASS` with the gate count printed.
 - scripts/browser/cgroup-sampler.mjs stops on SIGTERM and writes its lines, so a run can end the sampler at the page's end. Witness: the matrix cgroup files are non-empty and cover the page window.
 - scripts/browser/thread-cpu-sampler.mjs scans for renderers every 500 ms, not every 5 s, so a page's first seconds are sampled. Witness: the matrix threads file holds the page renderer's rows from its start.
+
+
+## Controlled 1024 run: result (Phase B)
+
+The matrix ran in two jobs, controlled-1024 and controlled-1024-retry. Full result, conditions and the per-run record are in docs/stall-causes/controlled-1024.md, and the report is docs/stall-causes/controlled-1024-report.json.
+
+- Stall frames, three valid runs each: LIVE unpinned 0, 2, 1; PAUSED unpinned 1, 0, 0; PAUSED pinned 0-7 12, 0, 0. All stalls are cpu-bound, and their run-queue wait is 0.8 to 3.1% of stall time.
+- P1 holds in direction only (3 against 1). P2 fails (LIVE wait share 0.031 against 0.25). P3 gives "pinning adds stall frames", and all 12 come from one run.
+- Cause: host CPU sharing in its run-queue form is not supported, so it is not recorded as proven. The stall time is the renderer's own on-CPU time. The shared-physical-core and clock explanations are not tested.
+- Fix: none verified. Pinning is not adopted, and no code change is made.
+- Status: the 1024 stall cause is OPEN. The streamer comparison with spoint is OPEN, blocked on spoint's push (origin/main 6c7f266 has no per-step timing entry point).
+
+Phase B pending lines.
+- scripts/check-controlled-run.mjs: RESULT: PASS. Witness: the gate output.
+- npm test on the Phase B tree: EXIT 0 with the PASS count. Witness: the job log.
