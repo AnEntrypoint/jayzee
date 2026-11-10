@@ -2737,3 +2737,26 @@ Gates run in this pass, all foreground, all exit 0: check:engine-core, check:eng
 Not run in this pass: the full npm test chain. check:engine-threads runs the threads artifact, which was not rebuilt in this pass, so it covers the older binary. check:asset-pipeline was not re-run; its last run was 14 PASS and its files are unchanged.
 
 Open after this pass: in-wasm first-frame measurement uses the existing fixed tier-0 pool, not device::plan at startup. Context-loss recovery and worker decode are not implemented (docs/ENGINE.md status).
+
+## Remaining reachable items: rank pass (Phase A, not built or run)
+
+Ranked by what blocks the most of the engine's web path. Phase A is code, docs and tests only: no build, gate, test or witness was run in this pass, and nothing is pushed. Each row names the change, its file and the witness Phase B runs.
+
+| rank | item | status in this pass |
+|---|---|---|
+| 1 | Per-frame allocation in the timed harness loop | changed (row A1) |
+| 2 | gm next_context refusal (task replacement after the first step) | recorded (row A2) |
+| 3 | device::plan wired at startup, pool and upload budget follow the device | see row A3 |
+| 4 | Context-loss recovery (rebuild pipelines, re-upload from arena copies) | see row A4 |
+| 5 | Decode on a worker (KTX2 transcode, meshopt decode) | blocked: needs a decoder dependency chosen by the owner |
+| 6 | Item 1 like-for-like (streamer against the planet restage on the same field) | blocked: needs the operation agreed by the owner |
+| 7 | Run-only items: full npm test chain, asset-pipeline re-run, threads rebuild, 1024 stall cause, Jolt determinism across threads, service-worker shim, Safari JSPI | not reachable without a run; left for Phase B |
+
+Rank 1 rows:
+
+| row | file | section | change | witness (Phase B) |
+|---|---|---|---|---|
+| A1 | scripts/browser/engine-render-browser.js | timed step | `renderer.stats()` is read once, on the last frame, instead of every frame after warm-up. It built a frozen object, an `Array.from` and a closure per frame inside the measured loop. `lastStats` is read only after the loop, so the result is the same. | grep shows one `renderer.stats()` call, at `frame === FRAMES - 1`; models-run.mjs JS heap begin and end, read the same way as before |
+| A1 | scripts/browser/engine-render-browser.js | planet camera | `cellOf` returned a new object every frame. `locateCell` writes into a reused object (`PATH_CELL_NOW`) and `pathCell` is copied field by field. `cellOf` remains for setup, which runs once. | grep shows `cellOf(` only at setup call sites; the planet path run (`path=planet`) still restages on the same cell changes (`cellChanges` in the result) |
+
+Rank 1 checked and found clean: the C++ render, model pool, device tier and export code have no heap container, `new` or `malloc` on the frame path (`engine_core.cpp` `malloc` is only in the `ENGINE_LEAK_ON_TICK` variant). `restageWindow` still allocates one Map and small arrays per cell change; that is an event rate, not a per-frame rate, and is left as it is.

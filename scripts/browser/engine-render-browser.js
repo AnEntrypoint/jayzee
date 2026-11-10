@@ -163,11 +163,16 @@ const planetSurface = (module) => {
   return (x, z) => module._engine_planet_height(x, PLANET.radius, z) - anchor
 }
 
-const cellOf = (module, x, y, z) => {
+const locateCell = (module, x, y, z, out) => {
   module._engine_planet_locate(x, y, z)
   const at = module._engine_planet_scratch() >> 2
-  return { face: module.HEAPU32[at], cx: module.HEAPU32[at + 1], cy: module.HEAPU32[at + 2] }
+  out.face = module.HEAPU32[at]
+  out.cx = module.HEAPU32[at + 1]
+  out.cy = module.HEAPU32[at + 2]
+  return out
 }
+
+const cellOf = (module, x, y, z) => locateCell(module, x, y, z, { face: 0, cx: 0, cy: 0 })
 
 const configurePlanet = (module) => {
   const status = module._engine_planet_configure(PLANET.radius, PLANET.cellSize, PLANET.gravity, PLANET.maxHeight)
@@ -209,6 +214,7 @@ const pagePlacement = new Map()
 const pathStats = { restages: 0, restageMs: [], cellChanges: 0 }
 let pathRef = null
 let pathCell = null
+const PATH_CELL_NOW = { face: 0, cx: 0, cy: 0 }
 
 const restageWindow = (module, renderer, cell) => {
   const started = performance.now()
@@ -244,7 +250,7 @@ const restageWindow = (module, renderer, cell) => {
 const setupPlanetPath = (module, renderer) => {
   const surface = configurePlanet(module)
   pathRef = cellOf(module, 0, PLANET.radius, 0)
-  pathCell = pathRef
+  pathCell = { face: pathRef.face, cx: pathRef.cx, cy: pathRef.cy }
   restageWindow(module, renderer, pathRef)
   pathStats.restages = 0
   pathStats.restageMs = []
@@ -255,11 +261,13 @@ const planetCamera = (module, renderer, frame, aspect, surface) => {
   const angle = frame * (PATH_STEP_M / CAMERA_RADIUS)
   const x = Math.sin(angle) * CAMERA_RADIUS
   const z = Math.cos(angle) * CAMERA_RADIUS
-  const cell = cellOf(module, x, PLANET.radius, z)
+  const cell = locateCell(module, x, PLANET.radius, z, PATH_CELL_NOW)
   if (cell.face !== pathCell.face || cell.cx !== pathCell.cx || cell.cy !== pathCell.cy) {
     pathStats.cellChanges += 1
     restageWindow(module, renderer, cell)
-    pathCell = cell
+    pathCell.face = cell.face
+    pathCell.cx = cell.cx
+    pathCell.cy = cell.cy
   }
   CAMERA.eye[0] = x
   CAMERA.eye[1] = surface(x, z) + CAMERA_HEIGHT
@@ -444,7 +452,7 @@ const run = async () => {
         for (let i = 0; i < phaseCount; i++) rows[at + ROW_FIELDS + i] = phasesAfter[i] - phasesBefore[i]
         lastStarted = started
         if (frame === WARMUP_FRAMES) { renderer.markWarmup(); result.warmAt = frame }
-        if (frame >= WARMUP_FRAMES) lastStats = renderer.stats()
+        if (frame === FRAMES - 1) lastStats = renderer.stats()
         result.lastFrame = frame
         frame += 1
         if (frame < FRAMES) requestAnimationFrame(step)
