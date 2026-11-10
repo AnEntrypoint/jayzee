@@ -24,7 +24,22 @@ export const RENDER_LAYOUT = Object.freeze({
   MATERIAL_SLOTS: 256,
 })
 
-const DEFAULT_GLUE = new URL('../../engine/out/engine-core-64mib.mjs', import.meta.url).href
+const DEFAULT_GLUE = new URL('../../engine/out/engine-core-512mib.mjs', import.meta.url).href
+
+const WEBGL2_MODEL_LIMITS = Object.freeze([2048, 256, 268435456, 4, 0])
+
+const MODEL_BIND_REFUSALS = Object.freeze({
+  '-1': 'the device limits fit no device tier',
+  '-2': 'the arena cannot hold the planned tier pool',
+  '-3': 'the model pool refused the planned layout',
+})
+
+const modelLimits = (device, navigatorLike) => {
+  const { maxTextureDimension2D, maxTextureArrayLayers, maxBufferSize } = device.limits
+  const texelBytes = device.features.has('texture-compression-bc') ? 1 : 4
+  const deviceMemoryBytes = navigatorLike.deviceMemory ? navigatorLike.deviceMemory * 1073741824 : 0
+  return [maxTextureDimension2D, maxTextureArrayLayers, maxBufferSize, texelBytes, deviceMemoryBytes]
+}
 
 export const chooseBackend = (requested, hasWebGpu) => {
   if (requested === 'webgpu') {
@@ -56,7 +71,7 @@ const finite = (value, label) => {
   return value
 }
 
-export const createRenderer = (module, backend) => {
+export const createRenderer = (module, backend, { modelTier = -1, device = null, deviceLost = null } = {}) => {
   const f32 = module.HEAPF32
   const u32 = module.HEAPU32
   const u8 = module.HEAPU8
@@ -72,6 +87,9 @@ export const createRenderer = (module, backend) => {
     module,
     backend,
     backendName: RENDER_BACKEND_NAMES[backend],
+    modelTier,
+    device,
+    deviceLost,
 
     setCamera({ viewProj, eye }) {
       expectWords(viewProj, 16, 'viewProj')
@@ -171,13 +189,17 @@ export const loadRenderer = async ({ glue = DEFAULT_GLUE, canvas, navigatorLike 
   ensureCanvasId(canvas)
   const backend = chooseBackend(requested, Boolean(navigatorLike && navigatorLike.gpu))
   const options = { canvas }
-  if (backend === RENDER_BACKEND.WEBGPU) options.preinitializedWebGPUDevice = await requestWebGpuDevice(navigatorLike.gpu)
+  const device = backend === RENDER_BACKEND.WEBGPU ? await requestWebGpuDevice(navigatorLike.gpu) : null
+  if (device) options.preinitializedWebGPUDevice = device
   const factory = (await import(glue)).default
   const module = await factory(options)
   status(module._engine_init(players, workers, budgetBytes), 'engine_init')
+  const modelTier = module._engine_models_bind_plan(...(device ? modelLimits(device, navigatorLike) : WEBGL2_MODEL_LIMITS))
+  if (modelTier < 0) throw new Error('engine_models_bind_plan refused: ' + (MODEL_BIND_REFUSALS[modelTier] ?? 'unknown status ' + modelTier))
   status(module._engine_render_init(backend), 'engine_render_init')
   status(module._engine_render_seal(), 'engine_render_seal')
-  return createRenderer(module, backend)
+  const deviceLost = device ? device.lost.then((info) => ({ reason: info.reason, message: info.message })) : null
+  return createRenderer(module, backend, { modelTier, device, deviceLost })
 }
 
 const status = (code, what) => {
