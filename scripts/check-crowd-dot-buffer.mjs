@@ -36,6 +36,7 @@ const objects = []
 
 const bufferTick = () => decodeCrowdDotPoses(dots, options, poses)
 const objectTick = () => decodeCrowdDots(dots, options, objects)
+const allocatingTick = () => decodeCrowdDots(dots, options)
 for (let i = 0; i < WARMUP_ITERATIONS; i++) {
   bufferTick()
   objectTick()
@@ -46,6 +47,9 @@ const bufferGc = await collectGc(() => {
 })
 const objectGc = await collectGc(() => {
   for (let i = 0; i < MEASURED_ITERATIONS; i++) objectTick()
+})
+const allocatingGc = await collectGc(() => {
+  for (let i = 0; i < MEASURED_ITERATIONS; i++) allocatingTick()
 })
 
 const renderer = createCrowdDotRendererWebGL(new Scene(), {})
@@ -59,8 +63,11 @@ const rendererGc = await collectGc(() => {
 gate('with three/tsl loaded, decodeCrowdDotPoses into a held Float64Array runs with no garbage collection after warm-up', () => {
   assert.equal(bufferGc.length, 0, 'garbage collection ran in the measured window: ' + JSON.stringify(bufferGc))
 })
-gate('with three/tsl loaded, the object form with a reused out array is seen as garbage collection, so the window can detect the churn', () => {
-  assert.ok(objectGc.length > 0, 'the object form made no garbage collection, so this process does not show the three/tsl effect')
+gate('with three/tsl loaded, decodeCrowdDots with a reused out array runs with no garbage collection after warm-up', () => {
+  assert.equal(objectGc.length, 0, 'garbage collection ran in the measured window: ' + JSON.stringify(objectGc))
+})
+gate('with three/tsl loaded, decodeCrowdDots without out is seen as garbage collection, so the window can detect churn', () => {
+  assert.ok(allocatingGc.length > 0, 'the allocating form made no garbage collection, so this process cannot detect churn')
 })
 gate('with three/tsl loaded, the WebGL crowd-dot renderer updates its instances with no garbage collection after warm-up', () => {
   assert.equal(rendererGc.length, 0, 'garbage collection ran in the measured window: ' + JSON.stringify(rendererGc))

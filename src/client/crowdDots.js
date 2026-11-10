@@ -53,6 +53,15 @@ export const decodeCrowdDotPoses = (dots, options, poses) => {
 
 let scratch = crowdPoseBuffer(SCRATCH_DOTS)
 
+class CrowdDotPose {
+  constructor() {
+    this.x = 0
+    this.y = 0
+    this.z = 0
+    this.scale = 0
+  }
+}
+
 export const decodeCrowdDots = (dots, options = {}, out = []) => {
   const wanted = dots ? dots.length : 0
   scratch = crowdPoseBufferFor(scratch, wanted)
@@ -60,7 +69,7 @@ export const decodeCrowdDots = (dots, options = {}, out = []) => {
   out.length = count
   for (let i = 0; i < count; i++) {
     const at = i * CROWD_POSE_STRIDE
-    const pose = out[i] || (out[i] = { x: 0, y: 0, z: 0, scale: 0 })
+    const pose = out[i] || (out[i] = new CrowdDotPose())
     pose.x = scratch[at]
     pose.y = scratch[at + 1]
     pose.z = scratch[at + 2]

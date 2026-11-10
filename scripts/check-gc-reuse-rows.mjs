@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process'
 import { PerformanceObserver } from 'node:perf_hooks'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -149,6 +150,13 @@ gate('bridge.transform returns the same view for a body on every call', () => {
 
 gate('a typed array allocated per call is seen as garbage collection', () => {
   assert.ok(allocatingTransform.length > 0, 'the witness saw no garbage collection in the allocating control, so it cannot detect churn')
+})
+
+gate('decodeCrowdDots allocates no bytes per call with three/tsl loaded, by sampled heap, where the allocating control shows bytes', () => {
+  const probe = fileURLToPath(new URL('./alloc-locate-crowd-dots.mjs', import.meta.url))
+  const summary = JSON.parse(execFileSync(process.execPath, ['--expose-gc', probe], { encoding: 'utf8' }).split('\n')[0])
+  assert.equal(summary.withTsl, true, 'the probe did not load three/tsl')
+  assert.ok(summary.bytesPerCall < 16, 'decodeCrowdDots allocates ' + summary.bytesPerCall + ' bytes per call with three/tsl loaded')
 })
 
 finish()

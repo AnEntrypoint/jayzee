@@ -8,6 +8,8 @@ import { CROWD_DOT_CELL_M, PLAYER_LOD_REDUCED_HZ } from '../src/snapshot-lod-pur
 import { decodeEntityRecord, ENTITY_RECORD_BYTES } from '../src/wire/binSnapshot.js'
 import { crowdDotScale, decodeCrowdDots } from '../src/client/crowdDots.js'
 
+const plainPoses = (poses) => poses.map(({ x, y, z, scale }) => ({ x, y, z, scale }))
+
 const fixture = JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'spoint', 'crowd-dots.json'), 'utf8'))
 const hexBytes = (hex) => Uint8Array.from(hex.match(/../g), (h) => parseInt(h, 16))
 const crowdPlayers = fixture.crowd.positions.map((position, i) => ({ id: i + 1, position }))
@@ -55,7 +57,7 @@ gate('a count of 100 in one cell is one bucket that spoint also reports', () => 
 })
 
 gate('client pose of spoint bucket dots matches spoint PlayerLOD arithmetic', () => {
-  assert.deepEqual(decodeCrowdDots(fixture.crowd.dots, { dotCellM: CROWD_DOT_CELL_M, dotSize: fixture.dotSize, viewerY: fixture.viewerY }), fixture.crowd.poses)
+  assert.deepEqual(plainPoses(decodeCrowdDots(fixture.crowd.dots, { dotCellM: CROWD_DOT_CELL_M, dotSize: fixture.dotSize, viewerY: fixture.viewerY })), fixture.crowd.poses)
 })
 
 gate('client pose of cell (0, 1) is placed at z 37.5, not at a packed key', () => {
@@ -79,7 +81,7 @@ gate('a ground function replaces the viewer height for bucket dots', () => {
 })
 
 gate('flat player dots use their own height and the dot size', () => {
-  assert.deepEqual(decodeCrowdDots([fixture.flat.sample], { viewerY: 99 }), [fixture.flat.pose])
+  assert.deepEqual(plainPoses(decodeCrowdDots([fixture.flat.sample], { viewerY: 99 })), [fixture.flat.pose])
 })
 
 gate('cadence: spoint reduced-tick modulus equals jayzee reducedTickModFor at every rate', () => {

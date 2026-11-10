@@ -2453,3 +2453,22 @@ Change made, not run. The JF6 scope above records that the render page allocates
 | Item | File | Commit | Witness | State after Phase A |
 |---|---|---|---|---|
 | JF6 allocation locate | `scripts/alloc-locate-crowd-dots.mjs` (new probe, not a gate) | this commit | Phase B: `node scripts/alloc-locate-crowd-dots.mjs` and `node scripts/alloc-locate-crowd-dots.mjs --no-tsl`. The TSL run must show the allocating site and its bytes per call. The no-TSL run is the control, which the gate already says is near zero. | Written, not run. |
+
+### Phase B results: JF6 allocation located and fixed (run 2026-11-10-01-27-53-963539)
+
+Phase A commit 22f6084 added the probe. Phase B ran it and found the allocation:
+
+- `node --expose-gc scripts/alloc-locate-crowd-dots.mjs` (three/tsl loaded, 20000 reused-out calls, sampled heap): 62840808 bytes at `decodeCrowdDots` crowdDots.js:56, 3145.0 bytes per call. The rest is probe overhead.
+- `--no-tsl` (control): 1.4 bytes per call, with `writeBucketPose` as the only other site at 8200 bytes.
+
+Cause, as tested: the pose objects were plain literals `{ x: 0, y: 0, z: 0, scale: 0 }`. The literal shares a hidden class with other object literals that have the same keys. Once three/tsl is loaded, some of that code leaves a field with a non-number type in that shape, so the field goes tagged, and each double written into a pose allocates a HeapNumber. The fix gives the pose its own class (`CrowdDotPose` in `src/client/crowdDots.js`), so the field representation is decided by this class alone. The probe then reports 28904 bytes in total, 1.45 bytes per call, the same as the control. The mechanism (the shared shape) is the inference that fits this result. It is not separately witnessed by reading the other literals.
+
+| Item | File | Commit | Witness | State after Phase B |
+|---|---|---|---|---|
+| JF6 allocation fixed | `src/client/crowdDots.js` (`CrowdDotPose`) | Phase B commit | `node --expose-gc scripts/check-gc-reuse-rows.mjs` RESULT PASS (13 PASS, including the new gate that runs the probe with three/tsl loaded and requires under 16 bytes per call) | Closed. The JF6 scope in the section above is widened: decodeCrowdDots with a reused out array is zero-garbage with three/tsl loaded. |
+| Probe as a gate | `scripts/check-gc-reuse-rows.mjs` (new gate, runs `scripts/alloc-locate-crowd-dots.mjs`) | Phase B commit | same run as above | Passes. |
+| Object form under TSL | `scripts/check-crowd-dot-buffer.mjs` | Phase B commit | `node --expose-gc scripts/check-crowd-dot-buffer.mjs` RESULT PASS (8 PASS). The old churn control, the reused-out object form, is now a zero-garbage claim. Its churn control is decodeCrowdDots without out. | Changed, because the old control only detected the bug that was just fixed. |
+| Plain-field comparison | `scripts/check-row16-client-decoder.mjs` (`plainPoses`) | Phase B commit | `node --expose-gc scripts/check-row16-client-decoder.mjs` RESULT PASS (22 PASS). The gate compares fields, not the prototype, which strict deepEqual checks. | Changed. |
+| Full chain | `npm test` | Phase B commit | exit 0, 4808 PASS, 0 FAIL, 239 RESULT PASS (log `build/diag/phaseB2-npm-test.log`) | Green. |
+
+Still open, unchanged: the phase 5 frame-time p99, the USE_WEBGPU to emdawnwebgpu migration, the ENGINE_THREADS branch, the 1024-tier stall fix, the launcher-level null-adapter fix. Dispatcher-owned: the phase 6 cube-sphere keying and the ENGINE.md decisions. The shape-sharing fact is a candidate for AGENTS.md, but that needs a full audit of AGENTS.md first, which this pass did not do.
