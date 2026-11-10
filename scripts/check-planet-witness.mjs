@@ -21,6 +21,7 @@ const good = (over = {}) => ({
   players: PLANET_ENTITY_COUNT,
   adapter: { api: 'webgpu', isFallbackAdapter: false, description: 'NVIDIA' },
   frameTimesMs: frames(10),
+  wallIntervalsMs: frames(10),
   allocationsSinceWarmup: '0',
   createsAfterSeal: 0,
   scene: goodScene,
@@ -63,6 +64,21 @@ gate('the verdict fails when the p99 is over the budget, and names the frames ov
   assert.equal(v.ok, false)
   assert.ok(v.failures.some((f) => f.includes('p99')))
   assert.equal(v.longFrames.length, 60)
+})
+
+gate('the verdict fails when a wall-clock interval is over the budget, even when the work time is under it', () => {
+  const wall = frames(10)
+  wall[300] = 25.2
+  const v = planetVerdict(good({ wallIntervalsMs: wall }), webgpu1024)
+  assert.equal(v.ok, false)
+  assert.deepEqual(v.longFrames, [{ frame: 300, ms: 25.2 }])
+  assert.ok(v.failures.some((f) => f.includes('worst frame 25.2')))
+})
+
+gate('the verdict fails when the wall-clock intervals are missing', () => {
+  const v = planetVerdict(good({ wallIntervalsMs: undefined }), webgpu1024)
+  assert.equal(v.ok, false)
+  assert.ok(v.failures.some((f) => f.includes('wall-clock intervals')))
 })
 
 gate('the verdict fails on the 362.9 ms outlier, and reports the frame index of that outlier', () => {
@@ -139,6 +155,7 @@ gate('each open item from the earlier reports has a cause, a hook and a gate fil
 gate('the render page exports the per-frame times, the player count and the planet scene report', () => {
   const page = readFileSync(join(root, 'scripts/browser/engine-render-browser.js'), 'utf8')
   assert.ok(page.includes('result.frameTimesMs = timed.map(roundTo2)'))
+  assert.ok(page.includes('result.wallIntervalsMs = Array.from(column(5), roundTo2)'))
   assert.ok(page.includes('result.players = readLayout(module).players'))
   assert.ok(page.includes('result.scene = planetScene.report()'))
   assert.ok(page.includes('beforeSeal = TIER === 1024'))

@@ -31,13 +31,17 @@ export const planetVerdict = (result, expected) => {
   else if (expected.backend === 'webgpu' && adapter.isFallbackAdapter !== false) failures.push('WebGPU adapter is a fallback or its fallback flag is unknown')
   if (expected.tier === 1024 && result.players !== PLANET_ENTITY_COUNT) failures.push('players ' + result.players + ' is not ' + PLANET_ENTITY_COUNT)
 
-  const times = result.frameTimesMs
+  const work = result.frameTimesMs
+  const wall = result.wallIntervalsMs
   let p99Ms = null
   let maxMs = null
   let longFrames = []
-  if (!Array.isArray(times) || times.length < PLANET_MIN_FRAMES) {
-    failures.push('frame times: ' + (Array.isArray(times) ? times.length : 'missing') + ' frames, at least ' + PLANET_MIN_FRAMES + ' are required')
+  if (!Array.isArray(work) || work.length < PLANET_MIN_FRAMES) {
+    failures.push('frame times: ' + (Array.isArray(work) ? work.length : 'missing') + ' frames, at least ' + PLANET_MIN_FRAMES + ' are required')
+  } else if (!Array.isArray(wall) || wall.length !== work.length) {
+    failures.push('wall-clock intervals: ' + (Array.isArray(wall) ? wall.length : 'missing') + ' for ' + work.length + ' frames')
   } else {
+    const times = work.map((ms, frame) => Math.max(ms, wall[frame]))
     p99Ms = quantile(times, 0.99)
     maxMs = Math.max(...times)
     longFrames = times.map((ms, frame) => ({ frame, ms })).filter((f) => f.ms > PLANET_FRAME_BUDGET_MS)
