@@ -227,7 +227,7 @@ export const createRenderer = (module, backend, { modelTier = -1, device = null,
   })
 }
 
-export const loadRenderer = async ({ glue = DEFAULT_GLUE, canvas, navigatorLike = globalThis.navigator, requested = 'auto', players = 64, workers = 1, budgetBytes = 67108864, beforeSeal = null } = {}) => {
+export const loadRenderer = async ({ glue = DEFAULT_GLUE, canvas, navigatorLike = globalThis.navigator, requested = 'auto', players = 64, workers = 1, budgetBytes = 67108864, beforeSeal = null, models = true } = {}) => {
   if (!canvas) throw new TypeError('loadRenderer needs a canvas')
   ensureCanvasId(canvas)
   const backend = chooseBackend(requested, Boolean(navigatorLike && navigatorLike.gpu))
@@ -237,13 +237,18 @@ export const loadRenderer = async ({ glue = DEFAULT_GLUE, canvas, navigatorLike 
   const factory = (await import(glue)).default
   const module = await factory(options)
   status(module._engine_init(players, workers, budgetBytes), 'engine_init')
-  const modelTier = module._engine_models_bind_plan(...(device ? modelLimits(device, navigatorLike) : WEBGL2_MODEL_LIMITS))
-  if (modelTier < 0) throw new Error('engine_models_bind_plan refused: ' + (MODEL_BIND_REFUSALS[modelTier] ?? 'unknown status ' + modelTier))
+  const modelTier = models ? bindModelPool(module, device, navigatorLike) : -1
   status(module._engine_render_init(backend), 'engine_render_init')
   if (beforeSeal) beforeSeal(module)
   status(module._engine_render_seal(), 'engine_render_seal')
   const deviceLost = device ? device.lost.then((info) => ({ reason: info.reason, message: info.message })) : null
   return createRenderer(module, backend, { modelTier, device, deviceLost })
+}
+
+const bindModelPool = (module, device, navigatorLike) => {
+  const tier = module._engine_models_bind_plan(...(device ? modelLimits(device, navigatorLike) : WEBGL2_MODEL_LIMITS))
+  if (tier < 0) throw new Error('engine_models_bind_plan refused: ' + (MODEL_BIND_REFUSALS[tier] ?? 'unknown status ' + tier))
+  return tier
 }
 
 const status = (code, what) => {

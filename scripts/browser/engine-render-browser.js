@@ -402,7 +402,7 @@ const run = async () => {
   let planetScene = null
   let worldReady = false
   const beforeSeal = TIER === 1024 ? (module) => { setupWorld(module); worldReady = true; planetScene = buildPlanetScene({ module, now: () => performance.now() }) } : null
-  const renderer = await loadRenderer({ glue: new URL(TIER_GLUE, import.meta.url).href, canvas, navigatorLike, requested, players: TIER, workers: WORKERS, budgetBytes: TIER_BUDGET, beforeSeal })
+  const renderer = await loadRenderer({ glue: new URL(TIER_GLUE, import.meta.url).href, canvas, navigatorLike, requested, players: TIER, workers: WORKERS, budgetBytes: TIER_BUDGET, beforeSeal, models: TIER === 1024 || MODELS })
   const module = renderer.module
   const placed = []
   const surface = setupScene(module, renderer, placed, worldReady)
