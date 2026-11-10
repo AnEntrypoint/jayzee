@@ -1,5 +1,6 @@
 import { checkVector, isFiniteNumber, resolveWorldOptions } from '../world/options.js'
 import { createBridge, readLayout } from './bridge.js'
+import { solverIterationsFor } from './solverIterations.js'
 
 const MAX_STEPS_PER_ADVANCE = 8
 const BOX_WORDS = 6
@@ -380,11 +381,13 @@ export const createEngineWorld = async (options = {}, glue = DEFAULT_GLUE) => {
   const settings = resolveWorldOptions(options)
   if (settings.boxCount > ENGINE_MAX_STATICS) throw new RangeError('engine holds at most ' + ENGINE_MAX_STATICS + ' static boxes')
   if (settings.drag >= 1) throw new RangeError('drag must be below 1 on the engine, where it is a Jolt damping factor')
-  const module = await loadEngineModule(glue, resolvePlan(options))
+  const plan = resolvePlan(options)
+  const module = await loadEngineModule(glue, plan)
   const layout = readLayout(module)
   if (settings.capacity > layout.bodies) {
     throw new RangeError('engine capacity is at most ' + layout.bodies + ' for ' + layout.players + ' players')
   }
+  const iterations = options.solverIterations === undefined ? solverIterationsFor(plan.players) : settings.solverIterations
   const configured = module._engine_world_configure(
     settings.capacity,
     settings.tickRate,
@@ -392,7 +395,7 @@ export const createEngineWorld = async (options = {}, glue = DEFAULT_GLUE) => {
     settings.drag,
     settings.radius,
     settings.restitution,
-    settings.solverIterations,
+    iterations,
   )
   if (configured !== ENGINE_OK) throw engineError(configured, 'engine refused the world configuration')
   for (let offset = 0; offset < settings.flatBoxes.length; offset += BOX_WORDS) {

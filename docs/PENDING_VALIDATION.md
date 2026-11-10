@@ -3287,3 +3287,27 @@ Open after Phase B:
 - KTX2 transcode of the prepped assets: not witnessed.
 - Physics scenario witnesses (spoint example games): not started.
 - spoint walk frame-time comparison: not run.
+
+## Stretch: 1024 solver, state hash, KTX2 transcode, launcher, open rows (Phase A, 2026-11-10)
+
+Phase A: code, docs and gates only. No build, test or witness run in this phase. Each change is listed with the witness Phase B runs.
+
+| change | files | witness (Phase B) |
+|---|---|---|
+| 1024-tier solver iterations: 4 for velocity and position, 8 for every other tier; host applies it only when `solverIterations` is unset | `src/engine/solverIterations.js` (new), `src/engine/EngineWorld.js`, `scripts/browser/engine-render-browser.js` | `npm run check:engine-solver-tier`; then the stream witness on the 1024 tier, both backends, both paths |
+| 1024 physics-state hash: 10,240 bodies, 120 ticks, fixed build (1 worker) against threaded build (4 workers), FNV-1a over float32 positions, pinned as `tier1024-solver4` | `scripts/lib/stateHash1024.mjs` (new), `scripts/gen-engine-state-hash-1024.mjs` (new), `scripts/check-engine-state-hash-1024.mjs` (new), `engine/state-hashes.json` (new, pin null until generated) | `npm run gen:engine-state-hash-1024` (writes the pin only when fixed and threaded agree), then `npm run check:engine-state-hash-1024` |
+| Stream records carry host load (`cpus`, `load1Before`, `load1After`) per run, so a frame figure is read with the load beside it | `scripts/browser/stream-witness-run.mjs` | the Phase B stream witness summary: every record has a `load` object |
+| KTX2 transcode witness: each prepped KTX2 image validates, and transcodes to ETC1 and BC1 through three's Basis transcoder (non-empty, non-zero) | `scripts/check-ktx2-transcode.mjs` (new), `package.json` script `check:ktx2-transcode` | `npm run asset:prep` (or `check:vegetation-assets`) first, then `npm run check:ktx2-transcode` |
+| Launcher: `chromium-webgpu.sh` starts Chromium with `--enable-unsafe-webgpu --enable-features=Vulkan,WebGPUService` on the command line, before the caller's arguments, so the flags no longer depend on the profile | `scripts/browser/chromium-webgpu.sh`, `scripts/check-chromium-launcher.mjs` (new) | `npm run check:chromium-launcher`; then a live adapter probe through the launcher (Phase B step) |
+
+Recorded, not changed in Phase A:
+
+- 1024 long-frame stalls. The cause is recorded in "Stalls at 1024, Phase B diagnosis": the single-threaded tick under CPU sharing and cgroup throttling. The solver change reduces the tick work. The stream records now carry load, so the stall rows can be read against it in Phase B.
+- 64-tier backend trace. Attributed in the Phase B record: encode 0.06, upload 0.06, acquire 0.04 and submit 0.04 ms are timed (0.20 ms); the remaining 0.04 ms of the 0.24 ms backend phase is not timed by any phase. No code change here.
+- 362.9 ms WebGL2 outlier. Still not reproduced. Its cause class is the same as the stalls (load and throttling). Left open until a run records load beside a frame value that is that large.
+- Controlled pause run (live). The tooling exists (`scripts/browser/controlled-run.mjs`), and `scripts/check-controlled-run.mjs` reads the recorded run. The live run is a Phase B step.
+- Instanced GLB vegetation draw path (queue item 2). Not built in Phase A. The reuse point is the prop path: `frame()` in `engine/src/render/render_webgl2.cpp` draws instanced records per class, and `kPropClasses` (4) with `propRecords` in `engine/src/render/render_frame.h` is the record layout. A vegetation path needs a per-instance transform stream from `vegetation::state()` (`Instance` in `engine/src/vegetation.h`), a model draw per instance in both backends (WebGL2 `glDrawElementsInstanced`, WebGPU instance-step vertex buffer), CPU culling by cell, and the prepped KTX2 assets through the texture path. This is multi-day work and is not started; no blind GPU code was landed.
+- spoint walk frame-time comparison (item 7). Not like-for-like: spoint's client is a three.js scene, and jayzee's page is the wasm renderer. The existing sample comparison (`scripts/spoint-streamer-compare.mjs`, ratio 1.08) is the only like-for-like figure.
+- Physics scenario witnesses from spoint's example games (item 8). Not started. The planet landscape is the one dataset; spoint's spawn assumptions are not copied.
+
+Defect recorded in this pass: the "simulation hashes" b6675ee2 and 21494c4d (ENGINE.md and the Phase A NoLock entry) are not produced by any gate or record in this repo. The render page's `hash` covers the camera and page samples. They are replaced by `tier1024-solver4` in `engine/state-hashes.json`.

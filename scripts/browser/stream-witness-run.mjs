@@ -1,4 +1,5 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
+import { cpus, loadavg } from 'node:os'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { runRenderWitness } from './render-witness.mjs'
@@ -46,17 +47,20 @@ for (const config of TIERS) {
     for (const path of PATHS) {
       const label = config.tier + '-' + backend.name + '-' + path
       const started = Date.now()
+      const load1Before = loadavg()[0]
       const run = await runRenderWitness({ root, port, query: queryFor(config, backend, path) })
       const wallMs = Date.now() - started
+      const load = { cpus: cpus().length, load1Before, load1After: loadavg()[0] }
       if (run.error || !run.result) {
-        summary.push({ label, wallMs, error: run.error ?? 'no result', failures: ['run failed'] })
+        summary.push({ label, wallMs, load, error: run.error ?? 'no result', failures: ['run failed'] })
         continue
       }
       const failures = verdict(run.result)
-      writeFileSync(resolve(outDir, label + '.json'), JSON.stringify({ wallMs, failures, result: run.result }, null, 1) + '\n')
+      writeFileSync(resolve(outDir, label + '.json'), JSON.stringify({ wallMs, load, failures, result: run.result }, null, 1) + '\n')
       summary.push({
         label,
         wallMs,
+        load,
         backend: run.result.backend,
         frameMedianMs: run.result.frameTimeMedianMs,
         frameP99Ms: run.result.frameTimeP99Ms,

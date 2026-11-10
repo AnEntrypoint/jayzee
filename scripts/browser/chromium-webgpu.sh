@@ -5,4 +5,4 @@ root=${WEBGPU_PROJECT_ROOT:-$(cd "$here/../.." && pwd)}
 BREAKPAD_DUMP_LOCATION=${BREAKPAD_DUMP_LOCATION:-$root/.playwriter/crash-dumps}
 export BREAKPAD_DUMP_LOCATION
 mkdir -p "$BREAKPAD_DUMP_LOCATION"
-exec "${WEBGPU_CHROMIUM:-/usr/bin/chromium}" "$@"
+exec "${WEBGPU_CHROMIUM:-/usr/bin/chromium}" --enable-unsafe-webgpu --enable-features=Vulkan,WebGPUService "$@"

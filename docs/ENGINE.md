@@ -492,7 +492,15 @@ Decision: the 1024 tier's frame budget is 16.7 ms (one tick at 60 Hz). The 1024 
 
 Measured: three interleaved rounds give a WebGPU median of 16.9 ms and a WebGL2 median of 17.5 ms, with round-to-round spread from 13.7 to 17.6 ms. The budget is reached in some rounds and missed in others, and the tick is most of the frame on both backends. So the 1024 tier is at the budget, not inside it. The 8-worker case is impossible with the current pthread pool size of 3, so 4 workers is the ceiling.
 
-Open for this decision: a tick that is clearly under 16.7 ms at 1024 needs a physics change, not a renderer change, because the render side is under 0.5 ms on both backends.
+The 1024 solver configuration (owner decision, dispatcher-recorded, 2026-11-10)
+
+The 64, 128 and 512 tiers keep their determinism hash and their 8 solver iterations. For the 1024 tier only, the solver runs 4 iterations for both velocity and position steps (`SOLVER_ITERATIONS_BY_PLAYERS` in `src/engine/solverIterations.js`). This is the least change that halves the contact-solver work and keeps the existing sleeping and broadphase settings. The host applies it only when the caller leaves `solverIterations` unset (`src/engine/EngineWorld.js`), and the render page reads the same table, so the witness runs what the host runs.
+
+The simulation hash is the physics state, not the render scene. `scripts/check-engine-state-hash-1024.mjs` runs 10,240 bodies for 120 ticks on the fixed build (1 worker) and on the threaded build (4 workers), requires the two to agree bit for bit, and compares the FNV-1a hash of the float32 positions with `engine/state-hashes.json` (key `tier1024-solver4`). The pin is written by `npm run gen:engine-state-hash-1024`, which refuses to write when the two builds disagree. The earlier values b6675ee2 and 21494c4d are not traceable to any gate or record in this repo: the render page's `hash` covers the camera and the page samples, so those values are not simulation hashes and are not used.
+
+The 1024 witness reports the host load beside each run (`load.load1Before`, `load.load1After`, `load.cpus` in each stream record), so a frame figure can be read with the load that produced it.
+
+Open for this decision: the 1024 tier is measured again in the stream witness after this change. If the median is still above 16.7 ms on either backend, the next lever is the position-step count alone, and that is a new decision.
 
 Minimum arena for the 1024 plan (decision)
 
