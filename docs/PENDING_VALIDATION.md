@@ -3382,3 +3382,27 @@ Not done in this Phase A, so they are open for stretch 2 and are not dropped:
 - Realised spoint vegetation density per km² (the tree and rock values above are ceilings, the grove and soil multipliers are not in the repo). Phase B measures it.
 - The procedural props count is zero because spoint's props are authored (4 entries, no area recorded). Revisit if spoint gains a scattered prop layer.
 - Streaming and collider updates on the witness scene. The witness scene itself runs in Phase B, and its object, collider, triangle and patch counts are recorded then.
+
+## Stretch 3, Phase A: collision placement and shared data
+
+Code, docs and gates only. No build, test or witness run in Phase A. Phase B runs each witness and fills in the ENGINE.md tables.
+
+| change | files | witness (Phase B) |
+|---|---|---|
+| Layer broadphase and update rate: very static and static have a rate of zero, dynamic has one per step; `stepCost()` reports per-step work by layer | `src/engine/colliderLayers.js` | `npm run check:collision-placement` (gate "per-step work is only the dynamic layer") |
+| Population colliders: trees and rocks as static, buildings and props as static props, terrain as very static | `src/engine/populationColliders.js` (new) | `npm run check:collision-placement` (gates "the population registers" and "static population colliders refit only on change") |
+| Ground-query placement on the render height store, timed on the injected clock | `src/engine/collisionPlacement.js` (new) | `npm run check:collision-placement` (gate "the ground query path") |
+| Jolt heightfield placement, built once and queried through the raycast; build time kept out of the query distribution | `src/engine/collisionPlacement.js` | `npm run check:collision-placement` (gate "the Jolt heightfield path") |
+| GPU-side placement through an injected dispatch | `src/engine/collisionPlacement.js` | `npm run check:collision-placement` (gate "the GPU path") |
+| Choice by measurement: no option preferred in code, nothing chosen without a measurement, options over the error tolerance excluded, lowest p99 wins, name tie-break | `src/engine/collisionPlacement.js` | `npm run check:collision-placement` (gates "no option is preferred" and "the choice is the lowest measured p99") |
+| One height store per patch, with render and physics on the same buffers; normals derived once; render and physics views are the same buffers | `src/engine/sharedData.js` (new) | `npm run check:collision-placement` (gates "the render and physics views" and "normals from a flat store") |
+| Instance transforms in a stride-16 stream, physics reads position in place | `src/engine/sharedData.js` | `npm run check:collision-placement` (gate "a physics position is read in place") |
+| Copy accounting: render bytes, physics copy avoided, copies avoided | `src/engine/sharedData.js` | `npm run check:collision-placement` (gate "the copy accounting") |
+| Stretch 3 section in ENGINE.md: question, options, decision rule, layers, sharing, byte table with Phase B blanks | `docs/ENGINE.md` | Phase B fills the TBD cells on the witness scene |
+
+Open for Phase B, not decided in Phase A:
+
+- The placement option itself. The numbers in ENGINE.md decide it. Phase B measures on the witness scene, both backends where the option runs. The GPU option is measured only if a dispatch exists.
+- The tolerance `maxErrorM` is set before the run and recorded with its value.
+- The Jolt heightfield path needs a Jolt build from the render samples. Phase A does not connect it to the Jolt host, so the Phase B run wires `buildHeightfield` and `raycastDown` to `src/collision/joltHost.js`.
+- The byte and copy numbers for the witness scene (patch count, instance count) are recorded in Phase B.

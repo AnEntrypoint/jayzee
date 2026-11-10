@@ -547,3 +547,42 @@ Colliders. Three layers, in `src/engine/colliderLayers.js`. Very static (terrain
 Streaming. Page streaming follows the engine's existing cube-sphere face cells, so it follows the curvature through `worldToCell`. No change is made in Phase A. Phase B checks it on the witness scene.
 
 Witness scene. The stretch-2 witness scene is not run in Phase A. Its object, collider and triangle counts and its patch counts are recorded in Phase B, with the asset source of each object class. The asset sources, in order: `/workspace/assets` (934 `.cluster.glb`) first, then `/workspace/hy3d`, `/workspace/oscraft` and `/workspace/spoint`.
+
+## Stretch 3: collision placement and shared data (Phase A)
+
+Question. Where do collision queries for the population get their ground height: a Jolt heightfield built from the render height store, a custom ground query on that same store for dynamic bodies, or a GPU-side query? The choice is made by measurement, not by preference. No option is the default in code.
+
+Options, in `src/engine/collisionPlacement.js`. Each takes its dependencies by injection and refuses to build without them.
+
+- `jolt-heightfield`: `buildHeightfield(samples, cellM)` builds the body once, `raycastDown(x, z)` queries it. Build time is kept out of the query distribution.
+- `ground-query`: `sampleHeight(x, y, z)` reads the render height store directly, with no body.
+- `gpu-query`: `dispatch(positions)` returns heights for a batch of positions from a GPU pass.
+
+Each option has a `measure()` hook returning `{count, p50Ms, p99Ms, maxMs}` on the injected clock. A clock is required, as the other pure modules require.
+
+Decision rule, `chooseByMeasurement(results, {maxErrorM, metric})`:
+1. An option with no measurement is not a candidate. With no measurement at all, the decision is `name: null`.
+2. An option whose measured height error exceeds `maxErrorM` is not a candidate. If none is within the tolerance, the decision is `name: null`.
+3. Among the rest, the lowest `metric` wins (`p99Ms` by default). A tie is broken by name, in alphabetical order.
+
+Phase B fills in this table on the witness scene (1024 tier, the population of stretch 2, both backends where the option runs). The tolerance is set before the run, and the numbers are recorded as measured.
+
+| option | build ms | query p50 ms | query p99 ms | max error m | chosen |
+|---|---|---|---|---|---|
+| jolt-heightfield | TBD | TBD | TBD | TBD | TBD |
+| ground-query | n/a | TBD | TBD | TBD | TBD |
+| gpu-query | n/a | TBD | TBD | TBD | TBD |
+
+Layers. `LAYER_CONFIG` in `src/engine/colliderLayers.js` gives each layer its broadphase and update rate. Very static and static have an update rate of zero, so a step does no work for them: their work is the build and the refit on change. Dynamic has a rate of one per step. `stepCost()` reports the per-step work by layer, and the gate checks that the static layers are zero. The population registers its trees and rocks as static and its buildings and props as static props, through `src/engine/populationColliders.js`. Terrain is very static.
+
+Shared data, in `src/engine/sharedData.js`. One height store per patch holds the heights and the normals derived from them. Render and physics take the same buffers (`renderView` and `physicsView`), so there is no copy. Instance transforms are a stride-16 stream with the position in the last column, and physics reads the position in place. Each path's copy count and bytes are recorded by `copyAccounting`:
+
+| quantity | formula | per 1000 instances, 10 patches of 400 B |
+|---|---|---|
+| render bytes (one copy) | patches × patch bytes + instances × 64 | 68,000 |
+| physics copy avoided | patches × patch bytes + instances × 12 | 16,000 |
+| copies avoided | patches + instances | 1,010 |
+
+Phase B measures the same counts on the witness scene and records them here with the scene's patch and instance counts.
+
+Witness: `scripts/check-collision-placement.mjs` (`npm run check:collision-placement`, in `npm test`). Its gates cover the layer rates and per-step cost, the population registration, the refit on change, each option's refusal and measurement, the choice rule, the shared buffers, the normals, the in-place position read and the byte accounting.

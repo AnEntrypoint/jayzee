@@ -3,6 +3,12 @@ export const LAYER_STATIC = 'static'
 export const LAYER_DYNAMIC = 'dynamic'
 export const LAYERS = Object.freeze([LAYER_VERY_STATIC, LAYER_STATIC, LAYER_DYNAMIC])
 
+export const LAYER_CONFIG = Object.freeze({
+  [LAYER_VERY_STATIC]: Object.freeze({ broadphase: 'very-static-tree', updateEverySteps: 0 }),
+  [LAYER_STATIC]: Object.freeze({ broadphase: 'static-tree', updateEverySteps: 0 }),
+  [LAYER_DYNAMIC]: Object.freeze({ broadphase: 'dynamic-tree', updateEverySteps: 1 }),
+})
+
 export const layerOf = (kind) => {
   if (kind === 'terrain' || kind === 'planet') return LAYER_VERY_STATIC
   if (kind === 'prop' || kind === 'box' || kind === 'tree' || kind === 'rock') return LAYER_STATIC
@@ -51,10 +57,15 @@ export const createColliderSet = () => {
     for (const [id, entry] of built) if (entry.layer === LAYER_DYNAMIC) dynamic.push(id)
     return dynamic
   }
+  const stepCost = () => {
+    const cost = { [LAYER_VERY_STATIC]: 0, [LAYER_STATIC]: 0, [LAYER_DYNAMIC]: 0 }
+    for (const entry of built.values()) if (LAYER_CONFIG[entry.layer].updateEverySteps > 0) cost[entry.layer] += 1
+    return cost
+  }
   const counts = () => {
     const out = { [LAYER_VERY_STATIC]: 0, [LAYER_STATIC]: 0, [LAYER_DYNAMIC]: 0 }
     for (const entry of built.values()) out[entry.layer] += 1
     return out
   }
-  return { add, change, flush, step, counts, stats: () => ({ ...stats }), pending: () => dirty.size }
+  return { add, change, flush, step, stepCost, counts, stats: () => ({ ...stats }), pending: () => dirty.size }
 }
