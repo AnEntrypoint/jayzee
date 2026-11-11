@@ -3947,3 +3947,15 @@ Witness: `build/diag/planet-64webgpu-capture/` after the Phase B job, five conse
 ### Long-frame trace trigger (Phase A)
 
 `scripts/browser/planet-witness-run.mjs` writes the full trace only when a run has a long frame. The dump goes to `<outDir>/dumps/<label>-frame<N>.trace.json` and holds `trigger: "long-frame"`, every `frameCases` record, and the trace events. A clean run writes no trace file. The per-frame capture fields from the previous entry are unchanged.
+
+### 64-webgpu spike hunt (Phase B outcome)
+
+`build/diag/spike-hunt.sh` built once, then ran `PLANET_ONLY=64-webgpu` up to 25 times, stopping at the first captured dump. Runs 1 to 4 were clean (rc=0). Run 5 captured a long frame (rc=1, `build/diag/spike-hunt.log`), so the hunt stopped after 5 of 25 runs.
+
+Captured dump: `build/diag/spike-5/dumps/64-webgpu-frame868.trace.json` (53.2 MB, 241,330 events). Frame 868 has `tickMs` 16.47 and `physics` 16.25 ms, against a median physics of 2.59 ms. Inside that frame, GPU submit took 0.13 ms, GC took 0 ms, and no worker pool ran (the 64 tier has `threads: false`). The excursion sits in the engine physics step inside `step` at `scripts/browser/engine-render-browser.js:490`.
+
+Host at capture, from `build/diag/spike-5/64-webgpu.json` (237 host samples): `zig` at 99.9% CPU in the spike window, with `git`, `ps` and `MainThread` also busy. The `ps` load is the runner's own 50 ms sampler. The cgroup throttle counters (`nr_throttled` 350,695, `throttled_usec` 87,145,424,710) are cumulative since container start and were not sampled per run window, so they do not show whether throttling happened during frame 868.
+
+Cause: not established. The physics excursion is either host CPU preemption under the concurrent `zig` build or in-engine Jolt work. The earlier spikes (`build/diag/planet-phaseB-final4/64-webgpu.json`, 26.19 ms at frame 250; `build/diag/planet-phaseB/64-webgpu.json`, 25.27 ms at frame 665) were main-thread idle inside the gap, so they may be a different mechanism. This is recorded as an open defect, not as expected. Closing it needs per-window `cpu.stat` deltas recorded by the runner, or a run with no concurrent build. The host-load test was not run, and PID 901344 was not touched.
+
+Witness: `build/diag/spike-hunt.log`, `build/diag/check-planet-witness.log` (`RESULT: PASS`, `EXIT 0`).
