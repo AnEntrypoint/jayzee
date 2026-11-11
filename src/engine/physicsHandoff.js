@@ -3,7 +3,7 @@ import { createPoseHandoffCore } from './poseHandoffCore.js'
 
 export const HANDOFF_POOL = 3
 
-export const createPhysicsHandoff = ({ module, glue, players, budgetBytes, workers = 1, solverIterations, path, pool = HANDOFF_POOL }) => {
+export const createPhysicsHandoff = ({ module, glue, players, budgetBytes, workers = 1, solverIterations, path, pool = HANDOFF_POOL, timeTicks = 0 }) => {
   const worker = new Worker(new URL('./physicsWorker.js', import.meta.url), { type: 'module' })
   const poseBytes = module._engine_pose_bytes()
   const reserve = module._engine_pose_reserve()
@@ -15,10 +15,19 @@ export const createPhysicsHandoff = ({ module, glue, players, budgetBytes, worke
 
   const onPose = (event) => {
     const message = event.data
-    if (typeof message !== 'number') return fail(message.message)
+    if (typeof message !== 'number') {
+      if (message.type === 'stats' && statsWaiter) return statsWaiter(message.tickMs)
+      return fail(message.message)
+    }
     core.receive(message)
     if (handoff.failure) worker.terminate()
   }
+
+  let statsWaiter = null
+  handoff.tickTimes = () => new Promise((resolve) => {
+    statsWaiter = resolve
+    worker.postMessage({ type: 'stats' })
+  })
 
   const fail = (message) => {
     handoff.failure = message
@@ -37,7 +46,7 @@ export const createPhysicsHandoff = ({ module, glue, players, budgetBytes, worke
     }
   })
 
-  worker.postMessage({ type: 'boot', glue, players, budgetBytes, workers, solverIterations, path, pose: buffers })
+  worker.postMessage({ type: 'boot', glue, players, budgetBytes, workers, solverIterations, path, pose: buffers, timeTicks })
   handoff.requestFrame = core.request
   handoff.close = () => worker.terminate()
   return handoff

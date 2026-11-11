@@ -268,5 +268,6 @@
   "check:scenario-planet-landing",
   "check:scenario-projectile-volley",
   "check:pose-allocations",
-  "check:terrain-agreement"
+  "check:terrain-agreement",
+  "check:glue-tier"
 ]

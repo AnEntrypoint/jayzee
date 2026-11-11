@@ -4017,3 +4017,105 @@ Not the compositor: the longest `VizCompositorThread` event inside the flush is 
 Host in the window: 3.6 cores of 12 used, `throttledPeriods` 0. The top processes were `exe` PID 901344 (80 ms), `fx` (50 ms) and the page's `chromium.real` (20 ms).
 
 Cause, as far as the trace names it: the GPU process held the gap, in one WebGPU flush that waited off-CPU. Still open: what the thread waited on. The trace has no event inside the decoder for those 17 ms, and it has no scheduler events, so it does not separate a block inside the GPU driver from the OS descheduling the thread. The host reading (3.6 of 12 cores, no throttling) makes CPU starvation unlikely, but does not rule out a deschedule. Closing it needs scheduler events for the GPU main thread (for example `sched_switch` through perf or ftrace) or Dawn's own trace category in the same window. Also not examined: the run's longest WebGPU flush is 144.7 ms, outside this gap.
+
+## Narrow loop: the check runner and check times (2026-11-11)
+
+Measured over the previous 14 hours: `npm test` ran 48 times for about 70 minutes, `planet-witness-run` 26 times for 51 minutes, and 22 sleeps cost 32 minutes. The loop is now narrow, and the habits are in AGENTS.md under "Working loop".
+
+Changes:
+- `npm test` is `scripts/run-checks.mjs`. The chain moved from the `test` script string to `scripts/test-chain.json` (the same 270 entries in the same order). `npm test -- <fragment>` runs the entries whose name or command contains the fragment, so one area or one file can be run alone. `--list` prints the selection.
+- Checks run four at a time. The 13 checks that measure tick time or run several threads (`scripts/test-serial.json`: the nine scenario gates, `engine-state-hash-1024`, `engine-threads`, `tick-governor`, `thread-sampler`) run alone after the others.
+- A check that passed on a tree is skipped on that tree (`build/checks/passed.json`). The tree key ignores this file and `docs/CHECK_TIMES.md`.
+- `scripts/build-kernel.mjs` skips the 11 to 24 s kernel compile when `src/kernel` and the jz package are unchanged.
+- `engine/test/build_host.sh` skips the native compile when no input is newer than the witness binary (20.7 s to 0.4 s).
+- `scripts/check-engine-state-hash-1024.mjs` runs its isolated children at the same time and no longer runs the 4-worker case twice (29.3 s to 12.4 s alone).
+- `scripts/check-engine-visibility.mjs` and `scripts/check-upstream-builtins.mjs` read the chain from `scripts/test-chain.json`.
+
+Measured wall time of a full run on this host, same 269 checks and 5,183 PASS lines each time:
+
+| run | wall |
+|---|---|
+| serial, forced, kernel rebuilt (`build/diag/checks-serial-1.log`) | 252.4 s |
+| four at a time, first run (`build/diag/checks-jobs4-1.log`) | 110.1 s |
+| four at a time, second run | 98.8 s |
+| rerun on the same tree | 0.6 s, 269 skipped |
+
+The per-check times are in `docs/CHECK_TIMES.md`. The floor of a full run is `check:pose-allocations` at 64 to 74 s. Its 2000 warm-up frames were tried at 300 and at 700: the gate then fails on one-off function-level allocations (10,128 B at `planetStream.js` `step` and at `poseHandoffCore.js:50` with 300 frames; 1,224 B with 700). Lowering V8's wrapper and Maglev thresholds did not remove them, so the warm-up stays at 2000 and the reason is recorded in `scripts/test-slow-reasons.json`.
+
+## Rank pass over the open ledger (2026-11-11)
+
+A read of this whole file found about 60 open rows. Ranked, reachable first:
+
+1. Records with no code: the three unrecorded scenarios, the 7-worker refusal line, the pose-region residual.
+2. Shared terrain data, Node: placement options measured, copy accounting, follow guard, long-walk rebase error, instances beyond 4096 m, mirrored and flat terrain controls.
+3. Vegetation streaming, Node: generation cost per patch, the allocation gate, sharing and scene counts, leaf to patch wiring, realised spoint density, a compiled test of `planDraws` and `planUploads`.
+4. Realistic physics scenarios: the fixed 128 and 512 MiB tiers, the engine state hash in lockstep, determinism over more scenarios, the tick-loop allocation gate, a moving boss target, deathrun respawn; in C++, the planet ray cast, the capsule cast gate, `ExtendedUpdate` with slope and step on streamed pages, line of sight.
+5. Static pools: shape construction refused after seal, the unaudited client paths, `visibleRuns` cost, 7 and 8 workers, the job-wait gate.
+6. Browser rows, in one Phase B: the planet witness on all four configurations, the stream witness, the PAUSED controlled run and its tail report, a `64-webgl2` hunt.
+
+Not reachable from this repo and host, with the reason: hosted CI and a second machine (the Actions spending limit; cross-machine hash); Safari; owner decisions (cube-sphere keying, the next solver lever, the spoint comparison operation, ENGINE.md wording, phases 9 and 12); a browser restart (null adapter, crash route 2); rows that only a recurrence can close (the 705 ms and 362.9 ms outliers, "Session with given id not found").
+
+### Records closed by reading existing witnesses
+
+- Marble bowl, planet landing and projectile volley were added in 170ebc7 and had no section here. Each gate is in `npm test` and passes with 8 PASS lines (`build/checks/check_scenario-*.log`). Their tick traces, both runs on both tiers, zero ticks over 16.7 ms and zero over 25 ms:
+
+| scenario | ticks per run | 64 MiB fixed, run 1 max / p99 ms | 1024 tier 2 workers, run 1 max / p99 ms |
+|---|---|---|---|
+| marble-bowl | 600 | 6.87 / 6.20 | 5.85 / 3.64 |
+| planet-landing | 480 | 5.56 / 0.88 | 5.58 / 0.58 |
+| projectile-volley | 120 | 3.48 / 3.20 | 4.57 / 3.32 |
+
+- The 7-worker refusal ("Witness: pending Phase B") is witnessed: `PASS 7 workers at 512 MiB is refused with the typed workers-do-not-fit error, not an abort` (`build/checks/check_engine-state-hash-1024.log`).
+- The pose handoff residual of Stretch 1 ("removing them needs a shared pose region") is closed by `src/engine/poseRegion.js` and `check:pose-allocations`: `"frameBytes":{"total":0,"own":0,"control":29328}` over 600 frames.
+
+### 64-webgpu gap: open defect
+
+Recorded as an open defect, not as expected. Evidence (hunt 3, run 12, frame 505): one WebGPU flush on the GPU process main thread, `CommandBufferService:PutChanged` with handler `WebGPUDecoderImpl`, ts 486897151114, 21.2 ms wall and 4.07 ms thread CPU, so about 17 ms off the CPU inside the decoder; the compositor's longest event in that window is 95 µs; the host used 3.6 of 12 cores with no throttled period.
+
+Scheduler events were not added: `perf`, `strace` and `gdb` are not installed and `/proc/<tid>/syscall` is refused (see "The off-CPU wait on r1"), and the devtools session has no scheduler category. What was added at no cost in runs is Dawn's own categories, `gpu.dawn` and `disabled-by-default-gpu.dawn`, in `GPU_TRACE_CATEGORIES` (`scripts/browser/page-witness.mjs`), so the next capture of a long flush shows which Dawn call the 17 ms sits in.
+
+## Static pools and browser rows closed in Phase A (2026-11-11)
+
+### Memory tier by budget (the "no path for a device that cannot reserve 512 MiB" row)
+
+`src/engine/glueTier.js` picks the smallest fixed memory tier (64, 128, 256 or 512 MiB) that holds a budget, and `instantiateWithinBudget` steps down a tier, with the budget capped to it, when the reservation fails. Only a reservation failure (`could not allocate memory`, `out of memory`, `WebAssembly.Memory`) steps down; an engine refusal such as a memory plan that does not fit is thrown at once. When no tier can be reserved the error is `GlueReservationError` (`glue-reservation-failed`) and names the tiers tried. `loadRendererWithinBudget({ glueFor, budgetBytes, ... })` in `src/engine/renderer.js` uses it. `loadRenderer`'s own default glue is unchanged.
+
+Witness: `node scripts/check-glue-tier.mjs`, 9 PASS, `RESULT: PASS`, including the real 64 and 128 MiB glues loaded through the chain. Not witnessed: a real browser on a device that refuses 512 MiB, which this host cannot produce.
+
+### Per-frame heap of the planet page, by snapshot (the "rests on the audit" row)
+
+`scripts/browser/planet-heap-run.mjs <tier-backend>` forces a collection and takes a heap snapshot 300 frames after warm-up and again 900 frames later, on the planet page of each configuration. Live JS object bytes over the 900-frame window:
+
+| configuration | before | after | growth | engine allocations after warm-up |
+|---|---|---|---|---|
+| 64-webgpu | 544,760 | 544,808 | 48 B | 0 |
+| 64-webgl2 | 651,988 | 652,036 | 48 B | 0 |
+| 1024-webgpu | 7,003,340 | 7,003,352 | 12 B | 0 |
+| 1024-webgl2 | 7,113,920 | 7,113,932 | 12 B | 0 |
+
+The limit is the 64 KiB of `check:browser-heap`. Records: `build/diag/planet-heap/*.json`. These runs were taken while other work loaded the host, which does not affect a byte count.
+
+### Planner against used memory at 1024 (measured, not reconciled)
+
+The page's heap snapshot now carries the engine's own counters (`arenaUsedBytes`, `heapInUseBytes`, `heapArenaBytes`, `modelsPoolBytes`). At the end of the 1024 planet run, in the 512 MiB glue:
+
+| backend | arena used | model pool | arena less model pool | malloc in use |
+|---|---|---|---|---|
+| WebGPU | 483,917,816 B (461.5 MiB) | 370,676,480 B (353.5 MiB) | 113,241,336 B (108.0 MiB) | 1,585,168 B |
+| WebGL2 | 136,410,744 B (130.1 MiB) | 23,169,408 B (22.1 MiB) | 113,241,336 B (108.0 MiB) | 1,581,568 B |
+
+So the 104.3 MiB plan is 3.7 MiB under what the 1024 scene carves outside the model pool, and the model pool is what takes the WebGPU tier to 461.5 MiB. The 64 tier carves 31,675,440 B (30.2 MiB) of its 64 MiB on both backends, with no model pool. Still open: the planner does not yet take the model pool or the 3.7 MiB as inputs.
+
+### KTX2 transcode in the browser worker
+
+`scripts/browser/decode-worker-run.mjs` now takes the first KTX2 image out of the prepped `build/assets/vegetation/tree.glb`, transcodes it to RGBA32 in Node through `src/engine/decodeCore.js` as the reference, and has the page transcode the same file in the decode worker. Result: 2,497 source bytes, 256 by 256, 262,144 RGBA bytes, FNV `3a6ad91e` on both sides, `ktx2Equal: true`, 8.97 ms in the worker (`build/diag/decode-worker/run.json`). BC7 output still waits on the tiered texture array.
+
+### Worker tick time at 1024 (instrument only)
+
+At 1024 players physics runs in a worker, so the page's rows did not carry the tick time. With `timed=1` the worker now times each tick into a preallocated array, and the page reports `workerTick` (median, p99, max, counts over 16.7 ms and 25 ms) in its result and in the planet summary. The values are recorded with the Phase B planet runs.
+
+### Tools kept from the gap hunts
+
+- `scripts/browser/planet-hunt.mjs <tier-backend> [max runs] [out dir]` runs the planet witness for one configuration until a long-frame dump appears, and writes `hunt.json`.
+- `scripts/browser/gap-events.mjs <dump>` lists, for each long frame, the events that cover the gap with their wall time, thread CPU time and the difference.
+- `engine/build-all.sh` rebuilds every variant present in `engine/out`, and `scripts/pin-engine-artifacts.mjs` rewrites the pins in `engine/artifacts.json`.

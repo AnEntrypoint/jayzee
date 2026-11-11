@@ -1,3 +1,5 @@
+import { instantiateWithinBudget } from './glueTier.js'
+
 export const RENDER_BACKEND = Object.freeze({ WEBGPU: 0, WEBGL2: 1 })
 
 export const RENDER_BACKEND_NAMES = Object.freeze(['webgpu', 'webgl2'])
@@ -254,4 +256,9 @@ const bindModelPool = (module, device, navigatorLike) => {
 const status = (code, what) => {
   if (code !== 0) throw new Error(what + ' failed with engine status ' + code)
   return code
+}
+
+export const loadRendererWithinBudget = ({ glueFor, budgetBytes, ...rest }) => {
+  if (typeof glueFor !== 'function') throw new TypeError('loadRendererWithinBudget needs glueFor(tierMiB)')
+  return instantiateWithinBudget({ budgetBytes, instantiate: (step) => loadRenderer({ ...rest, glue: glueFor(step.tierMiB), budgetBytes: step.budgetBytes }) })
 }

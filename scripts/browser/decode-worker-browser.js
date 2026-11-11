@@ -32,6 +32,15 @@ const run = async () => {
       result.transcoderRefusal = error.message
     }
     result.transcoderMs = Math.round((performance.now() - transcodeAt) * 100) / 100
+    const ktx2Path = new URLSearchParams(location.search).get('ktx2')
+    if (ktx2Path !== null) {
+      const bytes = new Uint8Array(await (await fetch('/' + ktx2Path)).arrayBuffer())
+      const realAt = performance.now()
+      const image = await worker.transcodeKtx2(bytes)
+      let hash = 0x811c9dc5
+      for (let i = 0; i < image.rgba.length; i++) hash = Math.imul(hash ^ image.rgba[i], 0x01000193) >>> 0
+      result.ktx2 = { sourceBytes: bytes.length, width: image.width, height: image.height, rgbaBytes: image.rgba.length, fnv: hash.toString(16).padStart(8, '0'), ms: Math.round((performance.now() - realAt) * 100) / 100 }
+    }
   } finally {
     worker.close()
   }

@@ -439,7 +439,14 @@ const modelsReport = (module, frameTimes) => {
   }
 }
 
-const heapSnapshot = (module) => ({ usedJSHeapSize: performance.memory ? performance.memory.usedJSHeapSize : null, wasmBytes: module.HEAPU8.buffer.byteLength })
+const heapSnapshot = (module) => ({
+  usedJSHeapSize: performance.memory ? performance.memory.usedJSHeapSize : null,
+  wasmBytes: module.HEAPU8.buffer.byteLength,
+  arenaUsedBytes: Number(module._engine_arena_used()),
+  heapInUseBytes: module._engine_heap_inuse_bytes(),
+  heapArenaBytes: module._engine_heap_arena_bytes(),
+  modelsPoolBytes: module._engine_models_pool_bytes(),
+})
 
 const run = async () => {
   const canvas = document.getElementById('engine-canvas')
@@ -453,7 +460,7 @@ const run = async () => {
   const module = renderer.module
   const placed = []
   const surface = setupScene(module, renderer, placed, worldReady)
-  const handoff = TIER === 1024 ? createPhysicsHandoff({ module, glue: new URL(TIER_GLUE, import.meta.url).href, players: TIER, budgetBytes: TIER_BUDGET, solverIterations: runConfig.solverIterations, path: { window: PATH_WINDOW, perFrame: PAGES_PER_FRAME, stepM: PATH_STEP_M, heightM: PATH_HEIGHT_M } }) : null
+  const handoff = TIER === 1024 ? createPhysicsHandoff({ module, glue: new URL(TIER_GLUE, import.meta.url).href, players: TIER, budgetBytes: TIER_BUDGET, solverIterations: runConfig.solverIterations, timeTicks: TIMED ? FRAMES : 0, path: { window: PATH_WINDOW, perFrame: PAGES_PER_FRAME, stepM: PATH_STEP_M, heightM: PATH_HEIGHT_M } }) : null
   if (handoff) await handoff.ready
 
   const aspect = canvas.width / canvas.height
@@ -579,6 +586,10 @@ const run = async () => {
   result.glue = TIER_GLUE
   result.solverIterations = runConfig.solverIterations
   result.tickMedianMs = round2(median(column(2)))
+  if (handoff && TIMED) {
+    const workerTicks = (await handoff.tickTimes()).subarray(WARMUP_FRAMES)
+    result.workerTick = { ticks: workerTicks.length, medianMs: round2(median(workerTicks)), p99Ms: round2(p99(workerTicks)), maxMs: round2(Math.max(...workerTicks)), overBudget: workerTicks.filter((ms) => ms > 16.7).length, over25: workerTicks.filter((ms) => ms > 25).length }
+  }
   result.outlierThresholdMs = round2(2 * result.frameTimeMedianMs)
   result.outliers = []
   for (let r = 0; r < timedCount; r++) {

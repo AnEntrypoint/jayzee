@@ -196,7 +196,7 @@ for (const config of PLANET_RUNS.filter((run) => !only || only === run.tier + '-
   }
   writeFileSync(resolve(outDir, label + '.json'), JSON.stringify({ label, wallMs, load, verdict, frameCases: cases, traceGapSummary: { pid: gapInfo.pid, tid: gapInfo.tid, callbacks: gapInfo.callbacks, aligned: gapInfo.aligned, intervalMismatches: gapInfo.intervalMismatches, error: gapInfo.error ?? null }, hostSamples: samples, result: run.result ?? null }, null, 1) + '\n')
   const wallMaxMs = run.result ? run.result.wallIntervalMaxMs : null
-  summary.push({ label, wallMs, ok: verdict.ok, workMaxMs: verdict.maxMs, workP99Ms: verdict.p99Ms, wallMaxMs, missedFrames: cases.length, frameCases: cases.map((c) => ({ frame: c.frame, intervalMs: c.intervalMs, workMs: c.workMs, classification: c.classification, maxLoad1: c.maxLoad1, gapMs: c.gapMs, mainThreadBusyMs: c.mainThreadBusyMs, topInWindow: c.topInWindow })), load, failures: verdict.failures })
+  summary.push({ label, wallMs, ok: verdict.ok, workMaxMs: verdict.maxMs, workP99Ms: verdict.p99Ms, wallMaxMs, workerTick: run.result?.workerTick ?? null, missedFrames: cases.length, frameCases: cases.map((c) => ({ frame: c.frame, intervalMs: c.intervalMs, workMs: c.workMs, classification: c.classification, maxLoad1: c.maxLoad1, gapMs: c.gapMs, mainThreadBusyMs: c.mainThreadBusyMs, topInWindow: c.topInWindow })), load, failures: verdict.failures })
 }
 
 console.log(JSON.stringify({ outDir, budgetMs: 16.7, runs: summary }, null, 1))
