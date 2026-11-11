@@ -40,12 +40,13 @@ export const projectDebugPort = (root, readText = (path) => readFileSync(path, '
 export const whenSet = (name) => '(() => { const value = window[' + JSON.stringify(name) + ']; return value ? JSON.stringify(value) : null })()'
 
 const TRACE_CATEGORIES = 'devtools.timeline,disabled-by-default-devtools.timeline,disabled-by-default-devtools.timeline.frame,toplevel'
+const GPU_TRACE_CATEGORIES = 'gpu,viz,cc,disabled-by-default-gpu.service'
 
-const startTrace = async ({ send, on, off }) => {
+const startTrace = async ({ send, on, off }, categories) => {
   const chunks = []
   const onData = (params) => chunks.push(...params.value)
   on('Tracing.dataCollected', onData)
-  await send('Tracing.start', { categories: TRACE_CATEGORIES, transferMode: 'ReportEvents' })
+  await send('Tracing.start', { categories, transferMode: 'ReportEvents' })
   let stopped = null
   return {
     stop: () => {
@@ -62,7 +63,7 @@ const startTrace = async ({ send, on, off }) => {
   }
 }
 
-const evaluateInOwnContext = async ({ debugPort, url, expression, timeoutMs, pollMs, record, trace = false }) => {
+const evaluateInOwnContext = async ({ debugPort, url, expression, timeoutMs, pollMs, record, trace = false, gpuTrace = false }) => {
   const client = await connectCdp(debugPort, { sendTimeoutMs: SEND_TIMEOUT_MS })
   const { send, close } = client
   let browserContextId = null
@@ -70,7 +71,7 @@ const evaluateInOwnContext = async ({ debugPort, url, expression, timeoutMs, pol
   let tracer = null
   try {
     ({ browserContextId } = await send('Target.createBrowserContext', { disposeOnDetach: true }))
-    if (trace) tracer = await startTrace(client)
+    if (trace) tracer = await startTrace(client, gpuTrace ? TRACE_CATEGORIES + ',' + GPU_TRACE_CATEGORIES : TRACE_CATEGORIES)
     const { sessionId } = await openPage(send, { url, browserContextId })
     if (record) recorder = await recordPageEvents(client, sessionId)
     const errorsSoFar = () => (recorder ? recorder.events().filter((event) => ERROR_KINDS.includes(event.kind)).map((event) => event.kind + ' ' + event.text) : [])
@@ -91,7 +92,7 @@ const evaluateInOwnContext = async ({ debugPort, url, expression, timeoutMs, pol
   }
 }
 
-export const runPageWitness = async ({ root, port, pagePath, expression, timeoutMs = DEFAULT_TIMEOUT_MS, pollMs = POLL_MS, record = true, trace = false, live = [], debugPort = projectDebugPort(root) }) => {
+export const runPageWitness = async ({ root, port, pagePath, expression, timeoutMs = DEFAULT_TIMEOUT_MS, pollMs = POLL_MS, record = true, trace = false, gpuTrace = false, live = [], debugPort = projectDebugPort(root) }) => {
   if (debugPort === null) return { error: 'no project playwriter browser for ' + root + ': .playwriter/debug-port is missing. Start it through the playwriter setup first.' }
   const reachable = await poll(async () => (await fetch('http://127.0.0.1:' + debugPort + '/json/version')).status === 200, 3, 500)
   if (!reachable) return { error: 'the project playwriter browser does not answer on debug port ' + debugPort + '. Start it through the playwriter setup first; this script starts no browser.' }
@@ -101,7 +102,7 @@ export const runPageWitness = async ({ root, port, pagePath, expression, timeout
     const url = 'http://127.0.0.1:' + port + '/' + pagePath.replace(/^\//, '')
     const served = await poll(async () => server.exitCode === null && (await fetch(url)).status === 200, 60, 200)
     if (!served) return { error: 'the static server did not answer 200 for ' + url + ' (is another process using port ' + port + '?)' }
-    return await evaluateInOwnContext({ debugPort, url, expression, timeoutMs, pollMs, record, trace }).catch((error) => ({ error: error.message }))
+    return await evaluateInOwnContext({ debugPort, url, expression, timeoutMs, pollMs, record, trace, gpuTrace }).catch((error) => ({ error: error.message }))
   } finally {
     stopChild(server, live)
   }

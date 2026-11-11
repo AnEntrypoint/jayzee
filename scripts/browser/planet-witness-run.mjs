@@ -179,7 +179,7 @@ for (const config of PLANET_RUNS.filter((run) => !only || only === run.tier + '-
   const samples = []
   const stop = { done: false }
   const sampling = sampleHost(samples, stop)
-  const run = await runRenderWitness({ root, port, query: planetQuery(config, frames), trace: true })
+  const run = await runRenderWitness({ root, port, query: planetQuery(config, frames), trace: true, gpuTrace: true })
   stop.done = true
   await sampling
   const wallMs = Date.now() - started
