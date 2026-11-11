@@ -425,6 +425,20 @@ const run = async () => {
   }
   let lastStats = null
   const lastCamera = { viewProj: new Float64Array(16), eye: new Float64Array(3) }
+  const firstCallMs = {}
+  const timeFirstCall = (name, call) => {
+    const at = performance.now()
+    call()
+    firstCallMs[name] = performance.now() - at
+  }
+  timeFirstCall('_engine_tick', () => { if (!handoff) module._engine_tick(0) })
+  if (TIMED && module._engine_phase_count) timeFirstCall('_engine_phase_total_ms', () => module._engine_phase_total_ms(0))
+  if (TIMED && module._engine_sim_active_bodies) timeFirstCall('_engine_sim_active_bodies', () => module._engine_sim_active_bodies())
+  if (DRAW) timeFirstCall('renderer.frame', () => {
+    renderer.setCamera(PATH === 'planet' ? planetCamera(module, renderer, 0, aspect, surface) : orbitCamera(0, aspect, surface))
+    if (renderer.frame() !== 0) throw new Error('engine_render_frame warm-up status')
+  })
+  result.firstCallMs = firstCallMs
   await new Promise((resolve, reject) => {
     let frame = 0
     let lastStarted = null

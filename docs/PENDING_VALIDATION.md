@@ -3745,3 +3745,21 @@ Phase B (2026-11-11): the engine is unchanged in this stretch, so the glues are 
 - Ruled out by the record: wasm arena allocation (0), render and upload (0.7 ms and 0.45 ms in the same frames), the page's JS (its phases are separate), and host load (the cost is in-callback, not a gap).
 - Not changed: no code fix. A warm-up that exercises rare Jolt paths would change the engine's initial state and so the pinned state hashes; that change needs its own determinism witness, and it has not been made.
 - Next test: save the browser trace in the failing config and read the wasm events inside the physics call. A compile stall appears as a compile event in that window. If it does, the fix is to force eager compilation of the engine module before the timed frames.
+
+## 64 WebGL2 physics spike: Phase A (pre-warm and saved traces)
+
+Changes:
+- scripts/browser/engine-render-browser.js: before the first frame, each per-frame export is called once and timed (`_engine_tick(0)`, `_engine_phase_total_ms`, `_engine_sim_active_bodies` when timed, and `renderer.frame()` with the frame-0 camera). The times go to `result.firstCallMs`, in ms, compile included. The warm-up render adds one to the renderer's frame counter.
+- scripts/browser/planet-witness-run.mjs: each config's raw trace is written to `<outDir>/traces/<label>.trace.json` as `{ label, firstCallMs, traceEvents }`, so a compile stall is read from the file.
+- scripts/browser/planet-witness-run.mjs: `PLANET_ONLY=<tier>-<backend>` runs one config.
+
+Witness, Phase B (build not needed: JS only):
+- `PLANET_ONLY=64-webgl2 node scripts/browser/planet-witness-run.mjs build/diag/planet-p1 8847 900`: wall 18248 ms, ok, workMax 3.26 ms, missed 0, 900 callbacks aligned, interval mismatches 0. First-call ms: `_engine_tick` 0.95, `renderer.frame` 3.91.
+- All four configs, `node scripts/browser/planet-witness-run.mjs build/diag/planet-p1 8847 900`, wall 136 s total:
+  - 1024-webgpu: wall 18599 ms, workMax 1.95, missed 0.
+  - 1024-webgl2: wall 18353 ms, workMax 0.97, missed 0.
+  - 64-webgpu: wall 18496 ms, workMax 3.38, missed 0.
+  - 64-webgl2: wall 18132 ms, workMax 3.07, missed 0.
+  All four: verdict ok, 900 callbacks aligned, 0 interval mismatches. Traces saved under build/diag/planet-p1/traces/.
+
+Result: the 26 ms and 29 ms in-callback spikes did not recur in this pass. The first-call times are 0 to 5 ms, so the lazy compile was small in this run. The compile hypothesis is not confirmed or rejected by these runs. The pre-warm is kept as the owner direction. OPEN: the earlier spike traces (trace-run8, planet-run2) were not saved, so their cause remains unconfirmed.

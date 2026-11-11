@@ -112,7 +112,8 @@ const frameCases = (result, samples, gapInfo) => {
 
 const summary = []
 let failed = 0
-for (const config of PLANET_RUNS) {
+const only = process.env.PLANET_ONLY
+for (const config of PLANET_RUNS.filter((run) => !only || only === run.tier + '-' + run.backend)) {
   const label = config.tier + '-' + config.backend
   const started = Date.now()
   const load1Before = loadavg()[0]
@@ -128,6 +129,8 @@ for (const config of PLANET_RUNS) {
   if (!verdict.ok) failed += 1
   const gapInfo = traceGaps(run.trace, run.result, frames)
   const cases = frameCases(run.result, samples, gapInfo)
+  mkdirSync(resolve(outDir, 'traces'), { recursive: true })
+  writeFileSync(resolve(outDir, 'traces', label + '.trace.json'), JSON.stringify({ label, firstCallMs: run.result?.firstCallMs ?? null, traceEvents: run.trace ?? [] }) + '\n')
   writeFileSync(resolve(outDir, label + '.json'), JSON.stringify({ label, wallMs, load, verdict, frameCases: cases, traceGapSummary: { pid: gapInfo.pid, tid: gapInfo.tid, callbacks: gapInfo.callbacks, aligned: gapInfo.aligned, intervalMismatches: gapInfo.intervalMismatches, error: gapInfo.error ?? null }, hostSamples: samples, result: run.result ?? null }, null, 1) + '\n')
   const wallMaxMs = run.result ? run.result.wallIntervalMaxMs : null
   summary.push({ label, wallMs, ok: verdict.ok, workMaxMs: verdict.maxMs, workP99Ms: verdict.p99Ms, wallMaxMs, missedFrames: cases.length, frameCases: cases.map((c) => ({ frame: c.frame, intervalMs: c.intervalMs, workMs: c.workMs, classification: c.classification, maxLoad1: c.maxLoad1, gapMs: c.gapMs, mainThreadBusyMs: c.mainThreadBusyMs, topInWindow: c.topInWindow })), load, failures: verdict.failures })
