@@ -1,6 +1,7 @@
 #include "phase_timer.h"
 #include <cstdint>
 #include <cstdlib>
+#include <malloc.h>
 
 #include <emscripten/emscripten.h>
 
@@ -147,6 +148,16 @@ int initialize(std::uint32_t players, std::uint32_t workers, double budgetBytes)
 }
 
 extern "C" {
+
+EMSCRIPTEN_KEEPALIVE double engine_heap_inuse_bytes() {
+  const struct mallinfo info = mallinfo();
+  return static_cast<double>(info.uordblks) + static_cast<double>(info.hblkhd);
+}
+
+EMSCRIPTEN_KEEPALIVE double engine_heap_arena_bytes() {
+  const struct mallinfo info = mallinfo();
+  return static_cast<double>(info.arena);
+}
 
 EMSCRIPTEN_KEEPALIVE int engine_plan_fits(std::uint32_t players, std::uint32_t workers, double budgetBytes) {
   engine::budget::Capacity probe{};

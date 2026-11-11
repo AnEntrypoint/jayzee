@@ -3604,3 +3604,10 @@ Open after this pass:
 - Measurement written, not yet run: `scripts/measure-threaded-footprint.mjs` loads the threaded glue in stages and reports the heap size after the factory (pool threads), after engine_init (arena), after world configure (job system), after the spawns (body storage) and after the planet configure. It takes the glue, the worker count and the budget as arguments.
 - Planned change: add the measured job-system and body-storage overhead per worker to the planner's fit formula in engine/src/budget.cpp. The number is set in Phase B from the measurement, and the default budget is not changed.
 - Witness: the state-hash gate's 8-worker case must be refused with `workers-do-not-fit`, and 2 and 4 workers must hash 8e96da08 with count 30720.
+
+## Threaded footprint, per allocation site (Phase A, 2026-11-11)
+
+- Change: `engine_heap_inuse_bytes` and `engine_heap_arena_bytes` exports read the allocator's in-use and arena sizes with `mallinfo()` (engine/src/engine_core.cpp, listed in engine/CMakeLists.txt).
+- Change: `scripts/measure-threaded-footprint.mjs` reads those exports at each stage (factory, engine_init, world configure, spawns, planet configure) and prints the in-use growth per stage and the high-water. The `HEAPU8.byteLength` readout is removed, since the threaded build pre-grows its heap to its maximum, so that number never changes.
+- Witness: Phase B runs the script at 2, 4 and 8 workers on a threaded build whose wasm maximum can hold the 8-worker configure. The per-stage growth is the per-site measurement, and the planner constant is set from it.
+- Limit: `mallinfo` reports in-use bytes at stage boundaries, not the peak inside one stage call.
