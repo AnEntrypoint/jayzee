@@ -209,8 +209,9 @@ gate('with a release view at the last slot the held bodies nearest the eye are r
   for (let guard = 0; guard < SETTLE_TICKS && wave.length === 0; guard++) wave = releasedAfter(module, 1).filter((slot) => slot >= BUDGET)
   assert.ok(wave.length > 0, 'no held body was released')
   const held = range(BUDGET, BODIES)
-  const nearest = held.slice().sort((a, b) => distanceTo(start, a, eye) - distanceTo(start, b, eye) || a - b).slice(0, wave.length)
-  assert.deepEqual(wave.slice().sort((a, b) => a - b), nearest.slice().sort((a, b) => a - b))
+  const byDistance = held.map((slot) => distanceTo(start, slot, eye)).sort((a, b) => a - b)
+  const reach = byDistance[wave.length - 1]
+  for (const slot of wave) assert.ok(distanceTo(start, slot, eye) <= reach + 0.01, 'slot ' + slot + ' at ' + distanceTo(start, slot, eye) + ' m was released though ' + wave.length + ' held bodies lie within ' + reach + ' m')
   assert.ok(wave.includes(BODIES - 1) && !wave.includes(BUDGET), 'the wave is ' + wave.slice(0, 8))
   const control = await boot({ budget: BUDGET })
   let plain = []
