@@ -8,6 +8,7 @@ import { decide } from './kaggle/push-gate.mjs'
 import { repeatedSpikes } from './kaggle/spikes.mjs'
 import { BASELINE, PROFILE_REPEATS, PROFILE_UNRECLAIMED_REPEATS, PROFILE_VARIANT, RECLAIM_OFF, buildPlan } from './kaggle/plan.mjs'
 import { describeSlowTick } from './kaggle/tickProfile.mjs'
+import { periodFit, slowTickTimes } from './kaggle/slowTickClock.mjs'
 import { referenceGlue } from './kaggle/reference.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -331,6 +332,25 @@ gate('a slow tick is described by the scopes that took more than in a quiet tick
   assert.equal(described.scopes[1].longestMs, 11)
   assert.equal(described.scopes[1].longestAtMs, 5)
   assert.deepEqual(described.threads, [{ lane: 0, events: 40, widestGapMs: 11, gapAtMs: 5, gapEndsAt: 'end of Island' }])
+})
+
+gate('slow ticks are placed on the clock of the kernel run, and gaps that are whole multiples of ten seconds are counted against what chance would give', () => {
+  const quiet = (count) => Array.from({ length: count }, () => 5)
+  const row = (slowAt) => {
+    const traceMs = quiet(400)
+    if (slowAt !== null) traceMs[slowAt] = 30
+    return { kind: 'tick', runS: 10, warmMs: 1000, loadMs: 500, setupMs: 500, traceMs }
+  }
+  const results = { configs: [{ kind: 'calibrate', runS: 3 }, row(100), row(100), row(null), row(100), row(260)] }
+  const events = slowTickTimes(results)
+  assert.deepEqual(events.map((event) => [event.row, event.tick, event.atS]), [[1, 100, 5.5], [2, 100, 15.5], [4, 100, 35.5], [5, 260, 46.3]])
+  const fit = periodFit(events)
+  assert.deepEqual(fit.gaps.map((gap) => [gap.periods, gap.offS]), [[1, 0], [2, 0], [1, 0.8]])
+  assert.equal(fit.near, 2)
+  assert.equal(fit.chanceShare, 0.15)
+  const boot = row(null)
+  boot.traceMs[0] = 40
+  assert.equal(slowTickTimes({ configs: [boot] }).length, 0)
 })
 
 gate('the regress plan carries the profile build at the top tier as rows the gate does not judge', () => {
