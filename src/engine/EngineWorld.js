@@ -126,6 +126,11 @@ export class EngineWorld {
     return handle
   }
 
+  follow(point) {
+    checkVector(point, 'follow point')
+    this.#write(this.#module._engine_follow(point[0], point[1], point[2]), 'physics origin')
+  }
+
   addCharacter({ position, radius, halfHeight }) {
     checkVector(position, 'character position')
     if (![radius, halfHeight].every(isFiniteNumber)) throw new RangeError('character radius and halfHeight must be finite numbers')

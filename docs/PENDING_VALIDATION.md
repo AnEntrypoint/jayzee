@@ -3652,3 +3652,12 @@ Not witnessed: that the registrations take effect on both orders. Nothing in the
 - Change: `scripts/check-scenario-character.mjs`, run as `check:scenario-character` and appended to the `npm test` chain. It places the character at the planet pole, lets it stand 180 ticks, then walks it 1 m/s for 60 ticks. Gates per tier: supported after standing and after walking (this is the first caller of the stretch 1 capsule dispatch, so supported is its witness), resting distance within 0.05 m, no drift over 30 ticks, walked distance within 0.05 m of 1 m, two runs agree bit for bit, worst tick work within 16.7 ms.
 - Limit: no stair step or slope walk; `Update` only, not `ExtendedUpdate`. The character is one, not one per player. Stepping with the origin shifted is covered only by the rebase line.
 - Witness: Phase B, both glues built, `npm test` and the character scenario on both tiers.
+
+## Character controller: Phase B defects and witness (2026-11-11)
+
+- Defect (stretch 1, fixed here): `capsuleContact` projected the capsule segment onto the body-frame origin. The planet's geometric centre is at body `-o`, so the nearest point was wrong whenever the physics origin was not zero. The projection now runs in double precision from `-o`. Witness: at origins 6370999, 6371000, 6371001 and 6371002 the character lands at the same height (6371001 for its centre), where before it differed by 1 m.
+- Defect (fixed here): Jolt's `CharacterVirtual::Update` does not apply gravity. `World::updateCharacter` now integrates gravity into a separate fall vector while unsupported, and the command velocity is kept apart from it, so `setCharacterVelocity` no longer cancels the fall.
+- Convention (measured, not a defect): the character's position is the capsule centre. A centre resting on the surface is at radius plus half-height above it.
+- Change: `EngineWorld.follow` wraps `engine_follow`. The scenario rebases onto the character before stepping, because at a 6.37 × 10⁶ m body position float32 steps are 0.5 m.
+- Witness: `scripts/check-scenario-character.mjs` on the 64 MiB fixed glue (sha256 87627e9a…, first build) and the 512 MiB threaded glue (sha256 744ee5ac…, the build after the projection fix; the hash is recorded in the build log). All six gates PASS on both tiers, and the scenario prints RESULT: PASS, exit 0.
+- Limit: the planet pages are not streamed in this scenario, so `heightAt` returns 0 and the surface is the sphere. Slopes and terrain steps are not exercised.

@@ -85,12 +85,19 @@ JPH::Vec3 PlanetShape::GetSurfaceNormal(const JPH::SubShapeID&, JPH::Vec3Arg loc
 
 bool capsuleContact(Planet& terrain, JPH::Mat44Arg capsuleToPlanet, float halfHeight, float radius, float maxSeparation,
                     JPH::Vec3& surface, JPH::Vec3& axis, float& depth) {
+  const PhysicsOrigin& o = physicsOrigin();
   const JPH::Vec3 a = capsuleToPlanet * JPH::Vec3(0.0f, -halfHeight, 0.0f);
   const JPH::Vec3 b = capsuleToPlanet * JPH::Vec3(0.0f, halfHeight, 0.0f);
-  const JPH::Vec3 ab = b - a;
-  const float lengthSq = ab.LengthSq();
-  const float along = lengthSq > 0.0f ? std::min(1.0f, std::max(0.0f, -a.Dot(ab) / lengthSq)) : 0.0f;
-  return sphereContact(terrain, a + ab * along, radius, maxSeparation, surface, axis, depth);
+  const double ex = static_cast<double>(b.GetX()) - a.GetX();
+  const double ey = static_cast<double>(b.GetY()) - a.GetY();
+  const double ez = static_cast<double>(b.GetZ()) - a.GetZ();
+  const double lengthSq = ex * ex + ey * ey + ez * ez;
+  const double dx = -o.x - a.GetX();
+  const double dy = -o.y - a.GetY();
+  const double dz = -o.z - a.GetZ();
+  const double along = lengthSq > 0.0 ? std::min(1.0, std::max(0.0, (dx * ex + dy * ey + dz * ez) / lengthSq)) : 0.0;
+  const JPH::Vec3 nearest = a + JPH::Vec3(static_cast<float>(ex), static_cast<float>(ey), static_cast<float>(ez)) * static_cast<float>(along);
+  return sphereContact(terrain, nearest, radius, maxSeparation, surface, axis, depth);
 }
 
 void collidePlanetCapsule(const JPH::Shape* inShape1, const JPH::Shape* inShape2, JPH::Vec3Arg, JPH::Vec3Arg,

@@ -133,6 +133,8 @@ struct World::Runtime {
   JPH::PhysicsSystem physics;
   JPH::CharacterVirtualSettings characterSettings;
   JPH::Ref<JPH::CharacterVirtual> character;
+  JPH::Vec3 characterCommand = JPH::Vec3::sZero();
+  JPH::Vec3 characterFall = JPH::Vec3::sZero();
   JPH::ShapeRefC sphere;
   JPH::ShapeRefC planetShape;
   JPH::ShapeRefC vegetationShape;
@@ -321,6 +323,15 @@ Status World::attachVegetation() {
   return kOk;
 }
 
+namespace {
+
+JPH::RVec3 toBody(const float* p) {
+  const PhysicsOrigin& o = physicsOrigin();
+  return JPH::RVec3(static_cast<float>(p[0] - o.x), static_cast<float>(p[1] - o.y), static_cast<float>(p[2] - o.z));
+}
+
+}
+
 Status World::addCharacter(const float* spec) {
   if (runtime_ == nullptr) return kNotConfigured;
   if (runtime_->character != nullptr) return kFull;
@@ -331,8 +342,8 @@ Status World::addCharacter(const float* spec) {
 }
 
 void World::setCharacterVelocity(const float* velocity) {
-  if (runtime_ == nullptr || runtime_->character == nullptr) return;
-  runtime_->character->SetLinearVelocity(JPH::Vec3(velocity[0], velocity[1], velocity[2]));
+  if (runtime_ == nullptr) return;
+  runtime_->characterCommand = JPH::Vec3(velocity[0], velocity[1], velocity[2]);
 }
 
 bool World::characterSupported() const {
@@ -362,6 +373,12 @@ void World::updateCharacter(float dt) {
     const double scale = -static_cast<double>(planetGravity_) / distance;
     gravity = JPH::Vec3(static_cast<float>(x * scale), static_cast<float>(y * scale), static_cast<float>(z * scale));
   }
+  if (runtime_->character->IsSupported()) {
+    runtime_->characterFall = JPH::Vec3::sZero();
+  } else {
+    runtime_->characterFall += gravity * dt;
+  }
+  runtime_->character->SetLinearVelocity(runtime_->characterCommand + runtime_->characterFall);
   const JPH::DefaultBroadPhaseLayerFilter broad(runtime_->objectVsBroadPhase, kLayerMoving);
   const JPH::DefaultObjectLayerFilter object(runtime_->objectPairs, kLayerMoving);
   runtime_->character->Update(dt, gravity, broad, object, JPH::BodyFilter(), JPH::ShapeFilter(), runtime_->temp);
@@ -379,15 +396,6 @@ Status World::addTrunk(const float* trunk) {
   if (id.IsInvalid()) return kFull;
   trunkBodies_ += 1;
   return kOk;
-}
-
-namespace {
-
-JPH::RVec3 toBody(const float* p) {
-  const PhysicsOrigin& o = physicsOrigin();
-  return JPH::RVec3(static_cast<float>(p[0] - o.x), static_cast<float>(p[1] - o.y), static_cast<float>(p[2] - o.z));
-}
-
 }
 
 std::int64_t World::spawn(const float* position, const float* velocity) {

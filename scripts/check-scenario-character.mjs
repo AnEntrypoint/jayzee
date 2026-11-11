@@ -28,6 +28,7 @@ const scenario = async (tier) => {
   const anchor = world.height(0, PLANET.radius, 0)
   const restingDistance = PLANET.radius + anchor + CHARACTER_RADIUS + CHARACTER_HALF_HEIGHT
   world.addCharacter({ position: [0, restingDistance + 0.5, 0], radius: CHARACTER_RADIUS, halfHeight: CHARACTER_HALF_HEIGHT })
+  world.follow([0, restingDistance, 0])
   const tickMs = []
   const trail = []
   const p = [0, 0, 0]
@@ -66,7 +67,7 @@ for (const tier of TIERS) {
   })
   gate(tier.label + ': the character rests on the surface at the capsule height within tolerance', () => {
     const distance = Math.hypot(...first.standing)
-    assert.ok(Math.abs(distance - first.restingDistance) <= REST_TOLERANCE_M, 'rests at distance ' + distance + ' expected ' + first.restingDistance)
+    assert.ok(Math.abs(distance - first.restingDistance) <= REST_TOLERANCE_M, 'centre rests at distance ' + distance + ' expected ' + first.restingDistance)
   })
   gate(tier.label + ': the standing character does not drift horizontally over the last 30 ticks', () => {
     const last = first.trail[first.trail.length - 1]
