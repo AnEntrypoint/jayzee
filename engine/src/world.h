@@ -19,6 +19,7 @@ constexpr std::uint32_t kNoBody = 0xffffffffu;
 constexpr std::uint8_t kSlotFree = 0;
 constexpr std::uint8_t kSlotAlive = 1;
 constexpr std::uint8_t kSlotAsleepSynced = 2;
+constexpr std::uint8_t kSlotAwakeSynced = 3;
 constexpr std::uint16_t kLastGeneration = 0xfffeu;
 constexpr std::uint16_t kRetiredGeneration = 0xffffu;
 constexpr std::uint32_t kFixedJoltBodies = 3;

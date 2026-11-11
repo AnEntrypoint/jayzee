@@ -735,23 +735,24 @@ void World::applyRadialGravity(JPH::PhysicsSystem& system, float dt) {
   if (runtime_ == nullptr || planetBody_ == kNoBody) return;
   constexpr float kSleepSpeed = 0.5f;
   const PhysicsOrigin& o = physicsOrigin();
-  JPH::BodyInterface& bodies = system.GetBodyInterfaceNoLock();
   const JPH::BodyLockInterfaceNoLock& locks = system.GetBodyLockInterfaceNoLock();
-  for (std::uint32_t slot = 0; slot < fresh_; ++slot) {
-    if (alive_[slot] == 0) continue;
-    const JPH::BodyID id(bodyIds_[slot]);
-    if (!bodies.IsActive(id)) continue;
-    const JPH::RVec3 position = bodies.GetCenterOfMassPosition(id);
+  const JPH::BodyID* active = system.GetActiveBodiesUnsafe(JPH::EBodyType::RigidBody);
+  const JPH::uint32 activeCount = system.GetNumActiveBodies(JPH::EBodyType::RigidBody);
+  for (JPH::uint32 i = 0; i < activeCount; ++i) {
+    JPH::Body* body = locks.TryGetBody(active[i]);
+    if (body == nullptr) continue;
+    const JPH::uint64 tag = body->GetUserData();
+    if (tag == 0 || alive_[tag - 1] == kSlotFree) continue;
+    const JPH::RVec3 position = body->GetCenterOfMassPosition();
     const double x = position.GetX() + o.x;
     const double y = position.GetY() + o.y;
     const double z = position.GetZ() + o.z;
     const double distance = std::sqrt(x * x + y * y + z * z);
     if (!(distance > 0.0)) continue;
     const double scale = -static_cast<double>(planetGravity_) * dt / distance;
-    bodies.AddLinearVelocity(id, JPH::Vec3(static_cast<float>(x * scale), static_cast<float>(y * scale), static_cast<float>(z * scale)));
-    const bool mayRest = bodies.GetLinearVelocity(id).Length() < kSleepSpeed;
-    JPH::Body* body = locks.TryGetBody(id);
-    if (body != nullptr && body->GetAllowSleeping() != mayRest) body->SetAllowSleeping(mayRest);
+    body->SetLinearVelocityClamped(body->GetLinearVelocity() + JPH::Vec3(static_cast<float>(x * scale), static_cast<float>(y * scale), static_cast<float>(z * scale)));
+    const bool mayRest = body->GetLinearVelocity().Length() < kSleepSpeed;
+    if (body->GetAllowSleeping() != mayRest) body->SetAllowSleeping(mayRest);
   }
 }
 
@@ -772,13 +773,23 @@ void World::step(std::uint32_t steps) {
       {
         engine::phase::Scope scope(engine::phase::kReadback);
         const JPH::BodyInterface& bodies = runtime_->physics.GetBodyInterfaceNoLock();
+        const JPH::BodyID* active = runtime_->physics.GetActiveBodiesUnsafe(JPH::EBodyType::RigidBody);
+        const JPH::uint32 activeCount = runtime_->physics.GetNumActiveBodies(JPH::EBodyType::RigidBody);
+        for (JPH::uint32 i = 0; i < activeCount; ++i) {
+          const JPH::uint64 tag = bodies.GetUserData(active[i]);
+          if (tag == 0 || alive_[tag - 1] == kSlotFree) continue;
+          const std::uint32_t slot = static_cast<std::uint32_t>(tag - 1);
+          sync(slot);
+          alive_[slot] = kSlotAwakeSynced;
+        }
         for (std::uint32_t slot = 0; slot < fresh_; ++slot) {
           const std::uint8_t state = alive_[slot];
-          if (state == kSlotFree) continue;
-          const bool active = bodies.IsActive(JPH::BodyID(bodyIds_[slot]));
-          if (!active && state == kSlotAsleepSynced) continue;
-          sync(slot);
-          alive_[slot] = active ? kSlotAlive : kSlotAsleepSynced;
+          if (state == kSlotAwakeSynced) {
+            alive_[slot] = kSlotAlive;
+          } else if (state == kSlotAlive) {
+            sync(slot);
+            alive_[slot] = kSlotAsleepSynced;
+          }
         }
       }
     }
@@ -828,11 +839,11 @@ int World::allocateSlot() {
 }
 
 void World::sync(std::uint32_t slot) {
-  JPH::BodyInterface& bodies = runtime_->physics.GetBodyInterfaceNoLock();
-  const JPH::BodyID id(bodyIds_[slot]);
-  const JPH::RVec3 p = bodies.GetPosition(id);
-  const JPH::Vec3 v = bodies.GetLinearVelocity(id);
-  const JPH::Quat q = bodies.GetRotation(id);
+  const JPH::Body* body = runtime_->physics.GetBodyLockInterfaceNoLock().TryGetBody(JPH::BodyID(bodyIds_[slot]));
+  if (body == nullptr) return;
+  const JPH::RVec3 p = body->GetPosition();
+  const JPH::Vec3 v = body->GetLinearVelocity();
+  const JPH::Quat q = body->GetRotation();
   const PhysicsOrigin& o = physicsOrigin();
   double* position = positions_ + slot * 3;
   double* velocity = velocities_ + slot * 3;
