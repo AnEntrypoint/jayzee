@@ -4209,3 +4209,172 @@ The engine follows every single placement itself since 170ebc7 (`spawn`, row 0 o
 So a device loss does not leak the first instance once a collection runs. Until it runs, both instances are reserved: twice the tier, 1024 MiB with the default glue and 128 MiB when the glue is chosen by budget. Both runs end `ok: true` with zero creates after seal and zero allocations after warm-up (`build/diag/device-loss/run-default.json`, `run-budget.json`).
 
 Defect found and fixed in the page: it asked for a 64 MiB budget with the model pool bound, which this adapter's model plan refuses (`engine_models_bind_plan refused: the engine budget holds a smaller model tier than the device plans`), so the page failed before any loss. It now uses a 512 MiB budget with the model pool, and 64 MiB without it in the budget variant. Still open: rebinding on the live instance instead of creating a second one, which is an owner decision.
+
+### Three browser witnesses were failing on the model-plan refusal (found and fixed)
+
+A sweep of the browser witnesses on this tree found three that failed before doing any work, each with `engine_models_bind_plan refused: the engine budget holds a smaller model tier than the device plans, so the bind is refused rather than lowered`. Each asked for a 64 MiB budget with the model pool bound, and this adapter plans a larger model tier. The refusal is the designed behaviour; the pages were not updated when it was introduced.
+
+| witness | fix | result after |
+|---|---|---|
+| `visibility-run.mjs` | 512 MiB budget in `visibility-browser.js` | WebGPU `ok true`, forward against visibility 0 of 518,400 pixels differ, visibility against occlusion 0 differ; WebGL2 `ok true`; occluded scene `ok true` |
+| `device-loss-run.mjs` | 512 MiB budget with the model pool (see the device-loss entry) | `ok true` |
+| `models-run.mjs` | the render page uses the 512 MiB glue and budget when `models=1` at 64 players | `ok true`, newcomer uploaded, 0 dirty slots at the end, steady-frame median 4.35 ms |
+
+Also run on this tree and passing unchanged: `models-vram-run`, `threads-run` (`repeatable true`, worst deviation 0 m, 4 workers), `gpu-backend-run`, `run-player-webgpu`, `decode-worker-run`. The models run's steady-frame p99 was 14.19 ms with other work loading the host, so it is not a timing record.
+
+## Vegetation streaming: the open rows (Phase A, 2026-11-11)
+
+### Per-frame allocation in the vegetation pool (the claim was false; fixed)
+
+`scripts/check-vegetation-allocations.mjs` samples the heap at every allocation over 600 frames after 6000 warm-up frames, on the Node engine, with a patch leaving and entering every second frame. Before the fix the vegetation path allocated 37,675,032 bytes in the window (`generate` 37,610,512, `sync` 45,600, `step` 18,920). The sites: `Math.hypot` (36 B per call in optimised code), array literals per instance and per patch, a PRNG closure per patch, the slot `Map`, the pending array, the `step` result object, and heights returned as boxed doubles (16 B per instance). They are replaced with scalars, typed arrays, an open-addressed `Int32Array` table, an `Int32Array` ring, one reused `step` result, and a `heightInto(n, out)` channel (`createEngineHeightInto` in `src/engine/terrainHeight.js`).
+
+| arm | bytes under the path over 600 frames | control bytes sampled |
+|---|---|---|
+| planet scene, integer clock (292,800 instances generated) | 0 | 29,608 |
+| planet scene, `performance.now` clock | 0 | 81,848 |
+| leaf ids past 32 bits, no patch entering | 0 | 29,048 |
+| leaf ids past 32 bits, patches entering | 120,000 (400 per entering patch, none per instance) | 29,048 |
+
+Behaviour changes: 73 of 1,045,504 generated float32 values differ by at most 3.8e-6 m, because `Math.hypot` became `Math.sqrt`; slot assignment, counts, origins and stats are identical. `sync` now refuses negative and non-safe-integer ids. `step()` returns one object that the next `step` overwrites. Open: the same measurement in the browser.
+
+### Generation cost per patch (measured; the budget decision stays open)
+
+`scripts/check-vegetation-generate-cost.mjs`, on `engine-core-1024mib-threads` with real `_engine_planet_height` samples, 512 timed patches after 64 warm-up, with the host at load 14 to 20:
+
+| patch | median | p95 | max | per instance |
+|---|---|---|---|---|
+| 1024 instances, every height from a loaded page | 0.257 ms | 0.405 ms | 0.525 ms | 251 ns |
+| 1024 instances, no loaded page (control) | 0.395 ms | 0.598 ms | 1.663 ms | 386 ns |
+| 8439 instances, the planet scene's patch size, warm | 2.936 ms | 3.475 ms | 3.752 ms | 348 ns |
+
+The 4096-instance budget is four 1024-instance patches: 1.03 ms at the median and 2.10 ms at the max. The planet scene's patches hold 8439 instances, so its budget is one patch per frame. Its first build of 16 patches took 126.1 ms, 7.9 ms per patch on cold code. `VEG_GEN_INSTANCES_PER_FRAME` is unchanged. Open: the browser cost, and the decision against the frame budget with render time added.
+
+### Scene counts and sharing on the real engine (recorded)
+
+`scripts/check-planet-scene-counts.mjs` pins, on the Node engine: 1024 entities and 67,509 trees over 1.2708 km²; colliders 1 very static, 67,509 static and 1024 dynamic, with only the dynamic layer costing a step; 16 patches of 8439 instances, 135,024 instances in 8,641,536 bytes bound to the engine arena, none deferred. `sharing(1024)` gives 8,657,920 render bytes, 1,636,672 physics bytes not copied and 135,040 copies not made. Triangles before culling, from the draw constants: 1,620,288 for vegetation (12 per instance) and 7,200 for the 16 terrain pages.
+
+Two defects found by this gate, recorded here and taken up below: every one of the scene's 136,048 height queries falls outside the loaded pages (the scene is at latitude 0.3, longitude 0.7, and the streamer loads pages around the pole), so every scene height is 0; and the scene draws 135,024 instances but registers 67,509 tree colliders, because the 16 patch caps cover twice the scene cap. A third: `src/engine/sceneSetup.js` uses a planet radius of 6,371,000 m and `src/engine/sphere.js` uses 6,360,000 m.
+
+### Quadtree leaf to patch id (it was not wired; now wired and gated)
+
+No file in `src/engine` read the quadtree. `src/engine/vegetationPatches.js` maps a mapspinner quadtree leaf (face, level, tx, ty) to one integer patch id and back (`leafPatchId`, `patchLeaf`), gives the pool a `patchCentre` for it, and picks the patch level from the capacity (level 17, a 97 m leaf, for 1024 instances at 53,125 per km²). Leaves finer than the patch level fold into their level 17 ancestor, so a terrain refinement does not change vegetation ids; a leaf coarser than it gets no patch. `scripts/check-vegetation-leaf-patches.mjs`, 10 PASS: the same leaves give the same ids, neighbours differ, and a re-plan after a move of 1.5 leaves keeps the id, slot and bytes of 48 of 64 patches and generates only the 16 that enter. Ids at level 17 are past 32 bits, so the pool keys patches by safe integer. The fold is jayzee's reading; ENGINE.md describes one patch per leaf. Open: the browser witness scene still uses its fixed grid; a host on the default `maxLevel` 11 must set the near-field leaf floor to the patch leaf size, or no leaf reaches the patch level.
+
+### Realised spoint vegetation density (measured)
+
+`scripts/check-spoint-veg-density.mjs` runs spoint's own `placementsForChunk` and `placementsForRockChunk` (spoint 5f43c86c, world tps-game, radius 63,600 m, seed 1337, its real height sampler and anchor field) over nine 1 km² tiles around the anchor. It reads `/workspace/spoint`, so it is not in `npm test`.
+
+| | mean per km² | min | median | max | jayzee ceiling | mean as share |
+|---|---|---|---|---|---|---|
+| vegetation | 4502.8 | 152 | 2913 | 10,978 | 53,125 | 8.48% |
+| rocks | 458.2 | 4 | 285 | 1174 | 15,625 | 2.93% |
+
+The jayzee values stay as ceilings. The planet scene's 67,509 trees are about 11.8 times spoint's realised mean for that area. Open: whether the witness scene should use the realised density, which is an owner decision.
+
+## Static pools and audits: the open rows (Phase A, 2026-11-11)
+
+### Compiled test of `planDraws` and `planUploads` (closed)
+
+`engine/test/witness_vegetation_plan.cpp`, registered in `main_all.cpp` and `build_host.sh`; the host witness went from 292 to 325 PASS. On a 3-species, 64-slot, capacity-16 field: without planes every resident species-slot pair is drawn exactly once with its count and block offset; with a cutting plane the drawn set equals a double-precision sphere test relative to the frame origin (89 of 141 pairs); the plan repeats exactly; for every draw cap from 0 to past the total the result is the first cap draws of the full plan; a count above capacity in a visible patch refuses the plan. For uploads: all slots dirty with the 1 MiB budget uploads each resident pair once (86,144 B, one frame) and clears every flag; a budget of 1.5 largest slots drains in 26 frames, none above the budget; a budget one byte below the first dirty slot uploads nothing.
+
+Open, found by the witness: `planDraws` has no instance budget, only the `maxOut` draw cap. `planUploads` stops at the first dirty slot that does not fit, so a slot larger than the budget blocks every later upload (62 of 63 later slots in the witness), and `valid()` does not bound capacity against `kUploadBytesPerFrame`: 4 species above 4096 instances per patch would stall vegetation uploads permanently. A count above capacity in a culled patch is not refused.
+
+### `visibleRuns` cost, native (closed for the native half)
+
+`witness_models.cpp` binds the model pool at each device tier layout in a forked child and checks `visibleRuns` over every slot against a double-precision reference (24 new lines; the host witness is at 349 PASS). Native `-O2` on a loaded host, best of 5 batches of 20 frames, printed and not thresholded:
+
+| device tier | slots × clusters | all visible, µs per frame | every second culled | all culled | µs per call, all visible |
+|---|---|---|---|---|---|
+| 0 | 128 × 32 | 43.6 | 25.0 | 14.3 | 0.34 |
+| 1 | 256 × 128 | 251.5 | 184.1 | 100.4 | 0.98 |
+| 2 | 256 × 256 | 506.7 | 383.1 | 221.1 | 1.98 |
+
+Open: the cost in the wasm build in a browser.
+
+### Unaudited per-frame client paths (closed as measured rows, each reduced)
+
+`scripts/alloc-audit.mjs` gains seven rows with collection ceilings, and `--only=<fragment>`. Collections in 50,000 calls, with the estimated bytes per call:
+
+| path | before | after |
+|---|---|---|
+| `AnimationSystem.update` (controller, foot grounding, two-leg IK) | 50 (1049 B) | 21 (440 B) |
+| `SpringBoneChain.update`, fresh list | 699 (14,659 B) | 51 (1070 B); 38 (797 B) into a held list |
+| `TwoBoneIKSolver.solve`, fresh result | 385 (8074 B) | 28 (587 B); 18 (377 B) into a held result |
+| `FootIKSolver.solve` under a parent matrix | 56 (1174 B) | 11 (231 B) |
+| `SnapshotProcessor.processSnapshot`, 64 players and 32 entities | 2074 (43,495 B) | 3 (31 B) |
+
+Changes: in-place variants of the rig math with the same operation order (the old functions are untouched); module-held scratch in the IK and spring paths; optional held results; rotation decoded straight from the record bytes; `Map.forEach` with held callbacks in the processor's sweeps; an index-based slot pool, a ring for the release window and recycled snapshot lists. Results unchanged: the module gates pass, including the 1e-12 spoint cross-check (`check-animation-rig`, 28 PASS), and bitwise comparisons against HEAD gave 0 mismatches over 200,000 two-bone solves, 100,000 foot solves, 180,000 spring steps, 2,000,012 quaternion words and 16,000 snapshots. Open: the held-result IK and spring rows still allocate, tier-dependent and not isolated; `AnimationSystem.update` still allocates ray origins and `setTarget` arrays; `RagdollPose.apply` is unaudited. These are Node measurements; the crowd-dot result above shows the browser can differ.
+
+### Job-wait gate (partly closed)
+
+`scripts/check-engine-job-wait.mjs`, run with `--import ./scripts/lib/clockCount.mjs` so the clock counter reaches the worker threads: on `engine-core-512mib-threads.mjs`, 1200 bodies in 100 separate piles run 300 ticks with 2 and 4 workers. Each worker count repeats bit for bit, and both equal the fixed 512 MiB build exactly (state hash 2737282626, worst gap 0 m). `performance.now` is read 0 times during the ticks on the main thread and in the three pool workers. Per tick on a loaded host: 14.6 ms fixed, 6.5 to 7.6 ms with 2 workers, 3.3 to 3.6 ms with 4, printed and not thresholded. 8 PASS.
+
+Open: the gate cannot show that a wait happened, because no export counts waits and the wait paths cross no JS import. The spin-count timed wait and the `sleep_for` overflow path are not reached by this load. Closing them needs a wait counter export in `futex_clockfree.cpp`, a debug timed-wait export, and a counted sleep override or a small job queue.
+
+## Realistic physics scenarios: the open rows, JavaScript side (Phase A, 2026-11-11)
+
+### Four tiers for every scenario gate (closed for Node)
+
+`scripts/lib/scenarioTiers.mjs` holds one tier table for the nine scenario gates: 64 MiB fixed (64 players), 128 MiB fixed (256 players, the most the 128 MiB plan carries), 512 MiB fixed (1024 players) and 512 MiB threaded with 2 workers. Every gate runs the same checks on all four. First-tick and later maximum per tier, from the trace files, with zero ticks over 16.7 ms and zero over 25 ms in the passing runs:
+
+| scenario | 64 fixed first / later max ms | 128 fixed | 512 fixed | 512 threaded × 2 |
+|---|---|---|---|---|
+| boss-fight | 7.30 / 1.42 | 4.03 / 0.80 | 4.52 / 0.23 | 5.32 / 0.35 |
+| character | 7.08 / 0.17 | 5.39 / 0.16 | 4.10 / 0.15 | 4.74 / 0.16 |
+| combat-bots | 6.29 / 0.11 | 5.38 / 0.11 | 4.35 / 0.13 | 4.13 / 0.13 |
+| deathrun | 4.49 / 1.10 | 5.03 / 1.89 | 5.28 / 0.72 | 4.88 / 1.33 |
+| lockstep-rts | 6.79 / 0.41 | 4.56 / 0.22 | 4.71 / 0.21 | 6.41 / 0.33 |
+| marble-bowl | 6.87 / 7.64 | 7.72 / 7.90 | 8.49 / 7.59 | 5.98 / 4.02 |
+| planet-landing | 7.34 / 0.91 | 4.72 / 1.11 | 5.63 / 0.95 | 5.98 / 0.61 |
+| projectile-volley | 4.97 / 1.23 | 4.25 / 1.21 | 4.43 / 1.76 | 4.84 / 1.03 |
+| settle | 6.91 / 1.74 | 5.51 / 1.18 | 11.79 / 1.71 | 6.57 / 2.72 |
+
+These were taken while other work loaded the host (load 10 to 14). Marble-bowl has the least margin, 7.6 to 7.9 ms per steady tick on the fixed tiers: at load 12 to 14 it ran over budget and passed when rerun at load 10. No budget was loosened. Open: the browser half (frame budgets on both backends), the 256 MiB tier, and threaded tiers other than 512 MiB with 2 workers.
+
+### Lockstep checkpoints hash engine state (closed, with one limit)
+
+The match moved to `scripts/lib/lockstepMatch.mjs`. Each 30-tick checkpoint hashes what the engine reports for every unit (body-frame position, world-frame position, support, and the control tick) with `fnvWords` from `scripts/lib/stateHash1024.mjs`; a gate line checks it equals `stateHash` over the same reads. Health and cooldowns are a second hash. A peer whose orders arrive 0 to 3 ticks late and in another order agrees with the on-time peer at all 12 checkpoints on all four tiers. Four controls are each caught at the first checkpoint after the change: an extra order (tick 120), a dropped order (90), two orders applied in the opposite order (30), an order that arrives after its apply tick (90). 44 PASS. Open: the hash is taken in JavaScript from engine reads, because the engine has no export that hashes character state, so character velocity and the fall accumulator are not covered. Orders are still scripted.
+
+### Thread-count determinism over the scenarios (closed on this host)
+
+`scripts/check-scenario-determinism.mjs`, 66 PASS: eight scenarios (settle, marble bowl, projectile volley, planet landing, lockstep RTS, deathrun pit, deathrun early pit, boss fight with a moving target) on the fixed build and on the threaded build at 2 and 4 workers, for the 512 MiB pair (1024 players) and the 128 MiB pair (256 players), each run in its own process. The final position hash, the velocity or game hash, `World#hash` and a hash of every 30-tick checkpoint are equal in all 32 comparisons. A run stopped at tick 20 gives a different hash in every scenario. The gate first checks that the two glues of a pair export the same functions: while only some glues had been rebuilt from the new C++ source, it failed on that line and on every character scenario, and it passed again once all were rebuilt. The hashes are in `build/diag/scenarios/determinism.json`. Open: one host; the cross-machine witness; worker counts other than 2 and 4; the 64 MiB pair.
+
+### Scenario tick-loop allocations (closed for four loops)
+
+`scripts/check-scenario-allocations.mjs`, 16 PASS: the heap is sampled at every allocation over 600 ticks after 30,000 warm-up ticks, one loop per process on the 64 MiB fixed glue, with a control allocation (29,512 B sampled). Four loops measure 0 bytes in `EngineWorld`, the bridge, `checkVector` and the scenario code, and 0 bytes in their callees: settle (step, 256 position and velocity reads, `hashInto`), lockstep RTS, the boss fight with a moving target, and a deathrun shuttle. Removed: two closures per `#gather` call (224 B per tick in `hash`), the boxed uint32 return of `hash` (16 B, now `hashInto(out, at)`), `Array#every` in `checkVector` (48 B per call on every `setCharacterVelocity`), a BigInt per `tick` read (now `controlTick`), and per-tick arrays, spreads and `Math.hypot` in the scenario loops. `checkVector` now refuses a vector with a hole, which `every` skipped.
+
+Open, measured and printed by the gate: a world created after another world in the same process allocates in the same loop (boss fight 240 B per tick, deathrun 64 B per tick), with no JavaScript-side cause found. With 6000 warm-up ticks the light loops still allocate. The combat-bots, character, marble-bowl, planet-landing and projectile-volley loops still push per-tick records and are not measured. The threaded glue is not measured.
+
+### Boss fight with a moving target (closed)
+
+The fight moved to `scripts/lib/bossFight.mjs`; the existing checks run unchanged on the still-player fight. A second variant moves the player along seeded waypoints (4 to 12 m of arc, 2.5 m/s). The boss must still close inside 8 m and attack: closest 7.96 m, 2 attacks. The player's shots travel at 60 m/s and count only when the shot segment passes within 0.6 m of the boss's engine position: 14 of 14 hit, worst 0.465 m, boss dead at tick 399 with the player at 50. Controls: shots at 8 m/s miss 3 of 18; another seed gives another path; the same seed repeats bit for bit. 40 PASS on four tiers. Open: the player is still scripted; a pursuing boss moves along the line of sight, so the lead term is not exercised by a crossing target; shots are JavaScript records, not engine bodies.
+
+### Deathrun kill height and respawn (closed, by a route that needs one engine export to be complete)
+
+The course moved to `scripts/lib/deathrun.mjs`. Each tick compares the runner's feet height above the planet surface with a kill height and, below it, respawns the runner at the last checkpoint reached. The surface course keeps its checks and never resets. Two pit courses put a box deck 3 m above the surface with a 6 m gap and a side bridge (kill height 1.5 m):
+
+| course | fall tick | feet height at reset | respawn at | finish tick |
+|---|---|---|---|---|
+| surface | none | | | 578 |
+| pit, gap at 26 to 32 m | 296 | 1.437 m | checkpoint 1 | 717 |
+| early pit, gap at 8 to 14 m | 113 | 1.445 m | the start | 733 |
+| no bridge | every attempt | | checkpoint 1 twice | none: out of respawns |
+
+40 PASS on four tiers, and the pit run repeats bit for bit. Open: the engine has no export that moves a character, so a respawn hands control to a standby character placed at the spawn point at setup (two per spawn point); the fallen character stays where it fell, and lives are bounded by the 16-character limit.
+
+### Seen and not yet examined
+
+`scripts/check-engine-sleep.mjs`, which is not in `npm test`, printed `RESULT: FAIL` (2 of 4) when the scenario agent ran it during the C++ rebuilds. It is examined in Phase B on the final binaries.
+
+## Planet ray cast, shape cast, character on terrain, seal refusal and rebase anchors (Phase A, 2026-11-11)
+
+- Ray cast (was missing: `CastRay` returned false). `PlanetShape` implements both `CastRay` overloads by marching the ray against the page heights (step 0.667 m at 20 m cells, coarser past 8192 steps) and bisecting 24 times. A start below the surface hits at distance 0. `engine_world_raycast` writes fraction, position, normal, kind and handle into the planet scratch, and `EngineWorld#raycast` wraps it. On the 64 MiB fixed and 512 MiB threaded glues: 600 seeded down rays hit within 4.6e-6 m of the surface (gate bound 1e-3 m), a grazing ray stops 1.4e-6 m from a plateau wall, the nearest of box, body and terrain wins, and there are 0 arena carves. `check-engine-raycast`, 22 PASS. Limit: a feature the ray stays under for less than one step can be missed; vegetation and characters are not hit.
+- Shape cast (the capsule cast path had no gate). Three defects found and fixed in `castCapsulePlanet`: the penetration axis had the wrong sign, so `CharacterVirtual` discarded every planet cast hit; the start transform was inverted twice; and the body id was invalid, so the character treated the planet as a null other character. A sphere cast against the planet is now registered too. Sweeps onto flat ground, a plateau and a 0.5 gradient ramp stop within 6.5e-6 m of the plane distance (bound 1e-3 m), and both collide orders agree on depth, point and normal. `check-engine-shapecast`, 24 PASS.
+- Character on terrain. `ExtendedUpdate` with step-up 0.4 m and stick-down 0.5 m along the radial up; capsule contacts carry the terrain triangle normal; gravity is applied while on ground; two spare pool blocks per size class per character are reserved at `addCharacter`. In `check-scenario-character-terrain`, with pages applied (20 PASS): a 26.6 degree slope is climbed and descended with 0 of 210 descent ticks unsupported (control without stick-to-floor: 190 of 207); a 60 degree slope stops the character at 3.758 m, with the foot at 4 m; a 0.3 m step is climbed and a 0.8 m step blocks (control without stair stepping: stopped at 5.612 m); 0 carves over 960 ticks. `check-scenario-character` still passes, 24 PASS.
+- Line of sight. `check-scenario-combat-bots` tests every shot with a ray. A duel 12 m apart lands 9 hits on open ground and 0 with a wall or a terrain ridge between, with 20 shots blocked each. 24 PASS.
+- Seal. `World::configure`, `addBox`, `addTrunk`, `addCharacter`, `configurePlanet` and `attachVegetation` return `kSealed` (-9) after `engine_arena_seal`, and `EngineWorld` throws `ArenaSealedError`. `check-engine-seal`, 10 PASS: refused calls change no body count or arena byte, with 0 carves, and play continues for 120 ticks. Open: a host that never seals is not protected.
+- Rebase. Live pooled bodies are re-placed from their float64 row, which `sync` keeps while the body has not moved in float32. In `check-rebase-session` (12 PASS) the engine error is 2.44e-5 m on the 81 km walk (74 rebases), the wander (4446) and the shuttle (5000); the old float32-shift arithmetic, kept as a JavaScript mirror for the control, reaches 1.46e-3 m and 6.53e-3 m. Open: static boxes, trunks and characters use a double-precision shift with no float64 anchor, so their rounding can still accumulate.
+- The 1024-tier state hash pin is unchanged, and fixed and threaded agree at 2 and 4 workers.
+- 7 and 8 workers stay refused, and it is a decision, not a build: by the planner formula 7 workers need 3,159,888 bytes and 8 need 3,686,536, against a reserve of 2,633,240 (measured with `scripts/measure-threaded-footprint.mjs`: 2 workers grow malloc by 526,648 bytes, 6 by 2,633,240). Fitting 8 means shrinking the threaded arena by about 1.1 MiB in every threaded artifact, raising `kHeapReserveBytes`, and changing the two gate rows that pin the refusal.
+- Also open: rigid sphere bodies still use the radial planet contact, kept so the state hash does not move; the capsule is not rotated to the local up; steps were tested as static boxes, not terrain steps.
+
+Variants: all 23 buildable glues in `engine/out` were rebuilt from this source with `engine/build-all.sh`, each rc=0.

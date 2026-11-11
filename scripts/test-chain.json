@@ -269,5 +269,20 @@
   "check:scenario-projectile-volley",
   "check:pose-allocations",
   "check:terrain-agreement",
-  "check:glue-tier"
+  "check:glue-tier",
+  "check:collision-placement-options",
+  "check:rebase-session",
+  "check:follow-misuse",
+  "check:vegetation-allocations",
+  "check:vegetation-leaf-patches",
+  "check:planet-scene-counts",
+  "check:vegetation-generate-cost",
+  "check:planet-witness-scene",
+  "check:engine-job-wait",
+  "check:scenario-determinism",
+  "check:scenario-allocations",
+  "check:engine-raycast",
+  "check:engine-shapecast",
+  "check:scenario-character-terrain",
+  "check:engine-seal"
 ]

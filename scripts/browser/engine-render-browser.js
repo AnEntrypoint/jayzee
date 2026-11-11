@@ -3,7 +3,7 @@ import { cellOrigin, PAGE_SIDE, PAGE_U_EDGE, PAGE_V_EDGE, planetCellSize } from 
 import { solverIterationsFor } from '../../src/engine/solverIterations.js'
 import { createPhysicsHandoff } from '../../src/engine/physicsHandoff.js'
 import { readLayout } from '../../src/engine/bridge.js'
-import { buildPlanetScene } from '../../src/engine/planetScene.js'
+import { buildPlanetScene, witnessSceneSpec } from '../../src/engine/planetScene.js'
 import { relativeLookAt } from '../../src/engine/cameraRelative.js'
 
 const QUERY = new URLSearchParams(location.search)
@@ -15,10 +15,11 @@ const MODELS = QUERY.get('models') === '1'
 const HOLD_END = QUERY.get('hold') === '1'
 const THREADS = QUERY.get('threads') === '1' && TIER === 1024
 const WORKERS = THREADS ? 4 : 1
+const LARGE_MEMORY = TIER === 1024 || MODELS
 const TIER_GLUE = THREADS
   ? '../../engine/out/engine-core-512mib-timed-threads-simd.mjs'
-  : (TIER === 1024 ? '../../engine/out/engine-core-512mib' : '../../engine/out/engine-core-64mib') + (TIMED ? '-timed' : '') + '.mjs'
-const TIER_BUDGET = TIER === 1024 ? 512 * 1024 * 1024 : 64 * 1024 * 1024
+  : (LARGE_MEMORY ? '../../engine/out/engine-core-512mib' : '../../engine/out/engine-core-64mib') + (TIMED ? '-timed' : '') + '.mjs'
+const TIER_BUDGET = LARGE_MEMORY ? 512 * 1024 * 1024 : 64 * 1024 * 1024
 const WARMUP_FRAMES = 60
 const FRAMES = QUERY.has('frames') ? Number(QUERY.get('frames')) : 600
 if (!Number.isInteger(FRAMES) || FRAMES <= WARMUP_FRAMES) throw new RangeError('frames must be a whole number above the warm-up frames')
@@ -455,11 +456,15 @@ const run = async () => {
   result.adapter = await adapterInfo()
   let planetScene = null
   let worldReady = false
-  const beforeSeal = TIER === 1024 ? (module) => { setupWorld(module); worldReady = true; planetScene = buildPlanetScene({ module, now: () => performance.now() }) } : null
+  const beforeSeal = TIER === 1024 ? (module) => { setupWorld(module); worldReady = true; planetScene = buildPlanetScene({ module, now: () => performance.now(), generate: false, spec: witnessSceneSpec(PLANET.radius) }) } : null
   const renderer = await loadRenderer({ glue: new URL(TIER_GLUE, import.meta.url).href, canvas, navigatorLike, requested, players: TIER, workers: WORKERS, budgetBytes: TIER_BUDGET, beforeSeal, models: TIER === 1024 || MODELS })
   const module = renderer.module
   const placed = []
   const surface = setupScene(module, renderer, placed, worldReady)
+  if (planetScene) {
+    module._engine_page_apply()
+    planetScene.generate()
+  }
   const handoff = TIER === 1024 ? createPhysicsHandoff({ module, glue: new URL(TIER_GLUE, import.meta.url).href, players: TIER, budgetBytes: TIER_BUDGET, solverIterations: runConfig.solverIterations, timeTicks: TIMED ? FRAMES : 0, path: { window: PATH_WINDOW, perFrame: PAGES_PER_FRAME, stepM: PATH_STEP_M, heightM: PATH_HEIGHT_M } }) : null
   if (handoff) await handoff.ready
 

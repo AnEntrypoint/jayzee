@@ -1,101 +1,154 @@
 import assert from 'node:assert/strict'
-import { join, resolve } from 'node:path'
-import { fileURLToPath, pathToFileURL } from 'node:url'
 import { finish, gate } from './lib/gate.mjs'
-import { createEngineWorld } from '../src/engine/EngineWorld.js'
-import { bodyPoolCapacity } from '../src/engine/poolPlan.js'
 import { writeTickTrace } from './lib/tickTrace.mjs'
-import { PLANET } from '../src/engine/sceneSetup.js'
+import { SCENARIO_TIERS } from './lib/scenarioTiers.mjs'
+import { DEATHRUN, DEATHRUN_COURSES, DEATHRUN_STATUS, createDeathrun } from './lib/deathrun.mjs'
 
-const root = resolve(fileURLToPath(new URL('..', import.meta.url)))
-const glueUrl = (path) => pathToFileURL(join(root, path)).href
-const CHARACTER_RADIUS = 0.4
-const CHARACTER_HALF_HEIGHT = 0.6
-const CHECKPOINT_ARC_M = [20, 40, 60]
-const CHECKPOINT_RADIUS_M = 2.5
-const RUN_SPEED_M_S = 6
+const CHECKPOINTS = DEATHRUN.checkpointArcM.length
 const SETTLE_TICKS = 30
 const FINISH_LIMIT_TICKS = 900
 const RADIAL_TOLERANCE_M = 0.1
-const TIERS = Object.freeze([
-  { label: '64 MiB fixed', glue: 'engine/out/engine-core-64mib.mjs', players: 64, workers: 1, budgetBytes: 64 * 1024 * 1024 },
-  { label: '512 MiB threaded, 2 workers', glue: 'engine/out/engine-core-512mib-threads.mjs', players: 1024, workers: 2, budgetBytes: 512 * 1024 * 1024 },
-])
+const DECK_EDGE_TOLERANCE_M = 0.2
+const RESPAWN_TOLERANCE_M = 0.6
+const TIERS = SCENARIO_TIERS
 
-const scenario = async (tier) => {
-  const world = await createEngineWorld({ capacity: bodyPoolCapacity(tier.players), tickRate: 60, gravity: -9.8, drag: 0, radius: 0.5, restitution: 0, players: tier.players, workers: tier.workers, budgetBytes: tier.budgetBytes }, glueUrl(tier.glue))
-  world.configurePlanet(PLANET)
-  const anchor = world.height(0, PLANET.radius, 0)
-  const centreRadius = PLANET.radius + anchor + CHARACTER_RADIUS + CHARACTER_HALF_HEIGHT
-  world.follow([0, centreRadius, 0])
-  world.addCharacter({ position: [0, centreRadius + 0.5, 0], radius: CHARACTER_RADIUS, halfHeight: CHARACTER_HALF_HEIGHT })
-  const planetCentre = [0, -centreRadius, 0]
-  const checkpoints = CHECKPOINT_ARC_M.map((arc) => {
-    const angle = arc / centreRadius
-    return [centreRadius * Math.sin(angle), centreRadius * Math.cos(angle) - centreRadius, 0]
-  })
-  const body = [0, 0, 0]
+const scenario = async (tier, courseName) => {
+  const run = await createDeathrun(tier, courseName)
   const tickMs = []
-  const radial = []
+  const height = []
   const supported = []
-  const reached = []
-  let next = 0
-  let finishTick = null
-  let tick = 0
-  for (; tick < FINISH_LIMIT_TICKS && next < checkpoints.length; tick++) {
-    world.characterBodyPosition(0, body)
-    const up = [body[0] - planetCentre[0], body[1] - planetCentre[1], body[2] - planetCentre[2]]
-    const upLength = Math.hypot(...up)
-    const normal = up.map((v) => v / upLength)
-    const target = checkpoints[next]
-    const toTarget = [target[0] - body[0], target[1] - body[1], target[2] - body[2]]
-    if (Math.hypot(...toTarget) <= CHECKPOINT_RADIUS_M) {
-      reached.push(tick)
-      next += 1
-      if (next === checkpoints.length) finishTick = tick
-      continue
-    }
-    const along = toTarget[0] * normal[0] + toTarget[1] * normal[1] + toTarget[2] * normal[2]
-    const tangent = toTarget.map((v, i) => v - along * normal[i])
-    const tangentLength = Math.hypot(...tangent)
-    world.setCharacterVelocity(0, tangentLength > 0 ? tangent.map((v) => (v / tangentLength) * RUN_SPEED_M_S) : [0, 0, 0])
+  const sinceSpawn = []
+  while (!run.over) {
+    if (!run.decide()) continue
     const started = performance.now()
-    world.step()
+    run.step()
     tickMs.push(performance.now() - started)
-    radial.push(upLength - centreRadius)
-    supported.push(world.characterSupported(0))
+    run.record()
+    height.push(run.feetHeightM)
+    supported.push(run.state.supported)
+    sinceSpawn.push(run.state.tick - run.state.spawnedAtTick)
   }
-  world.characterBodyPosition(0, body)
-  return { reached, finishTick, body: body.slice(), tickMs, radial, supported, ticks: tick }
+  const falls = []
+  for (let i = 0; i < Math.min(run.state.fallCount, run.fallTick.length); i++) {
+    falls.push({ tick: run.fallTick[i], x: run.falls[i * 4], z: run.falls[i * 4 + 2], feetHeightM: run.falls[i * 4 + 3], spawn: run.respawnSpawn[i], respawnAt: Array.from(run.respawnAt.subarray(i * 4, i * 4 + 3)) })
+  }
+  return {
+    course: run.course,
+    floorM: run.floorM,
+    killHeightM: run.killHeightM,
+    status: run.state.status,
+    reached: Array.from(run.reached),
+    finishTick: run.state.finishTick,
+    fallCount: run.state.fallCount,
+    respawnCount: run.state.respawnCount,
+    falls,
+    spawnPoints: Array.from(run.spawnPoints),
+    body: Array.from(run.position.subarray(0, 3)),
+    tickMs,
+    height,
+    supported,
+    sinceSpawn,
+  }
+}
+
+const bits = (values) => new Uint32Array(new Float64Array(values).buffer)
+
+const reachedInOrder = (run) => {
+  assert.equal(run.status, DEATHRUN_STATUS.finished, 'status ' + run.status)
+  assert.ok(run.reached.every((tick) => tick >= 0), 'reached ' + run.reached)
+  for (let i = 1; i < run.reached.length; i++) assert.ok(run.reached[i] > run.reached[i - 1], 'checkpoints out of order')
+}
+
+const respawnedAt = (run, spawn) => {
+  assert.equal(run.fallCount, 1, 'falls ' + run.fallCount)
+  assert.equal(run.respawnCount, 1)
+  const fall = run.falls[0]
+  assert.ok(fall.x > run.course.gap[0] && fall.x < run.course.gap[1], 'fell at x ' + fall.x)
+  assert.ok(fall.feetHeightM < run.killHeightM && fall.feetHeightM > 0, 'feet at ' + fall.feetHeightM + ' m when reset')
+  assert.equal(fall.spawn, spawn)
+  const offset = Math.hypot(fall.respawnAt[0] - run.spawnPoints[spawn * 3], fall.respawnAt[1] - run.spawnPoints[spawn * 3 + 1], fall.respawnAt[2] - run.spawnPoints[spawn * 3 + 2])
+  assert.ok(offset <= RESPAWN_TOLERANCE_M, 'respawned ' + offset + ' m from spawn point ' + spawn)
 }
 
 const runs = new Map()
 for (const tier of TIERS) {
-  runs.set(tier.label, { first: await scenario(tier), second: await scenario(tier) })
+  runs.set(tier.label, {
+    first: await scenario(tier, 'surface'),
+    second: await scenario(tier, 'surface'),
+    pit: await scenario(tier, 'pit'),
+    pitAgain: await scenario(tier, 'pit'),
+    earlyPit: await scenario(tier, 'early-pit'),
+    noBridge: await scenario(tier, 'no-bridge'),
+  })
 }
 
 for (const tier of TIERS) {
-  const { first, second } = runs.get(tier.label)
+  const { first, second, pit, pitAgain, earlyPit, noBridge } = runs.get(tier.label)
   gate(tier.label + ': the runner reaches all checkpoints in order within the tick limit', () => {
-    assert.equal(first.reached.length, CHECKPOINT_ARC_M.length, 'reached ' + first.reached.length + ' of ' + CHECKPOINT_ARC_M.length + ' checkpoints')
-    assert.ok(first.finishTick !== null && first.finishTick < FINISH_LIMIT_TICKS, 'finish tick ' + first.finishTick)
-    for (let i = 1; i < first.reached.length; i++) assert.ok(first.reached[i] > first.reached[i - 1], 'checkpoints out of order')
+    assert.equal(first.reached.filter((tick) => tick >= 0).length, CHECKPOINTS, 'reached ' + first.reached)
+    assert.ok(first.finishTick >= 0 && first.finishTick < FINISH_LIMIT_TICKS, 'finish tick ' + first.finishTick)
+    reachedInOrder(first)
   })
-  gate(tier.label + ': the runner stays on the planet surface within tolerance once it has landed', () => {
-    for (let i = SETTLE_TICKS; i < first.radial.length; i++) {
-      assert.ok(Math.abs(first.radial[i]) <= RADIAL_TOLERANCE_M, 'tick ' + i + ' radial error ' + first.radial[i])
+  gate(tier.label + ': the runner stays on the planet surface within tolerance once it has landed, and the minimum-height reset never fires on solid ground', () => {
+    for (let i = SETTLE_TICKS; i < first.height.length; i++) {
+      assert.ok(Math.abs(first.height[i]) <= RADIAL_TOLERANCE_M, 'tick ' + i + ' radial error ' + first.height[i])
       assert.equal(first.supported[i], true, 'tick ' + i + ' is not supported')
     }
+    assert.equal(first.fallCount, 0)
+    assert.equal(first.respawnCount, 0)
   })
   gate(tier.label + ': two runs agree bit for bit on the finish tick and the final runner position', () => {
     assert.equal(second.finishTick, first.finishTick)
-    assert.deepEqual(new Uint32Array(new Float32Array(second.body).buffer), new Uint32Array(new Float32Array(first.body).buffer))
+    assert.deepEqual(bits(second.body), bits(first.body))
   })
-  gate(tier.label + ': no tick runs over 25 ms or over the 16.7 ms budget (measured inside the step call, both runs)', () => {
-    const trace = writeTickTrace('deathrun', tier.label, [first.tickMs, second.tickMs])
+  gate(tier.label + ': pit course: the runner walks off the deck into the ' + DEATHRUN_COURSES.pit.gap.join(' to ') + ' m gap, drops below the ' + DEATHRUN.deckKillHeightM + ' m kill height and respawns at checkpoint 1, the last one it reached', () => {
+    assert.equal(pit.reached[0] >= 0 && pit.reached[0] < pit.falls[0].tick, true, 'checkpoint 1 at ' + pit.reached[0] + ', fall at ' + pit.falls[0].tick)
+    respawnedAt(pit, 1)
+  })
+  gate(tier.label + ': early pit course: a fall before the first checkpoint respawns at the start, so the respawn point follows the last checkpoint', () => {
+    assert.ok(earlyPit.reached[0] > earlyPit.falls[0].tick, 'checkpoint 1 at ' + earlyPit.reached[0] + ', fall at ' + earlyPit.falls[0].tick)
+    respawnedAt(earlyPit, 0)
+  })
+  gate(tier.label + ': pit courses: after the respawn the runner takes the bridge and still finishes all checkpoints in order within ' + DEATHRUN.tickLimit + ' ticks', () => {
+    for (const run of [pit, earlyPit]) {
+      reachedInOrder(run)
+      assert.ok(run.finishTick < DEATHRUN.tickLimit, 'finish tick ' + run.finishTick)
+      assert.ok(Math.abs(run.height[run.height.length - 1] - run.floorM) <= RADIAL_TOLERANCE_M, 'finished at height ' + run.height[run.height.length - 1])
+    }
+  })
+  gate(tier.label + ': pit courses: a supported runner is on the deck within ' + DECK_EDGE_TOLERANCE_M + ' m, and never lower than the kill height for more than the tick that resets it', () => {
+    for (const run of [pit, earlyPit]) {
+      for (let i = 0; i < run.height.length; i++) {
+        if (run.sinceSpawn[i] > SETTLE_TICKS && run.supported[i]) assert.ok(Math.abs(run.height[i] - run.floorM) <= DECK_EDGE_TOLERANCE_M, 'step ' + i + ' supported at height ' + run.height[i])
+        if (i > 0 && run.height[i] < run.killHeightM) assert.ok(run.height[i - 1] >= run.killHeightM, 'step ' + i + ' stayed below the kill height')
+      }
+    }
+  })
+  gate(tier.label + ': with the bridge removed the runner falls on every attempt, uses both lives at checkpoint 1 and the run ends as out of respawns, not as finished', () => {
+    assert.equal(noBridge.status, DEATHRUN_STATUS.outOfRespawns)
+    assert.equal(noBridge.fallCount, DEATHRUN.livesPerSpawn + 1)
+    assert.equal(noBridge.respawnCount, DEATHRUN.livesPerSpawn)
+    assert.equal(noBridge.finishTick, -1)
+    assert.deepEqual(noBridge.falls.map((fall) => fall.spawn), [1, 1, 1])
+  })
+  gate(tier.label + ': pit course: two runs agree bit for bit on the fall tick, the finish tick and the final runner position', () => {
+    assert.equal(pitAgain.falls[0].tick, pit.falls[0].tick)
+    assert.equal(pitAgain.finishTick, pit.finishTick)
+    assert.deepEqual(bits(pitAgain.body), bits(pit.body))
+  })
+  gate(tier.label + ': no tick runs over 25 ms or over the 16.7 ms budget (measured inside the step call, all six runs)', () => {
+    const trace = writeTickTrace('deathrun', tier.label, [first, second, pit, pitAgain, earlyPit, noBridge].map((run) => run.tickMs))
     assert.equal(trace.over25, 0, 'ticks over 25 ms: ' + trace.over25)
     assert.equal(trace.overBudget, 0, 'ticks over the 16.7 ms budget: ' + trace.overBudget)
   })
+}
+
+if (process.env.SCENARIO_DEBUG) {
+  for (const tier of TIERS) {
+    const summary = {}
+    for (const [name, run] of Object.entries(runs.get(tier.label))) summary[name] = { status: run.status, reached: run.reached, finishTick: run.finishTick, steps: run.height.length, falls: run.falls.map((fall) => ({ tick: fall.tick, x: Math.round(fall.x * 100) / 100, feetHeightM: Math.round(fall.feetHeightM * 1000) / 1000, spawn: fall.spawn, respawnAt: fall.respawnAt.map((v) => Math.round(v * 1000) / 1000) })) }
+    console.log(JSON.stringify({ tier: tier.label, ...summary }))
+  }
 }
 
 finish()

@@ -1,14 +1,12 @@
 import assert from 'node:assert/strict'
-import { join, resolve } from 'node:path'
-import { fileURLToPath, pathToFileURL } from 'node:url'
 import { finish, gate } from './lib/gate.mjs'
 import { createEngineWorld } from '../src/engine/EngineWorld.js'
 import { bodyPoolCapacity } from '../src/engine/poolPlan.js'
 import { writeTickTrace } from './lib/tickTrace.mjs'
+import { SCENARIO_TIERS, glueUrl } from './lib/scenarioTiers.mjs'
 import { PLANET } from '../src/engine/sceneSetup.js'
+import { createPoleTerrain } from './lib/polePages.mjs'
 
-const root = resolve(fileURLToPath(new URL('..', import.meta.url)))
-const glueUrl = (path) => pathToFileURL(join(root, path)).href
 const CHARACTER_RADIUS = 0.4
 const CHARACTER_HALF_HEIGHT = 0.6
 const BOTS = 8
@@ -22,10 +20,59 @@ const MOVE_SPEED_M_S = 3.5
 const SETTLE_TICKS = 60
 const TICK_LIMIT = 2400
 const RADIAL_TOLERANCE_M = 0.1
-const TIERS = Object.freeze([
-  { label: '64 MiB fixed', glue: 'engine/out/engine-core-64mib.mjs', players: 64, workers: 1, budgetBytes: 64 * 1024 * 1024 },
-  { label: '512 MiB threaded, 2 workers', glue: 'engine/out/engine-core-512mib-threads.mjs', players: 1024, workers: 2, budgetBytes: 512 * 1024 * 1024 },
-])
+const DUEL_GAP_M = 12
+const DUEL_TICKS = 150
+const WALL_HEIGHT_M = 3
+const WALL_HALF_THICKNESS_M = 0.25
+const WALL_HALF_WIDTH_M = 3
+const RIDGE_HEIGHT_M = 3
+const RIDGE_HALF_WIDTH_M = 8 / 3
+const TIERS = SCENARIO_TIERS
+
+const sightLine = (world, origin, from, to, hit) => {
+  const start = [from[0] + origin[0], from[1] + origin[1], from[2] + origin[2]]
+  const aim = [to[0] - from[0], to[1] - from[1], to[2] - from[2]]
+  return world.raycast(start, aim, Math.hypot(aim[0], aim[1], aim[2]), hit) === null
+}
+
+const ridgeHeight = (alongU) => RIDGE_HEIGHT_M * Math.max(0, 1 - Math.abs(alongU) / RIDGE_HALF_WIDTH_M)
+
+const duel = async (tier, obstacle) => {
+  const world = await createEngineWorld({ capacity: bodyPoolCapacity(tier.players), tickRate: 60, gravity: -9.8, drag: 0, radius: 0.5, restitution: 0, players: tier.players, workers: tier.workers, budgetBytes: tier.budgetBytes }, glueUrl(tier.glue))
+  world.configurePlanet(PLANET)
+  const terrain = createPoleTerrain(world, PLANET, { cells: 1, heightOf: (alongU) => (obstacle === 'terrain' ? ridgeHeight(alongU) : 0) })
+  const centreRadius = PLANET.radius + CHARACTER_RADIUS + CHARACTER_HALF_HEIGHT
+  const origin = [0, centreRadius, 0]
+  world.follow(origin)
+  if (obstacle === 'wall') world.addBox([-WALL_HALF_THICKNESS_M, PLANET.radius - 1, -WALL_HALF_WIDTH_M, WALL_HALF_THICKNESS_M, PLANET.radius + WALL_HEIGHT_M, WALL_HALF_WIDTH_M])
+  const duellists = [-1, 1].map((side) => ({ index: world.addCharacter({ position: terrain.point(side * DUEL_GAP_M / 2, 0, CHARACTER_RADIUS + CHARACTER_HALF_HEIGHT + 0.05), radius: CHARACTER_RADIUS, halfHeight: CHARACTER_HALF_HEIGHT }), health: MAX_HEALTH, cooldown: 0 }))
+  const positions = duellists.map(() => [0, 0, 0])
+  const hit = { distance: 0, position: [0, 0, 0], normal: [0, 0, 0], kind: 'none', handle: 0 }
+  const blockers = new Set()
+  let shots = 0
+  let blocked = 0
+  for (let t = 0; t < SETTLE_TICKS; t++) world.step()
+  world.markWarmup()
+  for (let t = 0; t < DUEL_TICKS; t++) {
+    duellists.forEach((bot, i) => world.characterBodyPosition(bot.index, positions[i]))
+    duellists.forEach((bot, i) => {
+      const other = duellists[1 - i]
+      if (bot.health <= 0 || other.health <= 0) return
+      if (bot.cooldown > 0) bot.cooldown -= 1
+      if (bot.cooldown !== 0) return
+      bot.cooldown = FIRE_INTERVAL_TICKS
+      if (sightLine(world, origin, positions[i], positions[1 - i], hit)) {
+        other.health -= DAMAGE
+        shots += 1
+      } else {
+        blocked += 1
+        blockers.add(hit.kind)
+      }
+    })
+    world.step()
+  }
+  return { health: duellists.map((bot) => bot.health), shots, blocked, blockers: [...blockers].sort(), gap: Math.hypot(...positions[0].map((v, a) => v - positions[1][a])), allocations: world.allocationsSinceWarmup() }
+}
 
 const scenario = async (tier) => {
   const world = await createEngineWorld({ capacity: bodyPoolCapacity(tier.players), tickRate: 60, gravity: -9.8, drag: 0, radius: 0.5, restitution: 0, players: tier.players, workers: tier.workers, budgetBytes: tier.budgetBytes }, glueUrl(tier.glue))
@@ -41,6 +88,9 @@ const scenario = async (tier) => {
     bots.push({ index: world.addCharacter({ position: at, radius: CHARACTER_RADIUS, halfHeight: CHARACTER_HALF_HEIGHT }), health: MAX_HEALTH, cooldown: 0, shotsFired: 0 })
   }
   const planetCentre = [0, -centreRadius, 0]
+  const origin = [0, centreRadius, 0]
+  const sight = { distance: 0, position: [0, 0, 0], normal: [0, 0, 0], kind: 'none', handle: 0 }
+  let blockedShots = 0
   const body = [0, 0, 0]
   const positions = bots.map(() => [0, 0, 0])
   const tickMs = []
@@ -87,6 +137,10 @@ const scenario = async (tier) => {
         world.setCharacterVelocity(bot.index, [0, 0, 0])
       }
       if (bot.cooldown > 0) bot.cooldown -= 1
+      if (bot.cooldown === 0 && nearestDistance <= WEAPON_RANGE_M && !sightLine(world, origin, here, target, sight)) {
+        blockedShots += 1
+        bot.cooldown = FIRE_INTERVAL_TICKS
+      }
       if (bot.cooldown === 0 && nearestDistance <= WEAPON_RANGE_M) {
         nearest.health -= DAMAGE
         bot.shotsFired += 1
@@ -111,12 +165,14 @@ const scenario = async (tier) => {
     world.characterBodyPosition(bot.index, body)
     finalPositions.push(...body)
   }
-  return { bots: bots.map((bot) => ({ health: bot.health, shotsFired: bot.shotsFired })), kills, radial, tickMs, finalPositions, ticks: tick, health }
+  return { bots: bots.map((bot) => ({ health: bot.health, shotsFired: bot.shotsFired })), kills, radial, tickMs, finalPositions, ticks: tick, health, blockedShots }
 }
 
 const runs = new Map()
+const duels = new Map()
 for (const tier of TIERS) {
   runs.set(tier.label, { first: await scenario(tier), second: await scenario(tier) })
+  duels.set(tier.label, { open: await duel(tier, 'none'), wall: await duel(tier, 'wall'), terrain: await duel(tier, 'terrain'), again: await duel(tier, 'wall') })
 }
 
 for (const tier of TIERS) {
@@ -125,6 +181,28 @@ for (const tier of TIERS) {
     const dead = first.bots.filter((bot) => bot.health <= 0).length
     assert.ok(dead >= BOTS / 2, 'eliminated ' + dead + ' of ' + BOTS + ' in ' + first.ticks + ' ticks')
     assert.ok(first.kills.length === dead, 'kill log has ' + first.kills.length + ' entries for ' + dead + ' deaths')
+  })
+  gate(tier.label + ': every shot is tested by a ray cast, and on open ground no shot is blocked', () => {
+    const fired = first.bots.reduce((sum, bot) => sum + bot.shotsFired, 0)
+    assert.ok(fired > 0, 'no shot was fired')
+    assert.equal(first.blockedShots, 0)
+  })
+  gate(tier.label + ': line of sight: two bots ' + DUEL_GAP_M + ' m apart kill each other on open ground, and the same shots are blocked by a wall between them and by a terrain ridge between them', () => {
+    const { open, wall, terrain, again } = duels.get(tier.label)
+    console.log('  ' + tier.label + ' duel: open ' + open.shots + ' hits, ' + open.blocked + ' blocked, health ' + open.health + '; wall ' + wall.shots + ' hits, ' + wall.blocked + ' blocked by ' + wall.blockers + ', health ' + wall.health + '; ridge ' + terrain.shots + ' hits, ' + terrain.blocked + ' blocked by ' + terrain.blockers + ', health ' + terrain.health)
+    assert.ok(Math.abs(open.gap - DUEL_GAP_M) <= 0.1 && Math.abs(wall.gap - DUEL_GAP_M) <= 0.1 && Math.abs(terrain.gap - DUEL_GAP_M) <= 0.1, 'the duellists moved')
+    assert.equal(open.blocked, 0)
+    assert.ok(open.health.some((value) => value <= 0), 'the open duel left both alive: ' + open.health)
+    assert.equal(wall.shots, 0)
+    assert.ok(wall.blocked > 0, 'the wall blocked no shot')
+    assert.deepEqual(wall.blockers, ['static'])
+    assert.deepEqual(wall.health, [MAX_HEALTH, MAX_HEALTH])
+    assert.equal(terrain.shots, 0)
+    assert.ok(terrain.blocked > 0, 'the ridge blocked no shot')
+    assert.deepEqual(terrain.blockers, ['planet'])
+    assert.deepEqual(terrain.health, [MAX_HEALTH, MAX_HEALTH])
+    assert.deepEqual(again, wall)
+    assert.equal(open.allocations + wall.allocations + terrain.allocations, 0)
   })
   gate(tier.label + ': the living bots stay on the planet surface within tolerance and supported after the settle window', () => {
     for (const sample of first.radial) {

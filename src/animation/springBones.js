@@ -1,6 +1,7 @@
 import {
-  IDENTITY_QUAT, addScaled3, angleTo3, applyQuat3, finiteTuple, lengthSq3, lerp3, normalize3, quatConjugate,
-  quatFromUnitVectors, quatMultiply, quatSlerp, scale3, sub3, add3, length3, divide3,
+  IDENTITY_QUAT, add3Into, addScaled3Into, angleTo3, applyQuat3Into, copy3, copy4, divide3, finiteTuple, finiteTupleInto, length3,
+  lengthSq3, lerp3Into, normalize3Into, quatConjugateInto, quatFromUnitVectorsInto, quatMultiplyInto, quatSlerpInto, scale3Into,
+  sub3, sub3Into,
 } from './rigMath.js'
 
 export const GRAVITY_MS2 = 9.81
@@ -10,6 +11,25 @@ export const RETAIN_AT_BOUNCE_0 = 0.85
 export const RETAIN_AT_BOUNCE_1 = 0.995
 const DEG = Math.PI / 180
 const OWNER = 'SpringBones'
+
+const held = {
+  accel: [0, 0, 0],
+  wind: [0, 0, 0],
+  velocity: [0, 0, 0],
+  moved: [0, 0, 0],
+  target: [0, 0, 0],
+  center: [0, 0, 0],
+  offset: [0, 0, 0],
+  rest: [0, 0, 0],
+  dir: [0, 0, 0],
+  swing: [0, 0, 0, 1],
+  clamp: [0, 0, 0, 1],
+  total: [0, 0, 0, 1],
+  world: [0, 0, 0, 1],
+  parentWorld: [0, 0, 0, 1],
+  conjugate: [0, 0, 0, 1],
+  local: [0, 0, 0, 1],
+}
 
 const fractionOf = (value, fallback, name) => {
   const v = value === undefined ? fallback : value
@@ -74,60 +94,68 @@ export class SpringBoneChain {
     return { index, offset, radius: spec.radius }
   }
 
-  update(dt, rootWorld, windDir = null) {
+  update(dt, rootWorld, windDir = null, out = null) {
     if (!(dt > 0)) return null
     const step = Math.min(dt, MAX_STEP_S)
     const step2 = step * step
     const last = this.boneCount - 1
     const retain = RETAIN_AT_BOUNCE_0 + (RETAIN_AT_BOUNCE_1 - RETAIN_AT_BOUNCE_0) * this.bounce
     const pull = Math.min(1, this.amount * SPRING_RATE_PER_S2 * step2)
-    let accel = [0, -GRAVITY_MS2 * this.gravity, 0]
-    if (windDir) accel = addScaled3(accel, finiteTuple(windDir, 3, 'wind direction', OWNER), this.windForce)
+    const accel = held.accel
+    accel[0] = 0
+    accel[1] = -GRAVITY_MS2 * this.gravity
+    accel[2] = 0
+    if (windDir) addScaled3Into(accel, accel, finiteTupleInto(held.wind, windDir, 3, 'wind direction', OWNER), this.windForce)
 
-    this.points[0] = finiteTuple(rootWorld, 3, 'root world position', OWNER)
-    this.prev[0] = this.points[0].slice()
+    finiteTupleInto(this.points[0], rootWorld, 3, 'root world position', OWNER)
+    copy3(this.prev[0], this.points[0])
 
     for (let k = 1; k <= last; k += 1) {
       const p = this.points[k]
-      const velocity = scale3(sub3(p, this.prev[k]), retain)
-      this.prev[k] = p.slice()
-      const moved = addScaled3(add3(p, velocity), accel, step2)
-      const target = addScaled3(this.points[k - 1], this.rest[k - 1], this.lengths[k - 1])
-      this.points[k] = lerp3(moved, target, pull)
+      const velocity = scale3Into(held.velocity, sub3Into(held.velocity, p, this.prev[k]), retain)
+      copy3(this.prev[k], p)
+      const moved = addScaled3Into(held.moved, add3Into(held.moved, p, velocity), accel, step2)
+      const target = addScaled3Into(held.target, this.points[k - 1], this.rest[k - 1], this.lengths[k - 1])
+      lerp3Into(p, moved, target, pull)
     }
 
     for (const c of this.colliders) {
-      let center = add3(this.points[c.index], c.offset)
+      const center = add3Into(held.center, this.points[c.index], c.offset)
       for (let k = 1; k <= last; k += 1) {
         if (k === c.index) continue
-        const d = sub3(this.points[k], center)
+        const d = sub3Into(held.offset, this.points[k], center)
         const dist = length3(d)
         if (dist > 0 && dist < c.radius) {
-          center = addScaled3(center, d, c.radius / dist)
-          this.points[k] = center.slice()
+          addScaled3Into(center, center, d, c.radius / dist)
+          copy3(this.points[k], center)
         }
       }
     }
 
-    const localQuats = []
-    let total = [0, 0, 0, 1]
-    let parentWorld = this.parentQuat
+    const localQuats = out === null ? [] : out
+    const total = copy4(held.total, IDENTITY_QUAT)
+    const parentWorld = copy4(held.parentWorld, this.parentQuat)
     for (let k = 0; k < last; k += 1) {
-      const rest = applyQuat3(this.restDirs[k], total)
-      this.rest[k] = rest.slice()
-      let dir = sub3(this.points[k + 1], this.points[k])
-      dir = lengthSq3(dir) > 0 ? normalize3(dir) : rest.slice()
+      const rest = applyQuat3Into(held.rest, this.restDirs[k], total)
+      copy3(this.rest[k], rest)
+      const dir = sub3Into(held.dir, this.points[k + 1], this.points[k])
+      if (lengthSq3(dir) > 0) normalize3Into(dir, dir)
+      else copy3(dir, rest)
       const bend = angleTo3(rest, dir)
       if (bend > this.limitRad) {
-        const clamp = quatSlerp(quatFromUnitVectors(rest, dir), IDENTITY_QUAT, 1 - this.limitRad / bend)
-        dir = applyQuat3(rest, clamp)
+        const clamp = quatSlerpInto(held.clamp, quatFromUnitVectorsInto(held.swing, rest, dir), IDENTITY_QUAT, 1 - this.limitRad / bend)
+        applyQuat3Into(dir, rest, clamp)
       }
-      this.points[k + 1] = addScaled3(this.points[k], dir, this.lengths[k])
-      total = quatMultiply(quatFromUnitVectors(rest, dir), total)
-      const world = quatMultiply(total, this.restQuat[k])
-      localQuats.push(quatMultiply(quatConjugate(parentWorld), world))
-      parentWorld = world
+      addScaled3Into(this.points[k + 1], this.points[k], dir, this.lengths[k])
+      quatMultiplyInto(total, quatFromUnitVectorsInto(held.swing, rest, dir), total)
+      const world = quatMultiplyInto(held.world, total, this.restQuat[k])
+      const local = quatMultiplyInto(held.local, quatConjugateInto(held.conjugate, parentWorld), world)
+      if (out === null) localQuats.push([local[0], local[1], local[2], local[3]])
+      else if (k < localQuats.length) copy4(localQuats[k], local)
+      else localQuats.push([local[0], local[1], local[2], local[3]])
+      copy4(parentWorld, world)
     }
+    if (localQuats.length !== last) localQuats.length = last
     return localQuats
   }
 }

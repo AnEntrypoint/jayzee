@@ -1,6 +1,18 @@
 export const RENDER_COLLISION_TOLERANCE_M = 1e-3
 export const RENDER_COLLISION_RANGE_M = 4096
 
+export const float32SpacingAt = (metres) => {
+  const magnitude = Math.abs(metres)
+  if (!Number.isFinite(magnitude)) throw new RangeError('float32SpacingAt needs a finite distance in metres')
+  if (magnitude < 2 ** -126) return 2 ** -149
+  return 2 ** (Math.floor(Math.log2(magnitude)) - 23)
+}
+
+export const relativeErrorBound = (reachM, translationM = 0) => {
+  if (!(reachM >= 0) || !(translationM >= 0)) throw new RangeError('relativeErrorBound needs a reach and a translation at zero or more, in metres')
+  return (float32SpacingAt(reachM) + float32SpacingAt(reachM + translationM)) / 2
+}
+
 export const relativeLookAt = (eye, target, up, out) => {
   let fx = target[0] - eye[0]
   let fy = target[1] - eye[1]

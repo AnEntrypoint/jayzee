@@ -1,40 +1,22 @@
 import assert from 'node:assert/strict'
-import { join, resolve } from 'node:path'
-import { fileURLToPath, pathToFileURL } from 'node:url'
 import { finish, gate } from './lib/gate.mjs'
-import { createEngineWorld } from '../src/engine/EngineWorld.js'
-import { bodyPoolCapacity } from '../src/engine/poolPlan.js'
 import { writeTickTrace } from './lib/tickTrace.mjs'
+import { SCENARIO_TIERS } from './lib/scenarioTiers.mjs'
+import { PROJECTILE_VOLLEY, buildProjectileVolley } from './lib/scenarioWorlds.mjs'
 
-const root = resolve(fileURLToPath(new URL('..', import.meta.url)))
-const glueUrl = (path) => pathToFileURL(join(root, path)).href
-const RADIUS = 0.2
-const SHOTS = 128
-const SPEED = 40
-const LAUNCH_Y = 6
-const WALL_X = 40
-const WALL_HALF_Z = 6
-const WALL_TOP = 6
-const TICKS = 120
+const RADIUS = PROJECTILE_VOLLEY.radius
+const SHOTS = PROJECTILE_VOLLEY.shots
+const SPEED = PROJECTILE_VOLLEY.speed
+const LAUNCH_Y = PROJECTILE_VOLLEY.launchY
+const WALL_X = PROJECTILE_VOLLEY.wallX
+const TICKS = PROJECTILE_VOLLEY.ticks
 const TRAJECTORY_TICKS = 40
-const GRAVITY = 9.8
+const GRAVITY = PROJECTILE_VOLLEY.gravity
 const TRAJECTORY_TOLERANCE_M = 0.15
-const TIERS = Object.freeze([
-  { label: '64 MiB fixed', glue: 'engine/out/engine-core-64mib.mjs', players: 64, workers: 1, budgetBytes: 64 * 1024 * 1024 },
-  { label: '1024 tier, 2 workers', glue: 'engine/out/engine-core-512mib-threads.mjs', players: 1024, workers: 2, budgetBytes: 512 * 1024 * 1024 },
-])
-const BOXES = Object.freeze([
-  [-2, -1, -20, 120, 0, 20],
-  [WALL_X, 0, -WALL_HALF_Z, WALL_X + 1, WALL_TOP, WALL_HALF_Z],
-])
-
-const COLUMNS = 16
-const launchPoint = (i) => [0, LAUNCH_Y + Math.floor(i / COLUMNS) * 0.5, -5.625 + (i % COLUMNS) * 0.75]
+const TIERS = SCENARIO_TIERS
 
 const scenario = async (tier) => {
-  const world = await createEngineWorld({ capacity: bodyPoolCapacity(tier.players), tickRate: 60, gravity: -GRAVITY, drag: 0, radius: RADIUS, restitution: 0, boxes: BOXES, players: tier.players, workers: tier.workers, budgetBytes: tier.budgetBytes }, glueUrl(tier.glue))
-  const handles = []
-  for (let i = 0; i < SHOTS; i++) handles.push(world.spawn(launchPoint(i), [SPEED, 0, 0]))
+  const { world, handles } = await buildProjectileVolley(tier)
   const tickMs = []
   const trajectory = []
   const p = [0, 0, 0]

@@ -107,6 +107,11 @@ set(ENGINE_EXPORTS
   _engine_character_supported
   _engine_character_axis
   _engine_character_body_axis
+  _engine_character_tune
+  _engine_world_raycast
+  _engine_world_shapecast
+  _engine_planet_collide_probe
+  _engine_arena_sealed
   _engine_spawn
   _engine_set_position
   _engine_set_velocity

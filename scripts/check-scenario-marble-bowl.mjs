@@ -1,44 +1,18 @@
 import assert from 'node:assert/strict'
-import { join, resolve } from 'node:path'
-import { fileURLToPath, pathToFileURL } from 'node:url'
 import { finish, gate } from './lib/gate.mjs'
-import { createEngineWorld } from '../src/engine/EngineWorld.js'
-import { bodyPoolCapacity } from '../src/engine/poolPlan.js'
 import { writeTickTrace } from './lib/tickTrace.mjs'
+import { SCENARIO_TIERS } from './lib/scenarioTiers.mjs'
+import { MARBLE_BOWL, buildMarbleBowl } from './lib/scenarioWorlds.mjs'
 
-const root = resolve(fileURLToPath(new URL('..', import.meta.url)))
-const glueUrl = (path) => pathToFileURL(join(root, path)).href
-const RADIUS = 0.3
-const COLUMNS = 16
-const ROWS = 32
-const BODIES = COLUMNS * ROWS
-const TICKS = 600
-const HALF = 6
-const WALL = 0.5
-const WALL_TOP = 4
+const RADIUS = MARBLE_BOWL.radius
+const BODIES = MARBLE_BOWL.bodies
+const TICKS = MARBLE_BOWL.ticks
+const HALF = MARBLE_BOWL.half
 const SPEED_LIMIT_MS = 0.5
-const TIERS = Object.freeze([
-  { label: '64 MiB fixed', glue: 'engine/out/engine-core-64mib.mjs', players: 64, workers: 1, budgetBytes: 64 * 1024 * 1024 },
-  { label: '1024 tier, 2 workers', glue: 'engine/out/engine-core-512mib-threads.mjs', players: 1024, workers: 2, budgetBytes: 512 * 1024 * 1024 },
-])
-const BOWL = Object.freeze([
-  [-HALF, -WALL, -HALF, HALF, 0, HALF],
-  [-HALF - WALL, 0, -HALF - WALL, -HALF, WALL_TOP, HALF + WALL],
-  [HALF, 0, -HALF - WALL, HALF + WALL, WALL_TOP, HALF + WALL],
-  [-HALF - WALL, 0, -HALF - WALL, HALF + WALL, WALL_TOP, -HALF],
-  [-HALF - WALL, 0, HALF, HALF + WALL, WALL_TOP, HALF + WALL],
-])
-
-const dropPoint = (i) => {
-  const col = i % COLUMNS
-  const row = Math.floor(i / COLUMNS)
-  return [-5 + col * (10 / (COLUMNS - 1)), 8 + (i % 3) * 0.7, -5 + row * (10 / (ROWS - 1))]
-}
+const TIERS = SCENARIO_TIERS
 
 const scenario = async (tier) => {
-  const world = await createEngineWorld({ capacity: bodyPoolCapacity(tier.players), tickRate: 60, gravity: -9.8, drag: 0, radius: RADIUS, restitution: 0, boxes: BOWL, players: tier.players, workers: tier.workers, budgetBytes: tier.budgetBytes }, glueUrl(tier.glue))
-  const handles = []
-  for (let i = 0; i < BODIES; i++) handles.push(world.spawn(dropPoint(i)))
+  const { world, handles } = await buildMarbleBowl(tier)
   const tickMs = []
   for (let t = 0; t < TICKS; t++) {
     const started = performance.now()

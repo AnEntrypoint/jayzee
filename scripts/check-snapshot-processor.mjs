@@ -219,9 +219,10 @@ gate('improvement over spoint: a recycled slot does not carry the previous owner
   const block = selfBlock.encodeSelfBlock({ inputSequence: 1, inputBuffer: 1, groundNormal: [0, 1, 0], wallNormals: [1, 0], position: [1, 2, 3] })
   const firstOut = p.processSnapshot({ tick: 1, timestamp: 1, players: [pl(7)], me: block }, 1, 7)
   assert(show(firstOut.players[0].wallPlanes) === '[1,0,1]', show(firstOut.players[0].wallPlanes))
+  const firstSlot = firstOut.players[0]
   for (let t = 2; t <= 97; t++) p.processSnapshot({ tick: t, timestamp: 1, players: [] }, t, 7)
   const later = p.processSnapshot({ tick: 98, timestamp: 1, players: [pl(8)] }, 98, 7)
-  assert(later.players[0] === firstOut.players[0], 'the slot was not recycled, so the claim was not exercised')
+  assert(later.players[0] === firstSlot, 'the slot was not recycled, so the claim was not exercised')
   assert(show(later.players[0].wallPlanes) === '[]', 'spoint leaves [1,0,1] here; got ' + show(later.players[0].wallPlanes))
 })
 

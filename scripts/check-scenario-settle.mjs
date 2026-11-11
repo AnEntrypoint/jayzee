@@ -1,30 +1,19 @@
 import assert from 'node:assert/strict'
-import { join, resolve } from 'node:path'
-import { fileURLToPath, pathToFileURL } from 'node:url'
 import { finish, gate } from './lib/gate.mjs'
-import { createEngineWorld } from '../src/engine/EngineWorld.js'
-import { bodyPoolCapacity } from '../src/engine/poolPlan.js'
 import { writeTickTrace } from './lib/tickTrace.mjs'
+import { SCENARIO_TIERS } from './lib/scenarioTiers.mjs'
+import { SETTLE, buildSettle } from './lib/scenarioWorlds.mjs'
 
-const root = resolve(fileURLToPath(new URL('..', import.meta.url)))
-const glueUrl = (path) => pathToFileURL(join(root, path)).href
-const BODIES = 256
-const RADIUS = 0.5
-const TICKS = 240
+const BODIES = SETTLE.bodies
+const RADIUS = SETTLE.radius
+const TICKS = SETTLE.ticks
 const SETTLE_WINDOW = 30
 const DRIFT_LIMIT_M = 1e-3
 const REST_TOLERANCE_M = 0.01
-const TIERS = Object.freeze([
-  { label: '64 MiB fixed', glue: 'engine/out/engine-core-64mib.mjs', players: 64, workers: 1, budgetBytes: 64 * 1024 * 1024 },
-  { label: '512 MiB threaded, 2 workers', glue: 'engine/out/engine-core-512mib-threads.mjs', players: 1024, workers: 2, budgetBytes: 512 * 1024 * 1024 },
-])
+const TIERS = SCENARIO_TIERS
 
 const scenario = async (tier) => {
-  const world = await createEngineWorld({ capacity: bodyPoolCapacity(tier.players), tickRate: 60, gravity: -9.8, drag: 0, radius: RADIUS, restitution: 0, players: tier.players, workers: tier.workers, budgetBytes: tier.budgetBytes }, glueUrl(tier.glue))
-  const handles = []
-  for (let i = 0; i < BODIES; i++) {
-    handles.push(world.spawn([(i % 16) * 2 - 15, 2 + (i % 7) * 0.6, Math.floor(i / 16) * 2 - 15]))
-  }
+  const { world, handles } = await buildSettle(tier)
   const trail = []
   const tickMs = []
   const p = [0, 0, 0]

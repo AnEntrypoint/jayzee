@@ -1,44 +1,19 @@
 import assert from 'node:assert/strict'
-import { join, resolve } from 'node:path'
-import { fileURLToPath, pathToFileURL } from 'node:url'
 import { finish, gate } from './lib/gate.mjs'
-import { createEngineWorld } from '../src/engine/EngineWorld.js'
 import { PLANET } from '../src/engine/sceneSetup.js'
-import { bodyPoolCapacity } from '../src/engine/poolPlan.js'
 import { writeTickTrace } from './lib/tickTrace.mjs'
+import { SCENARIO_TIERS } from './lib/scenarioTiers.mjs'
+import { PLANET_LANDING, buildPlanetLanding } from './lib/scenarioWorlds.mjs'
 
-const root = resolve(fileURLToPath(new URL('..', import.meta.url)))
-const glueUrl = (path) => pathToFileURL(join(root, path)).href
-const RADIUS = 0.5
-const BODIES = 256
-const DROP_M = 3
-const TICKS = 480
+const RADIUS = PLANET_LANDING.radius
+const BODIES = PLANET_LANDING.bodies
+const TICKS = PLANET_LANDING.ticks
 const SINK_LIMIT_M = 0.05
 const FLOAT_LIMIT_M = 1.0
-const TIERS = Object.freeze([
-  { label: '64 MiB fixed', glue: 'engine/out/engine-core-64mib.mjs', players: 64, workers: 1, budgetBytes: 64 * 1024 * 1024 },
-  { label: '1024 tier, 2 workers', glue: 'engine/out/engine-core-512mib-threads.mjs', players: 1024, workers: 2, budgetBytes: 512 * 1024 * 1024 },
-])
-
-const PATCH_SIDE = 16
-const PATCH_SPACING_M = 2
-const ANCHOR = [PLANET.radius, 0, 0]
-
-const dropPoint = (i) => {
-  const col = i % PATCH_SIDE
-  const row = Math.floor(i / PATCH_SIDE)
-  const across = (col - (PATCH_SIDE - 1) / 2) * PATCH_SPACING_M
-  const along = (row - (PATCH_SIDE - 1) / 2) * PATCH_SPACING_M
-  const p = [ANCHOR[0], across, along]
-  const len = Math.hypot(...p)
-  return p.map((c) => (c / len) * (PLANET.radius + DROP_M))
-}
+const TIERS = SCENARIO_TIERS
 
 const scenario = async (tier) => {
-  const world = await createEngineWorld({ capacity: bodyPoolCapacity(tier.players), tickRate: 60, gravity: -9.8, drag: 0, radius: RADIUS, restitution: 0, players: tier.players, workers: tier.workers, budgetBytes: tier.budgetBytes }, glueUrl(tier.glue))
-  world.configurePlanet(PLANET)
-  const handles = []
-  for (let i = 0; i < BODIES; i++) handles.push(world.spawn(dropPoint(i)))
+  const { world, handles } = await buildPlanetLanding(tier)
   const tickMs = []
   for (let t = 0; t < TICKS; t++) {
     const started = performance.now()

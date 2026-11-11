@@ -17,6 +17,7 @@ void phase6Vegetation();
 void phase7Codecs();
 void phase8Resources();
 void phase10Plan();
+void vegetationPlan();
 void modelsAndTiers();
 void visibilityAndOcclusion();
 
@@ -52,6 +53,7 @@ int main() {
   engine::witness::phase7Codecs();
   engine::witness::phase8Resources();
   engine::witness::phase10Plan();
+  engine::witness::vegetationPlan();
   engine::witness::modelsAndTiers();
   engine::witness::visibilityAndOcclusion();
 

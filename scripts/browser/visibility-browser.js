@@ -251,7 +251,7 @@ const cullRecord = (shot, totals) => {
 
 const run = async () => {
   const canvas = document.getElementById('engine-canvas')
-  const renderer = await loadRenderer({ canvas, requested: BACKEND, players: 1, workers: 1, budgetBytes: 67108864 })
+  const renderer = await loadRenderer({ canvas, requested: BACKEND, players: 1, workers: 1, budgetBytes: 536870912 })
   result.backend = renderer.backendName
   result.adapter = { modelTier: renderer.modelTier, clusterStride: renderer.clusterStride() }
   buildScene(renderer)

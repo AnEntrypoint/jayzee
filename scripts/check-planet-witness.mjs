@@ -7,12 +7,14 @@ import { buildPlanetScene, PLANET_ENTITY_COUNT, sceneSpec } from '../src/engine/
 import { OPEN_ITEMS, PLANET_FRAME_BUDGET_MS, PLANET_MIN_FRAMES, PLANET_RUNS, PLANET_TABLE_COLUMNS, comparePlanetRuns, planetQuery, planetVerdict } from '../src/engine/planetWitness.js'
 import { capAreaKm2 } from '../src/engine/population.js'
 import { densityFor } from '../src/engine/populationDensity.js'
+import { PAGE_SIDE } from '../src/engine/pageLayout.js'
+import { F32, TRANSFORM_STRIDE_FLOATS } from '../src/engine/sharedData.js'
 
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)))
 const fakeModule = () => ({ _engine_planet_height: () => 0 })
 const clock = () => { let t = 0; return () => (t += 1) }
 const frames = (value, n = PLANET_MIN_FRAMES) => Array.from({ length: n }, () => value)
-const goodScene = { entities: PLANET_ENTITY_COUNT, colliderCounts: { 'very-static': 1, static: 5, dynamic: PLANET_ENTITY_COUNT }, vegetationBound: true }
+const goodScene = { entities: PLANET_ENTITY_COUNT, colliderCounts: { 'very-static': 1, static: 5, dynamic: PLANET_ENTITY_COUNT }, vegetationBound: true, generatedInstances: 7808, generateHeightCallsOutsidePages: 26 }
 const good = (over = {}) => ({
   ok: true,
   errors: [],
@@ -113,6 +115,9 @@ gate('the verdict fails on a short run, a wrong player count, a missing scene, a
   assert.equal(planetVerdict(good({ players: 1023 }), webgpu1024).ok, false)
   assert.equal(planetVerdict(good({ scene: undefined }), webgpu1024).ok, false)
   assert.equal(planetVerdict(good({ scene: { ...goodScene, vegetationBound: null } }), webgpu1024).ok, false)
+  assert.equal(planetVerdict(good({ scene: { ...goodScene, generateHeightCallsOutsidePages: 79 } }), webgpu1024).ok, false)
+  assert.equal(planetVerdict(good({ scene: { ...goodScene, generateHeightCallsOutsidePages: null } }), webgpu1024).ok, false)
+  assert.equal(planetVerdict(good({ scene: { ...goodScene, generateHeightCallsOutsidePages: 78 } }), webgpu1024).ok, true)
   assert.equal(planetVerdict(good({ scene: { ...goodScene, colliderCounts: { dynamic: 1000 } } }), webgpu1024).ok, false)
 })
 
@@ -186,6 +191,23 @@ gate('the scene spec defaults to 1024 entities on the 6,360,000 m planet, and th
   assert.equal(sceneSpec().entities, PLANET_ENTITY_COUNT)
   assert.equal(PLANET_FRAME_BUDGET_MS, 16.7)
   assert.equal(PLANET_MIN_FRAMES, 600)
+})
+
+gate('the copy accounting of the generated planet scene is 16 patches of 1024 bytes and 135024 instances: 8657920 render bytes, 1636672 physics bytes not copied, 135040 copies not made', () => {
+  const scene = buildPlanetScene({ module: fakeModule(), now: clock() })
+  const r = scene.report()
+  const patchBytes = PAGE_SIDE * PAGE_SIDE * F32
+  const sharing = scene.vegetation.sharing(patchBytes)
+  console.log('copyAccounting ' + JSON.stringify({ patches: r.patches, patchBytes, instances: r.generatedInstances, ...sharing }))
+  assert.equal(r.patches, 16)
+  assert.equal(r.patchesDeferred, 0)
+  assert.equal(patchBytes, 1024)
+  assert.equal(r.generatedInstances, 135024)
+  assert.equal(r.generatedInstances, r.patches * r.vegetationPlan.capacityPerPatch)
+  assert.equal(r.vegetationBytes, r.generatedInstances * TRANSFORM_STRIDE_FLOATS * F32)
+  assert.deepEqual(sharing, { renderBytes: 8657920, physicsBytesIfCopied: 1636672, sharedBytes: 8657920, bytesSaved: 1636672, copiesSaved: 135040 })
+  assert.equal(sharing.renderBytes, r.patches * patchBytes + r.vegetationBytes)
+  assert.equal(sharing.physicsBytesIfCopied, r.patches * patchBytes + r.generatedInstances * 3 * F32)
 })
 
 const arenaModule = () => {

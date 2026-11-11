@@ -12,6 +12,9 @@ class PlanetShape final : public SurfaceShape {
 
   JPH::AABox GetLocalBounds() const override;
   JPH::Vec3 GetSurfaceNormal(const JPH::SubShapeID&, JPH::Vec3Arg localSurfacePosition) const override;
+  bool CastRay(const JPH::RayCast& ray, const JPH::SubShapeIDCreator& subShapeIDCreator, JPH::RayCastResult& ioHit) const override;
+  void CastRay(const JPH::RayCast& ray, const JPH::RayCastSettings& settings, const JPH::SubShapeIDCreator& subShapeIDCreator,
+               JPH::CastRayCollector& ioCollector, const JPH::ShapeFilter& shapeFilter = {}) const override;
 
   Planet& terrain() const { return terrain_; }
 
@@ -20,6 +23,13 @@ class PlanetShape final : public SurfaceShape {
   float bound_;
 };
 
+constexpr int kRaySteps = 8192;
+constexpr int kRayBisections = 24;
+constexpr int kCastSamples = 32;
+constexpr int kCastBisections = 24;
+constexpr float kCastResolutionMetres = 1.0e-5f;
+
+double rayStepMetres(const Planet& terrain);
 void registerCollisions();
 
 }

@@ -1,4 +1,4 @@
-import { mulberry32, capAreaKm2 } from './population.js'
+import { capAreaKm2 } from './population.js'
 import { PLANET_RADIUS_M } from './sphere.js'
 import { TRANSFORM_STRIDE_FLOATS, copyAccounting } from './sharedData.js'
 import { densityFor } from './populationDensity.js'
@@ -13,18 +13,30 @@ export const defaultAllocate = (kind, length) => {
 }
 export const VEG_GEN_INSTANCES_PER_FRAME = 4096
 export const MATRIX_BYTES = TRANSFORM_STRIDE_FLOATS * 4
+const UINT32_SPAN = 4294967296
+const NO_SLOT = -1
+const FREE = -1
+const DRAWS_PER_INSTANCE = 3
+const POLE_REFERENCE_LIMIT = 0.9
 
 const isCount = (v, name, min) => {
   if (!Number.isInteger(v) || v < min) throw new RangeError(name + ' must be a whole number at least ' + min)
 }
 
-export const patchSeed = (worldSeed, patchId, species = 0) => {
-  if (!Number.isInteger(patchId)) throw new TypeError('patchId must be an integer')
+const highWord = (id) => Math.trunc(id / UINT32_SPAN) | 0
+
+const seedBits = (worldSeed, low, high, species) => {
   let h = ((worldSeed | 0) ^ 0x7eed) >>> 0
-  h = Math.imul(h ^ patchId, 0x9e3779b1) >>> 0
+  h = Math.imul(h ^ low, 0x9e3779b1) >>> 0
+  if (high !== 0) h = Math.imul(h ^ high, 0xc2b2ae35) >>> 0
   h = Math.imul(h ^ species, 0x85ebca6b) >>> 0
   h ^= h >>> 13
-  return h >>> 0
+  return h | 0
+}
+
+export const patchSeed = (worldSeed, patchId, species = 0) => {
+  if (!Number.isSafeInteger(patchId)) throw new TypeError('patchId must be a safe integer')
+  return seedBits(worldSeed, patchId | 0, highWord(patchId), species) >>> 0
 }
 
 export const planVegetationPool = ({ maxBufferBytes, residentPatches, capacityPerPatch }) => {
@@ -43,6 +55,7 @@ export const createVegetationPool = ({
   species = VEG_SPECIES,
   worldSeed,
   heightAt,
+  heightInto,
   patchCentre,
   densityOf = (s) => densityFor('trees'),
   generatePerFrame = VEG_GEN_INSTANCES_PER_FRAME,
@@ -54,7 +67,8 @@ export const createVegetationPool = ({
   if (!(cullRadiusM >= 0) || !Number.isFinite(cullRadiusM)) throw new TypeError('createVegetationPool needs cullRadiusM, the bounding radius of one patch in metres')
   if (!plan || !Number.isInteger(plan.slots)) throw new TypeError('createVegetationPool needs a plan from planVegetationPool')
   if (typeof heightAt !== 'function') throw new TypeError('createVegetationPool needs heightAt(n), the patch height store')
-  if (typeof patchCentre !== 'function') throw new TypeError('createVegetationPool needs patchCentre(patchId) returning { latRad, lonRad, capRad }')
+  if (heightInto !== undefined && typeof heightInto !== 'function') throw new TypeError('heightInto must be a function (n, out) that writes the height to out[0]')
+  if (typeof patchCentre !== 'function') throw new TypeError('createVegetationPool needs patchCentre(patchId, out) returning { latRad, lonRad, capRad }')
   if (typeof now !== 'function') throw new TypeError('createVegetationPool needs now(), the injected clock')
   if (!Number.isInteger(worldSeed)) throw new TypeError('worldSeed must be an integer')
   isCount(generatePerFrame, 'generatePerFrame', 1)
@@ -67,106 +81,196 @@ export const createVegetationPool = ({
   const countsBlock = allocate('u32', species.length * slots)
   const counts = species.map((_, s) => countsBlock.subarray(s * slots, (s + 1) * slots))
   const dirty = allocate('u8', slots)
-  const owner = new Int32Array(slots).fill(-1)
+  const ownerLow = new Int32Array(slots)
+  const ownerHigh = new Int32Array(slots).fill(FREE)
+  const home = new Int32Array(slots)
   const stamp = new Uint32Array(slots)
   const freeStack = new Int32Array(slots)
   for (let s = 0; s < slots; s++) freeStack[s] = slots - 1 - s
   let freeTop = slots
-  const slotOf = new Map()
-  const pending = []
+  let tableBits = 2
+  while ((1 << tableBits) < slots * 2) tableBits += 1
+  const tableMask = (1 << tableBits) - 1
+  const tableShift = 32 - tableBits
+  const table = new Int32Array(1 << tableBits).fill(NO_SLOT)
+  const pendingQueue = new Int32Array(slots)
+  let pendingHead = 0
+  let pendingCount = 0
+  let resident = 0
   let epoch = 0
   let deferred = 0
   let generated = 0
   let generatedInstances = 0
-  let generateMs = 0
+  const timing = new Float64Array(1)
   const nrm = new Float64Array(3)
+  const draws = new Float64Array(DRAWS_PER_INSTANCE)
+  const heights = new Float64Array(1)
+  const heightsByArray = heightInto !== undefined
+  const centreScratch = { latRad: 0, lonRad: 0, capRad: 0 }
+  const stepResult = { patches: 0, budgetInstances: 0 }
   const origins = allocate('f64', slots * 3)
 
-  const expectedCount = (s, cap) => Math.round(densityOf(s) * capAreaKm2(cap.capRad, radiusM))
+  const ownerOf = (slot) => ownerHigh[slot] * UINT32_SPAN + (ownerLow[slot] >>> 0)
 
-  const generate = (slot, patchId) => {
-    const c = patchCentre(patchId)
-    const cosCap = Math.cos(c.capRad)
+  const bucketOf = (low, high) => Math.imul(low ^ Math.imul(high, 0x85ebca6b), 0x9e3779b1) >>> tableShift
+
+  const findSlot = (low, high) => {
+    let at = bucketOf(low, high)
+    while (table[at] !== NO_SLOT) {
+      const slot = table[at]
+      if (ownerLow[slot] === low && ownerHigh[slot] === high) return slot
+      at = (at + 1) & tableMask
+    }
+    return NO_SLOT
+  }
+
+  const insertSlot = (slot) => {
+    let at = home[slot]
+    while (table[at] !== NO_SLOT) at = (at + 1) & tableMask
+    table[at] = slot
+  }
+
+  const removeSlot = (slot) => {
+    let hole = home[slot]
+    while (table[hole] !== slot) hole = (hole + 1) & tableMask
+    let at = hole
+    for (;;) {
+      at = (at + 1) & tableMask
+      const moved = table[at]
+      if (moved === NO_SLOT) break
+      const from = home[moved]
+      const stays = hole <= at ? (hole < from && from <= at) : (hole < from || from <= at)
+      if (stays) continue
+      table[hole] = moved
+      hole = at
+    }
+    table[hole] = NO_SLOT
+  }
+
+  const dequeue = (slot) => {
+    let found = -1
+    for (let k = 0; k < pendingCount; k++) {
+      if (pendingQueue[(pendingHead + k) % slots] === slot) { found = k; break }
+    }
+    if (found === -1) return
+    for (let k = found; k < pendingCount - 1; k++) pendingQueue[(pendingHead + k) % slots] = pendingQueue[(pendingHead + k + 1) % slots]
+    pendingCount -= 1
+  }
+
+  const countCapRad = new Float64Array(species.length).fill(-1)
+  const countAtCapRad = new Int32Array(species.length)
+
+  const refreshCount = (s, capRad) => {
+    countAtCapRad[s] = Math.round(densityOf(species[s]) * capAreaKm2(capRad, radiusM))
+    countCapRad[s] = capRad
+  }
+
+  const generate = (slot) => {
+    const patchId = ownerOf(slot)
+    const c = patchCentre(patchId, centreScratch)
+    const capRad = c.capRad
+    const cosCap = Math.cos(capRad)
     const cl = Math.cos(c.latRad), sl = Math.sin(c.latRad)
-    const centre = [cl * Math.sin(c.lonRad), sl, cl * Math.cos(c.lonRad)]
-    origins[slot * 3] = radiusM * centre[0]
-    origins[slot * 3 + 1] = radiusM * centre[1]
-    origins[slot * 3 + 2] = radiusM * centre[2]
-    const ref = Math.abs(centre[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0]
-    const a0 = [ref[1] * centre[2] - ref[2] * centre[1], ref[2] * centre[0] - ref[0] * centre[2], ref[0] * centre[1] - ref[1] * centre[0]]
-    const al = Math.hypot(a0[0], a0[1], a0[2])
-    const a = [a0[0] / al, a0[1] / al, a0[2] / al]
-    const b = [centre[1] * a[2] - centre[2] * a[1], centre[2] * a[0] - centre[0] * a[2], centre[0] * a[1] - centre[1] * a[0]]
+    const cx = cl * Math.sin(c.lonRad), cy = sl, cz = cl * Math.cos(c.lonRad)
+    origins[slot * 3] = radiusM * cx
+    origins[slot * 3 + 1] = radiusM * cy
+    origins[slot * 3 + 2] = radiusM * cz
+    const offPole = Math.abs(cy) < POLE_REFERENCE_LIMIT
+    const r0 = offPole ? 0 : 1, r1 = offPole ? 1 : 0, r2 = 0
+    const a0x = r1 * cz - r2 * cy, a0y = r2 * cx - r0 * cz, a0z = r0 * cy - r1 * cx
+    const al = Math.sqrt(a0x * a0x + a0y * a0y + a0z * a0z)
+    const ax = a0x / al, ay = a0y / al, az = a0z / al
+    const bx = cy * az - cz * ay, by = cz * ax - cx * az, bz = cx * ay - cy * ax
+    let total = 0
     for (let s = 0; s < species.length; s++) {
-      const count = expectedCount(species[s], c)
+      if (countCapRad[s] !== capRad) refreshCount(s, capRad)
+      const count = countAtCapRad[s]
       if (count > capacity) throw new RangeError('patch ' + patchId + ' needs ' + count + ' instances, above the capacity ' + capacity)
-      const random = mulberry32(patchSeed(worldSeed, patchId, s))
+      let state = seedBits(worldSeed, ownerLow[slot], ownerHigh[slot], s) >>> 0
       const buf = buffers[s][slot]
-      const base = 0
       for (let i = 0; i < count; i++) {
-        const cosTheta = 1 - random() * (1 - cosCap)
+        for (let d = 0; d < DRAWS_PER_INSTANCE; d++) {
+          state = (state + 0x6d2b79f5) >>> 0
+          let t = state
+          t = Math.imul(t ^ (t >>> 15), t | 1)
+          t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
+          draws[d] = ((t ^ (t >>> 14)) >>> 0) / UINT32_SPAN
+        }
+        const cosTheta = 1 - draws[0] * (1 - cosCap)
         const sinTheta = Math.sqrt(Math.max(0, 1 - cosTheta * cosTheta))
-        const phi = random() * 2 * Math.PI
+        const phi = draws[1] * 2 * Math.PI
         const cp = Math.cos(phi), sp = Math.sin(phi)
-        let x = cosTheta * centre[0] + sinTheta * (cp * a[0] + sp * b[0])
-        let y = cosTheta * centre[1] + sinTheta * (cp * a[1] + sp * b[1])
-        let z = cosTheta * centre[2] + sinTheta * (cp * a[2] + sp * b[2])
-        const len = Math.hypot(x, y, z)
+        let x = cosTheta * cx + sinTheta * (cp * ax + sp * bx)
+        let y = cosTheta * cy + sinTheta * (cp * ay + sp * by)
+        let z = cosTheta * cz + sinTheta * (cp * az + sp * bz)
+        const len = Math.sqrt(x * x + y * y + z * z)
         x /= len; y /= len; z /= len
         nrm[0] = x; nrm[1] = y; nrm[2] = z
-        const h = heightAt(nrm)
-        const r = radiusM + h
-        const yaw = random() * 2 * Math.PI
-        const refN = Math.abs(y) < 0.9 ? [0, 1, 0] : [1, 0, 0]
-        let ex = refN[1] * z - refN[2] * y, ey = refN[2] * x - refN[0] * z, ez = refN[0] * y - refN[1] * x
-        const el = Math.hypot(ex, ey, ez)
+        if (heightsByArray) heightInto(nrm, heights)
+        else heights[0] = heightAt(nrm)
+        const r = radiusM + heights[0]
+        const yaw = draws[2] * 2 * Math.PI
+        const offPoleHere = Math.abs(y) < POLE_REFERENCE_LIMIT
+        const n0 = offPoleHere ? 0 : 1, n1 = offPoleHere ? 1 : 0, n2 = 0
+        let ex = n1 * z - n2 * y, ey = n2 * x - n0 * z, ez = n0 * y - n1 * x
+        const el = Math.sqrt(ex * ex + ey * ey + ez * ez)
         ex /= el; ey /= el; ez /= el
         const nx = y * ez - z * ey, ny = z * ex - x * ez, nz = x * ey - y * ex
         const cw = Math.cos(yaw), sw = Math.sin(yaw)
         const fx = cw * ex + sw * nx, fy = cw * ey + sw * ny, fz = cw * ez + sw * nz
         const sx = y * fz - z * fy, sy = z * fx - x * fz, sz = x * fy - y * fx
-        const o = base + i * TRANSFORM_STRIDE_FLOATS
+        const o = i * TRANSFORM_STRIDE_FLOATS
         buf[o] = sx; buf[o + 1] = sy; buf[o + 2] = sz; buf[o + 3] = 0
         buf[o + 4] = x; buf[o + 5] = y; buf[o + 6] = z; buf[o + 7] = 0
         buf[o + 8] = fx; buf[o + 9] = fy; buf[o + 10] = fz; buf[o + 11] = 0
-        buf[o + 12] = r * x - radiusM * centre[0]
-        buf[o + 13] = r * y - radiusM * centre[1]
-        buf[o + 14] = r * z - radiusM * centre[2]
+        buf[o + 12] = r * x - radiusM * cx
+        buf[o + 13] = r * y - radiusM * cy
+        buf[o + 14] = r * z - radiusM * cz
         buf[o + 15] = 1
       }
       counts[s][slot] = count
+      total += count
     }
     dirty[slot] = 1
     generated += 1
-    generatedInstances += counts.reduce((acc, arr) => acc + arr[slot], 0)
+    generatedInstances += total
   }
 
   const sync = (patchIds) => {
     epoch += 1
-    for (const id of patchIds) {
-      if (!Number.isInteger(id)) throw new TypeError('patch ids must be integers')
-      const existing = slotOf.get(id)
-      if (existing !== undefined) stamp[existing] = epoch
+    const wanted = patchIds.length
+    for (let k = 0; k < wanted; k++) {
+      const id = patchIds[k]
+      if (!Number.isSafeInteger(id) || id < 0) throw new TypeError('patch ids must be safe integers at zero or more')
+      const existing = findSlot(id | 0, highWord(id))
+      if (existing !== NO_SLOT) stamp[existing] = epoch
     }
     for (let slot = 0; slot < slots; slot++) {
-      if (owner[slot] === -1 || stamp[slot] === epoch) continue
-      slotOf.delete(owner[slot])
-      owner[slot] = -1
-      for (const arr of counts) arr[slot] = 0
+      if (ownerHigh[slot] === FREE || stamp[slot] === epoch) continue
+      removeSlot(slot)
+      ownerHigh[slot] = FREE
+      resident -= 1
+      for (let s = 0; s < counts.length; s++) counts[s][slot] = 0
       freeStack[freeTop] = slot
       freeTop += 1
-      const queued = pending.indexOf(slot)
-      if (queued !== -1) pending.splice(queued, 1)
+      dequeue(slot)
     }
-    for (const id of patchIds) {
-      if (slotOf.has(id)) continue
+    for (let k = 0; k < wanted; k++) {
+      const id = patchIds[k]
+      const low = id | 0
+      const high = highWord(id)
+      if (findSlot(low, high) !== NO_SLOT) continue
       if (freeTop === 0) { deferred += 1; continue }
       freeTop -= 1
       const slot = freeStack[freeTop]
-      slotOf.set(id, slot)
-      owner[slot] = id
+      ownerLow[slot] = low
+      ownerHigh[slot] = high
+      home[slot] = bucketOf(low, high)
+      insertSlot(slot)
+      resident += 1
       stamp[slot] = epoch
-      pending.push(slot)
+      pendingQueue[(pendingHead + pendingCount) % slots] = slot
+      pendingCount += 1
     }
   }
 
@@ -174,17 +278,30 @@ export const createVegetationPool = ({
     if (!(budget >= capacity)) throw new RangeError('budget must be at least one patch capacity')
     let spent = 0
     let done = 0
-    const t0 = now()
-    while (pending.length > 0) {
-      const slot = pending[0]
-      if (spent > 0 && spent + capacity > budget) break
-      pending.shift()
-      generate(slot, owner[slot])
-      spent += capacity
-      done += 1
+    if (pendingCount > 0) {
+      const t0 = now()
+      while (pendingCount > 0) {
+        if (spent > 0 && spent + capacity > budget) break
+        const slot = pendingQueue[pendingHead]
+        pendingHead = (pendingHead + 1) % slots
+        pendingCount -= 1
+        generate(slot)
+        spent += capacity
+        done += 1
+      }
+      timing[0] += now() - t0
     }
-    generateMs += now() - t0
-    return { patches: done, budgetInstances: spent }
+    stepResult.patches = done
+    stepResult.budgetInstances = spent
+    return stepResult
+  }
+
+  const instanceTotal = () => {
+    let total = 0
+    for (let s = 0; s < counts.length; s++) {
+      for (let slot = 0; slot < slots; slot++) total += counts[s][slot]
+    }
+    return total
   }
 
   const drawRanges = (speciesIndex, out) => {
@@ -218,9 +335,12 @@ export const createVegetationPool = ({
     memory: () => ({ block, counts: countsBlock, dirty, origins, species: species.length, slots, capacity, radius: cullRadiusM }),
     buffers: () => buffers,
     counts: () => counts,
-    slotOf: (id) => slotOf.get(id),
+    slotOf: (id) => {
+      const slot = Number.isSafeInteger(id) && id >= 0 ? findSlot(id | 0, highWord(id)) : NO_SLOT
+      return slot === NO_SLOT ? undefined : slot
+    },
     bytes: () => buffers.reduce((acc, arr) => acc + arr.reduce((x, b) => x + b.byteLength, 0), 0),
-    stats: () => ({ resident: slotOf.size, pending: pending.length, deferred, generated, generatedInstances, generateMs }),
-    sharing: (patchBytes) => copyAccounting({ patches: slotOf.size, patchBytes, instances: counts.reduce((acc, arr) => acc + arr.reduce((x, y) => x + y, 0), 0) }),
+    stats: () => ({ resident, pending: pendingCount, deferred, generated, generatedInstances, generateMs: timing[0] }),
+    sharing: (patchBytes) => copyAccounting({ patches: resident, patchBytes, instances: instanceTotal() }),
   }
 }

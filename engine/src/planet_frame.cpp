@@ -217,6 +217,78 @@ double heightAt(Planet& terrain, double x, double y, double z) {
   return s00 + ty * (s01 - s00) + tx * (s11 - s01);
 }
 
+SurfaceSample sampleSurface(Planet& terrain, double x, double y, double z, PageCursor& cursor) {
+  SurfaceSample out;
+  const double point[3] = {x, y, z};
+  const double distance = std::sqrt(dot(point, point));
+  const double up[3] = {x / distance, y / distance, z / distance};
+  out.height = 0.0;
+  out.normal[0] = up[0];
+  out.normal[1] = up[1];
+  out.normal[2] = up[2];
+  out.flat = true;
+  const int face = pickFace(x, y, z);
+  const Frame& frame = kFrames[face];
+  const double cu = dot(point, frame.u);
+  const double cv = dot(point, frame.v);
+  const double cc = dot(point, frame.c);
+  const double ccSafe = cc > 1.0 ? cc : 1.0;
+  const double scale = kAtanScale * terrain.radius;
+  const double offsetX = (scale * std::atan(cu / ccSafe) + terrain.radius) / terrain.cellSize;
+  const double offsetY = (scale * std::atan(cv / ccSafe) + terrain.radius) / terrain.cellSize;
+  const int cx = clampIndex(static_cast<int>(std::floor(offsetX)), terrain.cellsPerFace);
+  const int cy = clampIndex(static_cast<int>(std::floor(offsetY)), terrain.cellsPerFace);
+  std::int64_t key = 0;
+  int slot = -1;
+  if (packCellKey(face, cx, cy, terrain.cellsPerFace, key)) {
+    if (!cursor.valid || cursor.key != key) {
+      cursor.key = key;
+      cursor.slot = terrain.pages.lookup(key);
+      cursor.valid = true;
+    }
+    slot = cursor.slot;
+  }
+  if (slot < 0) {
+    terrain.gapQueries += 1;
+    return out;
+  }
+  const double gx = clampUnit(offsetX - cx) * (kPageSide - 1);
+  const double gy = clampUnit(offsetY - cy) * (kPageSide - 1);
+  const int i0 = std::min(static_cast<int>(gx), kPageSide - 2);
+  const int j0 = std::min(static_cast<int>(gy), kPageSide - 2);
+  const double tx = gx - i0;
+  const double ty = gy - j0;
+  const float* s = terrain.pages.pageSamples(slot);
+  const double s00 = s[j0 * kPageSide + i0];
+  const double s10 = s[j0 * kPageSide + i0 + 1];
+  const double s01 = s[(j0 + 1) * kPageSide + i0];
+  const double s11 = s[(j0 + 1) * kPageSide + i0 + 1];
+  double alongX = 0.0;
+  double alongY = 0.0;
+  if (ty <= tx) {
+    alongX = s10 - s00;
+    alongY = s11 - s10;
+    out.height = s00 + tx * alongX + ty * alongY;
+  } else {
+    alongX = s11 - s01;
+    alongY = s01 - s00;
+    out.height = s00 + ty * alongY + tx * alongX;
+  }
+  if (alongX == 0.0 && alongY == 0.0) return out;
+  const double perOffset = (kPageSide - 1) / terrain.cellSize;
+  const double slopeX = alongX * perOffset * scale / (ccSafe * ccSafe + cu * cu);
+  const double slopeY = alongY * perOffset * scale / (ccSafe * ccSafe + cv * cv);
+  double normal[3];
+  for (int k = 0; k < 3; ++k) {
+    const double gradient = slopeX * (ccSafe * frame.u[k] - cu * frame.c[k]) + slopeY * (ccSafe * frame.v[k] - cv * frame.c[k]);
+    normal[k] = up[k] - gradient;
+  }
+  const double length = std::sqrt(dot(normal, normal));
+  for (int k = 0; k < 3; ++k) out.normal[k] = normal[k] / length;
+  out.flat = false;
+  return out;
+}
+
 void surfacePoint(const Frame& frame, double radius, double ox, double oy, double* out) {
   const double tu = std::tan(ox / (kAtanScale * radius));
   const double tv = std::tan(oy / (kAtanScale * radius));

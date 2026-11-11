@@ -29,7 +29,46 @@ export function setupFootGrounding(skeleton, options = {}) {
   }
 }
 
-export function groundFeet(grounding, io) {
+class FootTargetPoint {
+  constructor() {
+    this.x = 0
+    this.y = 0
+    this.z = 0
+  }
+}
+
+export const makeGroundingResult = () => ({ drop: 0, hipDelta: 0, targets: [], points: [] })
+
+const fillHeldTargets = (grounding, readFootWorld, out) => {
+  const targets = out.targets
+  const points = out.points
+  let count = 0
+  for (const leg of grounding.legs) {
+    if (count === targets.length) {
+      targets[count] = { side: leg.side, chain: leg.chain, enabled: false, target: null }
+      points[count] = new FootTargetPoint()
+    }
+    const entry = targets[count]
+    entry.side = leg.side
+    entry.chain = leg.chain
+    if (leg.targetY === null) {
+      entry.enabled = false
+      entry.target = null
+    } else {
+      const foot = readFootWorld(leg.foot)
+      const point = points[count]
+      point.x = foot[0]
+      point.y = leg.targetY
+      point.z = foot[2]
+      entry.enabled = true
+      entry.target = point
+    }
+    count += 1
+  }
+  if (targets.length !== count) targets.length = count
+}
+
+export function groundFeet(grounding, io, out = null) {
   const { readFootWorld, raycast, moveHips } = io
   let drop = 0
   for (const leg of grounding.legs) {
@@ -53,6 +92,13 @@ export function groundFeet(grounding, io) {
       hipDelta = delta
       grounding.hipOffset = drop
     }
+  }
+
+  if (out !== null) {
+    fillHeldTargets(grounding, readFootWorld, out)
+    out.drop = drop
+    out.hipDelta = hipDelta
+    return out
   }
 
   const targets = []
@@ -81,6 +127,8 @@ export class AnimationSystem {
     this.ragdoll = null
     this.footTargets = null
     this._grounding = null
+    this._groundingIo = { readFootWorld: null, raycast: null, moveHips: null }
+    this._groundingResult = makeGroundingResult()
 
     this.options = {
       enableIK: options.enableIK !== false,
@@ -102,7 +150,11 @@ export class AnimationSystem {
   _groundFeet() {
     const g = this._grounding
     if (!g) return
-    const result = groundFeet(g, { readFootWorld: this.readFootWorld, raycast: this.options.raycastCallback, moveHips: this.moveHips })
+    const io = this._groundingIo
+    io.readFootWorld = this.readFootWorld
+    io.raycast = this.options.raycastCallback
+    io.moveHips = this.moveHips
+    const result = groundFeet(g, io, this._groundingResult)
     this.footTargets = result.targets
     for (const entry of result.targets) {
       const chain = this.ikRig ? this.ikRig.getChain(entry.chain) : null

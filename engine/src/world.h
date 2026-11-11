@@ -51,7 +51,27 @@ enum Status : int {
   kZeroThickness = -6,
   kAlreadyInitialized = -7,
   kWorkersDoNotFit = -8,
+  kSealed = -9,
 };
+
+enum HitKind : std::uint32_t {
+  kHitNone = 0,
+  kHitPlanet = 1,
+  kHitBody = 2,
+  kHitStatic = 3,
+  kHitVegetation = 4,
+};
+
+struct QueryHit {
+  double fraction;
+  double position[3];
+  double normal[3];
+  std::uint32_t kind;
+  std::uint32_t handle;
+};
+
+constexpr float kCharacterStepUpMetres = 0.4f;
+constexpr float kCharacterStickDownMetres = 0.5f;
 
 struct Config {
   std::uint32_t capacity;
@@ -96,6 +116,10 @@ class World {
   Status addTrunk(const double* trunk);
   int addCharacter(const double* spec);
   void setCharacterVelocity(std::uint32_t index, const float* velocity);
+  Status tuneCharacters(float stepUp, float stickDown);
+  int castRay(const double* origin, const double* direction, QueryHit& out);
+  int castRound(double radius, double halfHeight, const double* origin, const double* direction, QueryHit& out);
+  int probePlanet(double radius, double halfHeight, bool planetFirst, double maxSeparation, const double* center, QueryHit& out);
   bool characterSupported(std::uint32_t index) const;
   void characterPosition(std::uint32_t index, float* out) const;
   void characterBodyPosition(std::uint32_t index, float* out) const;
@@ -132,6 +156,7 @@ class World {
   void rebase(double x, double y, double z);
   void removeBody(std::uint32_t index);
   void releaseRuntime();
+  void classify(std::uint32_t joltBody, QueryHit& out) const;
 
   Runtime* runtime_ = nullptr;
   budget::Capacity limits_{};
@@ -145,6 +170,8 @@ class World {
   float drag_ = 0.0f;
   float restitution_ = 0.0f;
   float planetGravity_ = 0.0f;
+  float characterStepUp_ = kCharacterStepUpMetres;
+  float characterStickDown_ = kCharacterStickDownMetres;
   std::uint32_t groundBody_ = kNoBody;
   std::uint32_t planetBody_ = kNoBody;
   std::uint32_t vegetationBody_ = kNoBody;

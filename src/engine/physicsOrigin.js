@@ -19,6 +19,16 @@ export const rebaseBody = (relative, origin, eye, out) => {
   return out
 }
 
+export const rebaseShift = (origin, eye, out) => {
+  for (let k = 0; k < 3; k++) out[k] = Math.fround(eye[k] - origin[k])
+  return out
+}
+
+export const rebaseBodyByShift = (relative, shift, out) => {
+  for (let k = 0; k < 3; k++) out[k] = Math.fround(relative[k] - shift[k])
+  return out
+}
+
 export const rebaseCost = ({ bodies, liveSlots }) => ({
   positionWrites: bodies,
   positionBytes: bodies * 12,

@@ -11,5 +11,10 @@
   "check:scenario-boss-fight",
   "check:scenario-marble-bowl",
   "check:scenario-planet-landing",
-  "check:scenario-projectile-volley"
+  "check:scenario-projectile-volley",
+  "check:vegetation-allocations",
+  "check:engine-job-wait",
+  "check:scenario-determinism",
+  "check:scenario-allocations",
+  "check:scenario-character-terrain"
 ]

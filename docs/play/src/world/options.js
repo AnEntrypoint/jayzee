@@ -29,7 +29,7 @@ export const flattenBoxes = (boxes) => {
 }
 
 export const checkVector = (value, name) => {
-  if (!Array.isArray(value) || value.length !== 3 || !value.every(isFiniteNumber)) {
+  if (!Array.isArray(value) || value.length !== 3 || !isFiniteNumber(value[0]) || !isFiniteNumber(value[1]) || !isFiniteNumber(value[2])) {
     throw new TypeError(name + ' must be a finite [x, y, z] triple')
   }
 }

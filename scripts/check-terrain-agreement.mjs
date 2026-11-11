@@ -52,6 +52,19 @@ const bilinearHeight = (samples, u, v) => {
   return (1 - c.tx) * (1 - c.ty) * c.s00 + c.tx * (1 - c.ty) * c.s10 + (1 - c.tx) * c.ty * c.s01 + c.tx * c.ty * c.s11
 }
 
+const SAMPLE_ORDER_CONTROLS = Object.freeze([
+  { label: 'u and v swapped', at: (u, v) => [v, u] },
+  { label: 'u negated', at: (u, v) => [1 - u, v] },
+  { label: 'v negated', at: (u, v) => [u, 1 - v] },
+  { label: 'both axes negated', at: (u, v) => [1 - u, 1 - v] },
+])
+const FLAT_HEIGHT_M = 0.3
+const CONTROL_FLOOR_M = 0.01
+
+const agreementGap = (draws, heightOf) => draws.reduce((m, d) => Math.max(m, Math.abs(d.collision - heightOf(d.u, d.v))), 0)
+
+const agrees = (draws, heightOf) => agreementGap(draws, heightOf) <= AGREEMENT_TOLERANCE_M
+
 const onSurface = (world, cell, u, v) => {
   const frame = world.cellFrame(cell.face, cell.cx, cell.cy)
   const p = [0, 1, 2].map((k) => frame.origin[k] + u * frame.uEdge[k] + v * frame.vEdge[k])
@@ -125,6 +138,24 @@ const runTier = async (tier) => {
     const at = locate(world, mid)
     assert.equal(`${at.face},${at.cx},${at.cy}`, `${cell.face},${cell.cx},${cell.cy}`, 'the frame centre does not locate to its cell')
   })
+  const controlGaps = {}
+  for (const control of SAMPLE_ORDER_CONTROLS) {
+    const mirrored = (u, v) => renderedHeight(samples, ...control.at(u, v))
+    controlGaps[control.label] = agreementGap(draws, mirrored)
+    gate(`${tier.label}: negative control, a terrain read with ${control.label} fails the agreement check by more than ${CONTROL_FLOOR_M} m`, () => {
+      assert.equal(agrees(draws, mirrored), false, 'the mirrored terrain passed the agreement check, so the check does not see sample order')
+      assert.ok(controlGaps[control.label] > CONTROL_FLOOR_M, 'mirrored gap ' + controlGaps[control.label] + ' m')
+    })
+  }
+  const flatSamples = new Float32Array(PAGE_SIDE * PAGE_SIDE).fill(FLAT_HEIGHT_M)
+  controlGaps.flat = agreementGap(draws, (u, v) => renderedHeight(flatSamples, u, v))
+  gate(`${tier.label}: negative control, a flat terrain fails the agreement check against the staged pages by more than ${CONTROL_FLOOR_M} m`, () => {
+    assert.equal(agrees(draws, (u, v) => renderedHeight(flatSamples, u, v)), false, 'a flat terrain passed the agreement check, so the check does not see the samples')
+    assert.ok(controlGaps.flat > CONTROL_FLOOR_M, 'flat gap ' + controlGaps.flat + ' m')
+  })
+  gate(`${tier.label}: the agreement check itself passes on the staged samples through the same function the controls use`, () => {
+    assert.equal(agrees(draws, (u, v) => renderedHeight(samples, u, v)), true)
+  })
   const picks = [...draws].sort((a, b) => Math.abs(b.bilinear - b.rendered) - Math.abs(a.bilinear - a.rendered)).slice(0, PICKS)
   const contacts = []
   for (const pick of picks) {
@@ -148,7 +179,17 @@ const runTier = async (tier) => {
       assert.ok(gap <= PHYSICS_TOLERANCE_M, 'contact gap ' + gap + ' m at a point whose bilinear gap is ' + c.pickBilinearGap + ' m')
     }
   })
-  return { worst, bilinearGap, contacts: inCell.length }
+  const centreKey = world.cellKey(cell.face, cell.cx, cell.cy)
+  world.releasePage(centreKey)
+  world.writePage(centreKey, flatSamples)
+  world.applyPages()
+  const flatWorst = draws.reduce((m, d) => Math.max(m, Math.abs(world.height(d.p[0], d.p[1], d.p[2]) - FLAT_HEIGHT_M)), 0)
+  const flatAgainstStaged = draws.reduce((m, d) => Math.max(m, Math.abs(world.height(d.p[0], d.p[1], d.p[2]) - d.rendered)), 0)
+  gate(`${tier.label}: flat-terrain control, with the centre page restaged flat at ${FLAT_HEIGHT_M} m the collision height is ${FLAT_HEIGHT_M} m at every draw and no longer agrees with the old samples`, () => {
+    assert.ok(flatWorst <= AGREEMENT_TOLERANCE_M, 'flat page gap ' + flatWorst + ' m')
+    assert.ok(flatAgainstStaged > CONTROL_FLOOR_M, 'the collision height did not move with the page: gap ' + flatAgainstStaged + ' m')
+  })
+  return { worst, bilinearGap, contacts: inCell.length, controlGaps, flatWorst, flatAgainstStaged }
 }
 
 const started = Date.now()

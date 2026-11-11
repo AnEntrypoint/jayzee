@@ -35,6 +35,18 @@ struct Planet {
   PageCache pages;
 };
 
+struct PageCursor {
+  std::int64_t key = 0;
+  int slot = -1;
+  bool valid = false;
+};
+
+struct SurfaceSample {
+  double height;
+  double normal[3];
+  bool flat;
+};
+
 std::size_t bytesFor(std::uint32_t pageSlots);
 Planet* bind(void* base, std::uint32_t pageSlots);
 Planet& state();
@@ -45,6 +57,7 @@ Cell worldToCell(double x, double y, double z, double radius, double cellSize);
 bool packCellKey(int face, int cx, int cy, int cellsPerFace, std::int64_t& key);
 Cell resolveCell(int face, int cx, int cy, int cellsPerFace);
 double heightAt(Planet& terrain, double x, double y, double z);
+SurfaceSample sampleSurface(Planet& terrain, double x, double y, double z, PageCursor& cursor);
 void cellFrame(const Planet& terrain, int face, int cx, int cy, double* out);
 
 }

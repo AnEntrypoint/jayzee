@@ -1,8 +1,8 @@
 import { unpackGroundNormal } from '../wire/groundNormalWire.js'
 import { inputDepthFromWire, NO_INPUT_DEPTH } from '../wire/inputDepthWire.js'
 import { unpackWallPlanes } from '../wire/wallPlaneWire.js'
-import { decodeEntityRecordInto, decodePlayerRecordInto, WIRE_UNITS_PER_METER } from '../wire/index.js'
-import { PLAYER_TIER_FULL, PLAYER_TIER_REDUCED, unpackQuat } from '../snapshot-lod-pure/records.js'
+import { decodeEntityRecordInto, decodeEntityRotationInto, decodePlayerRecordInto, decodePlayerRotationInto, WIRE_UNITS_PER_METER } from '../wire/index.js'
+import { PLAYER_TIER_FULL, PLAYER_TIER_REDUCED } from '../snapshot-lod-pure/records.js'
 import { reexpressPlayerRecord, reexpressEntityRecord } from './reexpressRecords.js'
 
 const TAU = 2 * Math.PI
@@ -121,7 +121,7 @@ const fillPlayerArr = (s, p) => {
   const record = decodePlayerRecordInto(p[1], playerRecord)
   copy3(s.position, record.position)
   s.heightAbsent = false
-  unpackQuat(record.rotationWord, s.rotation)
+  decodePlayerRotationInto(p[1], s.rotation)
   copy3(s.velocity, record.velocity)
   s.onGround = p[2] === 1
   s.health = p[3]
@@ -174,9 +174,10 @@ const applyFieldDelta = (s, mask, fields, start) => {
   let fi = start
   if (mask & FIELD_MODEL) s.model = fields[fi++]
   if (mask & KINEMATIC_FIELDS) {
-    const record = decodeEntityRecordInto(fields[fi++], entityRecord)
+    const bin = fields[fi++]
+    const record = decodeEntityRecordInto(bin, entityRecord)
     if (mask & FIELD_POS) copy3(s.position, record.position)
-    if (mask & FIELD_ROT) unpackQuat(record.rotationWord, s.rotation)
+    if (mask & FIELD_ROT) decodeEntityRotationInto(bin, s.rotation)
     if (mask & FIELD_VEL) copy3(s.velocity, record.velocity)
     if (mask & FIELD_SCALE) copy3(s.scale, record.scale)
   }
@@ -194,7 +195,7 @@ const fillEntityArr = (s, e) => {
   s.model = e[1]
   const record = decodeEntityRecordInto(e[2], entityRecord)
   copy3(s.position, record.position)
-  unpackQuat(record.rotationWord, s.rotation)
+  decodeEntityRotationInto(e[2], s.rotation)
   copy3(s.velocity, record.velocity)
   s.bodyType = e[3]
   s.custom = e[4]
@@ -259,18 +260,28 @@ const copyEntityStateInto = (dst, s) => {
 class SlotPool {
   #make
   #free = []
+  #count = 0
 
   constructor(makeSlot) {
     this.#make = makeSlot
   }
 
   acquire() {
-    return this.#free.length ? this.#free.pop() : this.#make()
+    if (this.#count === 0) return this.#make()
+    this.#count -= 1
+    return this.#free[this.#count]
   }
 
   release(slot) {
-    this.#free.push(slot)
+    this.#free[this.#count] = slot
+    this.#count += 1
   }
+}
+
+const makeList = () => []
+
+const trimList = (list, count) => {
+  if (list.length !== count) list.length = count
 }
 
 export class SnapshotProcessor {
@@ -278,14 +289,20 @@ export class SnapshotProcessor {
   #entityStates = new Map()
   #callbacks
   #now
-  #seenEntities = new Set()
+  #entitySeenCall = new Map()
   #deltaFailures = 0
   #deltaFailureIds = new Set()
   #lastSeenCall = new Map()
   #callCount = 0
   #playerSlotPool = new SlotPool(makePlayerSlot)
   #entitySlotPool = new SlotPool(makeEntitySlot)
-  #releaseQueue = []
+  #playerListPool = new SlotPool(makeList)
+  #entityListPool = new SlotPool(makeList)
+  #released = new Array(SNAPSHOT_RELEASE_WINDOW).fill(null)
+  #releaseAt = 0
+  #playerCount = 0
+  #entityCount = 0
+  #current = null
 
   constructor({ callbacks = {}, now = null } = {}) {
     if (now !== null && typeof now !== 'function') throw new TypeError('SnapshotProcessor now must be a function returning milliseconds')
@@ -308,17 +325,49 @@ export class SnapshotProcessor {
     return this.#now()
   }
 
-  #maybeReleaseOldest() {
-    if (this.#releaseQueue.length <= SNAPSHOT_RELEASE_WINDOW) return
-    const oldest = this.#releaseQueue.shift()
-    for (const slot of oldest.players) this.#playerSlotPool.release(slot)
-    for (const slot of oldest.entities) this.#entitySlotPool.release(slot)
+  #keepAndReleaseOldest(snapshot) {
+    const oldest = this.#released[this.#releaseAt]
+    this.#released[this.#releaseAt] = snapshot
+    this.#releaseAt = (this.#releaseAt + 1) % SNAPSHOT_RELEASE_WINDOW
+    if (oldest === null) return
+    for (let i = 0; i < oldest.players.length; i++) this.#playerSlotPool.release(oldest.players[i])
+    for (let i = 0; i < oldest.entities.length; i++) this.#entitySlotPool.release(oldest.entities[i])
+    this.#playerListPool.release(oldest.players)
+    this.#entityListPool.release(oldest.entities)
+  }
+
+  #sweepPlayer = (track, pid) => {
+    if (this.#lastSeenCall.get(pid) === this.#callCount) return
+    if (track.tier === PLAYER_TIER_REDUCED) {
+      const lastSeen = this.#lastSeenCall.get(pid) || 0
+      if (this.#callCount - lastSeen < REDUCED_TIER_ABSENCE_GRACE_SNAPSHOTS) {
+        this.#keepPlayer(this.#current, track)
+        return
+      }
+    }
+    this.#playerStates.delete(pid)
+    this.#lastSeenCall.delete(pid)
+    this.#callbacks.onPlayerLeft?.(pid)
+  }
+
+  #sweepEntity = (track, eid) => {
+    if (this.#entitySeenCall.get(eid) === this.#callCount) return
+    this.#entityStates.delete(eid)
+    this.#entitySeenCall.delete(eid)
+    this.#callbacks.onEntityRemoved?.(eid)
+  }
+
+  #keepPlayer(snapshot, track) {
+    snapshot.players[this.#playerCount] = copyPlayerStateInto(this.#playerSlotPool.acquire(), track)
+    this.#playerCount += 1
   }
 
   processSnapshot(data, tick, selfId = null) {
     this.lastSnapshotTick = tick
     this.#callCount++
-    const snapshotForBuffer = { tick: data.tick || 0, timestamp: this.#timestampOf(data), players: [], entities: [] }
+    const snapshotForBuffer = { tick: data.tick || 0, timestamp: this.#timestampOf(data), players: this.#playerListPool.acquire(), entities: this.#entityListPool.acquire() }
+    this.#playerCount = 0
+    this.#entityCount = 0
     if (data.dots) snapshotForBuffer.dots = data.dots
 
     for (const p of data.players || []) {
@@ -336,26 +385,16 @@ export class SnapshotProcessor {
       if (!track.rotation) track.rotation = [0, 0, 0, 1]
       if (!track.velocity) track.velocity = [0, 0, 0]
       if (pid === selfId && Array.isArray(data.me)) applySelfBlock(track, data.me)
-      snapshotForBuffer.players.push(copyPlayerStateInto(this.#playerSlotPool.acquire(), track))
+      this.#keepPlayer(snapshotForBuffer, track)
     }
-    for (const pid of this.#playerStates.keys()) {
-      if (this.#lastSeenCall.get(pid) === this.#callCount) continue
-      const track = this.#playerStates.get(pid)
-      if (track.tier === PLAYER_TIER_REDUCED) {
-        const lastSeen = this.#lastSeenCall.get(pid) || 0
-        if (this.#callCount - lastSeen < REDUCED_TIER_ABSENCE_GRACE_SNAPSHOTS) {
-          snapshotForBuffer.players.push(copyPlayerStateInto(this.#playerSlotPool.acquire(), track))
-          continue
-        }
-      }
-      this.#playerStates.delete(pid)
-      this.#lastSeenCall.delete(pid)
-      this.#callbacks.onPlayerLeft?.(pid)
-    }
+    this.#current = snapshotForBuffer
+    this.#playerStates.forEach(this.#sweepPlayer)
+    this.#current = null
 
     this.#processEntities(data, snapshotForBuffer)
-    this.#releaseQueue.push(snapshotForBuffer)
-    this.#maybeReleaseOldest()
+    trimList(snapshotForBuffer.players, this.#playerCount)
+    trimList(snapshotForBuffer.entities, this.#entityCount)
+    this.#keepAndReleaseOldest(snapshotForBuffer)
     return snapshotForBuffer
   }
 
@@ -377,7 +416,8 @@ export class SnapshotProcessor {
       this.#entityStates.set(eid, track)
       this.#callbacks.onEntityAdded?.(eid, track)
     }
-    snapshotForBuffer.entities.push(copyEntityStateInto(this.#entitySlotPool.acquire(), track))
+    snapshotForBuffer.entities[this.#entityCount] = copyEntityStateInto(this.#entitySlotPool.acquire(), track)
+    this.#entityCount += 1
     return eid
   }
 
@@ -388,20 +428,18 @@ export class SnapshotProcessor {
         for (const eid of data.removed) {
           if (this.#entityStates.has(eid)) {
             this.#entityStates.delete(eid)
+            this.#entitySeenCall.delete(eid)
             this.#callbacks.onEntityRemoved?.(eid)
           }
         }
       }
       return
     }
-    this.#seenEntities.clear()
-    for (const e of data.entities || []) this.#seenEntities.add(this.#handleEntity(e, snapshotForBuffer))
-    for (const eid of this.#entityStates.keys()) {
-      if (!this.#seenEntities.has(eid)) {
-        this.#entityStates.delete(eid)
-        this.#callbacks.onEntityRemoved?.(eid)
-      }
+    for (const e of data.entities || []) {
+      const eid = this.#handleEntity(e, snapshotForBuffer)
+      if (this.#entityStates.has(eid)) this.#entitySeenCall.set(eid, this.#callCount)
     }
+    this.#entityStates.forEach(this.#sweepEntity)
   }
 
   getPlayerState(pid) {
@@ -433,6 +471,7 @@ export class SnapshotProcessor {
   clear() {
     this.#playerStates.clear()
     this.#entityStates.clear()
+    this.#entitySeenCall.clear()
     this.#lastSeenCall.clear()
   }
 }

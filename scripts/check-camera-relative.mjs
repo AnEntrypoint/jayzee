@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { finish, gate } from './lib/gate.mjs'
 import { PLANET_RADIUS_M } from '../src/engine/sphere.js'
-import { RENDER_COLLISION_RANGE_M, RENDER_COLLISION_TOLERANCE_M, absolutePosition, maxAbsDifference, relativeLookAt, renderedPosition } from '../src/engine/cameraRelative.js'
+import { RENDER_COLLISION_RANGE_M, RENDER_COLLISION_TOLERANCE_M, absolutePosition, float32SpacingAt, maxAbsDifference, relativeErrorBound, relativeLookAt, renderedPosition } from '../src/engine/cameraRelative.js'
 import { createVegetationPool, planVegetationPool } from '../src/engine/vegetation.js'
 
 const R = PLANET_RADIUS_M
@@ -66,6 +66,90 @@ gate('the render position of every resident instance matches its collision posit
     assert.ok(checked > 0, 'no instances were checked')
     assert.ok(worst <= RENDER_COLLISION_TOLERANCE_M, 'frame origin ' + F.join(',') + ': worst difference ' + worst + ' m is above ' + RENDER_COLLISION_TOLERANCE_M + ' m')
   }
+})
+
+const TRANSLATION_BOUND_M = 128
+const REACH_DIRECTIONS = 64
+const REACH_ROWS = Object.freeze([
+  { reachM: 4096, within: true },
+  { reachM: 8192, within: true },
+  { reachM: 16384, within: false },
+  { reachM: 50000, within: false },
+])
+
+const seededDirections = (count) => {
+  let seed = 20261111
+  const random = () => {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0
+    return seed / 4294967296
+  }
+  return Array.from({ length: count }, () => {
+    const z = random() * 2 - 1
+    const a = random() * 2 * Math.PI
+    const r = Math.sqrt(1 - z * z)
+    return [r * Math.cos(a), r * Math.sin(a), z]
+  })
+}
+
+const worstAtReach = (pool, reachM) => {
+  const rel = [0, 0, 0]
+  const rendered = [0, 0, 0]
+  const truth = [0, 0, 0]
+  let worst = 0
+  let checked = 0
+  let finite = true
+  let translation = 0
+  for (const dir of seededDirections(REACH_DIRECTIONS)) {
+    eachInstance(pool, ({ slot, i, origin, transform }) => {
+      const frameOrigin = [origin[0] + dir[0] * reachM, origin[1] + dir[1] * reachM, origin[2] + dir[2] * reachM]
+      const got = renderedPosition(origin, frameOrigin, transform, rel, rendered)
+      pool.readWorld(0, slot, i, truth)
+      finite = finite && got.every(Number.isFinite)
+      worst = Math.max(worst, maxAbsDifference(rendered, truth))
+      translation = Math.max(translation, Math.abs(transform[0]), Math.abs(transform[1]), Math.abs(transform[2]))
+      checked += 1
+    })
+  }
+  return { reachM, worst, checked, finite, translation }
+}
+
+gate('float32 spacing is 2^-11 m in [4096, 8192), 2^-10 m in [8192, 16384) and 2^-8 m at 50 km, and the two-rounding bound is the mean of the spacing at the reach and at the reach plus the translation', () => {
+  assert.equal(float32SpacingAt(4096), 2 ** -11)
+  assert.equal(float32SpacingAt(8191), 2 ** -11)
+  assert.equal(float32SpacingAt(8192), 2 ** -10)
+  assert.equal(float32SpacingAt(50000), 2 ** -8)
+  assert.equal(float32SpacingAt(1), Math.fround(1 + 2 ** -23) - 1)
+  assert.equal(relativeErrorBound(4096, TRANSLATION_BOUND_M), 2 ** -11)
+  assert.equal(relativeErrorBound(8192, TRANSLATION_BOUND_M), 2 ** -10)
+  assert.equal(relativeErrorBound(16384 - TRANSLATION_BOUND_M, TRANSLATION_BOUND_M), (2 ** -10 + 2 ** -9) / 2)
+  assert.ok(relativeErrorBound(8192, TRANSLATION_BOUND_M) <= RENDER_COLLISION_TOLERANCE_M)
+  assert.ok(relativeErrorBound(16384, TRANSLATION_BOUND_M) > RENDER_COLLISION_TOLERANCE_M)
+  assert.throws(() => relativeErrorBound(-1), RangeError)
+  assert.throws(() => float32SpacingAt(Infinity), RangeError)
+})
+
+for (const row of REACH_ROWS) {
+  const verdict = row.within ? 'stays within the tolerance' : 'misses the tolerance, and is drawn anyway: nothing refuses or culls it by distance'
+  gate('an instance ' + row.reachM + ' m from the eye, at planet radius, in ' + REACH_DIRECTIONS + ' seeded directions: the render position ' + verdict, () => {
+    const measured = worstAtReach(makePool(), row.reachM)
+    const bound = relativeErrorBound(row.reachM, TRANSLATION_BOUND_M)
+    console.log('reach ' + JSON.stringify({ ...measured, boundM: bound, toleranceM: RENDER_COLLISION_TOLERANCE_M }))
+    assert.ok(measured.checked > 0, 'no instances were checked')
+    assert.ok(measured.translation <= TRANSLATION_BOUND_M, 'a translation of ' + measured.translation + ' m is above the ' + TRANSLATION_BOUND_M + ' m the bound assumes')
+    assert.equal(measured.finite, true, 'renderedPosition returned a non-finite position')
+    assert.ok(measured.worst <= bound, 'worst error ' + measured.worst + ' m is above the derived bound ' + bound + ' m')
+    assert.equal(measured.worst <= RENDER_COLLISION_TOLERANCE_M, row.within, 'worst error ' + measured.worst + ' m against the tolerance ' + RENDER_COLLISION_TOLERANCE_M + ' m')
+  })
+}
+
+gate('no distance limit is applied in code: the range constant is read only by the gates, and the vegetation draw culls by frustum plane and patch radius, not by reach', () => {
+  assert.equal(RENDER_COLLISION_RANGE_M, 4096)
+  for (const file of ['src/engine/renderer.js', 'src/engine/vegetation.js', 'src/engine/planetScene.js']) {
+    assert.equal(read(file).includes('RENDER_COLLISION_RANGE_M'), false, file + ' reads the range')
+  }
+  const draw = read('engine/src/render/vegetation_draw.h')
+  assert.ok(draw.includes('if (planes != nullptr && outsidePlane(planes, rel, b.radius)) continue;'))
+  assert.equal(/4096\.0|kRenderRange|maxReach/.test(draw), false)
 })
 
 gate('negative control: the absolute float32 path (fround(origin) + translation) misses the tolerance at planet radius', () => {

@@ -111,6 +111,18 @@ void fillLayout() {
   layoutWords[kRegionWord0 + kRegionCodecCounts] = addressOf(codecScratch->counts);
 }
 
+void writeQueryHit(const engine::QueryHit& hit) {
+  planetScratchF[0] = hit.fraction;
+  planetScratchF[1] = hit.position[0];
+  planetScratchF[2] = hit.position[1];
+  planetScratchF[3] = hit.position[2];
+  planetScratchF[4] = hit.normal[0];
+  planetScratchF[5] = hit.normal[1];
+  planetScratchF[6] = hit.normal[2];
+  planetScratchF[7] = static_cast<double>(hit.kind);
+  planetScratchF[8] = static_cast<double>(hit.handle);
+}
+
 int initialize(std::uint32_t players, std::uint32_t workers, double budgetBytes) {
   if (!(budgetBytes >= 0.0) || budgetBytes > kMaxBudgetBytes) return engine::kRange;
   if (engine::arena::sealed() || engine::arena::used() != 0) return engine::kAlreadyInitialized;
@@ -237,6 +249,42 @@ EMSCRIPTEN_KEEPALIVE float engine_character_body_axis(std::uint32_t index, std::
   float out[3];
   engine::world().characterBodyPosition(index, out);
   return out[axis];
+}
+
+EMSCRIPTEN_KEEPALIVE int engine_character_tune(float stepUp, float stickDown) {
+  return engine::world().tuneCharacters(stepUp, stickDown);
+}
+
+EMSCRIPTEN_KEEPALIVE int engine_world_raycast(double ox, double oy, double oz, double dx, double dy, double dz) {
+  const double origin[3] = {ox, oy, oz};
+  const double direction[3] = {dx, dy, dz};
+  engine::QueryHit hit{};
+  const int status = engine::world().castRay(origin, direction, hit);
+  if (status == 1) writeQueryHit(hit);
+  return status;
+}
+
+EMSCRIPTEN_KEEPALIVE int engine_world_shapecast(double radius, double halfHeight, double ox, double oy, double oz, double dx, double dy,
+                                                double dz) {
+  const double origin[3] = {ox, oy, oz};
+  const double direction[3] = {dx, dy, dz};
+  engine::QueryHit hit{};
+  const int status = engine::world().castRound(radius, halfHeight, origin, direction, hit);
+  if (status == 1) writeQueryHit(hit);
+  return status;
+}
+
+EMSCRIPTEN_KEEPALIVE int engine_planet_collide_probe(double radius, double halfHeight, int planetFirst, double maxSeparation, double x,
+                                                     double y, double z) {
+  const double center[3] = {x, y, z};
+  engine::QueryHit hit{};
+  const int status = engine::world().probePlanet(radius, halfHeight, planetFirst != 0, maxSeparation, center, hit);
+  if (status == 1) writeQueryHit(hit);
+  return status;
+}
+
+EMSCRIPTEN_KEEPALIVE int engine_arena_sealed() {
+  return engine::arena::sealed() ? 1 : 0;
 }
 
 EMSCRIPTEN_KEEPALIVE double engine_spawn(double px, double py, double pz, double vx, double vy, double vz) {

@@ -3,6 +3,7 @@ import { PLANET_ENTITY_COUNT } from './planetScene.js'
 export const PLANET_FRAME_BUDGET_MS = 16.7
 export const PLANET_MIN_FRAMES = 600
 export const PLANET_MISSED_FRAME_MS = 25
+export const PLANET_VEGETATION_OUTSIDE_SHARE = 0.01
 
 export const PLANET_RUNS = Object.freeze([
   Object.freeze({ tier: 1024, threads: true, backend: 'webgpu', phase: 10 }),
@@ -60,6 +61,8 @@ export const planetVerdict = (result, expected) => {
       if (scene.entities !== PLANET_ENTITY_COUNT) failures.push('scene entities ' + scene.entities + ' is not ' + PLANET_ENTITY_COUNT)
       if (!scene.colliderCounts || scene.colliderCounts.dynamic !== PLANET_ENTITY_COUNT) failures.push('dynamic colliders are not ' + PLANET_ENTITY_COUNT)
       if (scene.vegetationBound !== true) failures.push('vegetation is not bound to the draw path')
+      if (typeof scene.generateHeightCallsOutsidePages !== 'number') failures.push('the scene does not report how many vegetation heights fell outside the loaded pages')
+      else if (scene.generateHeightCallsOutsidePages > scene.generatedInstances * PLANET_VEGETATION_OUTSIDE_SHARE) failures.push('vegetation heights outside the loaded pages: ' + scene.generateHeightCallsOutsidePages + ' of ' + scene.generatedInstances)
     }
   }
   const missedFrames = Array.isArray(wall) ? wall.filter((ms) => ms > PLANET_MISSED_FRAME_MS).length : null

@@ -1,6 +1,12 @@
+#include <sys/wait.h>
+#include <unistd.h>
+
+#include <chrono>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
+#include <cstdlib>
 #include <cstring>
 
 #include "device_tier.h"
@@ -42,6 +48,214 @@ constexpr std::uint32_t kChurnCycles = 10000;
 
 bool refusedWith(double value, Status status) {
   return value == static_cast<double>(status);
+}
+
+constexpr std::uint32_t kCostVertices = 4;
+constexpr std::uint32_t kCostBatches = 5;
+constexpr std::uint32_t kCostFramesPerBatch = 20;
+constexpr float kFarX = 1.0e6f;
+constexpr float kFarCut = 1.0e5f;
+constexpr float kSlotCut = 201.5f;
+constexpr double kShiftedOrigin[3] = {100.0, 0.0, 0.0};
+constexpr double kCostOrigin[3] = {0.0, 0.0, 0.0};
+
+std::uint32_t gCostIndices[models::kMaxClustersPerSlot * models::kClusterIndices];
+models::Range gCostRuns[models::kMaxClustersPerSlot];
+models::Range gReferenceRuns[models::kMaxClustersPerSlot];
+
+struct Tally {
+  std::uint64_t runs;
+  std::uint64_t kept;
+  std::uint32_t slots;
+};
+
+std::uint32_t referenceRuns(std::uint32_t slot, const float planes[6][4], const double frameOrigin[3], models::Range* out, std::uint32_t& kept) {
+  kept = 0;
+  const models::Cluster* clusters = models::slotClusters(slot);
+  const std::uint32_t count = models::slotClusterCount(slot);
+  const models::Range base = models::slotRange(slot);
+  float offset[3];
+  models::modelOffset(slot, offset);
+  std::uint32_t runs = 0;
+  bool open = false;
+  for (std::uint32_t c = 0; c < count; ++c) {
+    bool outside = false;
+    for (int p = 0; p < 6 && !outside; ++p) {
+      double distance = static_cast<double>(planes[p][3]);
+      for (int k = 0; k < 3; ++k) {
+        const double centre = static_cast<double>(clusters[c].centre[k]) * static_cast<double>(models::kModelScale) + static_cast<double>(offset[k]) - frameOrigin[k];
+        distance += static_cast<double>(planes[p][k]) * centre;
+      }
+      outside = distance < -static_cast<double>(clusters[c].radius) * static_cast<double>(models::kModelScale);
+    }
+    if (outside) {
+      open = false;
+      continue;
+    }
+    kept += 1;
+    if (open) {
+      out[runs - 1].indexCount += clusters[c].indexCount;
+    } else {
+      out[runs] = models::Range{base.firstVertex, base.vertexCount, base.firstIndex + clusters[c].firstIndex, clusters[c].indexCount};
+      runs += 1;
+      open = true;
+    }
+  }
+  return runs;
+}
+
+std::uint32_t mismatches(const float planes[6][4], const double frameOrigin[3], Tally& tally) {
+  std::uint32_t wrong = 0;
+  tally = Tally{0, 0, 0};
+  for (std::uint32_t slot = 0; slot < models::slotCount(); ++slot) {
+    std::uint32_t kept = 0;
+    std::uint32_t expectedKept = 0;
+    const std::uint32_t runs = models::visibleRuns(slot, planes, gCostRuns, &kept, frameOrigin);
+    const std::uint32_t expected = referenceRuns(slot, planes, frameOrigin, gReferenceRuns, expectedKept);
+    tally.runs += runs;
+    tally.kept += kept;
+    tally.slots += runs > 0 ? 1 : 0;
+    if (runs != expected || kept != expectedKept) {
+      wrong += 1;
+      continue;
+    }
+    for (std::uint32_t r = 0; r < runs; ++r) {
+      if (gCostRuns[r].firstVertex != gReferenceRuns[r].firstVertex || gCostRuns[r].vertexCount != gReferenceRuns[r].vertexCount ||
+          gCostRuns[r].firstIndex != gReferenceRuns[r].firstIndex || gCostRuns[r].indexCount != gReferenceRuns[r].indexCount) {
+        wrong += 1;
+        break;
+      }
+    }
+  }
+  return wrong;
+}
+
+double nanosecondsPerFrame(const float planes[6][4], std::uint64_t& sink) {
+  double best = 0.0;
+  for (std::uint32_t batch = 0; batch < kCostBatches; ++batch) {
+    const auto start = std::chrono::steady_clock::now();
+    for (std::uint32_t frame = 0; frame < kCostFramesPerBatch; ++frame) {
+      for (std::uint32_t slot = 0; slot < models::slotCount(); ++slot) {
+        std::uint32_t kept = 0;
+        sink += models::visibleRuns(slot, planes, gCostRuns, &kept, kCostOrigin) + kept;
+      }
+    }
+    const double elapsed = std::chrono::duration<double, std::nano>(std::chrono::steady_clock::now() - start).count() / kCostFramesPerBatch;
+    if (batch == 0 || elapsed < best) best = elapsed;
+  }
+  return best;
+}
+
+void report(std::uint32_t tier, const char* scene, const float planes[6][4], std::uint64_t& sink) {
+  const double frame = nanosecondsPerFrame(planes, sink);
+  std::printf("INFO visibleRuns tier %u, %s: %.4f microseconds per call, %.2f microseconds per frame over %u slots\n", tier, scene,
+              frame / 1000.0 / static_cast<double>(models::slotCount()), frame / 1000.0, models::slotCount());
+}
+
+void tierCost(std::uint32_t tier) {
+  device::Plan planned{};
+  if (!device::planTier(tier, 1, planned)) {
+    check(false, "visibleRuns cost: the tier plans");
+    return;
+  }
+  const models::Layout layout{planned.modelSlots, planned.verticesPerModel, planned.indicesPerModel, planned.vertexStrideBytes, planned.uploadBytesPerFrame};
+  const std::size_t bytes = (models::bytesFor(layout) + models::kAlignment - 1) & ~(models::kAlignment - 1);
+  void* storage = std::aligned_alloc(models::kAlignment, bytes);
+  if (storage == nullptr || models::bind(storage, bytes, layout) != kOk) {
+    check(false, "visibleRuns cost: the tier pool binds");
+    return;
+  }
+  const std::uint32_t clusters = layout.indicesPerSlot / models::kClusterIndices;
+  alignas(16) std::uint8_t vertices[kCostVertices * 256] = {};
+  const float xs[kCostVertices] = {0.0f, 1.0f, kFarX, kFarX + 1.0f};
+  for (std::uint32_t v = 0; v < kCostVertices; ++v) {
+    const float position[3] = {xs[v], 0.0f, 0.0f};
+    std::memcpy(vertices + v * layout.vertexStrideBytes, position, sizeof position);
+  }
+  for (std::uint32_t i = 0; i < layout.indicesPerSlot; ++i) gCostIndices[i] = ((i / models::kClusterIndices) % 2) * 2 + (i % 2);
+  std::uint32_t refused = 0;
+  for (std::uint32_t slot = 0; slot < layout.slots; ++slot) {
+    const double handle = models::acquire(kCostVertices, layout.indicesPerSlot);
+    if (handle <= 0.0 || models::upload(handle, vertices, kCostVertices, gCostIndices, layout.indicesPerSlot) != kOk) refused += 1;
+    if (models::slotClusterCount(slot) != clusters) refused += 1;
+  }
+  std::printf("INFO visibleRuns tier %u layout: %u slots of %u clusters, %u sphere tests per frame at most\n", tier, layout.slots, clusters, layout.slots * clusters);
+  char label[160];
+  std::snprintf(label, sizeof label, "visibleRuns tier %u: every slot fills with %u clusters", tier, clusters);
+  check(refused == 0 && clusters * models::kClusterIndices == layout.indicesPerSlot && clusters % 2 == 0, label);
+
+  float everything[6][4];
+  unitPlanes(everything);
+  float alternate[6][4];
+  unitPlanes(alternate);
+  alternate[0][0] = -1.0f;
+  alternate[0][3] = kFarCut;
+  float nothing[6][4];
+  unitPlanes(nothing);
+  nothing[0][0] = 1.0f;
+  nothing[0][3] = -1.0e9f;
+  float someSlots[6][4];
+  unitPlanes(someSlots);
+  someSlots[0][0] = -1.0f;
+  someSlots[0][3] = kSlotCut;
+
+  Tally tally{};
+  std::uint32_t wrong = mismatches(everything, kCostOrigin, tally);
+  std::uint32_t shape = 0;
+  for (std::uint32_t slot = 0; slot < layout.slots; ++slot) {
+    if (models::visibleRuns(slot, everything, gCostRuns, nullptr, kCostOrigin) != 1 || gCostRuns[0].firstIndex != slot * layout.indicesPerSlot ||
+        gCostRuns[0].indexCount != layout.indicesPerSlot) {
+      shape += 1;
+    }
+  }
+  std::snprintf(label, sizeof label, "visibleRuns tier %u: with every plane passing each slot is one run of all its indices and keeps every cluster", tier);
+  check(wrong == 0 && shape == 0 && tally.runs == layout.slots && tally.kept == static_cast<std::uint64_t>(layout.slots) * clusters, label);
+
+  wrong = mismatches(alternate, kCostOrigin, tally);
+  shape = 0;
+  for (std::uint32_t slot = 0; slot < layout.slots; ++slot) {
+    const std::uint32_t runs = models::visibleRuns(slot, alternate, gCostRuns, nullptr, kCostOrigin);
+    if (runs != clusters / 2) shape += 1;
+    for (std::uint32_t r = 0; r < runs; ++r) {
+      if (gCostRuns[r].indexCount != models::kClusterIndices || gCostRuns[r].firstIndex != slot * layout.indicesPerSlot + 2 * r * models::kClusterIndices) shape += 1;
+    }
+  }
+  std::snprintf(label, sizeof label, "visibleRuns tier %u: with every second cluster culled each slot is %u separate runs of 384 indices", tier, clusters / 2);
+  check(wrong == 0 && shape == 0 && tally.runs == static_cast<std::uint64_t>(layout.slots) * (clusters / 2) && tally.kept == tally.runs, label);
+
+  wrong = mismatches(nothing, kCostOrigin, tally);
+  std::snprintf(label, sizeof label, "visibleRuns tier %u: a plane every cluster fails gives no run in any slot", tier);
+  check(wrong == 0 && tally.runs == 0 && tally.kept == 0, label);
+
+  wrong = mismatches(someSlots, kCostOrigin, tally);
+  std::snprintf(label, sizeof label, "visibleRuns tier %u: a plane across the slot row keeps the first 53 slots and culls the rest, as the double reference does", tier);
+  check(wrong == 0 && tally.slots == 53 && tally.kept == 53ull * (clusters / 2), label);
+  wrong = mismatches(someSlots, kShiftedOrigin, tally);
+  std::snprintf(label, sizeof label, "visibleRuns tier %u: a frame origin 100 m along x keeps 25 more slots, as the double reference does", tier);
+  check(wrong == 0 && tally.slots == 78, label);
+
+  std::uint64_t sink = 0;
+  report(tier, "every cluster visible", everything, sink);
+  report(tier, "every second cluster culled", alternate, sink);
+  report(tier, "every cluster culled", nothing, sink);
+  std::snprintf(label, sizeof label, "visibleRuns tier %u: the timed calls returned runs", tier);
+  check(sink > 0, label);
+}
+
+void tierCostInChild(std::uint32_t tier) {
+  std::fflush(stdout);
+  const int before = engine::test::failureCount();
+  const pid_t child = fork();
+  if (child == 0) {
+    tierCost(tier);
+    std::fflush(stdout);
+    _exit(engine::test::failureCount() == before ? 0 : 1);
+  }
+  int status = -1;
+  const bool waited = child > 0 && waitpid(child, &status, 0) == child;
+  char label[160];
+  std::snprintf(label, sizeof label, "visibleRuns tier %u: the run in its own process, with the pool bound at the tier layout, ends with no failure", tier);
+  check(waited && WIFEXITED(status) && WEXITSTATUS(status) == 0, label);
 }
 
 }
@@ -91,6 +305,8 @@ void modelsAndTiers() {
   check(!models::validLayout({4, 8, 12, 8}), "a vertex stride below 12 bytes is refused, since a position is three floats");
   check(models::validLayout({4, 512, 98304, 32}), "a slot of 256 clusters of 384 indices is valid");
   check(!models::validLayout({4, 512, 98305, 32}), "a slot needing more than 256 clusters is refused");
+
+  for (std::uint32_t tier = 0; tier < 3; ++tier) tierCostInChild(tier);
 
   check(refusedWith(models::acquire(1, 1), kNotConfigured), "acquire before bind reports not configured");
   check(models::bind(nullptr, sizeof gStorage, kLayout) == kRange, "bind refuses a null base");

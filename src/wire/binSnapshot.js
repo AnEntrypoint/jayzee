@@ -144,23 +144,50 @@ export const encodeSmallestThree = (components) => {
   return word
 }
 
-export const decodeSmallestThree = (word) => {
+const smallestThreeInto = (largest, firstLevel, secondLevel, thirdLevel, out) => {
+  const first = firstLevel / SMALLEST_THREE_STEPS_PER_UNIT - Math.SQRT1_2
+  const second = secondLevel / SMALLEST_THREE_STEPS_PER_UNIT - Math.SQRT1_2
+  const third = thirdLevel / SMALLEST_THREE_STEPS_PER_UNIT - Math.SQRT1_2
+  const sumSquares = 0 + first * first + second * second + third * third
+  if (sumSquares > 1) return sumSquares
+  const rebuilt = Math.sqrt(1 - sumSquares)
+  out[0] = largest === 0 ? rebuilt : first
+  out[1] = largest === 1 ? rebuilt : largest > 1 ? second : first
+  out[2] = largest === 2 ? rebuilt : largest > 2 ? third : second
+  out[3] = largest === 3 ? rebuilt : third
+  return 0
+}
+
+const refuseSumSquares = (word, sumSquares) => refuse('word ' + word + ' stores |three|^2 ' + sumSquares + ', which no unit quaternion can have')
+
+export const decodeSmallestThreeInto = (word, out) => {
   quatWord(word)
-  const largest = Math.floor(word / SMALLEST_THREE_LARGEST_SHIFT)
-  const fields = [
+  const sumSquares = smallestThreeInto(
+    Math.floor(word / SMALLEST_THREE_LARGEST_SHIFT),
     Math.floor(word / SMALLEST_THREE_HIGH_FIELD_SHIFT) % SMALLEST_THREE_FIELD_SPAN,
     Math.floor(word / SMALLEST_THREE_FIELD_SPAN) % SMALLEST_THREE_FIELD_SPAN,
-    word % SMALLEST_THREE_FIELD_SPAN
-  ].map((level) => level / SMALLEST_THREE_STEPS_PER_UNIT - Math.SQRT1_2)
-  const sumSquares = fields.reduce((sum, value) => sum + value * value, 0)
-  if (sumSquares > 1) refuse('word ' + word + ' stores |three|^2 ' + sumSquares + ', which no unit quaternion can have')
-  const components = []
-  let next = 0
-  for (let i = 0; i < 4; i++) {
-    components.push(i === largest ? Math.sqrt(1 - sumSquares) : fields[next++])
-  }
-  return components
+    word % SMALLEST_THREE_FIELD_SPAN,
+    out,
+  )
+  if (sumSquares !== 0) refuseSumSquares(word, sumSquares)
+  return out
 }
+
+const recordRotationInto = (bytes, out) => {
+  const low = bytes[ROTATION_AT]
+  const midLow = bytes[ROTATION_AT + 1]
+  const midHigh = bytes[ROTATION_AT + 2]
+  const high = bytes[ROTATION_AT + 3]
+  const sumSquares = smallestThreeInto(high >> 6, ((high & 0x3f) << 4) | (midHigh >> 4), ((midHigh & 0x0f) << 6) | (midLow >> 2), ((midLow & 0x03) << 8) | low, out)
+  if (sumSquares !== 0) refuseSumSquares(readUint32(bytes, ROTATION_AT), sumSquares)
+  return out
+}
+
+export const decodePlayerRotationInto = (input, out) => recordRotationInto(recordBytesOf(input, PLAYER_RECORD_BYTES), out)
+
+export const decodeEntityRotationInto = (input, out) => recordRotationInto(recordBytesOf(input, ENTITY_RECORD_BYTES), out)
+
+export const decodeSmallestThree = (word) => decodeSmallestThreeInto(word, [0, 0, 0, 0])
 
 export const msgpackArrayHeader = (count) => {
   if (!Number.isInteger(count) || count < 0 || count > 0xffffffff) refuse('array length ' + String(count) + ' is not a uint32')
