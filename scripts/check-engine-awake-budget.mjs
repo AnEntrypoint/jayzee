@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import assert from 'node:assert/strict'
@@ -198,6 +199,8 @@ const releasedAfter = (module, ticks) => {
   for (let i = 0; i < ticks; i++) module._engine_tick(1)
   return movedSlots(start, positions(module))
 }
+const VIEW_COS = 0.5
+const RELEASE_VIEW_MARGIN_COS = 0.15
 const distanceTo = (start, slot, eye) => Math.sqrt((start[slot * 3] - eye[0]) ** 2 + (start[slot * 3 + 1] - eye[1]) ** 2 + (start[slot * 3 + 2] - eye[2]) ** 2)
 
 gate('with a release view at the last slot the held bodies nearest the eye are released first, and with no view the lowest slots are', async () => {
@@ -219,24 +222,27 @@ gate('with a release view at the last slot the held bodies nearest the eye are r
   assert.deepEqual(plain, range(BUDGET, BUDGET + plain.length))
 })
 
-gate('a cone picks the bodies in front of the eye before nearer ones behind it, the slot-order tuning ignores the view, and both runs end at rest', async () => {
+gate('a cone, widened by the release margin, picks the bodies in front of the eye before nearer ones behind it, the slot-order tuning ignores the view, and both runs end at rest', async () => {
   const module = await boot({ budget: BUDGET })
   const start = positions(module)
   const mid = BUDGET + Math.floor((BODIES - BUDGET) / 2)
   const eye = eyeAt(module, mid, 3)
   const ahead = [start[(BODIES - 1) * 3] - eye[0], 0, start[(BODIES - 1) * 3 + 2] - eye[2]]
-  assert.equal(module._engine_world_set_release_view(eye[0], eye[1], eye[2], ahead[0], ahead[1], ahead[2], 0.5, 1000), 0)
+  assert.equal(module._engine_world_set_release_view(eye[0], eye[1], eye[2], ahead[0], ahead[1], ahead[2], VIEW_COS, 1000), 0)
   let wave = []
   for (let guard = 0; guard < SETTLE_TICKS && wave.length === 0; guard++) wave = releasedAfter(module, 1).filter((slot) => slot >= BUDGET)
   const length = Math.sqrt(ahead[0] ** 2 + ahead[2] ** 2)
-  const inFront = (slot) => {
+  assert.ok(readFileSync(new URL('../engine/src/world.h', import.meta.url), 'utf8').includes('kReleaseViewMarginCos = ' + RELEASE_VIEW_MARGIN_COS + ';'))
+  const inCone = (cosine) => (slot) => {
     const d = [start[slot * 3] - eye[0], start[slot * 3 + 1] - eye[1], start[slot * 3 + 2] - eye[2]]
     const far = Math.sqrt(d[0] ** 2 + d[1] ** 2 + d[2] ** 2)
-    return (d[0] * ahead[0] + d[2] * ahead[2]) / length >= 0.5 * far
+    return (d[0] * ahead[0] + d[2] * ahead[2]) / length >= cosine * far
   }
-  const visibleHeld = range(BUDGET, BODIES).filter(inFront)
-  assert.ok(visibleHeld.length > wave.length, 'the cone holds only ' + visibleHeld.length + ' held bodies, fewer than one wave')
-  assert.ok(wave.every(inFront), 'a body outside the cone was released while ' + visibleHeld.length + ' in it were held')
+  const inOrderingCone = inCone(VIEW_COS - RELEASE_VIEW_MARGIN_COS)
+  const orderedHeld = range(BUDGET, BODIES).filter(inOrderingCone)
+  assert.ok(orderedHeld.length > wave.length, 'the cone holds only ' + orderedHeld.length + ' held bodies, fewer than one wave')
+  assert.ok(wave.every(inOrderingCone), 'a body outside the widened cone was released while ' + orderedHeld.length + ' in it were held')
+  assert.ok(orderedHeld.length > range(BUDGET, BODIES).filter(inCone(VIEW_COS)).length, 'the margin adds no body, so the gate does not test it')
   const before = module._engine_world_unsettled_in_view()
   assert.ok(before > 0 && before <= BODIES)
   settle(module)

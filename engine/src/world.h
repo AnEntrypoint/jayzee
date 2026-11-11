@@ -59,6 +59,7 @@ constexpr std::uint32_t joltQuadNodePages(const budget::Capacity& c) {
 }
 
 constexpr std::uint32_t kAwakeDesignBodies = 16384;
+constexpr double kReleaseViewMarginCos = 0.15;
 
 constexpr std::uint32_t contactBodies(const budget::Capacity& c) {
   return c.bodies < kAwakeDesignBodies ? c.bodies : kAwakeDesignBodies;
@@ -204,7 +205,7 @@ class World {
   void sync(std::uint32_t slot);
   void hide(std::uint32_t slot);
   void pull(JPH::Body& body, std::uint32_t slot, const PhysicsOrigin& o, float dt);
-  bool inView(std::uint32_t slot, double& distance) const;
+  bool inView(std::uint32_t slot, double cosine, double& distance) const;
   void refillReleaseQueue();
   void applyAirLayers();
   Status applyTuning(std::uint32_t flags);

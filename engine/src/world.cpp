@@ -955,14 +955,14 @@ std::uint32_t World::wakeCount(std::uint32_t count) const {
   return active >= limit ? 0 : std::min(count, limit - active);
 }
 
-bool World::inView(std::uint32_t slot, double& distance) const {
+bool World::inView(std::uint32_t slot, double cosine, double& distance) const {
   const double* p = positions_ + slot * 3;
   const double dx = p[0] - viewEye_[0];
   const double dy = p[1] - viewEye_[1];
   const double dz = p[2] - viewEye_[2];
   distance = std::sqrt(dx * dx + dy * dy + dz * dz);
   if (distance > viewRange_) return false;
-  return dx * viewDir_[0] + dy * viewDir_[1] + dz * viewDir_[2] >= viewCos_ * distance;
+  return dx * viewDir_[0] + dy * viewDir_[1] + dz * viewDir_[2] >= cosine * distance;
 }
 
 void World::refillReleaseQueue() {
@@ -978,7 +978,7 @@ void World::refillReleaseQueue() {
     queueCount_ += 1;
     if (!ordered) continue;
     double distance = 0.0;
-    const bool visible = inView(slot, distance);
+    const bool visible = inView(slot, std::max(viewCos_ - kReleaseViewMarginCos, -1.0), distance);
     releaseKeys_[slot] = static_cast<float>(distance) + (visible ? 0.0f : kOutOfViewMetres);
   }
   if (!ordered) return;
@@ -1033,7 +1033,7 @@ std::uint32_t World::unsettledInView() const {
     const std::uint8_t state = alive_[slot];
     if (state != kSlotHeld && state != kSlotAlive && state != kSlotAwakeSynced) continue;
     double distance = 0.0;
-    if (!viewSet_ || inView(slot, distance)) unsettled += 1;
+    if (!viewSet_ || inView(slot, viewCos_, distance)) unsettled += 1;
   }
   return unsettled;
 }
