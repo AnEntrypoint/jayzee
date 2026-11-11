@@ -1,0 +1,16 @@
+{
+  "check:pose-allocations": "2000 warm-up frames of the 1024-player threaded tick, about 21 ms each. With 300 or 700 warm-up frames the sampler still sees one-off function-level allocations (10128 B and 1224 B) from V8 tier-up, so the warm-up cannot be shortened without a false failure.",
+  "check:engine-state-hash-1024": "Five isolated 1024-tier runs of 120 ticks (fixed, and 2, 4, 7, 8 workers). They now run at the same time; before, they ran one after another and the 4-worker run was done twice (29 s).",
+  "check:gc-witness": "20000 measured ticks and 20000 control ticks under a GC observer. The count is the claim, so the ticks stay.",
+  "check:elevation-ab": "Runs spoint A/B elevation script at the fixture N and compares its output line for line.",
+  "check:scenario-marble-bowl": "512 bodies for 600 ticks, twice, on two tiers.",
+  "check:height-cpu": "Evaluates every spoint height fixture sample to 1e-12.",
+  "check:heightmap-cli": "Runs the heightmap CLI once per fixture case.",
+  "check:app-watch": "Waits on real file-watch events.",
+  "check:sphere-population": "Places the full sphere population and checks every member.",
+  "check:engine-threads": "Runs the threaded scenario at several worker counts.",
+  "check:mapspinner-atmosphere": "Integrates the atmosphere tables against spoint values.",
+  "check:snapshots": "Encodes and decodes the delta history at full depth.",
+  "check:thread-sampler": "Samples real threads over a timed window.",
+  "build:kernel": "Compiles the kernel with jz. It is skipped when src/kernel and the jz package are unchanged."
+}

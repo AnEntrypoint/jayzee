@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
-import { execFileSync } from 'node:child_process'
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
 import { readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -11,11 +12,12 @@ const glueUrl = (path) => pathToFileURL(join(root, path)).href
 const pins = JSON.parse(readFileSync(join(root, 'engine/state-hashes.json'), 'utf8'))
 
 const child = join(root, 'scripts/lib/stateHashChild.mjs')
-const runIsolated = (glue, workers) => JSON.parse(execFileSync(process.execPath, [child, glueUrl(glue), String(workers)], { encoding: 'utf8', maxBuffer: 1 << 20 }))
-const fixedRun = runIsolated(FIXED_GLUE, 1)
-const threadedRun = runIsolated(THREADED_GLUE, THREADED_WORKERS)
+const execFileAsync = promisify(execFile)
+const runIsolated = async (glue, workers) => JSON.parse((await execFileAsync(process.execPath, [child, glueUrl(glue), String(workers)], { encoding: 'utf8', maxBuffer: 1 << 20 })).stdout)
+const [fixedRun, ...threadedRuns] = await Promise.all([runIsolated(FIXED_GLUE, 1), ...THREAD_COUNTS.map((workers) => runIsolated(THREADED_GLUE, workers))])
+const countRuns = new Map(THREAD_COUNTS.map((workers, at) => [workers, threadedRuns[at]]))
+const threadedRun = countRuns.get(THREADED_WORKERS) ?? await runIsolated(THREADED_GLUE, THREADED_WORKERS)
 const fixed = fixedRun.hash
-const countRuns = new Map(THREAD_COUNTS.map((workers) => [workers, runIsolated(THREADED_GLUE, workers)]))
 
 gate('the 1024-tier scenario moves bodies, so the hash is not of a still world', () => {
   assert.equal(fixedRun.count, 10240 * 3)

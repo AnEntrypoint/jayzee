@@ -118,7 +118,7 @@ gate('the browser witness files exist', () => {
 gate('the test script runs this gate', () => {
   const pkg = JSON.parse(read('package.json'))
   if (!pkg.scripts['check:engine-visibility']) throw new Error('package.json has no check:engine-visibility script')
-  if (!pkg.scripts.test.includes('npm run check:engine-visibility')) throw new Error('npm test does not run check:engine-visibility')
+  if (!JSON.parse(read('scripts/test-chain.json')).includes('check:engine-visibility')) throw new Error('npm test does not run check:engine-visibility')
 })
 
 gate('the files this change adds or edits carry no comments', () => {

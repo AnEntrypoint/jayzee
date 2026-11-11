@@ -13,6 +13,18 @@ Non-obvious facts for automated edits. Architecture and measured costs live in d
 - scripts/lib/gate.mjs holds the shared PASS and FAIL reporter. A new gate imports it, runs each claim through gate(label, fn), and ends with finish().
   A gate body may return a promise. Its PASS or FAIL line prints when the promise settles, and `finish()` prints RESULT after every pending gate. Before this, `gate` ran an async body without awaiting it, so PASS printed before its assertions ran.
 
+## Working loop
+
+- A change is proved by the one check that can fail for it. Run that check alone: `npm test -- <name or path fragment>` runs every chain entry whose name or command contains the fragment, so `npm test -- scenario` runs the scenario gates and `npm test -- check-ccd.mjs` runs one file. `npm test -- --list <fragment>` prints what would run.
+- A failing check is rerun alone, by name. The runner prints the command.
+- `npm test` with no fragment runs once, before the push. Do not run it to see whether a narrow change broke something unrelated.
+- A check that passed on a tree is not run again on that tree. The runner keeps the passes per tree in `build/checks/passed.json` and skips them. The tree key covers every tracked and untracked file except `docs/PENDING_VALIDATION.md` and `docs/CHECK_TIMES.md`, plus the names, sizes and times of `engine/out`. `npm run test:force` ignores the record.
+- `scripts/build-kernel.mjs` rebuilds `dist/kernel.wasm` only when `src/kernel` or the jz package changed (`dist/kernel.wasm.inputs` holds the digest). `--force` rebuilds.
+- Checks run `--jobs` at a time (default 4, or `CHECK_JOBS`). A check that measures time or allocation goes in `scripts/test-serial.json` and runs alone after the others.
+- Each check writes its output to `build/checks/<name>.log` and its wall time to `build/checks/timings.json`. `docs/CHECK_TIMES.md` records the times; a check over 2 s needs a reason there.
+- A hunt, build or long run is started once and waited on in the same turn, by its process, with a bounded timeout. Do not sleep and do not poll it. Do other Phase A work while it runs, and do not end the turn while it is running.
+- A browser witness is run when the change can alter what the browser does. A runner-only change is proved by the gate that reads the runner.
+
 ## Facts that bite
 
 - `World#hash` is FNV-1a over the float64 bit patterns, read as uint32 words in JavaScript. It is not in the kernel. A negative zero and a positive zero hash differently.
@@ -116,7 +128,7 @@ Non-obvious facts for automated edits. Architecture and measured costs live in d
 - The quality governor's default control store keeps writes. spoint's headless `RenderControls.set` drops them, so a test that expects spoint's behaviour must pass its own store.
 - `smoothstep` in `src/client-pure/cascadeShadow.js` with equal edges returns a step, where GLSL's `smoothstep` is undefined there.
 - Preset lookup in `src/client-pure/qualityPresets.js` uses `Object.hasOwn`. spoint accepts the key `constructor`, which is a prototype property there.
-- Policy: no unit tests. Every check is a gate script under scripts/ that runs against the built kernel and the real modules, prints PASS or FAIL lines, and exits non-zero on failure. `npm test` runs the build, then every check:* gate in its chain, then the type check. A gate that is not in the test script does not run in npm test.
+- Policy: no unit tests. Every check is a gate script under scripts/ that runs against the built kernel and the real modules, prints PASS or FAIL lines, and exits non-zero on failure. `npm test` is `scripts/run-checks.mjs`: it builds the kernel, then runs every name in `scripts/test-chain.json` in order of the chain, several at a time. A gate that is not in `scripts/test-chain.json` does not run in npm test.
 - `createTickScheduler` arms no wake while paused, where spoint re-arms a zero-delay wake, and it takes `precise` as an option instead of reading `SPOINT_PRECISE_TICKS`.
 - `src/upstream-builtins/noise.js` is jayzee's own noise. upstream gives signatures and no defaults or values. The algorithm is Gustavson simplex with a seeded permutation, and `makeSeededRng` is a 32-bit mixer. Optional `frequency`, `amplitude`, `seed`, `delta` and `metric` take the values in `NOISE_OPTION_DEFAULTS`. `seed` is an integer (taken mod 2^32) or a string hashed with FNV-1a. `next()` returns a uint32 and is a jayzee reading. The domain-warp offsets 5.2 and 1.3 are jayzee's constants.
 - Deliberate improvements over the silent-default pattern, each with its gate line as witness: noise `fbm2`, `ridged`, `billowed2` and `domainWarp2` refuse a call without `octaves`, `gain`, `lacunarity`, `ridgeGain`, `warpAmp` or `warpFrequency`, and an octave count that is not a whole number from 1 to 16 (witness: "octaves, gain and lacunarity must be given", "ridgeGain is required for ridged", "every warp term must be given"). Room-routing refuses a malformed room list, rejected list, or key slug, rather than coercing it (witness: "non-array room list, a room without an id or with bad counts", "bad rejected list", "!!!" and the 70-character key in the scoped-negative gate). Terrain's `shore` refuses every call after checking its inputs, rather than inventing a curve (witness: "scoped negative: shore is refused for every input"). The spoint candidates from stream 33 are not verified here; the spoint source for them is not in this repo.

@@ -7,6 +7,8 @@ jolt_include="$root/build/jolt"
 jolt_lib="$root/build/host-jolt/libJolt.a"
 out="$root/build/engine-host-witness"
 mkdir -p "$out"
+stale="$(find "$engine/src" "$engine/test" "$jolt_lib" -newer "$out/engine-witness" -print -quit 2>/dev/null || echo missing)"
+if [ ! -x "$out/engine-witness" ] || [ -n "$stale" ]; then
 c++ -std=c++20 -O2 -DNDEBUG -ffp-contract=off -fno-fast-math -fno-exceptions -fno-rtti -pthread \
   -mavx2 -mbmi -mpopcnt -mlzcnt -mf16c -mfpmath=sse \
   -DJPH_CROSS_PLATFORM_DETERMINISTIC -DJPH_USE_AVX -DJPH_USE_AVX2 -DJPH_USE_F16C -DJPH_USE_LZCNT \
@@ -41,4 +43,5 @@ c++ -std=c++20 -O2 -DNDEBUG -ffp-contract=off -fno-fast-math -fno-exceptions -fn
   "$engine/src/pool_alloc.cpp" \
   "$jolt_lib" \
   -o "$out/engine-witness"
+fi
 "$out/engine-witness"

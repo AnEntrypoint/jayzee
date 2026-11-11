@@ -51,7 +51,7 @@ gate('the two sources together name 21 builtin modules, so the owner count of 23
 
 gate('every one of the 21 builtin names has its own check:upstream-builtin-<name> script in the npm test chain', () => {
   const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
-  const inChain = new Set([...pkg.scripts.test.matchAll(/npm run (check:upstream-builtin-[a-z0-9-]+)/g)].map((m) => m[1]))
+  const inChain = new Set(JSON.parse(readFileSync(join(root, 'scripts', 'test-chain.json'), 'utf8')))
   for (const name of EXPECTED_NAMES) {
     const script = 'check:upstream-builtin-' + name
     assert(typeof pkg.scripts[script] === 'string', script + ' is not defined in package.json')

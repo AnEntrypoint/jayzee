@@ -1,0 +1,15 @@
+[
+  "check:tick-governor",
+  "check:thread-sampler",
+  "check:engine-threads",
+  "check:engine-state-hash-1024",
+  "check:scenario-settle",
+  "check:scenario-character",
+  "check:scenario-deathrun",
+  "check:scenario-combat-bots",
+  "check:scenario-lockstep-rts",
+  "check:scenario-boss-fight",
+  "check:scenario-marble-bowl",
+  "check:scenario-planet-landing",
+  "check:scenario-projectile-volley"
+]
