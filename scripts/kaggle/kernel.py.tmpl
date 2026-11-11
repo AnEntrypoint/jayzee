@@ -102,8 +102,45 @@ def run_one(node, run):
     entry["args"] = run["args"]
     entry["nodeFlags"] = run["nodeFlags"]
     entry["probe"] = run["probe"]
+    entry["role"] = run.get("role")
     entry["runS"] = round(time.time() - began, 1)
     return entry
+
+
+def median(values):
+    ordered = sorted(values)
+    return ordered[len(ordered) // 2]
+
+
+def summarise(configs):
+    groups = {}
+    order = []
+    for entry in configs:
+        key = json.dumps([entry.get("script"), entry.get("args"), entry.get("nodeFlags")])
+        if key not in groups:
+            groups[key] = []
+            order.append(key)
+        groups[key].append(entry)
+    lines = []
+    for key in order:
+        rows = groups[key]
+        first = rows[0]
+        line = {"script": first.get("script"), "args": first.get("args"), "nodeFlags": first.get("nodeFlags"), "role": first.get("role"), "repeats": len(rows)}
+        good = [row for row in rows if row.get("kind") == "tick" and not row.get("refused") and not row.get("error")]
+        if good:
+            line.update({
+                "bodies": good[0].get("bodies"), "workers": good[0].get("workers"), "knobs": good[0].get("knobs"), "variant": good[0].get("variant"),
+                "p99MedianMs": median([row["p99Ms"] for row in good]), "p99WorstMs": max(row["p99Ms"] for row in good),
+                "maxWorstMs": max(row["maxMs"] for row in good),
+                "activeMeanMedianMs": median([row.get("activeMeanMs") or 0 for row in good]),
+                "overBudgetEach": [row["overBudget"] for row in good], "overBudgetHostEach": [row.get("overBudgetHost") for row in good],
+                "lastActiveTick": max((row.get("lastActiveTick") or -1) for row in good),
+                "visualSettleTick": max((row.get("visualSettleTick") or -1) for row in good),
+            })
+        else:
+            line["results"] = [{name: row.get(name) for name in ("kind", "refused", "error", "status", "singleMs", "memoryMs", "cpuP99Ms", "cpuMaxMs", "cpuOver25", "tier") if row.get(name) is not None} for row in rows]
+        lines.append(line)
+    return lines
 
 
 def main():
@@ -125,12 +162,11 @@ def main():
     for run in runs:
         entry = run_one(node, run)
         results["configs"].append(entry)
-        shown = dict(entry)
-        shown.pop("traceMs", None)
-        shown.pop("activeTrace", None)
-        print("RESULT " + json.dumps(shown), flush=True)
         save(results)
     results["totalS"] = round(time.time() - started, 1)
+    results["summary"] = summarise(results["configs"])
+    for line in results["summary"]:
+        print("CONFIG " + json.dumps(line), flush=True)
     save(results)
     print("DONE", json.dumps({"totalS": results["totalS"], "configs": len(results["configs"])}), flush=True)
 

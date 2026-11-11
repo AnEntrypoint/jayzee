@@ -142,6 +142,29 @@ gate('the build is compared on the mean tick while bodies are awake: 8 percent o
   assert.equal(judge(BASELINE, run(9, 9)).topTier.activeMeanLimitMs, null, 'rows with no mean are judged on the p99 and the count alone')
 })
 
+gate('record rows in the gate run are not judged: a slow record row at the top tier leaves the verdict alone, and with no gate role every matching row is judged', () => {
+  const results = run(12, 12)
+  for (const c of results.configs.filter((c) => c.kind === 'tick')) c.role = 'gate'
+  results.configs.push({ ...tick('base', 99, 400), role: 'record' })
+  const verdict = judge(BASELINE, results)
+  assert.equal(verdict.ok, true, verdict.failures.join('; '))
+  assert.equal(verdict.topTier.candidateP99EachMs.length, top.repeats)
+  const legacy = run(12, 12)
+  legacy.configs.push(tick('base', 99, 400))
+  assert.equal(judge(BASELINE, legacy).topTier.candidateP99EachMs.length, top.repeats + 1)
+})
+
+gate('a tick over budget with no host mark stays counted and is carried in the verdict with its counters', () => {
+  const results = run(12, 12)
+  const row = results.configs.find((c) => c.variant === 'base')
+  row.overBudget = 1
+  row.overTicks = [{ tick: 285, ms: 31.78, host: false, awake: 3969, released: 107, minorFaults: 300, majorFaults: 0, involuntarySwitches: 0, systemJiffies: 2, arenaGrowthBytes: 65536, memoryGrowthBytes: 0, engineRunMs: 120, waitMaxMs: 0.02 }, { tick: 90, ms: 18, host: true }]
+  const verdict = judge(BASELINE, results)
+  assert.equal(verdict.topTier.candidateUnmarkedOverTicks.length, 1)
+  assert.equal(verdict.topTier.candidateUnmarkedOverTicks[0].tick, 285)
+  assert.deepEqual(verdict.topTier.candidateOverEach.slice(0, 1), [1])
+})
+
 gate('missing reference rows, missing candidate rows, a missing marble tier and a run with no result each fail', () => {
   const noReference = run(12, 12)
   noReference.configs = noReference.configs.filter((c) => c.variant !== 'reference')
@@ -279,8 +302,10 @@ gate('the regress plan runs the reference and the candidate alternately at the t
   const plan = buildPlan('regress')
   assert.equal(plan.runs[0].script, 'scripts/kaggle/calibrate.mjs')
   assert.equal(plan.runs.at(-1).script, 'scripts/kaggle/calibrate.mjs')
-  const ticks = plan.runs.filter((r) => r.glueArg >= 0)
+  const ticks = plan.runs.filter((r) => r.role === 'gate')
   assert.equal(ticks.length, top.repeats * 2)
+  const record = plan.runs.filter((r) => r.role === 'record')
+  assert.ok(record.length >= 4 && record.every((r) => r.script === 'scripts/kaggle/bench.mjs'), 'the gate run carries no record rows')
   ticks.forEach((r, i) => {
     assert.equal(r.args[0].startsWith('build/reference/'), i % 2 === 0, 'row ' + i + ' glue ' + r.args[0])
     assert.deepEqual(r.args.slice(1, 3), [String(top.bodies), String(top.workers)])

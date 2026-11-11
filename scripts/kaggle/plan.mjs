@@ -11,6 +11,7 @@ export const BUDGET_MS = 16.7
 export const TICKS = 900
 export const ARENA_BUDGET_BYTES = 1024 * MIB
 export const TOP_TIER_BODIES = 40960
+export const COMPACT_BODIES = 12288
 export const HEADROOM_BODIES = Object.freeze([49152, 65536])
 export const HEADROOM_WORKERS = Object.freeze([3, 4, 6])
 export const HEADROOM_GLUE = 'build/variants/cap65536/engine-core-1024mib-threads-simd.mjs'
@@ -29,7 +30,7 @@ export const VARIANT_REPEATS = 3
 export const variantGlue = (name) => 'build/variants/' + name + '/engine-core-1024mib-threads-simd.mjs'
 
 const calibrate = () => ({ script: 'scripts/kaggle/calibrate.mjs', nodeFlags: [], args: [], glueArg: -1, probe: false })
-const tick = (glue, bodies, workers, extra = {}) => ({ script: 'scripts/kaggle/bench.mjs', nodeFlags: extra.nodeFlags ?? [], args: [glue, String(bodies), String(workers), String(TICKS), String(ARENA_BUDGET_BYTES), String(extra.iterations ?? 'default'), extra.scene ?? 'planet', extra.warm === false ? 'cold' : 'warm', extra.warmSpec ?? 'default', extra.knobs ?? 'none'], glueArg: 0, probe: extra.probe === true })
+const tick = (glue, bodies, workers, extra = {}) => ({ script: 'scripts/kaggle/bench.mjs', nodeFlags: extra.nodeFlags ?? [], args: [glue, String(bodies), String(workers), String(extra.ticks ?? TICKS), String(ARENA_BUDGET_BYTES), String(extra.iterations ?? 'default'), extra.scene ?? 'planet', extra.warm === false ? 'cold' : 'warm', extra.warmSpec ?? 'default', extra.knobs ?? 'none'], glueArg: 0, probe: extra.probe === true, role: extra.role ?? (extra.probe === true ? 'probe' : 'matrix') })
 const marble = (tier, runs = MARBLE_RUNS, warmRuns = 0) => ({ script: 'scripts/kaggle/marble.mjs', nodeFlags: [], args: [String(tier), String(runs), String(warmRuns)], glueArg: -1, probe: false })
 
 const matrix = () => {
@@ -49,12 +50,18 @@ const variants = () => {
   return runs
 }
 
+export const RECORD_WORKERS = Object.freeze([1, 2, 3, 6])
+
 const regressWith = (candidate) => () => {
   const runs = []
   const { bodies, workers, repeats } = BASELINE.topTier
   runs.push(calibrate())
-  for (let repeat = 0; repeat < repeats; repeat++) for (const glue of [referenceGlue(BASELINE.referenceCommit), candidate]) runs.push(tick(glue, bodies, workers))
+  for (let repeat = 0; repeat < repeats; repeat++) for (const glue of [referenceGlue(BASELINE.referenceCommit), candidate]) runs.push(tick(glue, bodies, workers, { role: 'gate' }))
   for (let tier = 0; tier < MARBLE_TIERS; tier++) runs.push(marble(tier, BASELINE.marble.runs, BASELINE.marble.warmRuns))
+  for (const count of RECORD_WORKERS) runs.push(tick(candidate, bodies, count, { role: 'record' }))
+  for (const glue of TICK_GLUES.filter((path) => path !== candidate)) runs.push(tick(glue, bodies, workers, { role: 'record' }))
+  runs.push(tick(candidate, bodies, workers, { warm: false, role: 'record' }))
+  runs.push(tick(candidate, COMPACT_BODIES, workers, { role: 'record' }))
   runs.push(calibrate())
   return runs
 }
@@ -119,7 +126,36 @@ const stall = () => {
   return runs
 }
 
-export const PLANS = Object.freeze({ ceiling, claim, stall, matrix, variants, regress: regressWith(SIMD_GLUE), control: regressWith(SCALAR_GLUE) })
+export const STRETCH_CAP = 98304
+export const STRETCH_GLUE = 'build/variants/cap98304/engine-core-1024mib-threads-simd.mjs'
+export const STRETCH_REPEATS = 3
+export const STRETCH_TUNINGS = Object.freeze([0, 4, 8, 12])
+export const STRETCH_BUDGETS = Object.freeze([6144, 8192, 12288])
+export const STRETCH_TIERS = Object.freeze([65536, 81920, 98304])
+export const TUNE_BOTH = 12
+export const TUNE_RELEASE_BY_SLOT = 16
+export const PREVIOUS_TIER_COMMIT = 'f4e63b04bc2c41e9c5cb1c08066154f99d9ed12d'
+export const PREVIOUS_TIER_BODIES = 40960
+
+const stretch = () => {
+  const runs = [calibrate()]
+  const previous = referenceGlue(PREVIOUS_TIER_COMMIT)
+  for (let repeat = 0; repeat < STRETCH_REPEATS; repeat++) {
+    runs.push(tick(previous, PREVIOUS_TIER_BODIES, 4, { role: 'reference' }))
+    for (const tune of STRETCH_TUNINGS) runs.push(tick(STRETCH_GLUE, COMPACT_BODIES, 4, { knobs: ALL_AWAKE + ',tune=' + tune, role: 'all awake' }))
+    for (const tune of STRETCH_TUNINGS) runs.push(tick(STRETCH_GLUE, PREVIOUS_TIER_BODIES, 4, { knobs: 'tune=' + tune, role: 'tuning' }))
+    runs.push(tick(STRETCH_GLUE, PREVIOUS_TIER_BODIES, 4, { knobs: 'tune=' + TUNE_RELEASE_BY_SLOT, role: 'slot order' }))
+    for (const budget of STRETCH_BUDGETS) runs.push(tick(STRETCH_GLUE, PREVIOUS_TIER_BODIES, 4, { knobs: 'awake=' + budget + ',tune=' + TUNE_BOTH, role: 'budget' }))
+    for (const bodies of STRETCH_TIERS) {
+      runs.push(tick(STRETCH_GLUE, bodies, 4, { knobs: 'tune=0', role: 'tier' }))
+      runs.push(tick(STRETCH_GLUE, bodies, 4, { knobs: 'tune=' + TUNE_BOTH, role: 'tier' }))
+    }
+  }
+  runs.push(calibrate())
+  return runs
+}
+
+export const PLANS = Object.freeze({ stretch, ceiling, claim, stall, matrix, variants, regress: regressWith(SIMD_GLUE), control: regressWith(SCALAR_GLUE) })
 
 export const buildPlan = (mode = 'matrix') => {
   if (!Object.hasOwn(PLANS, mode)) throw new RangeError('unknown plan ' + mode)
