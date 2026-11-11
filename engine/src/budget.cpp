@@ -57,6 +57,11 @@ constexpr std::uint64_t kMaterialBytes = 64;
 constexpr std::uint64_t kTextureBytes = 32;
 constexpr std::uint64_t kLightBytes = 32;
 constexpr std::uint64_t kWorkerScratchBytes = 64ull * 1024ull;
+#if defined(ENGINE_THREADS)
+constexpr std::uint64_t kWorkerStackBytes = 512ull * 1024ull;
+#else
+constexpr std::uint64_t kWorkerStackBytes = 0;
+#endif
 constexpr std::uint64_t kSlackBytes = 1024ull * 1024ull;
 
 constexpr std::uint64_t kBodyRowBytes = 2 * sizeof(std::uint32_t) + sizeof(std::uint16_t) + sizeof(std::uint8_t) + 6 * sizeof(double) +
@@ -104,7 +109,7 @@ std::uint64_t totalBytes(const Capacity& c) {
   total += players * visible * entityBytes;
   total += players * c.baselineDepth * visible * entityBytes;
   total += codec::kScratchBytes + codec::kScratchValues * sizeof(double) + 4 * sizeof(std::int32_t);
-  total += static_cast<std::uint64_t>(c.workers) * kWorkerScratchBytes;
+  total += static_cast<std::uint64_t>(c.workers) * (kWorkerScratchBytes + kWorkerStackBytes);
   total += kSlackBytes;
   return total;
 }
