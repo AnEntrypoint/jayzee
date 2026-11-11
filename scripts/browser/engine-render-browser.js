@@ -43,6 +43,11 @@ const CLASS_MATERIALS = [0, 1, 2, 3]
 
 const result = { phase: PHASE, errors: [], done: false, warmAt: null, lastFrame: -1, heldAtEnd: false }
 window.engineRenderResult = result
+const VISIBILITY_LIMIT = 64
+result.visibility = { initial: document.visibilityState, changes: [] }
+document.addEventListener('visibilitychange', () => {
+  if (result.visibility.changes.length < VISIBILITY_LIMIT) result.visibility.changes.push({ atMs: Math.round(performance.timeOrigin + performance.now()), state: document.visibilityState })
+})
 const report = (line) => {
   const el = document.getElementById('result')
   if (el) el.textContent += line + '\n'

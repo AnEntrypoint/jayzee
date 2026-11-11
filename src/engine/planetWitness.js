@@ -51,6 +51,7 @@ export const planetVerdict = (result, expected) => {
     const missed = wall.map((ms, frame) => ({ frame, ms })).filter((f) => f.ms > PLANET_MISSED_FRAME_MS)
     if (missed.length > 0) failures.push('missed frames: ' + missed.length + ' rAF intervals over ' + PLANET_MISSED_FRAME_MS + ' ms, first at frame ' + missed[0].frame + ' (' + missed[0].ms + ' ms)')
   }
+  if (result.visibility && (result.visibility.initial !== 'visible' || result.visibility.changes.length > 0)) failures.push('the page was hidden during the run (' + result.visibility.changes.length + ' visibility changes), so its frame intervals are not a measurement')
   if (result.allocationsSinceWarmup !== '0' && result.allocationsSinceWarmup !== 0) failures.push('allocations after warm-up: ' + result.allocationsSinceWarmup)
   if (result.createsAfterSeal !== 0) failures.push('creates after seal: ' + result.createsAfterSeal)
 

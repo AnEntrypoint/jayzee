@@ -4398,3 +4398,65 @@ Open after these fixes:
 - The verdict still has no pixel check for terrain. The screenshots are the witness.
 - Worker tick time at 1024 with the bodies on the planet surface is recorded with the Phase B runs.
 - Every browser number recorded for the planet path before this entry was taken on the broken scene: no terrain in view, no vegetation, bodies pulled toward the planet's centre. Those rows are superseded by the Phase B runs below.
+
+## Phase B (2026-11-11): the one validation pass for this stretch
+
+One sequence, `build/diag/phaseB-final.sh`, waited on by its process: `npm test`, the four planet runs, the heap windows, the small browser witnesses, the stream witness and two hunts. Other sessions were working on the host the whole time (load 7 to 13 on 12 cores, cgroup use 6 to 14 cores in the sampled windows), so every timing below was taken on a loaded host.
+
+### Node
+
+`npm test`: exit 0, 299 checks, 0 failed, wall 158.7 s at four jobs (`build/diag/phaseB-final/npm-test.log`; 297 ran and 2 were already passed on that tree). An earlier full run on the same code counted 5,782 PASS lines. The first full run of the pass failed one check, `check:scenario-marble-bowl`, on one 23.09 ms tick in the 512 MiB threaded tier (run p99 4.58 ms); it passed when rerun alone. Its cause was then measured:
+
+| marble-bowl run | max tick | ticks over 16.7 ms | cgroup throttled periods in the run | throttled time |
+|---|---|---|---|---|
+| 512 MiB fixed, run 1 | 24.15 ms | 1 | 1 | 141 ms |
+| 64 MiB fixed, run 2 | 30.66 ms | 1 | 1 | 262 ms |
+| 128 MiB fixed, runs 1 and 2 | 9.56 ms | 0 | 1 each | 0 and 76 ms |
+| the other four runs | under 7 ms | 0 | 0 | 0 |
+
+In another run, every one of 62 over-budget ticks (17 to 42 ms) carried 2 to 16 involuntary context switches in that tick, and the run had 2,730 against 48 to 656 in runs with no over-budget tick. So the over-budget ticks are the container's CPU quota (12 CPUs per 100 ms period, shared with the other sessions) stopping the process, not engine work. `scripts/lib/tickTrace.mjs` now gives every scenario gate a tick timer that reads `nr_throttled` from `/sys/fs/cgroup/cpu.stat` after each tick, with no allocation. A tick over budget during a throttled period is recorded and printed, and is not counted against the engine; if more than 2 percent of a run's ticks are in that state the run fails as having no valid window. A tick over budget with no throttled period still fails. In three further passes of all the scenario gates no tick went over budget, so the per-tick attribution itself has not yet fired.
+
+Also in this pass: `check:engine-sleep` and `check:engine-render` were failing outside the chain (the sleep gate read origin-relative transforms as absolute positions; the render gate pinned a 40-byte `PagePlacement` that is 56 bytes since the float64 origin). Both are repaired, and the fourteen engine gates that need only `engine/out` are now in the chain. `check:ci-engine-glue` derives the glues CI must build from the chain files and their imports; the workflow built five and the chain reads ten, so the workflow now builds the missing six. Hosted CI cannot be run from here (the Actions spending limit), so that workflow change is not witnessed.
+
+### Browser, on the repaired planet scene
+
+| configuration | frame work p99 / max | missed rAF intervals | physics |
+|---|---|---|---|
+| 64-webgl2 | 1.77 / 2.28 ms | 0 | in page: median 0.10 ms, max 1.86 ms |
+| 64-webgpu | 2.14 / 3.33 ms | 2 (26.97 and 35.10 ms) | in page: median 0.10 ms, max 2.72 ms |
+| 1024-webgl2 | 1.36 / 4.09 ms | 5 (25.4 to 32.7 ms) | worker tick: median 44.1 ms, p99 111.8 ms, max 115.4 ms |
+| 1024-webgpu | 3.80 / 5.58 ms | 6 (25.4 to 51.3 ms) | worker tick: median 57.8 ms, p99 97.7 ms, max 113.5 ms |
+
+All four: `ok true` from the page, 0 engine allocations after warm-up, 256 pages placed. At 1024: 16 vegetation draws of 1,952 instances in the last frame, 18 block moves, 11,468 instances generated over the run, 0 heights outside loaded pages. A second set (`planet-2`) had 0 missed intervals on both WebGL2 runs, 1 on 1024-webgpu and 7 on 64-webgpu. Records: `build/diag/phaseB-final/planet/`, `planet-2/`.
+
+The planet witness is therefore not green on WebGPU, and the 1024 physics tick is far over budget:
+- The 1024 worker tick is 44 to 58 ms at the median with 4 workers, 10,240 bodies piled on the planet surface, on a loaded host. Every one of its ticks is over 25 ms. This is the first time the worker tick has been measured (the page rows never carried it), and it is an open defect: at 1024 players the physics runs at about 20 ticks a second, and the page draws the latest pose at 60.
+- The missed intervals on WebGPU have the page's main thread idle and GPU-process tasks covering the gap, with no cgroup throttled period and no page visibility change in those runs.
+
+Other browser witnesses, all exit 0: the four heap windows (growth 48, 48, 12 and 12 B over 902 to 904 frames, 0 engine allocations; arena used 31,691,824 B at 64, 475,401,208 B on 1024 WebGPU and 127,894,136 B on 1024 WebGL2), visibility (WebGPU forward against visibility 0 of 518,400 pixels differ, WebGL2, occluded), models (steady frame median 2.94 ms, p99 5.87 ms), models-vram, device loss (default and by budget, first module collected), decode worker (`ktx2Equal true`), crowd dots (36.1 B per update), threads (`repeatable true`, deviation 0 m), gpu-backend, player-webgpu.
+
+Stream witness, 16 configurations (`build/diag/phaseB-final/stream/summary.json`): 13 pass. The three failures: `64-webgl2-planet` and `64-webgl2-flyover` on per-frame page streaming (3.41 and 4.63 ms against 2 ms), and `1024-webgl2-planet` on one 19.35 ms frame. Every WebGPU configuration and the 128 and 512 tiers pass, with 224 to 256 pages placed. The earlier record was 3 of 16 failing on the broken scene; these three are on the repaired scene and are open.
+
+### What held the long frames, from the dumps
+
+- A second WebGPU gap with the same signature as run 12 (`hunt-1024-webgpu/run-1`, frame 668, interval 36.56 ms): the GPU process main thread ran one WebGPU flush for 21.7 ms of wall time and 6.9 ms of CPU. With Dawn's categories in the trace, the off-CPU time has a name: `Queue::Submit` [gpu.dawn], ts 495900735901 + 1,794 µs, 19.28 ms wall, 4.63 ms thread CPU, so 14.65 ms off the CPU inside the submit. So the wait is inside Dawn's queue submit, which is the call into the GPU driver. In the `64-webgpu` capture the submits in the gaps were off the CPU for 3.3 and 5.4 ms.
+- It is not the other browser on the same GPU: `nvidia-smi pmon`, sampled each second by the runner, shows the other Chromium GPU process (pid 3589646) at 0 percent through the whole run, this project's GPU process at 22 to 28 percent, and Xvfb at 17 to 32 percent near the long frames.
+- It is not cgroup throttling (0 throttled periods in those windows) and not a hidden page (no visibility change).
+- A 975.73 ms interval in `hunt-64-webgl2/run-1` (frame 431) had 0.74 ms of work, the renderer idle, and no GPU task. That is the signature of a page held back because another page was in front: the project browser is shared with other sessions, and each witness brings its own page to the front. The same explains one planet run that never finished and one that ran at about one frame a second. The page now records `visibilitychange`, the verdict fails a run whose page was hidden, and a gap that overlaps a hidden span is classified `page-hidden-in-gap`. No hidden span has been recorded since the instrument was added, so this cause is inferred from the signature, not yet witnessed.
+
+Still open for the WebGPU gaps: what the driver waits on inside `Queue::Submit`. The next instrument is a scheduler trace of the GPU process, which this host does not allow, or a run with no other session on the host.
+
+### Not run
+
+The PAUSED controlled run: it starts two busy loops to pause, which loads the shared host, and it refuses when other work uses more than 0.2 of the CPU after pausing; another session's process alone is at 0.95.
+
+### Open after this pass, in rank order
+
+1. The 1024 physics worker tick, 44 to 58 ms at the median.
+2. WebGPU gaps: the wait inside Dawn's `Queue::Submit`.
+3. Page seams in the witness terrain, and no pixel check for terrain or vegetation in the verdict.
+4. The three stream-witness failures on WebGL2.
+5. Vegetation: the block is 16 patches because only about ±155 m of pages is loaded; `planDraws` has no instance budget; the browser cost of generation is not measured.
+6. Statics, trunks and characters have no float64 rebase anchor; rigid spheres use the radial planet contact; 7 and 8 workers need a smaller threaded arena (a decision).
+7. Residual allocations: 36 B per crowd-dot update in the browser; the held-result IK and spring rows; a second world in one process.
+8. Not reachable here: hosted CI and a second machine, Safari, owner decisions (cube-sphere keying, the solver lever, the spoint comparison operation, ENGINE.md wording, the witness vegetation density), a browser restart.

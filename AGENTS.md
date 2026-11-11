@@ -243,6 +243,15 @@ Non-obvious facts for automated edits. Architecture and measured costs live in d
 - Characters get gravity only from the planet, so a world without `configurePlanet` leaves a character hanging. No export sets a character's position; the deathrun respawn uses standby characters added at setup.
 - With boxes passed at creation near the planet radius, the physics origin is the first box's centre, and a later `follow` within the rebase distance does not move it.
 - `scripts/check-scenario-determinism.mjs` compares a fixed and a threaded glue and needs both built from one source. Its first line per pair compares their export lists.
+- The planet path of the render page works in absolute planet coordinates: the eye, the look-at target, the lights and the body spawns are offset by the planet radius, the ground box is left out, and the physics worker gets the same base through `path.baseY`. In a local frame the terrain pages, which are placed by `_engine_planet_cell_frame`, are 6,371 km from the camera, and the bodies sit at the planet centre under radial gravity.
+- The planet verdict checks times, counts and allocations, not pixels. `scripts/browser/planet-shot.mjs <query> <out.png>` screenshots with `hold=1` are how terrain and vegetation are confirmed. `veg=0` on the page is the vegetation-off control.
+- A WebGPU storage-buffer binding offset must be a multiple of 256 bytes. The vegetation draw binds the whole species buffer once and selects the slot with the first instance of the draw, so any capacity works.
+- The project browser is shared with other sessions, and each witness brings its page to the front. A page behind another runs its frames at about one a second. The render page records `visibilitychange`, and the planet verdict fails a run whose page was hidden.
+- The container has a CPU quota of 12 CPUs per 100 ms, shared by every session. When it is used up, every thread stops until the next period, which shows as a 20 to 40 ms tick with several involuntary context switches. `createTickTimer` in `scripts/lib/tickTrace.mjs` reads `nr_throttled` after each tick, and a tick over budget in a throttled period is recorded, printed and not counted against the engine.
+- The planet runner samples `nvidia-smi pmon` once a second and puts the GPU use of each process near a long frame in `gpuProcessesNearFrame`. Two Chromium GPU processes and Xvfb share the GPU.
+- At 1024 players the physics worker tick is 44 to 58 ms at the median with 4 workers and the bodies piled on the planet surface, on a loaded host. The page rows did not carry it before `workerTick`.
+- `check:ci-engine-glue` derives the glues CI must build from the chain files and their imports. A gate that loads a new glue fails that check until `.github/workflows/ci.yml` builds it.
+- The engine gates outside `scripts/test-chain.json` rot: two were failing unnoticed. A gate that needs only `engine/out` belongs in the chain.
 
 ## Dependencies and licences
 

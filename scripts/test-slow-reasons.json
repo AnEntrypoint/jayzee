@@ -24,5 +24,8 @@
   "check:engine-tiers": "10240 bodies settle for 365 ticks on the fixed 512 MiB build, twice; the carve count after warm-up is the claim.",
   "check:engine-host-witness": "Compiles the native witness when a source under engine/src or engine/test changed; 0.4 s otherwise.",
   "check:scenario-character-terrain": "Four tiers of slope, step and descent runs with their controls.",
-  "check:planet-witness-scene": "Builds the witness scene three times on the 1024-tier engine and runs one camera lap."
+  "check:planet-witness-scene": "Builds the witness scene three times on the 1024-tier engine and runs one camera lap.",
+  "check:alloc-audit": "Sixteen rows of 50,000 calls each under a 1 MiB semi-space.",
+  "check:scenario-combat-bots": "Two runs on four tiers, with the duel and its wall and ridge controls.",
+  "check:scenario-planet-landing": "Two runs of 480 ticks on four tiers."
 }
