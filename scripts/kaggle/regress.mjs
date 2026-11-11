@@ -68,10 +68,12 @@ export const judge = (baseline, results) => {
   const marble = marbles.map((c) => {
     const onCpu = c.clockSource !== 'performance.now'
     const p99Ms = onCpu ? c.cpuP99Ms : c.wallP99Ms
-    const over25 = onCpu ? c.cpuOver25 : c.wallOver25
+    const over25 = onCpu ? c.cpuOver25Repeated : c.wallOver25Repeated
+    const over25InAnyRun = onCpu ? c.cpuOver25 : c.wallOver25
     if (p99Ms > baseline.marble.p99Ms) failures.push('marble bowl ' + c.tier + ' p99 ' + p99Ms + ' ms is over ' + baseline.marble.p99Ms + ' ms')
-    if (over25 > baseline.marble.over25) failures.push('marble bowl ' + c.tier + ' has ' + over25 + ' ticks over ' + c.spikeMs + ' ms after its warm run')
-    return { tier: c.tier, clockSource: c.clockSource, p99Ms, maxMs: onCpu ? c.cpuMaxMs : c.wallMaxMs, over25, overBudget: onCpu ? c.cpuOverBudget : c.wallOverBudget }
+    if (!Number.isInteger(over25)) failures.push('marble bowl ' + c.tier + ' carries no count of repeated ticks over ' + c.spikeMs + ' ms')
+    if (over25 > baseline.marble.over25) failures.push('marble bowl ' + c.tier + ' has ' + over25 + ' ticks over ' + c.spikeMs + ' ms at the same tick in at least half of its runs after its warm run')
+    return { tier: c.tier, clockSource: c.clockSource, p99Ms, maxMs: onCpu ? c.cpuMaxMs : c.wallMaxMs, over25, over25InAnyRun, overBudget: onCpu ? c.cpuOverBudget : c.wallOverBudget }
   })
   const broken = results.configs.filter((c) => c.error)
   if (broken.length) failures.push(broken.length + ' runs gave no result')

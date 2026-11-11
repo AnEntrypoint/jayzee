@@ -2,6 +2,7 @@ import { availableParallelism } from 'node:os'
 import { createTickTimer, summariseTicks, FRAME_BUDGET_MS, SPIKE_MS, TICK_CLOCK_SOURCE } from '../lib/tickTrace.mjs'
 import { SCENARIO_TIERS } from '../lib/scenarioTiers.mjs'
 import { MARBLE_BOWL, buildMarbleBowl } from '../lib/scenarioWorlds.mjs'
+import { repeatedSpikes } from './spikes.mjs'
 
 const tier = SCENARIO_TIERS[Number(process.argv[2])]
 const RUNS = Number(process.argv[3])
@@ -23,7 +24,10 @@ const timedRun = async () => {
   wall.forEach((ms, tick) => {
     if (ms > FRAME_BUDGET_MS) wallOverTicks.push({ tick, wallMs: round(ms), cpuMs: wall.cpuMs ? round(wall.cpuMs[tick]) : null, waitMs: wall.waitMs ? round(wall.waitMs[tick]) : null })
   })
+  const spikesOf = (values) => Array.from(values, (ms, tick) => (ms > SPIKE_MS ? tick : -1)).filter((tick) => tick >= 0)
   return {
+    cpuSpikeTicks: spikesOf(wall.cpuMs ?? wall),
+    wallSpikeTicks: spikesOf(wall),
     clock: summary.clock,
     cpuP99Ms: round(summary.p99Ms),
     cpuMaxMs: round(summary.maxMs),
@@ -58,6 +62,8 @@ console.log('RESULT ' + JSON.stringify({
   cpuMaxMs: Math.max(...perRun.map((r) => r.cpuMaxMs)),
   cpuOverBudget: perRun.reduce((n, r) => n + r.cpuOverBudget, 0),
   cpuOver25: perRun.reduce((n, r) => n + r.cpuOver25, 0),
+  cpuOver25Repeated: repeatedSpikes(perRun.map((r) => r.cpuSpikeTicks)).length,
+  wallOver25Repeated: repeatedSpikes(perRun.map((r) => r.wallSpikeTicks)).length,
   wallP99Ms: Math.max(...perRun.map((r) => r.wallP99Ms)),
   wallMaxMs: Math.max(...perRun.map((r) => r.wallMaxMs)),
   wallOverBudget: perRun.reduce((n, r) => n + r.wallOverBudget, 0),

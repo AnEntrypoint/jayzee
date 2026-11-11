@@ -44,7 +44,7 @@ const lines = [
   '',
   '- Budget: ' + results.budgetMs + ' ms per tick, ' + results.ticks + ' ticks per configuration. Ticks 0 and 1 are the boot ticks, ticks 2 to 299 the settle window, and ticks from 300 the steady window. The timed call is the whole worker tick: page streaming, follow, `engine_tick` and the pose export.',
   '- Arena plan: 1024 players under a ' + results.arenaBudgetBytes + ' byte budget.',
-  '- Machine: ' + results.cpuModel + ', ' + results.nproc + ' CPUs, Node ' + results.node + '.',
+  '- Machine: ' + results.cpuModel + ', ' + results.nproc + ' CPUs, Node ' + results.node + (results.machine ? ', machine class ' + results.machine.class + ' (' + results.machine.cores + ' cores, ' + results.machine.siblings + ' threads)' : '') + '.',
   '- Pushed ' + pushedAt + '. Queue wait ' + (results.startedAtEpochS - pushedEpochS).toFixed(0) + ' s from the push to the first line of the script. Run time ' + results.totalS + ' s for ' + results.configs.length + ' of ' + results.plannedRuns + ' planned runs.',
   ...glues.map((glue) => {
     const whole = goalpost(glue)

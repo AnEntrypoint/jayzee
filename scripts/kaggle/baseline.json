@@ -17,7 +17,7 @@
     "warmRuns": 1,
     "p99Ms": 16.7,
     "over25": 0,
-    "basis": "Kaggle runs 8 and 9: every tick over 16.7 ms in a first run falls at the first impact (ticks 75 to 83) on cold code; later runs peak at 12 to 20.3 ms of CPU time with zero runqueue wait, and p99 stays at or under 15.0 ms."
+    "basis": "Kaggle runs 8 and 9: every tick over 16.7 ms in a first run falls at the first impact (ticks 75 to 83) on cold code; later runs peak at 12 to 20.3 ms of CPU time with zero runqueue wait, and p99 stays at or under 15.0 ms. Kaggle run 21, on the Xeon class: one tick of 29.0 ms (tick 202 of one run of four on the 64 MiB tier, CPU time equal to wall time, no runqueue wait) while the other three runs of the same deterministic scenario peaked at 13.5 to 14.8 ms. The bench shows the same single stalls on that class (19.8 and 41.9 ms between ticks of 6 ms with the same awake count). A stall that is not repeated at the same tick is the host, so a tick over 25 ms counts when it is over in at least half of the timed runs at the same tick index; single ones stay in the verdict as over25InAnyRun."
   },
   "drift": {
     "p99Factor": 1.25,

@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { finish, gate } from './lib/gate.mjs'
 import { classRecord, judge } from './kaggle/regress.mjs'
 import { decide } from './kaggle/push-gate.mjs'
+import { repeatedSpikes } from './kaggle/spikes.mjs'
 import { BASELINE, buildPlan } from './kaggle/plan.mjs'
 import { referenceGlue } from './kaggle/reference.mjs'
 
@@ -13,7 +14,7 @@ const BUDGET_MS = 16.7
 const top = BASELINE.topTier
 
 const tick = (variant, p99Ms, overBudget) => ({ kind: 'tick', variant, bodies: top.bodies, workers: top.workers, warm: true, p99Ms, overBudget })
-const marble = (tier, cpuP99Ms, cpuOver25) => ({ kind: 'marble-bowl', tier, clockSource: 'schedstat', spikeMs: 25, cpuP99Ms, cpuMaxMs: cpuP99Ms + 2, cpuOver25, cpuOverBudget: 0, wallP99Ms: 40, wallMaxMs: 60, wallOver25: 9, wallOverBudget: 30 })
+const marble = (tier, cpuP99Ms, cpuOver25Repeated, cpuOver25 = cpuOver25Repeated) => ({ kind: 'marble-bowl', tier, clockSource: 'schedstat', spikeMs: 25, cpuP99Ms, cpuMaxMs: cpuP99Ms + 2, cpuOver25, cpuOver25Repeated, cpuOverBudget: 0, wallP99Ms: 40, wallMaxMs: 60, wallOver25: 9, wallOver25Repeated: 9, wallOverBudget: 30 })
 const marbles = () => Array.from({ length: BASELINE.marble.tiers }, (_, i) => marble('tier ' + i, 12, 0))
 const CLASS = 'TestVendor-1-2-3'
 const SINGLE_MS = 500
@@ -83,10 +84,25 @@ gate('the marble bowl fails on a p99 over its budget or a tick over 25 ms of CPU
   assert.match(judge(BASELINE, run(12, 12, 0, 0, [...marbles().slice(1), marble('spike', 12, 1)])).failures.join(' '), /ticks over 25 ms/)
 })
 
+gate('a tick over 25 ms in one marble run of four is recorded and not judged, as Kaggle run 21 had at tick 202 of one run; the same tick in half the runs fails', () => {
+  const once = judge(BASELINE, run(12, 12, 0, 0, [...marbles().slice(1), marble('once', 12, 0, 1)]))
+  assert.equal(once.ok, true, once.failures.join('; '))
+  assert.equal(once.marble.at(-1).over25InAnyRun, 1)
+  assert.deepEqual(repeatedSpikes([[], [202], [], []]), [])
+  assert.deepEqual(repeatedSpikes([[202], [202], [], []]), [202])
+  assert.deepEqual(repeatedSpikes([[77], [202], [], []]), [], 'two runs with different ticks are two single stalls')
+  assert.deepEqual(repeatedSpikes([[75, 76], [76], [76, 90], [76]]), [76])
+  assert.deepEqual(repeatedSpikes([[5]]), [5], 'with one run every tick over the limit counts')
+  assert.throws(() => repeatedSpikes([]), /at least one run/)
+  const unlabelled = marbles()
+  delete unlabelled[0].cpuOver25Repeated
+  assert.match(judge(BASELINE, run(12, 12, 0, 0, unlabelled)).failures.join(' '), /no count of repeated ticks/)
+})
+
 gate('without the CPU clock the marble bowl is judged on wall time', () => {
-  const wallOnly = marbles().map((c) => ({ ...c, clockSource: 'performance.now', wallP99Ms: 12, wallOver25: 0 }))
+  const wallOnly = marbles().map((c) => ({ ...c, clockSource: 'performance.now', wallP99Ms: 12, wallOver25: 0, wallOver25Repeated: 0 }))
   assert.equal(judge(BASELINE, run(12, 12, 0, 0, wallOnly)).ok, true)
-  assert.equal(judge(BASELINE, run(12, 12, 0, 0, wallOnly.map((c) => ({ ...c, wallOver25: 1 })))).ok, false)
+  assert.equal(judge(BASELINE, run(12, 12, 0, 0, wallOnly.map((c) => ({ ...c, wallOver25: 1, wallOver25Repeated: 1 })))).ok, false)
 })
 
 gate('the push gate refuses a missing verdict, a verdict for another payload and a failed verdict, and passes a matching one', () => {

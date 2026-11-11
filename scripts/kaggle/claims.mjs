@@ -6,9 +6,12 @@ import { KERNEL_REF } from './plan.mjs'
 const here = dirname(fileURLToPath(import.meta.url))
 
 const median = (values) => [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)]
-const buildOf = (c) => (c.variant === 'reference' ? 'unbudgeted reference' : c.knobs === 'awake=0' ? 'candidate, every body awake' : 'candidate, awake budget ' + c.awakeBudget)
+const knobsOf = (c) => Object.fromEntries(!c.knobs || c.knobs === 'none' ? [] : c.knobs.split(',').map((pair) => pair.split('=')))
+const budgetOf = (c) => Number(knobsOf(c).awake ?? c.awakeBudget ?? 0)
+const otherKnobs = (c) => Object.entries(knobsOf(c)).filter(([key]) => key !== 'awake').map(([key, value]) => ', ' + key + ' ' + value).join('')
+const buildOf = (c) => (c.variant === 'reference' ? 'unbudgeted reference' : (budgetOf(c) === 0 ? 'candidate, every body awake' : 'candidate, awake budget ' + budgetOf(c)) + otherKnobs(c))
 
-export const summarise = (runs) => {
+export const summarise = (runs, budgetMs) => {
   const classes = new Map()
   for (const { version, results } of runs) {
     const machine = results.machine
@@ -40,7 +43,7 @@ export const summarise = (runs) => {
     singleMs: entry.singleMs.length ? Math.min(...entry.singleMs) : null,
     memoryMs: entry.memoryMs.length ? Math.min(...entry.memoryMs) : null,
     laneSlowdown: entry.laneSlowdown.length ? Math.max(...entry.laneSlowdown) : null,
-    rows: [...entry.rows.values()].map((row) => ({ build: row.build, bodies: row.bodies, workers: row.workers, repeats: row.p99.length, medianP99Ms: median(row.p99), worstP99Ms: Math.max(...row.p99), worstMaxMs: Math.max(...row.max), overEach: row.over, peakActive: Math.max(...row.peakActive), lastActiveTick: Math.max(...row.lastActiveTick), holds: (budgetMs) => row.over.every((n) => n === 0) && Math.max(...row.p99) <= budgetMs })).sort((a, b) => a.bodies - b.bodies || a.build.localeCompare(b.build) || a.workers - b.workers),
+    rows: [...entry.rows.values()].map((row) => ({ build: row.build, bodies: row.bodies, workers: row.workers, repeats: row.p99.length, medianP99Ms: median(row.p99), worstP99Ms: Math.max(...row.p99), worstMaxMs: Math.max(...row.max), overEach: row.over, repeatsHolding: row.over.filter((n, i) => n === 0 && row.p99[i] <= budgetMs).length, peakActive: Math.max(...row.peakActive), lastActiveTick: Math.max(...row.lastActiveTick), holds: row.over.every((n) => n === 0) && Math.max(...row.p99) <= budgetMs })).sort((a, b) => a.bodies - b.bodies || a.build.localeCompare(b.build) || a.workers - b.workers),
   }))
 }
 
@@ -49,8 +52,8 @@ export const render = (classes, budgetMs) => {
   for (const c of classes) {
     const m = c.machine
     const lscpu = m.lscpu ?? {}
-    lines.push('### ' + c.class + ' (' + m.modelName + ')', '', '- Kernel versions: ' + c.versions.join(', ') + '. ' + m.cores + ' cores, ' + m.siblings + ' threads, ' + m.mhz + ' MHz, L2 ' + (lscpu['L2 cache'] ?? m.cache) + ', L3 ' + (lscpu['L3 cache'] ?? 'not reported') + ', avx512 ' + (m.avx512f ? 'yes' : 'no') + ', cgroup cpu.max ' + m.cgroupCpuMax + '.', '- Calibration: single thread ' + c.singleMs + ' ms, memory chase ' + c.memoryMs + ' ms, four lanes at once cost ' + c.laneSlowdown + ' times one lane.', '', '| bodies | build | workers | repeats | median p99 ms | worst p99 ms | worst max ms | ticks over budget per repeat | peak awake | last awake tick | holds |', '|' + '---|'.repeat(11))
-    for (const row of c.rows) lines.push('| ' + [row.bodies, row.build, row.workers, row.repeats, row.medianP99Ms, row.worstP99Ms, row.worstMaxMs, row.overEach.join(', '), row.peakActive, row.lastActiveTick, row.holds(budgetMs) ? 'yes' : 'no'].join(' | ') + ' |')
+    lines.push('### ' + c.class + ' (' + m.modelName + ')', '', '- Kernel versions: ' + c.versions.join(', ') + '. ' + m.cores + ' cores, ' + m.siblings + ' threads, ' + m.mhz + ' MHz, L2 ' + (lscpu['L2 cache'] ?? m.cache) + ', L3 ' + (lscpu['L3 cache'] ?? 'not reported') + ', avx512 ' + (m.avx512f ? 'yes' : 'no') + ', cgroup cpu.max ' + m.cgroupCpuMax + '.', '- Calibration: single thread ' + c.singleMs + ' ms, memory chase ' + c.memoryMs + ' ms, four lanes at once cost ' + c.laneSlowdown + ' times one lane.', '', '| bodies | build | workers | repeats | median p99 ms | worst p99 ms | worst max ms | ticks over budget per repeat | repeats with none over | peak awake | last awake tick | holds in every repeat |', '|' + '---|'.repeat(12))
+    for (const row of c.rows) lines.push('| ' + [row.bodies, row.build, row.workers, row.repeats, row.medianP99Ms, row.worstP99Ms, row.worstMaxMs, row.overEach.join(', '), row.repeatsHolding + ' of ' + row.repeats, row.peakActive, row.lastActiveTick, row.holds ? 'yes' : 'no'].join(' | ') + ' |')
     lines.push('')
   }
   return lines
@@ -62,7 +65,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const runs = paths.map((path) => ({ version: Number((/out-v(\d+)/.exec(path) ?? [])[1]), results: JSON.parse(readFileSync(resolve(path), 'utf8')) }))
   const budgets = new Set(runs.map((run) => run.results.budgetMs))
   if (budgets.size !== 1) throw new Error('the runs do not share one budget')
-  const lines = render(summarise(runs), [...budgets][0])
+  const lines = render(summarise(runs, [...budgets][0]), [...budgets][0])
   writeFileSync(join(here, 'claims.md'), lines.join('\n') + '\n')
   console.log(lines.join('\n'))
 }
