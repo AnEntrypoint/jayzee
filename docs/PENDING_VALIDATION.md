@@ -3633,3 +3633,10 @@ Open after this pass:
 - Change: each tier gates the worst tick work time at 16.7 ms. The time is taken around the `world.step()` call only, the same way the planet witness times the tick, not by wall clock between ticks.
 - Witness: the four gates per tier (settle, no drift, bit-for-bit agreement, worst tick work within 16.7 ms). Not yet run; Phase B runs them.
 - Open: items 2 to 5 of the stretch (the other four scenarios, the vegetation identification pass, the parity rows and the platform items) are not started in this pass.
+
+## CharacterVirtual collision dispatch: planet capsule (Phase A, 2026-11-11)
+
+- Decision: a capsule against the planet is registered as `CollideShape` in both reachable orders (User1 with Capsule, and Capsule with User1) and as a `CastShape` for Capsule moving against User1. The collide entries reuse `sphereContact` at the capsule's segment point nearest the planet centre. The cast samples 33 fractions along the sweep and bisects the first penetrating interval (24 steps).
+- Deviation: `CastShape` is registered only as Capsule moving against User1. Jolt casts the ShapeCast's own shape against bodies, and the planet is static, so a planet-moving cast has no caller in the engine. Registering it would be unreachable code.
+- Limit: the segment rule is exact only while the planet is locally spherical over the capsule's length. Terrain height varies over the capsule, so the contact is an approximation of the true capsule-terrain contact.
+- Witness: Phase B builds the threaded and non-threaded glues, and `npm test` must pass. The settle scenario cannot test this dispatch, because it spawns boxes and spheres only and no character, so its witness is recorded as unable to test it.
