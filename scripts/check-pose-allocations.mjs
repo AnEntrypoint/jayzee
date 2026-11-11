@@ -12,7 +12,7 @@ import { attachPoseRegion, poseRegionBuffers } from '../src/engine/poseRegion.js
 import { createPoseHandoffCore, createPoseStepper } from '../src/engine/poseHandoffCore.js'
 
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)))
-const GLUE = pathToFileURL(resolve(root, 'engine/out/engine-core-512mib.mjs')).href
+const GLUE = pathToFileURL(resolve(root, 'engine/out/engine-core-1024mib-threads.mjs')).href
 const FRAME_FILES = ['src/engine/poseHandoffCore.js', 'src/engine/poseRegion.js', 'src/engine/planetStream.js', 'src/engine/sceneSetup.js'].map((f) => pathToFileURL(resolve(root, f)).href)
 const WARMUP_FRAMES = 2000
 const COUNTED_FRAMES = 600
@@ -20,7 +20,7 @@ const SLOTS = 3
 const MIB = 1024 * 1024
 
 const started = Date.now()
-const plan = resolvePlan({ players: 1024, workers: 1, budgetBytes: 512 * MIB })
+const plan = resolvePlan({ players: 1024, workers: 2, budgetBytes: 512 * MIB })
 const module = await loadEngineModule(GLUE, plan)
 const layout = readLayout(module)
 configureWorld(module, solverIterationsFor(layout.players))

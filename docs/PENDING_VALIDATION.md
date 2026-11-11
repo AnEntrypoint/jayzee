@@ -3898,3 +3898,19 @@ Witness that closes it, all in Phase B on a rebuilt threaded glue:
 - `npm run check:pose-allocations` against `engine/out/engine-core-1024mib-threads.mjs`: `frameBytes.total` and `own` both 0 over 600 frames. The gate currently runs on the non-threaded glue, so the threaded run is a separate command (see Phase B).
 - `npm run check:engine-threads`: the threaded run agrees with the fixed run within 1 mm after 600 ticks, and two threaded runs agree bit for bit.
 - The pool job-wait tests: the repo has no dedicated job-wait test. `check:engine-threads` is the job-wait witness, because it runs the pool through 600 ticks with four workers.
+
+### Phase B outcome for the clock-free wait (open)
+
+Changes after the first commit: `__timedwait_cp` and `__timedwait` (musl's timed wait behind `sem_wait`, which read the clock on every main-thread call) and `sched_yield` (which read the clock to call `_emscripten_yield`) are replaced in `engine/src/futex_clockfree.cpp`. The allocation gate now runs on `engine/out/engine-core-1024mib-threads.mjs` with two workers.
+
+Measured on the rebuilt threaded glues (`build/diag/rebuild-threads4.log`, all `rc=0`):
+- `check:engine-threads`: PASS (`build/diag/engine-threads-final4.log`).
+- `check:pose-allocations` on the threaded runtime: `frameBytes` total 25,128, own 25,128, inherited 0 over 600 frames. FAIL (`build/diag/pose-alloc-final4.log`).
+- `npm test`: 5,174 PASS, one FAIL, the threaded allocation row (`build/diag/phaseB-final4-npm-test.log`).
+- Planet configs: 1024-webgpu, 1024-webgl2 and 64-webgl2 PASS. 64-webgpu misses one frame at 26.19 ms (frame 250), `build/diag/planet-phaseB-final4.log`. The host load was not measured during this run.
+
+What is established: the threaded glue no longer calls the clock import at run time. `performance.now` was called 0 times over the whole allocation gate run (`build/diag/count-now.log`, preload `build/diag/count-now.mjs`). The inherited clock allocation is gone (inherited 0).
+
+What is not established: the remaining ~25 KB over 600 frames (about 42 B per frame) is attributed to the stepper arrow. The earlier bisect put it at the `_engine_tick` call. The glue's import census shows no JS import called from the tick other than the clock, which does not run. The cause is not identified. Next step: read which import or V8 boundary the tick crosses with a native sampling profiler, or build a counted probe inside the tick.
+
+Not done: no push. The Phase B row that fails is the threaded allocation row, which the owner set as the push condition.
