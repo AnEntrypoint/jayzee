@@ -34,8 +34,7 @@ const variantOf = (path) => (path.includes('/variants/') ? path.split('/').at(-2
 const base = { kind: 'tick', scene, warm, warmSpec: warmSpecArg, knobs: knobsArg, variant: variantOf(glue), glue: glue.split('/').pop(), bodies, workers, iterations, budgetMs: BUDGET_MS, budgetBytes, ticks, cpus: availableParallelism(), execArgv: process.execArgv }
 
 const emit = (result) => {
-  console.log('RESULT ' + JSON.stringify(result))
-  process.exit(0)
+  process.stdout.write('RESULT ' + JSON.stringify(result) + '\n', () => process.exit(0))
 }
 const round = (ms, digits) => Number(ms.toFixed(digits))
 const quantile = (sorted, p) => sorted[Math.min(sorted.length - 1, Math.floor(p * sorted.length))]
