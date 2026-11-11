@@ -3669,3 +3669,5 @@ Not witnessed: that the registrations take effect on both orders. Nothing in the
 - Change: `scripts/check-scenario-deathrun.mjs`, run as `check:scenario-deathrun` and appended to `npm test`. Gates per tier: all three checkpoints in order within 900 ticks, radial error within 0.1 m and supported after the 30-tick landing, two runs agree bit for bit on the finish tick and final position, worst tick work within 16.7 ms.
 - Limit: no respawn, no minimum-height reset, and no terrain. The leaderboard and HUD are not ported.
 - Witness: Phase B, both glues rebuilt and the deathrun scenario on both tiers.
+
+Phase B (2026-11-11): both glues rebuilt (64 MiB sha256 e5bfb97f…, 512 MiB threaded sha256 81345e61…). The deathrun scenario prints RESULT: PASS on both tiers (all eight gates). `npm test` exit 0 with no FAIL lines.
