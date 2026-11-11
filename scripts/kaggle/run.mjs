@@ -1,0 +1,59 @@
+import { execFileSync, spawnSync } from 'node:child_process'
+import { mkdirSync, readFileSync, rmSync, writeFileSync, existsSync } from 'node:fs'
+import { dirname, join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { DATASET_REF, KERNEL_REF } from './plan.mjs'
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
+const POLL_MS = 20000
+const DATASET_WAIT_MS = 300000
+const RUN_WAIT_MS = 3000000
+
+const kaggle = (args, timeout = 600000) => {
+  const done = spawnSync('kaggle', args, { cwd: root, encoding: 'utf8', timeout, env: { ...process.env, KAGGLE_CONFIG_DIR: process.env.KAGGLE_CONFIG_DIR ?? '/config/.kaggle' } })
+  return { status: done.status, text: (done.stdout ?? '') + (done.stderr ?? '') }
+}
+const pause = (ms) => new Promise((done) => setTimeout(done, ms))
+
+export const runOnKaggle = async (mode, note) => {
+  const packed = JSON.parse(execFileSync('node', [join(root, 'scripts/kaggle/pack.mjs'), mode], { cwd: root, encoding: 'utf8' }).trim().split('\n').pop())
+  const uploaded = kaggle(['datasets', 'version', '-p', 'build/kaggle/dataset', '-m', note, '-q'])
+  if (uploaded.status !== 0) throw new Error('dataset version failed: ' + uploaded.text.slice(-400))
+  const datasetDeadline = Date.now() + DATASET_WAIT_MS
+  for (;;) {
+    const files = kaggle(['datasets', 'files', DATASET_REF]).text
+    const ready = /^ready$/m.test(kaggle(['datasets', 'status', DATASET_REF]).text)
+    if (ready && files.includes(' ' + packed.archiveBytes + ' ')) break
+    if (Date.now() > datasetDeadline) throw new Error('dataset version was not ready with ' + packed.archiveBytes + ' bytes: ' + files.slice(-300))
+    await pause(POLL_MS)
+  }
+  const pushedAt = new Date().toISOString()
+  const pushed = kaggle(['kernels', 'push', '-p', 'build/kaggle/kernel'])
+  const version = /Kernel version (\d+) successfully pushed/.exec(pushed.text)
+  if (!version) throw new Error('kernel push failed: ' + pushed.text.slice(-400))
+  const runDeadline = Date.now() + RUN_WAIT_MS
+  let state = ''
+  for (;;) {
+    await pause(POLL_MS)
+    state = (/KernelWorkerStatus\.(\w+)/.exec(kaggle(['kernels', 'status', KERNEL_REF]).text) ?? [])[1] ?? 'UNKNOWN'
+    if (state === 'COMPLETE' || state === 'ERROR' || state === 'CANCEL_ACKNOWLEDGED') break
+    if (Date.now() > runDeadline) throw new Error('kernel still ' + state + ' after ' + RUN_WAIT_MS + ' ms')
+  }
+  const outDir = join(root, 'build/kaggle/out-v' + version[1])
+  rmSync(outDir, { recursive: true, force: true })
+  mkdirSync(outDir, { recursive: true })
+  const fetched = kaggle(['kernels', 'output', KERNEL_REF, '-p', outDir])
+  const resultsPath = join(outDir, 'results.json')
+  if (!existsSync(resultsPath)) throw new Error('kernel ended ' + state + ' with no results.json: ' + fetched.text.slice(-400))
+  const results = JSON.parse(readFileSync(resultsPath, 'utf8'))
+  if (results.payloadSha256 !== packed.payloadSha256) throw new Error('results are for payload ' + results.payloadSha256 + ', not ' + packed.payloadSha256)
+  const meta = { mode, version: Number(version[1]), pushedAt, state, payloadSha256: packed.payloadSha256, resultsPath, queueWaitS: Number((results.startedAtEpochS - Date.parse(pushedAt) / 1000).toFixed(0)), runS: results.totalS ?? null, configs: results.configs.length, plannedRuns: results.plannedRuns }
+  writeFileSync(join(outDir, 'meta.json'), JSON.stringify(meta, null, 1) + '\n')
+  return { meta, results }
+}
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  const [mode = 'matrix', note = 'run'] = process.argv.slice(2)
+  const { meta } = await runOnKaggle(mode, note)
+  console.log(JSON.stringify(meta))
+}

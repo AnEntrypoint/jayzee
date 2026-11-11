@@ -9,7 +9,7 @@ import { SCENARIO_TIERS } from '../lib/scenarioTiers.mjs'
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 const out = join(root, 'build/kaggle')
 const stage = join(out, 'stage')
-const plan = buildPlan()
+const plan = buildPlan(process.argv[2] ?? 'matrix')
 const entries = [...new Set(plan.runs.map((run) => run.script))]
 const glues = [...new Set([...TICK_GLUES, ...SCENARIO_TIERS.map((tier) => tier.glue)])]
 

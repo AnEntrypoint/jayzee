@@ -3,10 +3,11 @@ import { createTickTimer, summariseTicks, FRAME_BUDGET_MS, SPIKE_MS } from '../l
 import { SCENARIO_TIERS } from '../lib/scenarioTiers.mjs'
 import { MARBLE_BOWL, buildMarbleBowl } from '../lib/scenarioWorlds.mjs'
 
-const RUNS = 2
 const tier = SCENARIO_TIERS[Number(process.argv[2])]
+const RUNS = Number(process.argv[3])
+const WARM_RUNS = Number(process.argv[4] ?? '0')
 
-const timedRun = async () => {
+const run = async (timed) => {
   const { world } = await buildMarbleBowl(tier)
   const timer = createTickTimer()
   for (let t = 0; t < MARBLE_BOWL.ticks; t++) {
@@ -14,12 +15,22 @@ const timedRun = async () => {
     world.step()
     timer.stop()
   }
-  return summariseTicks(timer.tickMs)
+  return timed ? timer.tickMs : null
 }
 
-const runs = []
-for (let r = 0; r < RUNS; r++) runs.push(await timedRun())
 const round = (ms) => Number(ms.toFixed(3))
+for (let r = 0; r < WARM_RUNS; r++) await run(false)
+const perRun = []
+for (let r = 0; r < RUNS; r++) {
+  const tickMs = await run(true)
+  const summary = summariseTicks(tickMs)
+  const sorted = Float64Array.from(tickMs).sort()
+  const overTicks = []
+  tickMs.forEach((ms, tick) => {
+    if (ms > FRAME_BUDGET_MS) overTicks.push([tick, round(ms)])
+  })
+  perRun.push({ medianMs: round(sorted[Math.floor(sorted.length / 2)]), p99Ms: round(summary.p99Ms), maxMs: round(summary.maxMs), overBudget: overTicks.length, over25: overTicks.filter((t) => t[1] > SPIKE_MS).length, overTicks: overTicks.slice(0, 12) })
+}
 console.log('RESULT ' + JSON.stringify({
   kind: 'marble-bowl',
   tier: tier.label,
@@ -28,13 +39,13 @@ console.log('RESULT ' + JSON.stringify({
   bodies: MARBLE_BOWL.bodies,
   ticks: MARBLE_BOWL.ticks,
   runs: RUNS,
+  warmRuns: WARM_RUNS,
   budgetMs: FRAME_BUDGET_MS,
   spikeMs: SPIKE_MS,
   cpus: availableParallelism(),
-  p99Ms: round(Math.max(...runs.map((run) => run.p99Ms))),
-  maxMs: round(Math.max(...runs.map((run) => run.maxMs))),
-  overBudget: runs.reduce((n, run) => n + run.overBudget + (run.noValidWindow ? 0 : run.hostThrottledOverBudget), 0),
-  over25: runs.reduce((n, run) => n + run.over25, 0),
-  hostThrottledOverBudget: runs.reduce((n, run) => n + run.hostThrottledOverBudget, 0),
-  overBudgetTicks: runs.flatMap((run, r) => run.overBudgetTicks.map((t) => ({ run: r, tick: t.tick, ms: t.ms }))).slice(0, 24),
+  p99Ms: Math.max(...perRun.map((r) => r.p99Ms)),
+  maxMs: Math.max(...perRun.map((r) => r.maxMs)),
+  overBudget: perRun.reduce((n, r) => n + r.overBudget, 0),
+  over25: perRun.reduce((n, r) => n + r.over25, 0),
+  perRun,
 }))
