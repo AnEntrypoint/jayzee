@@ -4597,3 +4597,10 @@ Kaggle runs, all private, kernel `heclgang/jayzee-physics-goalpost`, class Genui
 8. `.mcp.json` runs `node .playwriter/pw-243db69/pw/bin/playwriter-project`.
 
 Not done or open: the awake budget did not rise; the cause of the two unexplained ticks; the cause of the long GPU-process batch; the AMD class has no record for the new reference (the run landed on the Xeon class), so the gate will name it as unrecorded when a run lands there.
+
+## Phase J, pending (2026-11-11): the two open items of Phase I
+
+Phase A commits, each with the witness it needs in Phase B. Nothing here is built into the pushed glues or measured yet.
+
+- 3ca9ae9 `engine/src/tick_profile.h`, `tick_profile.cpp`, `world.cpp`, `bridge.cpp`, `exports_pose.cpp`, `engine/CMakeLists.txt`, `engine/build.sh`, `scripts/kaggle/tickProfile.mjs`, `bench.mjs`, `plan.mjs`, `summarise.mjs`: a profile build (`ENGINE_VARIANT=threadsprofile`, written to `build/variants/profile`) that times every Jolt scope and the engine's own scopes per tick; the bench keeps the table of each tick over budget beside the quiet mean; the gate run carries 20 profile rows at the top tier. Witness: the production glues rebuild to the same bytes (the scope macro is empty there); `check:kaggle-regress` (two new lines); the Kaggle gate run, read with `node scripts/kaggle/summarise.mjs <results> --profile`, which must name the scope that holds the time of an over-budget tick with no host mark.
+- the commit after it, `scripts/browser/gpuBatch.mjs`, `threadSampler.mjs`, `planet-witness-run.mjs`: each slow `HandleDawnCommands` batch split into traced steps and untraced gaps, and with `PLANET_GPU_THREAD=1` the GPU process main thread sampled every 0.5 ms for run time, run-queue wait, state and wait channel. Witness: `check:own-display` (two new lines); a planet witness run on the own display with the sampler, which must say whether the longest step of the slow batches is on the CPU, waiting for a CPU or asleep.
