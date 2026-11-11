@@ -5,7 +5,8 @@ import { cpus, loadavg } from 'node:os'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { runRenderWitness } from './render-witness.mjs'
-import { witnessBrowser } from './ownDisplay.mjs'
+import { processesNaming, witnessBrowser } from './ownDisplay.mjs'
+import { describeBatches, tsAfterFrames } from './gpuBatch.mjs'
 import { THROTTLE_SAMPLE_MS, THROTTLE_SLACK_MS, excuseHostThrottled, isHostThrottledGap, throttledBetween } from './hostThrottle.mjs'
 import { PLANET_FRAME_BUDGET_MS, PLANET_MISSED_FRAME_MS, PLANET_RUNS, planetQuery, planetVerdict } from '../../src/engine/planetWitness.js'
 
@@ -235,9 +236,44 @@ const frameCases = (result, samples, gapInfo, gpuRows = [], throttleSamples = []
   return cases
 }
 
+const GPU_PROCESS_FLAG = '--type=gpu-process'
+const SAMPLER_STOP_MS = 5000
+
+const groupOf = (pid) => {
+  try {
+    const stat = readFileSync('/proc/' + pid + '/stat', 'utf8')
+    return Number(stat.slice(stat.lastIndexOf(')') + 2).split(' ')[2])
+  } catch {
+    return null
+  }
+}
+
+const gpuProcessOf = (browserPid) => {
+  if (!browserPid) return null
+  const found = processesNaming(GPU_PROCESS_FLAG).filter((pid) => groupOf(pid) === browserPid)
+  return found.length > 0 ? found[0] : null
+}
+
+const startThreadSampler = (pid, outPath) => {
+  const child = spawn(process.execPath, [resolve(root, 'scripts/browser/threadSampler.mjs'), String(pid), String(pid), outPath], { stdio: ['pipe', 'ignore', 'inherit'] })
+  const exited = new Promise((done) => child.once('exit', done))
+  return async () => {
+    child.kill('SIGTERM')
+    const timer = setTimeout(() => child.kill('SIGKILL'), SAMPLER_STOP_MS)
+    await exited
+    clearTimeout(timer)
+    try {
+      return JSON.parse(readFileSync(outPath, 'utf8'))
+    } catch {
+      return null
+    }
+  }
+}
+
 const summary = []
 let failed = 0
 const only = process.env.PLANET_ONLY
+const sampleGpuThread = process.env.PLANET_GPU_THREAD === '1'
 const dumpWorkMs = process.env.PLANET_DUMP_WORK_MS === undefined ? Infinity : Number(process.env.PLANET_DUMP_WORK_MS)
 if (Number.isNaN(dumpWorkMs) || dumpWorkMs <= 0) throw new RangeError('PLANET_DUMP_WORK_MS must be a number of milliseconds above zero')
 const own = await witnessBrowser(root)
@@ -254,7 +290,10 @@ for (const config of PLANET_RUNS.filter((run) => !only || only === run.tier + '-
   const stopGpu = sampleGpu(gpuRows)
   const throttleSamples = []
   const throttleTimer = setInterval(() => throttleSamples.push({ epochMs: Date.now(), ...readCgroupCpu() }), THROTTLE_SAMPLE_MS)
+  const gpuPid = sampleGpuThread ? gpuProcessOf(own.browserPid) : null
+  const stopSampler = gpuPid === null ? null : startThreadSampler(gpuPid, resolve(outDir, label + '-gpu-thread.json'))
   const run = await runRenderWitness({ root, port, query: planetQuery(config, frames), trace: true, gpuTrace: true, timeoutMs: RUN_TIMEOUT_MS, debugPort: own.debugPort })
+  const gpuThread = stopSampler ? await stopSampler() : null
   stop.done = true
   clearInterval(throttleTimer)
   await sampling
@@ -263,6 +302,7 @@ for (const config of PLANET_RUNS.filter((run) => !only || only === run.tier + '-
   const load = { cpus: cpus().length, load1Before, load1After: loadavg()[0], topProcesses: topProcesses() }
   const pageVerdict = run.error || !run.result ? { ok: false, failures: ['run failed: ' + (run.error ?? 'no result')] } : planetVerdict(run.result, config)
   const gapInfo = traceGaps(run.trace, run.result, frames)
+  const gpuBatches = Array.isArray(run.trace) ? describeBatches(run.trace, { afterTs: tsAfterFrames(run.trace, WARMUP_FRAMES_IN_PAGE), samples: gpuThread }) : null
   const cases = frameCases(run.result, samples, gapInfo, gpuRows, throttleSamples)
   const verdict = excuseHostThrottled(pageVerdict, cases)
   if (!verdict.ok) failed += 1
@@ -274,9 +314,9 @@ for (const config of PLANET_RUNS.filter((run) => !only || only === run.tier + '-
     const dumpName = label + '-frame' + (cases.length > 0 ? cases[0].frameIndex : slowWorkFrame) + '.trace.json'
     writeFileSync(resolve(outDir, 'dumps', dumpName), JSON.stringify({ label, trigger: cases.length > 0 ? 'long-frame' : 'work-over-' + dumpWorkMs + '-ms', frameCases: cases, firstCallMs: run.result?.firstCallMs ?? null, traceEvents: run.trace ?? [] }) + '\n')
   }
-  writeFileSync(resolve(outDir, label + '.json'), JSON.stringify({ label, wallMs, load, verdict, frameCases: cases, traceGapSummary: { pid: gapInfo.pid, tid: gapInfo.tid, callbacks: gapInfo.callbacks, aligned: gapInfo.aligned, intervalMismatches: gapInfo.intervalMismatches, error: gapInfo.error ?? null }, hostSamples: samples, gpuSamples: gpuRows, result: run.result ?? null }, null, 1) + '\n')
+  writeFileSync(resolve(outDir, label + '.json'), JSON.stringify({ label, wallMs, load, verdict, frameCases: cases, traceGapSummary: { pid: gapInfo.pid, tid: gapInfo.tid, callbacks: gapInfo.callbacks, aligned: gapInfo.aligned, intervalMismatches: gapInfo.intervalMismatches, error: gapInfo.error ?? null }, gpuBatches, hostSamples: samples, gpuSamples: gpuRows, result: run.result ?? null }, null, 1) + '\n')
   const wallMaxMs = run.result ? run.result.wallIntervalMaxMs : null
-  summary.push({ label, wallMs, ok: verdict.ok, workMaxMs: verdict.maxMs, workP99Ms: verdict.p99Ms, wallMaxMs, workerTick: run.result?.workerTick ?? null, missedFrames: cases.length, hostThrottledIntervals: verdict.hostThrottledIntervals ?? 0, frameCases: cases.map((c) => ({ frame: c.frame, intervalMs: c.intervalMs, workMs: c.workMs, classification: c.classification, maxLoad1: c.maxLoad1, gapMs: c.gapMs, mainThreadBusyMs: c.mainThreadBusyMs, topInWindow: c.topInWindow })), load, failures: verdict.failures })
+  summary.push({ label, gpuBatches, wallMs, ok: verdict.ok, workMaxMs: verdict.maxMs, workP99Ms: verdict.p99Ms, wallMaxMs, workerTick: run.result?.workerTick ?? null, missedFrames: cases.length, hostThrottledIntervals: verdict.hostThrottledIntervals ?? 0, frameCases: cases.map((c) => ({ frame: c.frame, intervalMs: c.intervalMs, workMs: c.workMs, classification: c.classification, maxLoad1: c.maxLoad1, gapMs: c.gapMs, mainThreadBusyMs: c.mainThreadBusyMs, topInWindow: c.topInWindow })), load, failures: verdict.failures })
 }
 } finally {
   stopped = await own.stop()
