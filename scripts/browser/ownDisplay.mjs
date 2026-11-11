@@ -105,6 +105,14 @@ export const stopTree = async (child, graceMs = STOP_GRACE_MS) => {
   return { pgid, forced, left: groupAlive(pgid) }
 }
 
+export const guardGroups = (pgids, graceSeconds = 2) => {
+  const targets = pgids.map((pgid) => '-' + pgid).join(' ')
+  const guard = spawn('sh', ['-c', 'read _; kill -TERM ' + targets + ' 2>/dev/null; sleep ' + graceSeconds + '; kill -KILL ' + targets + ' 2>/dev/null'], { detached: true, stdio: ['pipe', 'ignore', 'ignore'] })
+  guard.unref()
+  guard.stdin.unref?.()
+  return guard
+}
+
 const stopByPid = async (pids, graceMs = STOP_GRACE_MS) => {
   for (const pid of pids) {
     try {
@@ -121,8 +129,10 @@ export const startOwnBrowser = async ({ root, width = 1280, height = 800, chromi
   const xvfb = spawn('Xvfb', xvfbArgs({ display, width, height }), { detached: true, stdio: 'ignore' })
   let browser = null
   let profileDir = null
+  let guard = null
   const stop = async () => {
     const stopped = { display, browser: browser ? await stopTree(browser) : null, strays: [], xvfb: await stopTree(xvfb) }
+    if (guard) guard.kill('SIGKILL')
     if (profileDir) {
       stopped.strays = await stopByPid(processesNaming(profileDir))
       rmSync(profileDir, { recursive: true, force: true })
@@ -141,6 +151,7 @@ export const startOwnBrowser = async ({ root, width = 1280, height = 800, chromi
     seedWebgpuLabs(profileDir)
     const debugPort = await freePort()
     browser = spawn(chromium, chromiumFlags({ debugPort, profileDir, width, height }), { detached: true, stdio: 'ignore', env: { ...process.env, DISPLAY: ':' + display } })
+    guard = guardGroups([xvfb.pid, browser.pid])
     let answering = false
     for (let i = 0; i < READY_TRIES && !answering; i++) {
       answering = await fetch('http://127.0.0.1:' + debugPort + '/json/version').then((response) => response.status === 200, () => false)

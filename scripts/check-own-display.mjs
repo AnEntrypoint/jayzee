@@ -4,6 +4,29 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { finish, gate } from './lib/gate.mjs'
 import { FIRST_DISPLAY, chromiumFlags, freeDisplay, freePort, processesNaming, stopTree, xvfbArgs } from './browser/ownDisplay.mjs'
 
+const OWNER_SCRIPT = (guarded) => [
+  "import { spawn } from 'node:child_process'",
+  "import { guardGroups } from './scripts/browser/ownDisplay.mjs'",
+  "const tree = spawn('sh', ['-c', 'sleep 300 & sleep 301 & wait'], { detached: true, stdio: 'ignore' })",
+  guarded ? 'guardGroups([tree.pid], 1)' : '',
+  "console.log('PGID ' + tree.pid)",
+  'setInterval(() => {}, 1000)',
+].join('\n')
+
+const ownerWithTree = async (guarded) => {
+  const owner = spawn(process.execPath, ['--input-type=module', '-e', OWNER_SCRIPT(guarded)], { cwd: new URL('..', import.meta.url), stdio: ['ignore', 'pipe', 'inherit'] })
+  const pgid = await new Promise((done, fail) => {
+    let text = ''
+    owner.stdout.on('data', (chunk) => {
+      text += chunk
+      const found = /PGID (\d+)/.exec(text)
+      if (found) done(Number(found[1]))
+    })
+    owner.once('exit', () => fail(new Error('the owner exited before it reported its tree')))
+  })
+  return { owner, pgid }
+}
+
 const MARK = 'own-display-gate-' + process.pid
 const alive = (pid) => {
   try {
@@ -73,6 +96,23 @@ gate('control: without stopTree the same tree is still running, and the gate the
   const members = groupMembers(child.pid)
   assert.ok(members.every(alive))
   const stopped = await stopTree(child)
+  assert.equal(stopped.left, false)
+})
+
+gate('a runner killed outright still has its tree stopped, by the guard that waits on its pipe', async () => {
+  const { owner, pgid } = await ownerWithTree(true)
+  assert.ok(await until(() => groupMembers(pgid).length >= 3), 'the tree did not start')
+  owner.kill('SIGKILL')
+  assert.ok(await until(() => groupMembers(pgid).length === 0, 300), 'the tree outlived its killed runner: ' + groupMembers(pgid))
+})
+
+gate('control: without the guard the tree outlives its killed runner, and the gate then stops it', async () => {
+  const { owner, pgid } = await ownerWithTree(false)
+  assert.ok(await until(() => groupMembers(pgid).length >= 3))
+  owner.kill('SIGKILL')
+  await new Promise((done) => setTimeout(done, 1500))
+  assert.ok(groupMembers(pgid).length >= 3, 'the tree stopped with no guard, so the gate above proves nothing')
+  const stopped = await stopTree({ pid: pgid })
   assert.equal(stopped.left, false)
 })
 
