@@ -75,6 +75,7 @@ std::uint64_t hostCarved = 0;
 float* stageRows = nullptr;
 std::uint32_t* stageHandles = nullptr;
 std::int32_t planetScratch[4];
+double planetScratchF[16];
 engine::codec::Scratch* codecScratch = nullptr;
 
 template <typename T>
@@ -399,6 +400,26 @@ EMSCRIPTEN_KEEPALIVE std::int64_t engine_planet_key(int face, int cx, int cy) {
 
 EMSCRIPTEN_KEEPALIVE std::int32_t* engine_planet_scratch() {
   return planetScratch;
+}
+
+EMSCRIPTEN_KEEPALIVE double* engine_planet_scratch_f64() {
+  return planetScratchF;
+}
+
+EMSCRIPTEN_KEEPALIVE int engine_planet_face_local(double x, double y, double z) {
+  const engine::planet::Planet& terrain = engine::planet::state();
+  if (!terrain.configured) return engine::kNotConfigured;
+  const engine::planet::FaceLocal local = engine::planet::worldToFaceLocal(x, y, z, terrain.radius);
+  planetScratchF[0] = local.ox;
+  planetScratchF[1] = local.oy;
+  return local.face;
+}
+
+EMSCRIPTEN_KEEPALIVE int engine_planet_cell_frame(int face, int cx, int cy) {
+  const engine::planet::Planet& terrain = engine::planet::state();
+  if (!terrain.configured) return engine::kNotConfigured;
+  engine::planet::cellFrame(terrain, face, cx, cy, planetScratchF);
+  return 0;
 }
 
 EMSCRIPTEN_KEEPALIVE int engine_vegetation_bind(float* block, std::uint32_t* counts, std::uint8_t* dirty, double* origins, float radius, std::uint32_t species, std::uint32_t slots, std::uint32_t capacity) {

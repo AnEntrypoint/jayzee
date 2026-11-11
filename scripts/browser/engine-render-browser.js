@@ -1,5 +1,5 @@
 import { loadRenderer, RENDER_LAYOUT } from '../../src/engine/renderer.js'
-import { cellOrigin, PAGE_SIDE, PAGE_SPAN, PAGE_U_EDGE, PAGE_V_EDGE, planetCellSize } from '../../src/engine/pageLayout.js'
+import { cellOrigin, PAGE_SIDE, PAGE_U_EDGE, PAGE_V_EDGE, planetCellSize } from '../../src/engine/pageLayout.js'
 import { solverIterationsFor } from '../../src/engine/solverIterations.js'
 import { createPhysicsHandoff } from '../../src/engine/physicsHandoff.js'
 import { readLayout } from '../../src/engine/bridge.js'
@@ -184,35 +184,50 @@ const pathStats = { restages: 0, restageCount: 0, restageMs: new Float64Array(FR
 let pathRef = null
 let pathCell = null
 const PATH_CELL_NOW = { face: 0, cx: 0, cy: 0 }
-const PAGE_ORIGIN = new Float64Array(3)
-const OFFSET_BIAS = 64
-const OFFSET_RADIX = 256
-const packOffset = (dx, dy) => (dx + OFFSET_BIAS) * OFFSET_RADIX + (dy + OFFSET_BIAS)
-const offsetDx = (packed) => Math.floor(packed / OFFSET_RADIX) - OFFSET_BIAS
-const offsetDy = (packed) => (packed % OFFSET_RADIX) - OFFSET_BIAS
+const CELL_BIAS = 1 << 20
+const CELL_RADIX = 1 << 21
+const packCell = (face, cx, cy) => (face * CELL_RADIX + (cx + CELL_BIAS)) * CELL_RADIX + (cy + CELL_BIAS)
+const cellFaceOf = (packed) => Math.floor(Math.floor(packed / CELL_RADIX) / CELL_RADIX)
+const cellXOf = (packed) => (Math.floor(packed / CELL_RADIX) % CELL_RADIX) - CELL_BIAS
+const cellYOf = (packed) => (packed % CELL_RADIX) - CELL_BIAS
 
 const PATH_WINDOW = Math.max(1, Math.min(8, Number(QUERY.get('window') ?? 2)))
 const PAGES_PER_FRAME = Math.max(1, Number(QUERY.get('streamPerFrame') ?? 8))
 const wantedPages = new Map()
-const pageQueue = { releaseKey: [], stageKey: [], stageOffset: [] }
+const pageQueue = { releaseKey: [], stageKey: [], stageCell: [] }
+const PAGE_FRAME = { origin: new Float64Array(3), uEdge: new Float64Array(3), vEdge: new Float64Array(3) }
 
 const planWindow = (module, cell) => {
   wantedPages.clear()
   for (let dy = -PATH_WINDOW; dy < PATH_WINDOW; dy++) {
     for (let dx = -PATH_WINDOW; dx < PATH_WINDOW; dx++) {
-      wantedPages.set(module._engine_planet_key(cell.face, cell.cx + dx, cell.cy + dy), packOffset(cell.cx + dx - pathRef.cx, cell.cy + dy - pathRef.cy))
+      const cx = cell.cx + dx
+      const cy = cell.cy + dy
+      wantedPages.set(module._engine_planet_key(cell.face, cx, cy), packCell(cell.face, cx, cy))
     }
   }
   pageQueue.releaseKey.length = 0
   for (const key of pagePlacement.keys()) if (!wantedPages.has(key)) pageQueue.releaseKey.push(key)
   pageQueue.stageKey.length = 0
-  pageQueue.stageOffset.length = 0
-  for (const [key, packed] of wantedPages) {
+  pageQueue.stageCell.length = 0
+  for (const [key, cellKey] of wantedPages) {
     if (pagePlacement.has(key)) continue
     pageQueue.stageKey.push(key)
-    pageQueue.stageOffset.push(packed)
+    pageQueue.stageCell.push(cellKey)
   }
   pathStats.restages += 1
+}
+
+const placePageFrame = (module, face, cx, cy) => {
+  if (module._engine_planet_cell_frame(face, cx, cy) !== 0) throw new Error('cell frame refused at ' + face + ',' + cx + ',' + cy)
+  const at = module._engine_planet_scratch_f64() / 8
+  const f = module.HEAPF64
+  for (let k = 0; k < 3; k++) {
+    PAGE_FRAME.origin[k] = f[at + k]
+    PAGE_FRAME.uEdge[k] = f[at + 3 + k]
+    PAGE_FRAME.vEdge[k] = f[at + 6 + k]
+  }
+  return PAGE_FRAME
 }
 
 const recordPart = (name, value) => {
@@ -235,13 +250,14 @@ const streamPages = (module, renderer, limit) => {
   }
   while (budget > 0 && pageQueue.stageKey.length > 0) {
     const key = pageQueue.stageKey.pop()
-    const packed = pageQueue.stageOffset.pop()
+    const cell = pageQueue.stageCell.pop()
     if (pagePlacement.has(key)) continue
-    const dx = offsetDx(packed)
-    const dy = offsetDy(packed)
+    const face = cellFaceOf(cell)
+    const cx = cellXOf(cell)
+    const cy = cellYOf(cell)
     const t0 = performance.now()
     const slot = module._engine_page_stage(key)
-    if (slot < 0) throw new Error('page stage refused at window cell ' + dx + ',' + dy)
+    if (slot < 0) throw new Error('page stage refused at cell ' + face + ',' + cx + ',' + cy)
     const t1 = performance.now()
     const samples = module._engine_page_samples(slot) >> 2
     const k = Math.abs(Number(key)) % 97
@@ -251,10 +267,8 @@ const streamPages = (module, renderer, limit) => {
     const t2 = performance.now()
     module._engine_page_commit(slot)
     const t3 = performance.now()
-    PAGE_ORIGIN[0] = dx * PAGE_SPAN
-    PAGE_ORIGIN[1] = 0
-    PAGE_ORIGIN[2] = (0 - dy) * PAGE_SPAN
-    renderer.placePage(slot, PAGE_ORIGIN, PAGE_U_EDGE, PAGE_V_EDGE)
+    const frame = placePageFrame(module, face, cx, cy)
+    renderer.placePage(slot, frame.origin, frame.uEdge, frame.vEdge)
     const t4 = performance.now()
     recordPart('stage', t1 - t0)
     recordPart('fill', t2 - t1)

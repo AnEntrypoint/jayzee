@@ -3818,3 +3818,29 @@ Phase B witness, final tree:
   - 64-webgl2: wall 18175 ms, workMax 3.12 ms, missed 0.
 - `npm test`, first run: 253 PASS, 1 FAIL. The failing gate pinned the old `result.frameTimesMs = timed.map(roundTo2)` text in `scripts/check-planet-witness.mjs`. The pin was updated to the `Array.from` form; the gate passes alone.
 - `npm test`, second run on the same tree: exit 0, 263 PASS, 0 FAIL, wall 2m17s, log build/diag/stretch1-npmtest2.log.
+
+## Stretch 2: one terrain dataset for collision and visuals (Phase A, Phase B witness)
+
+Defects found, with the change for each.
+
+1. Collision interpolated the page bilinearly (`heightAt`), but the render draws each 15 by 15 quad as two triangles split from (0,0) to (1,1) (`engine/src/render/render_webgl2.cpp` and `render_webgpu.cpp`, terrain vertex shaders). The two surfaces differ inside every non-planar quad. Change: `heightAt` (`engine/src/planet_frame.cpp`) uses the same triangle as the rasteriser: `ty <= tx` takes (0,0),(1,0),(1,1), otherwise (0,0),(1,1),(0,1).
+2. The render placed each page on a flat 20 m grid (`cellOrigin`), not on the engine's cell frame, so a rendered page and the collision cell it stands for did not share a place or an orientation. Change: `cellFrame` (`engine/src/planet_frame.cpp`) gives a cell's world origin and edge vectors from the same face frames that `worldToFaceLocal` inverts, and exports `engine_planet_cell_frame`, `engine_planet_face_local` and `engine_planet_scratch_f64`. The page places each staged page with `placePageFrame`. Edge length is `cellSize × π/4` = 20.0 m, which is the old `PAGE_SPAN`, so the tile size is unchanged. The `4/π` factor in the face coordinates is why the edge is not `cellSize`.
+
+Witness first (red): `scripts/check-terrain-agreement.mjs` run against the pre-change glues stops at the first new export (`_engine_planet_face_local` missing). That is the red state for the new API. The bilinear-vs-rendered disagreement is in the gate's own control line, which measures 0.19 m on this data.
+
+Measurement, which is not a defect of the engine but a limit of the witness: with the physics origin at 0, a body at planet radius has float32 positions quantised to 0.5 m, so a surface of 0.0944 m rests at 0.5 m. A body rests exactly at surface plus radius, to 1e-7 m, once `world.follow` moves the origin to it. The render path follows the eye every frame (`engine_render_set_origin`), so the rendered game is in the precise case. The gate follows each drop point too. A host that never follows gets 0.5 m contact steps at planet radius, and that is recorded as an open limit.
+
+Also changed: `EngineWorld.faceLocal`, `cellFrame` and `applyPages` (`src/engine/EngineWorld.js`). `relativeLookAt` is unchanged in output.
+
+Glues rebuilt with the change: fixed 64 MiB (`engine-core-64mib`), fixed 512 MiB (`engine-core-512mib`), threaded 512 MiB (`engine-core-512mib-threads`), timed 64 MiB (`engine-core-64mib-timed`), threaded timed SIMD 512 MiB (`engine-core-512mib-timed-threads-simd`). Pins in `engine/artifacts.json` updated for the two that the artifact gate lists: `engine-core-64mib` `5e2e3d60…` and `engine-core-512mib` `7dcd5f1b…`. These are local hashes, and CI must confirm them. The 128 MiB and leak variants were not rebuilt; their pins are unchanged and stale against the source.
+
+Witness, final tree:
+- `node scripts/check-terrain-agreement.mjs`, wall 352 ms for the script, exit 0:
+  - 64 tier: collision equals the rendered height at 2000 interior points, worst gap 0 m; control, bilinear differs by 0.1906 m; centre-cell frame edges 20.0 m, normal outward; 12 of 12 resting spheres within 0.001 m of surface plus radius.
+  - 1024 tier, 2 workers: the same four results, identical numbers.
+- Planet witness, `node scripts/browser/planet-witness-run.mjs build/diag/stretch2-planet 8847 900`, wall 2m16s total:
+  - 1024-webgpu: wall 18443 ms, workMax 1.44 ms, missed 0.
+  - 1024-webgl2: wall 18103 ms, workMax 1.00 ms, missed 0.
+  - 64-webgpu: wall 18512 ms, workMax 3.39 ms, missed 0.
+  - 64-webgl2: wall 18005 ms, workMax 3.25 ms, missed 0.
+- `npm test` with the gate in the chain: exit 0, 264 PASS, 0 FAIL, log build/diag/stretch2-npmtest2.log.

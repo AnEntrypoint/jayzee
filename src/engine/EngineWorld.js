@@ -351,6 +351,25 @@ export class EngineWorld {
     return this.#module._engine_planet_height(x, y, z)
   }
 
+  faceLocal(point) {
+    checkVector(point, 'point')
+    const face = this.#module._engine_planet_face_local(point[0], point[1], point[2])
+    this.#write(face < 0 ? face : 0, 'face local')
+    const at = this.#module._engine_planet_scratch_f64() / 8
+    return { face, ox: this.#module.HEAPF64[at], oy: this.#module.HEAPF64[at + 1] }
+  }
+
+  cellFrame(face, cx, cy) {
+    this.#write(this.#module._engine_planet_cell_frame(face, cx, cy), 'cell frame')
+    const at = this.#module._engine_planet_scratch_f64() / 8
+    const f = this.#module.HEAPF64
+    return {
+      origin: [f[at], f[at + 1], f[at + 2]],
+      uEdge: [f[at + 3], f[at + 4], f[at + 5]],
+      vEdge: [f[at + 6], f[at + 7], f[at + 8]],
+    }
+  }
+
   gapQueries() {
     return Number(this.#module._engine_planet_gap_queries())
   }
@@ -376,6 +395,10 @@ export class EngineWorld {
     this.#module.HEAPF32.set(samples, base)
     this.#write(this.#module._engine_page_commit(slot), 'page commit')
     return slot
+  }
+
+  applyPages() {
+    this.#module._engine_page_apply()
   }
 
   releasePage(key) {

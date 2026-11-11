@@ -45,6 +45,7 @@ Cell worldToCell(double x, double y, double z, double radius, double cellSize);
 bool packCellKey(int face, int cx, int cy, int cellsPerFace, std::int64_t& key);
 Cell resolveCell(int face, int cx, int cy, int cellsPerFace);
 double heightAt(Planet& terrain, double x, double y, double z);
+void cellFrame(const Planet& terrain, int face, int cx, int cy, double* out);
 
 }
 

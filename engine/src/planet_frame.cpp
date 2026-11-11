@@ -213,7 +213,36 @@ double heightAt(Planet& terrain, double x, double y, double z) {
   const double s10 = s[j0 * kPageSide + i0 + 1];
   const double s01 = s[(j0 + 1) * kPageSide + i0];
   const double s11 = s[(j0 + 1) * kPageSide + i0 + 1];
-  return (1.0 - tx) * (1.0 - ty) * s00 + tx * (1.0 - ty) * s10 + (1.0 - tx) * ty * s01 + tx * ty * s11;
+  if (ty <= tx) return s00 + tx * (s10 - s00) + ty * (s11 - s10);
+  return s00 + ty * (s01 - s00) + tx * (s11 - s01);
+}
+
+void surfacePoint(const Frame& frame, double radius, double ox, double oy, double* out) {
+  const double tu = std::tan(ox / (kAtanScale * radius));
+  const double tv = std::tan(oy / (kAtanScale * radius));
+  double d[3];
+  for (int k = 0; k < 3; ++k) d[k] = frame.c[k] + tu * frame.u[k] + tv * frame.v[k];
+  const double len = std::sqrt(dot(d, d));
+  for (int k = 0; k < 3; ++k) out[k] = radius * d[k] / len;
+}
+
+void cellFrame(const Planet& terrain, int face, int cx, int cy, double* out) {
+  const Frame& frame = kFrames[face];
+  const double ox0 = cx * terrain.cellSize - terrain.radius;
+  const double oy0 = cy * terrain.cellSize - terrain.radius;
+  const double ox1 = ox0 + terrain.cellSize;
+  const double oy1 = oy0 + terrain.cellSize;
+  double corner[3];
+  double alongU[3];
+  double alongV[3];
+  surfacePoint(frame, terrain.radius, ox0, oy0, corner);
+  surfacePoint(frame, terrain.radius, ox1, oy0, alongU);
+  surfacePoint(frame, terrain.radius, ox0, oy1, alongV);
+  for (int k = 0; k < 3; ++k) {
+    out[k] = corner[k];
+    out[3 + k] = alongU[k] - corner[k];
+    out[6 + k] = alongV[k] - corner[k];
+  }
 }
 
 }
