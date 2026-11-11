@@ -40,6 +40,21 @@
       "candidateP99Ms": 6.71,
       "candidateOverBudget": 0,
       "holds": false
+    },
+    "GenuineIntel-6-79-0": {
+      "modelName": "Intel(R) Xeon(R) CPU @ 2.20GHz",
+      "cores": "2",
+      "siblings": "4",
+      "cache": "56320 KB",
+      "kaggleRun": 32,
+      "referenceCommit": "f4e63b04bc2c41e9c5cb1c08066154f99d9ed12d",
+      "bodies": 40960,
+      "workers": 4,
+      "singleMs": 523.5,
+      "referenceP99Ms": 5.048,
+      "candidateP99Ms": 5.015,
+      "candidateOverBudget": 0,
+      "holds": true
     }
   }
 }
