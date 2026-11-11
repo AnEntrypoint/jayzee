@@ -3584,3 +3584,8 @@ Open after this pass:
 - Change: `scripts/check-engine-state-hash-1024.mjs` now runs the threaded 1024-tier scenario at 2 and 8 workers as well as the existing 4, and gates each one against the fixed build's state hash. The worker counts are `THREAD_COUNTS` in `scripts/lib/stateHash1024.mjs`.
 - Witness: `npm run check:engine-state-hash-1024`, gate "the threaded build agrees with the fixed build at every worker count in THREAD_COUNTS, bit for bit". Not yet run; Phase B runs it on the threaded glue.
 - Open: this covers one scenario at 120 ticks on this host. The cross-machine hash witness in docs/ENGINE.md remains open.
+
+## Phase B fix (2026-11-11): state-hash gate ran out of wasm memory
+
+- Cause: the gate built four 512 MiB instances in one process; the fourth aborted with OOM in createEngineWorld.
+- Fix: each scenario runs in scripts/lib/stateHashChild.mjs in its own process.
