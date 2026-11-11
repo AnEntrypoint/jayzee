@@ -3619,3 +3619,10 @@ Open after this pass:
 - Constants set from the data: `kJoltThreadHeapBytes` = 526,648 and `kHeapReserveBytes` = 2,633,240 (the largest measured need that configures), in engine/src/budget.cpp under ENGINE_THREADS. `workersFit` refuses a worker count whose threads need more than the reserve, and `initialize` returns kWorkersDoNotFit before planning. The reserve is set by the fixed arena layout, so it does not depend on the budget.
 - Witness: `npm test` exit 0, 5086 PASS, 0 FAIL. The state-hash gate passes the 2- and 4-worker hash 8e96da08 and count 30720, and the refused-8 case ("8 workers at 512 MiB is refused with the typed workers-do-not-fit error, not an abort").
 - Limit: the 7-worker and 8-worker configures were measured only as aborts, so the reserve is bounded between the measured success at 6 workers and the abort at 7. Using the success bound refuses 7 and 8.
+
+## Scenario witness: settle (Phase A, 2026-11-11)
+
+- Change: `scripts/check-scenario-settle.mjs` drops 256 bodies onto the ground plane (64 MiB, 64 players, fixed build) and runs 240 ticks. Witness gates: every body settles at the body radius within 0.01 m; the last 30 ticks show no horizontal drift above 1e-3 m; two runs agree bit for bit on the settled positions.
+- Change: `check:scenario-settle` script, appended to the `npm test` chain in package.json.
+- Not gated: tick time. A wall-clock gate would be flaky on this host, so tick timings are left for a separate measurement.
+- Open: the other scenarios (character controller, deathrun, combat bots, lockstep RTS, boss fights) are not started.
