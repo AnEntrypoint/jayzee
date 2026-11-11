@@ -223,6 +223,10 @@ EMSCRIPTEN_KEEPALIVE int engine_world_set_awake_budget(std::uint32_t bodies) {
   return engine::world().setAwakeBudget(bodies);
 }
 
+EMSCRIPTEN_KEEPALIVE int engine_world_set_tuning(std::uint32_t flags) {
+  return engine::world().setTuning(flags);
+}
+
 EMSCRIPTEN_KEEPALIVE int engine_world_set_spawn_asleep(std::uint32_t asleep) {
   return engine::world().setSpawnAsleep(asleep != 0);
 }

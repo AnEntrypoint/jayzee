@@ -98,12 +98,30 @@ void PageCache::applyPending() {
   }
 }
 
-int PageCache::lookup(std::int64_t key) const {
+int PageCache::scan(std::int64_t key) const {
   for (int slot = 0; slot < slots_; ++slot) {
     const PageState state = states_[slot];
     if ((state == PageState::kResident || state == PageState::kPendingRelease) && keys_[slot] == key) return slot;
   }
   return -1;
+}
+
+void PageCache::cacheLookups(bool on) {
+  cacheLookups_ = on;
+}
+
+int PageCache::lookup(std::int64_t key) const {
+  if (!cacheLookups_) return scan(key);
+  constexpr std::uint64_t kMix = 0x9E3779B97F4A7C15ull;
+  const std::uint32_t at = static_cast<std::uint32_t>((static_cast<std::uint64_t>(key) * kMix) >> 56) % kRecentLookups;
+  const int remembered = recent_[at].load(std::memory_order_relaxed) - 1;
+  if (remembered >= 0 && remembered < slots_) {
+    const PageState state = states_[remembered];
+    if ((state == PageState::kResident || state == PageState::kPendingRelease) && keys_[remembered] == key) return remembered;
+  }
+  const int found = scan(key);
+  if (found >= 0) recent_[at].store(found + 1, std::memory_order_relaxed);
+  return found;
 }
 
 int PageCache::residentCount() const {

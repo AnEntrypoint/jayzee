@@ -1,4 +1,5 @@
 import { availableParallelism } from 'node:os'
+import { closeSync, openSync, readSync } from 'node:fs'
 import { PerformanceObserver } from 'node:perf_hooks'
 import { loadEngineModule, resolvePlan } from '../../src/engine/EngineWorld.js'
 import { readLayout } from '../../src/engine/bridge.js'
@@ -60,6 +61,7 @@ const awakeBudget = knobs.awake !== undefined ? Number(knobs.awake) : budgetSett
 if (budgetSetter) knobStatus.push(module._engine_world_set_awake_budget(awakeBudget))
 else if (awakeBudget !== 0) knobStatus.push(-1)
 if (knobs.asleep !== undefined) knobStatus.push(module._engine_world_set_spawn_asleep(1))
+if (knobs.tune !== undefined) knobStatus.push(typeof module._engine_world_set_tuning === 'function' ? module._engine_world_set_tuning(Number(knobs.tune)) : -1)
 if (knobStatus.some((code) => code !== 0)) emit({ ...base, refused: 'knob', status: knobStatus })
 const perRow = Math.ceil(Math.sqrt(bodies))
 for (let i = 0; i < bodies; i++) {
@@ -73,6 +75,52 @@ const region = attachPoseRegion(poseRegionBuffers({ slots: 1, poseBytes }), { ow
 const stepper = createPoseStepper({ module, streamer, region, reserve })
 const setupMs = performance.now() - setupStarted
 
+const openCounter = (path) => {
+  try {
+    return openSync(path, 'r')
+  } catch {
+    return -1
+  }
+}
+const counterBytes = Buffer.alloc(4096)
+const NEWLINE = 10
+const SPACE = 32
+const numberAfter = (bytes, length, label, skipFields) => {
+  const at = bytes.indexOf(label)
+  if (at < 0 || at >= length) return -1
+  let i = at + label.length
+  for (let skipped = 0; skipped <= skipFields; skipped++) {
+    while (i < length && bytes[i] === SPACE) i += 1
+    if (skipped === skipFields) break
+    while (i < length && bytes[i] !== SPACE && bytes[i] !== NEWLINE) i += 1
+  }
+  let value = 0
+  while (i < length && bytes[i] >= 48 && bytes[i] <= 57) {
+    value = value * 10 + bytes[i] - 48
+    i += 1
+  }
+  return value
+}
+const THROTTLED_LABEL = Buffer.from('nr_throttled ')
+const THROTTLED_USEC_LABEL = Buffer.from('throttled_usec ')
+const STAT_LABEL = Buffer.from('cpu ')
+const STEAL_FIELD = 7
+const cgroupFd = openCounter('/sys/fs/cgroup/cpu.stat')
+const statFd = openCounter('/proc/stat')
+const throttledAt = new Float64Array(ticks + 1).fill(-1)
+const throttledUsecAt = new Float64Array(ticks + 1).fill(-1)
+const stealAt = new Float64Array(ticks + 1).fill(-1)
+const readCounters = (at) => {
+  if (cgroupFd >= 0) {
+    const length = readSync(cgroupFd, counterBytes, 0, counterBytes.length, 0)
+    throttledAt[at] = numberAfter(counterBytes, length, THROTTLED_LABEL, 0)
+    throttledUsecAt[at] = numberAfter(counterBytes, length, THROTTLED_USEC_LABEL, 0)
+  }
+  if (statFd >= 0) {
+    const length = readSync(statFd, counterBytes, 0, 512, 0)
+    stealAt[at] = numberAfter(counterBytes, length, STAT_LABEL, STEAL_FIELD)
+  }
+}
 const activeOf = typeof module._engine_world_active_bodies === 'function' ? module._engine_world_active_bodies : null
 const active = new Int32Array(ticks)
 const collections = []
@@ -80,18 +128,31 @@ const gcObserver = new PerformanceObserver((list) => collections.push(...list.ge
 gcObserver.observe({ entryTypes: ['gc'] })
 const loopStarted = performance.now()
 const times = new Float64Array(ticks)
+readCounters(0)
 for (let f = 0; f < ticks; f++) {
   region.setFrame(0, f)
   const at = performance.now()
   stepper(0)
   times[f] = performance.now() - at
   if (activeOf) active[f] = activeOf()
+  readCounters(f + 1)
 }
+if (cgroupFd >= 0) closeSync(cgroupFd)
+if (statFd >= 0) closeSync(statFd)
+const hostCounters = throttledAt[0] >= 0 && stealAt[0] >= 0
+const throttledIn = (tick) => throttledAt[tick + 1] - throttledAt[tick]
+const throttledUsecIn = (tick) => throttledUsecAt[tick + 1] - throttledUsecAt[tick]
+const stealIn = (tick) => stealAt[tick + 1] - stealAt[tick]
+const hostMoved = (tick) => hostCounters && (throttledIn(tick) > 0 || stealIn(tick) > 0)
 collections.push(...gcObserver.takeRecords())
 gcObserver.disconnect()
 const overTicks = []
 times.forEach((ms, tick) => {
-  if (ms > BUDGET_MS) overTicks.push([tick, round(ms, 2), activeOf ? active[tick] : null])
+  if (ms > BUDGET_MS) overTicks.push([tick, round(ms, 2), activeOf ? active[tick] : null, hostCounters ? throttledIn(tick) : null, hostCounters ? round(throttledUsecIn(tick) / 1000, 2) : null, hostCounters ? stealIn(tick) : null])
+})
+let overBudgetHostThrottled = 0
+times.forEach((ms, tick) => {
+  if (ms > BUDGET_MS && hostMoved(tick)) overBudgetHostThrottled += 1
 })
 let lastActiveTick = -1
 if (activeOf) active.forEach((count, tick) => {
@@ -114,6 +175,11 @@ emit({
   p99Ms: round(quantile(sorted, 0.99), 3),
   maxMs: round(sorted[sorted.length - 1], 3),
   overBudget: over(times),
+  overBudgetHostThrottled,
+  hostCounters,
+  throttledPeriods: hostCounters ? throttledAt[ticks] - throttledAt[0] : null,
+  throttledMs: hostCounters ? round((throttledUsecAt[ticks] - throttledUsecAt[0]) / 1000, 1) : null,
+  stealJiffies: hostCounters ? stealAt[ticks] - stealAt[0] : null,
   bootTicksMs: Array.from(times.subarray(0, BOOT_TICKS), (ms) => round(ms, 2)),
   settleTicks: settle.length,
   settleMedianMs: settle.length ? round(quantile(settleSorted, 0.5), 3) : null,

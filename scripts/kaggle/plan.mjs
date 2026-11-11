@@ -85,7 +85,29 @@ const claim = () => {
   return runs
 }
 
-export const PLANS = Object.freeze({ claim, matrix, variants, regress: regressWith(SIMD_GLUE), control: regressWith(SCALAR_GLUE) })
+export const CEILING_CAP = 40960
+export const CEILING_GLUE = 'build/variants/cap40960/engine-core-1024mib-threads-simd.mjs'
+export const CEILING_BODIES = Object.freeze([12288, 16384, 20480, 24576, 32768, 40960])
+export const CEILING_HELD_IN_WORLD_BODIES = Object.freeze([20480, 24576, 32768, 40960])
+export const CEILING_REPEATS = 3
+export const HELD_IN_WORLD_COMMIT = '675210968a34dcddaa949615b39e55c594bd68d0'
+export const TUNINGS = Object.freeze([0, 1, 2, 4, 7])
+
+const ceiling = () => {
+  const runs = [calibrate()]
+  const unbudgeted = referenceGlue(UNBUDGETED_COMMIT, CEILING_CAP)
+  const heldInWorld = referenceGlue(HELD_IN_WORLD_COMMIT, CEILING_CAP)
+  for (let repeat = 0; repeat < CEILING_REPEATS; repeat++) {
+    runs.push(tick(unbudgeted, TOP_TIER_BODIES, 4))
+    for (const bodies of CEILING_BODIES) runs.push(tick(CEILING_GLUE, bodies, 4))
+    for (const bodies of CEILING_HELD_IN_WORLD_BODIES) runs.push(tick(heldInWorld, bodies, 4))
+    for (const tune of TUNINGS) runs.push(tick(CEILING_GLUE, TOP_TIER_BODIES, 4, { knobs: ALL_AWAKE + ',tune=' + tune, probe: true }))
+  }
+  runs.push(calibrate())
+  return runs
+}
+
+export const PLANS = Object.freeze({ ceiling, claim, matrix, variants, regress: regressWith(SIMD_GLUE), control: regressWith(SCALAR_GLUE) })
 
 export const buildPlan = (mode = 'matrix') => {
   if (!Object.hasOwn(PLANS, mode)) throw new RangeError('unknown plan ' + mode)

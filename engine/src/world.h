@@ -22,6 +22,10 @@ constexpr std::uint8_t kSlotAsleepSynced = 2;
 constexpr std::uint8_t kSlotAwakeSynced = 3;
 constexpr std::uint8_t kSlotHeld = 4;
 constexpr std::uint32_t kNoHeld = 0xffffffffu;
+constexpr std::uint32_t kTunePageLookupCache = 1u;
+constexpr std::uint32_t kTuneGravityAfterStep = 2u;
+constexpr std::uint32_t kTuneWholeIslands = 4u;
+constexpr std::uint32_t kTuneAll = kTunePageLookupCache | kTuneGravityAfterStep | kTuneWholeIslands;
 constexpr std::uint16_t kLastGeneration = 0xfffeu;
 constexpr std::uint16_t kRetiredGeneration = 0xffffu;
 constexpr std::uint32_t kFixedJoltBodies = 3;
@@ -139,6 +143,7 @@ class World {
   void optimize();
   Status setAwakeBudget(std::uint32_t bodies);
   Status setSpawnAsleep(bool asleep);
+  Status setTuning(std::uint32_t flags);
   Status setSleep(float seconds, float pointSpeed);
   std::uint32_t heldBodies() const;
   std::uint32_t wakeCount(std::uint32_t count) const;
@@ -169,6 +174,7 @@ class World {
   int resolve(std::uint32_t handle) const;
   int allocateSlot();
   void sync(std::uint32_t slot);
+  void hide(std::uint32_t slot);
   void rebase(double x, double y, double z);
   void removeBody(std::uint32_t index);
   void releaseRuntime();
@@ -183,6 +189,7 @@ class World {
   std::uint32_t awakeBudget_ = 0;
   std::uint32_t heldCursor_ = kNoHeld;
   bool spawnAsleep_ = false;
+  std::uint32_t tuning_ = 0;
   std::uint32_t fresh_ = 0;
   std::uint32_t freeCount_ = 0;
   std::uint32_t tickRate_ = 1;

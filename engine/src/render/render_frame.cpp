@@ -209,6 +209,7 @@ void planFrame(const SceneView& scene, Camera& camera, FramePlan& plan) {
     out[kRecordWords - 1] = cls;
     for (std::uint32_t k = 0; k < kRecordWords; ++k) hash = mixWord(hash, out[k]);
     if (cls >= kPropClasses) continue;
+    if (t.qx == 0.0f && t.qy == 0.0f && t.qz == 0.0f && t.qw == 0.0f) continue;
     if (!inFrustum(camera.planes, rel, kPropRadius)) continue;
     const std::uint32_t index = plan.propCount[cls];
     plan.propCount[cls] = index + 1;

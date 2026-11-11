@@ -31,6 +31,18 @@ const boot = async (settings = {}) => {
   return module
 }
 
+const TRANSFORM_WORDS = 7
+const HIT_BODY = 2
+const hiddenSlots = (module) => {
+  const rows = new Float32Array(module.HEAPU8.buffer, module._engine_transforms(), BODIES * TRANSFORM_WORDS)
+  const hidden = []
+  for (let i = 0; i < BODIES; i++) {
+    const at = i * TRANSFORM_WORDS
+    if (rows[at + 3] === 0 && rows[at + 4] === 0 && rows[at + 5] === 0 && rows[at + 6] === 0) hidden.push(i)
+  }
+  return hidden
+}
+const range = (from, to) => Array.from({ length: to - from }, (_, i) => from + i)
 const positions = (module) => new Float64Array(module.HEAPU8.buffer, module._engine_positions(), BODIES * POSITION_WORDS).slice()
 const heightOf = (at, i) => Math.sqrt(at[i * POSITION_WORDS] ** 2 + at[i * POSITION_WORDS + 1] ** 2 + at[i * POSITION_WORDS + 2] ** 2) - PLANET.radius
 const movedSlots = (start, now) => {
@@ -70,6 +82,32 @@ gate('a budget of ' + BUDGET + ' wakes the first ' + BUDGET + ' spawns and holds
   for (let i = 0; i < 20; i++) module._engine_tick(1)
   const moved = movedSlots(start, positions(module))
   assert.deepEqual(moved, Array.from({ length: BUDGET }, (_, i) => i))
+})
+
+gate('a held body is not in the world: its pose carries the zero rotation that the renderer skips, and a ray through it passes', async () => {
+  const module = await boot({ budget: BUDGET })
+  assert.deepEqual(hiddenSlots(module), range(BUDGET, BODIES))
+  const at = positions(module)
+  const held = BODIES - 1
+  const woken = 0
+  const down = (slot) => module._engine_world_raycast(at[slot * POSITION_WORDS], at[slot * POSITION_WORDS + 1] + 3, at[slot * POSITION_WORDS + 2], 0, -3.4, 0)
+  assert.equal(down(woken), 1, 'the ray above a woken body hit nothing')
+  assert.equal(down(held), 0, 'the ray above a held body hit something')
+  const control = await boot()
+  assert.deepEqual(hiddenSlots(control), [])
+  assert.equal(control._engine_world_raycast(at[held * POSITION_WORDS], at[held * POSITION_WORDS + 1] + 3, at[held * POSITION_WORDS + 2], 0, -3.4, 0), 1, 'control: with no budget the same ray hits the body')
+})
+
+gate('a released body gets its pose back on the tick it is released, and no pose is hidden once nothing is held', async () => {
+  const module = await boot({ budget: BUDGET })
+  let checked = 0
+  settle(module, () => {
+    const held = module._engine_world_held_bodies()
+    assert.equal(hiddenSlots(module).length, held)
+    checked += 1
+  })
+  assert.ok(checked > 100)
+  assert.deepEqual(hiddenSlots(module), [])
 })
 
 gate('the awake count never passes the budget, held bodies are released in slot order, and every body ends at rest with none held', async () => {
