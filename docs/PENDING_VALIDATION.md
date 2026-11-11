@@ -3869,3 +3869,16 @@ Phase B witness, `npm run check:scenario-<name>` on each gate, both tiers, both 
 Every scenario's trace file is in build/diag/scenarios/. The run 1 maxima are the first-call cost, and the run 2 maxima are below 1 ms.
 
 `npm test`: exit 0, 264 PASS, 0 FAIL, wall 2m26.110s.
+
+## Threaded runtime clock allocation (Phase A, open)
+
+Residual: the threaded glue allocates per tick, and the pose-frame gate measures it as 20,760 B over 600 frames on `engine-core-1024mib-threads.mjs`. The non-threaded 512 MiB glue measures 0 B over the same 600 frames (`build/diag/pose-alloc-nonthreaded.log`).
+
+Cause, from the built glue:
+- The only clock import is `_emscripten_get_now=()=>performance.timeOrigin+performance.now()` in the glue JS. Both halves allocate per call in Node: a 20,000-call measurement gives 69.6 B/call for the expression and 94.2 B/call for `performance.now()` alone (`build/diag/clock-alloc.mjs`). Caching `timeOrigin` does not remove it.
+- In the wasm (`build/diag/512t.wat` from `engine/out/engine-core-512mib-threads.wasm`), the clock is called from `$126`, which has signature `(i32, i32, f64) -> i32`, the shape of `emscripten_futex_wait`. Its clock read happens on entry and in its loop, and infinite waits read it too. So every futex wait in the threaded runtime allocates, and the Jolt pool's semaphore waits (`sem_wait`) are the futex waits reached per tick.
+- Jolt's `sleep_for(100 µs)` sites in `JobSystemThreadPool.cpp` are queue-full overflow paths, not the per-tick path.
+
+Not done: a non-allocating clock. The alternatives are (a) a fake monotonic clock in the import, which changes the timeout behaviour of every timed wait in the runtime and needs a gate for that; (b) removing the futex waits from the per-tick path, which changes the job system.
+
+Witness needed to close it: `scripts/check-pose-allocations.mjs` against `engine/out/engine-core-1024mib-threads.mjs` reports `frameBytes.own` and `inheritedFromFramePath` at 0 over 600 frames, and `check:engine-threads` still passes.
