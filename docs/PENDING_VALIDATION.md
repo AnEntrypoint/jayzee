@@ -3943,3 +3943,7 @@ Witness, final state, all `rc=0` or PASS:
 - `loadAtFrameStart` and `topAtFrameStart`: the nearest host sample to the frame's start, taken every 50 ms (it was 250 ms)
 
 Witness: `build/diag/planet-64webgpu-capture/` after the Phase B job, five consecutive runs of `PLANET_ONLY=64-webgpu`.
+
+### Long-frame trace trigger (Phase A)
+
+`scripts/browser/planet-witness-run.mjs` writes the full trace only when a run has a long frame. The dump goes to `<outDir>/dumps/<label>-frame<N>.trace.json` and holds `trigger: "long-frame"`, every `frameCases` record, and the trace events. A clean run writes no trace file. The per-frame capture fields from the previous entry are unchanged.

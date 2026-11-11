@@ -143,7 +143,11 @@ for (const config of PLANET_RUNS.filter((run) => !only || only === run.tier + '-
   const gapInfo = traceGaps(run.trace, run.result, frames)
   const cases = frameCases(run.result, samples, gapInfo)
   mkdirSync(resolve(outDir, 'traces'), { recursive: true })
-  writeFileSync(resolve(outDir, 'traces', label + '.trace.json'), JSON.stringify({ label, firstCallMs: run.result?.firstCallMs ?? null, traceEvents: run.trace ?? [] }) + '\n')
+  if (cases.length > 0) {
+    mkdirSync(resolve(outDir, 'dumps'), { recursive: true })
+    const dumpName = label + '-frame' + cases[0].frameIndex + '.trace.json'
+    writeFileSync(resolve(outDir, 'dumps', dumpName), JSON.stringify({ label, trigger: 'long-frame', frameCases: cases, firstCallMs: run.result?.firstCallMs ?? null, traceEvents: run.trace ?? [] }) + '\n')
+  }
   writeFileSync(resolve(outDir, label + '.json'), JSON.stringify({ label, wallMs, load, verdict, frameCases: cases, traceGapSummary: { pid: gapInfo.pid, tid: gapInfo.tid, callbacks: gapInfo.callbacks, aligned: gapInfo.aligned, intervalMismatches: gapInfo.intervalMismatches, error: gapInfo.error ?? null }, hostSamples: samples, result: run.result ?? null }, null, 1) + '\n')
   const wallMaxMs = run.result ? run.result.wallIntervalMaxMs : null
   summary.push({ label, wallMs, ok: verdict.ok, workMaxMs: verdict.maxMs, workP99Ms: verdict.p99Ms, wallMaxMs, missedFrames: cases.length, frameCases: cases.map((c) => ({ frame: c.frame, intervalMs: c.intervalMs, workMs: c.workMs, classification: c.classification, maxLoad1: c.maxLoad1, gapMs: c.gapMs, mainThreadBusyMs: c.mainThreadBusyMs, topInWindow: c.topInWindow })), load, failures: verdict.failures })
