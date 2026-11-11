@@ -3959,3 +3959,12 @@ Host at capture, from `build/diag/spike-5/64-webgpu.json` (237 host samples): `z
 Cause: not established. The physics excursion is either host CPU preemption under the concurrent `zig` build or in-engine Jolt work. The earlier spikes (`build/diag/planet-phaseB-final4/64-webgpu.json`, 26.19 ms at frame 250; `build/diag/planet-phaseB/64-webgpu.json`, 25.27 ms at frame 665) were main-thread idle inside the gap, so they may be a different mechanism. This is recorded as an open defect, not as expected. Closing it needs per-window `cpu.stat` deltas recorded by the runner, or a run with no concurrent build. The host-load test was not run, and PID 901344 was not touched.
 
 Witness: `build/diag/spike-hunt.log`, `build/diag/check-planet-witness.log` (`RESULT: PASS`, `EXIT 0`).
+
+### Long-frame physics split (Phase A, for the 64-webgpu spike)
+
+Each entry in a run's `frameCases` (and so each dump) now carries three fields that separate a physics excursion inside the Jolt step from one outside it:
+- `joltStepMs`: the engine's `physics` phase for that frame, from the timed rows. The phase scope wraps only `runtime_->physics.Update` (`engine/src/world.cpp`, the `kPhysics` scope in `World::step`), so this is the Jolt step time.
+- `tickOutsideJoltMs`: the tick time minus `joltStepMs`. It is the part of the tick outside the Jolt step (character updates, sync, and the engine's other tick work).
+- `hostCpuInFrame`: the cgroup CPU delta and throttle delta over the frame's window, read from `/sys/fs/cgroup/cpu.stat` at each 50 ms host sample, with the top five processes by CPU delta from `/proc/<pid>/stat` for the processes in the `ps` list. `sampleWallMs` gives the span of the samples used. The resolution is one 50 ms sample, so a window shorter than that is bounded by its neighbouring samples, not measured inside.
+
+The frame's row is matched by the engine frame number, which is `frameIndex` (the warm-up of 60 frames is included). The dump name uses the same number.

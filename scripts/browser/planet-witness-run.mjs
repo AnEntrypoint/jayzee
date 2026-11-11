@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { execFile, execFileSync } from 'node:child_process'
 import { promisify } from 'node:util'
 import { cpus, loadavg } from 'node:os'
@@ -19,6 +19,23 @@ mkdirSync(outDir, { recursive: true })
 
 const topProcesses = () => execFileSync('ps', ['-eo', 'pid,pcpu,comm', '--sort=-pcpu'], { encoding: 'utf8' }).trim().split('\n').slice(1, 4).map((line) => line.trim())
 
+const CLOCK_TICK_MS = 10
+
+const readCgroupCpu = () => {
+  const stat = Object.fromEntries(readFileSync('/sys/fs/cgroup/cpu.stat', 'utf8').trim().split('\n').map((line) => line.split(' ')).map(([key, value]) => [key, Number(value)]))
+  return { usageUsec: stat.usage_usec, nrThrottled: stat.nr_throttled, throttledUsec: stat.throttled_usec }
+}
+
+const readProcMs = (pid) => {
+  try {
+    const text = readFileSync('/proc/' + pid + '/stat', 'utf8')
+    const fields = text.slice(text.lastIndexOf(')') + 2).split(' ')
+    return (Number(fields[11]) + Number(fields[12])) * CLOCK_TICK_MS
+  } catch {
+    return null
+  }
+}
+
 const sampleHost = async (samples, stop) => {
   while (!stop.done) {
     const at = Date.now()
@@ -27,7 +44,8 @@ const sampleHost = async (samples, stop) => {
       const [pid, pcpu, ...name] = line.trim().split(/\s+/)
       return { pid: Number(pid), pcpu: Number(pcpu), comm: name.join(' ') }
     })
-    samples.push({ epochMs: at, load1: loadavg()[0], top })
+    const procMs = Object.fromEntries(top.map((p) => [p.pid, readProcMs(p.pid)]).filter(([, ms]) => ms !== null))
+    samples.push({ epochMs: at, load1: loadavg()[0], top, cgroup: readCgroupCpu(), procMs })
     await new Promise((resolve) => setTimeout(resolve, SAMPLE_MS))
   }
 }
@@ -85,8 +103,30 @@ const traceGaps = (events, result, frames) => {
   return { pid, tid, callbacks: list.length, aligned: frames, intervalMismatches, gaps }
 }
 
+const windowCpu = (samples, start, end) => {
+  const before = samples.filter((sample) => sample.epochMs <= start && sample.cgroup).pop()
+  const after = samples.find((sample) => sample.epochMs >= end && sample.cgroup)
+  if (!before || !after) return null
+  const wallMs = after.epochMs - before.epochMs
+  const cgroupCpuMs = (after.cgroup.usageUsec - before.cgroup.usageUsec) / 1000
+  const processes = Object.keys(after.procMs)
+    .filter((pid) => before.procMs[pid] !== undefined)
+    .map((pid) => ({ pid: Number(pid), comm: after.top.find((p) => p.pid === Number(pid))?.comm ?? null, cpuMs: after.procMs[pid] - before.procMs[pid] }))
+    .sort((a, b) => b.cpuMs - a.cpuMs)
+    .slice(0, 5)
+  return {
+    sampleWallMs: wallMs,
+    cgroupCpuMs,
+    cgroupCores: wallMs > 0 ? Math.round((cgroupCpuMs / wallMs) * 100) / 100 : null,
+    throttledPeriods: after.cgroup.nrThrottled - before.cgroup.nrThrottled,
+    throttledMs: (after.cgroup.throttledUsec - before.cgroup.throttledUsec) / 1000,
+    processes,
+  }
+}
+
 const frameCases = (result, samples, gapInfo) => {
   if (!result || !Array.isArray(result.wallIntervalsMs) || !Array.isArray(result.frameStartsMs)) return []
+  const physicsColumn = Array.isArray(result.rowColumns) ? result.rowColumns.indexOf('physics') : -1
   const cases = []
   result.wallIntervalsMs.forEach((interval, frame) => {
     if (interval <= PLANET_MISSED_FRAME_MS && result.frameTimesMs[frame] <= PLANET_FRAME_BUDGET_MS) return
@@ -94,6 +134,9 @@ const frameCases = (result, samples, gapInfo) => {
     const work = result.frameTimesMs[frame]
     const window = samples.filter((sample) => sample.epochMs >= start - interval && sample.epochMs <= start + work)
     const nearest = samples.length ? samples.reduce((best, sample) => (Math.abs(sample.epochMs - start) < Math.abs(best.epochMs - start) ? sample : best)) : null
+    const row = Array.isArray(result.rows) && physicsColumn >= 0 ? result.rows.find((r) => r[0] === frame + WARMUP_FRAMES_IN_PAGE) : null
+    const joltStepMs = row ? row[physicsColumn] : null
+    const tickMs = row ? row[2] : null
     const gap = gapInfo && gapInfo.gaps ? gapInfo.gaps.find((x) => x.frame === frame + WARMUP_FRAMES_IN_PAGE) : null
     const busyShare = gap && gap.gapMs > 0 ? gap.coveredMs / gap.gapMs : null
     const classification = work > PLANET_FRAME_BUDGET_MS
@@ -117,6 +160,9 @@ const frameCases = (result, samples, gapInfo) => {
       gcMs: gap ? Math.round(gap.gcMs * 100) / 100 : null,
       gpuTaskMs: gap ? Math.round(gap.gpuMs * 100) / 100 : null,
       rendererOtherThreadMs: gap ? Math.round(gap.rendererOtherMs * 100) / 100 : null,
+      joltStepMs,
+      tickOutsideJoltMs: tickMs !== null && joltStepMs !== null ? Math.round((tickMs - joltStepMs) * 100) / 100 : null,
+      hostCpuInFrame: windowCpu(samples, start, start + work),
       frameIndex: frame + WARMUP_FRAMES_IN_PAGE,
     })
   })
