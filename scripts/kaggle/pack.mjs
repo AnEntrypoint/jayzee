@@ -7,7 +7,7 @@ import { DATASET_REF, KERNEL_REF, buildPlan } from './plan.mjs'
 import { SCENARIO_TIERS } from '../lib/scenarioTiers.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
-const out = join(root, 'build/kaggle')
+const out = join(root, process.argv[3] ?? 'build/kaggle')
 const stage = join(out, 'stage')
 const plan = buildPlan(process.argv[2] ?? 'matrix')
 const entries = [...new Set(plan.runs.map((run) => run.script))]

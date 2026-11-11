@@ -17,7 +17,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const { BASELINE } = await import('./plan.mjs')
   const { ensureReference } = await import('./reference.mjs')
   ensureReference(BASELINE.referenceCommit)
-  const packed = JSON.parse(execFileSync('node', [join(root, 'scripts/kaggle/pack.mjs'), 'regress'], { cwd: root, encoding: 'utf8' }).trim().split('\n').pop())
+  const packed = JSON.parse(execFileSync('node', [join(root, 'scripts/kaggle/pack.mjs'), 'regress', 'build/kaggle/gate'], { cwd: root, encoding: 'utf8' }).trim().split('\n').pop())
   const verdict = existsSync(verdictPath) ? JSON.parse(readFileSync(verdictPath, 'utf8')) : null
   const decision = decide(verdict, packed.payloadSha256)
   if (!decision.ok) {
