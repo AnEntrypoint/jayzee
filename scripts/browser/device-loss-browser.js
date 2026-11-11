@@ -1,4 +1,12 @@
-import { loadRenderer } from '../../src/engine/renderer.js'
+import { loadRenderer, loadRendererWithinBudget } from '../../src/engine/renderer.js'
+
+const BY_BUDGET = new URLSearchParams(location.search).get('glue') === 'budget'
+const BUDGET_BYTES = BY_BUDGET ? 67108864 : 536870912
+const glueFor = (tierMiB) => new URL('../../engine/out/engine-core-' + tierMiB + 'mib.mjs', import.meta.url).href
+const load = async (canvas) => {
+  const options = { canvas, navigatorLike: navigator, requested: 'webgpu', players: 64, budgetBytes: BUDGET_BYTES, models: !BY_BUDGET }
+  return BY_BUDGET ? (await loadRendererWithinBudget({ ...options, glueFor })).value : loadRenderer(options)
+}
 
 const FRAMES_BEFORE = 5
 const FRAMES_AFTER = 5
@@ -14,7 +22,10 @@ const drawFrames = (renderer, count) => {
 const run = async () => {
   const canvas = document.getElementById('engine-canvas')
   const started = performance.now()
-  let renderer = await loadRenderer({ canvas, navigatorLike: navigator, requested: 'webgpu', players: 64, budgetBytes: 67108864 })
+  let renderer = await load(canvas)
+  result.glueByBudget = BY_BUDGET
+  result.firstWasmBytes = renderer.module.HEAPU8.buffer.byteLength
+  window.deviceLossFirstModule = new WeakRef(renderer.module)
   const limits = renderer.device.limits
   result.limits = { maxTextureDimension2D: limits.maxTextureDimension2D, maxTextureArrayLayers: limits.maxTextureArrayLayers, maxBufferSize: limits.maxBufferSize, textureCompressionBc: renderer.device.features.has('texture-compression-bc'), deviceMemory: navigator.deviceMemory ?? null }
   result.before = { modelTier: renderer.modelTier, backend: renderer.backendName, statuses: drawFrames(renderer, FRAMES_BEFORE), frames: renderer.stats().frames }
@@ -26,7 +37,8 @@ const run = async () => {
 
   renderer = null
   const reloadAt = performance.now()
-  const recovered = await loadRenderer({ canvas, navigatorLike: navigator, requested: 'webgpu', players: 64, budgetBytes: 67108864 })
+  const recovered = await load(canvas)
+  result.secondWasmBytes = recovered.module.HEAPU8.buffer.byteLength
   result.reloadMs = Math.round(performance.now() - reloadAt)
   recovered.markWarmup()
   const statuses = drawFrames(recovered, FRAMES_AFTER)

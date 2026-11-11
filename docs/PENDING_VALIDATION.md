@@ -4119,3 +4119,93 @@ At 1024 players physics runs in a worker, so the page's rows did not carry the t
 - `scripts/browser/planet-hunt.mjs <tier-backend> [max runs] [out dir]` runs the planet witness for one configuration until a long-frame dump appears, and writes `hunt.json`.
 - `scripts/browser/gap-events.mjs <dump>` lists, for each long frame, the events that cover the gap with their wall time, thread CPU time and the difference.
 - `engine/build-all.sh` rebuilds every variant present in `engine/out`, and `scripts/pin-engine-artifacts.mjs` rewrites the pins in `engine/artifacts.json`.
+
+### WebGPU crowd-dot `update`, measured in the browser (the row Node could not reach)
+
+`scripts/browser/crowd-dot-heap-run.mjs` opens `crowd-dot-heap.html` on the WebGPU backend, warms `update` for 20,000 calls of 64 dots, then samples every allocation over 2,000 more calls through the devtools heap profiler and attributes the bytes under `update`. A control allocation in the page proves the sampler sees allocations (14,976 B).
+
+| | bytes under `update` over 2,000 calls | per update |
+|---|---|---|
+| before | 4,950,036 | 2,475 B |
+| after | 63,888 | 31.9 B |
+
+Cause: `update` set a `Vector3` from three doubles per dot. In Chromium a double stored into an object field is a 12-byte heap number, so each dot cost 36 B (4,609,548 B attributed to `update` itself: 2,000 × 64 × 36 = 4,608,000). Node stores those fields unboxed, which is why `check:crowd-dot-buffer` could not see it. Fix: both dot renderers write the instance matrix straight into the instance array (`setScaledTranslationFrom` in `src/client/webgpuInstancing.js`, and the loop in `src/client/playerLodRenderer.js`). The matrix is the same: a compose with an identity quaternion is the scale on the diagonal and the translation. The spoint fixture gates still pass (`check:player-lod-renderer`, `check:player-lod-renderer-webgpu`, `check:crowd-dot-buffer`, `check:player-dot-shader-spoint`).
+
+Still open: 31.9 B per update remains, about 0.5 B per dot. The sites are `decodeCrowdDotPoses` (12 B per call), three's `toArray` and `setMatrixAt` inside `acquireId` (7.2 B), `acquireId` (5.0 B) and `markSlotDirty` (3.0 B). The runner fails above 64 B per update.
+
+## Shared terrain data: the open rows (Phase A, 2026-11-11)
+
+### Copy accounting on the witness scene (closed)
+
+Pinned in `scripts/check-planet-witness.mjs`. The scene is `DEFAULT_SCENE` (seed 1, 1024 entities, patch side 4, radius 6,360,000 m), generated in Node. It has 16 resident patches of 1024 bytes (16 by 16 float32 samples), none deferred, and 135,024 generated instances (16 × 8439 per patch). `copyAccounting` gives 8,657,920 render bytes, 1,636,672 physics bytes not copied, and 135,040 copies not made. The tree collider count is 67,509, a different number from the generated instance count. Open: the same counts read from a browser run of the page.
+
+### Mirrored and flat terrain controls (closed in Node)
+
+`scripts/check-terrain-agreement.mjs` runs the agreement check through one function, and each tier gains seven gates. Gaps against the collision height, the same on both tiers, against a tolerance of 1e-6 m:
+
+| reading | gap (m) |
+|---|---|
+| correct order | 0 |
+| u and v swapped | 0.5707 |
+| u negated | 0.7220 |
+| v negated | 0.6625 |
+| both negated | 0.6202 |
+| flat | 0.6758 |
+| centre page restaged flat at 0.3 m | 1.2e-8 from 0.3 m at all 2000 draws; 0.6758 from the old samples |
+
+A mirrored terrain no longer passes this gate. Open: the renderer's sample order is still a JavaScript model of the shader (`renderedHeight`), not a read of drawn pixels, and the browser `sceneDigest` flat-terrain control has not been run.
+
+### Instances beyond 4096 m (closed as a recorded limit)
+
+`src/engine/cameraRelative.js` gains `float32SpacingAt` and `relativeErrorBound`, and `scripts/check-camera-relative.mjs` gains six gates over 86,400 instance and direction pairs per reach at planet radius:
+
+| reach from the eye | worst render error | derived bound | tolerance 1e-3 m |
+|---|---|---|---|
+| 4096 m | 3.4e-4 m | 4.9e-4 m | within |
+| 8192 m | 6.9e-4 m | 9.8e-4 m | within |
+| 16,384 m | 1.3e-3 m | 2.0e-3 m | missed |
+| 50 km | 3.9e-3 m | 3.9e-3 m | missed |
+
+Nothing refuses or culls an instance by distance: `RENDER_COLLISION_RANGE_M` is read only by gates, and the vegetation draw culls by frustum plane and patch radius. A far instance is drawn with the larger error. Open: the numbers come from the JavaScript mirror `renderedPosition`, not from the shader, and no distance cull exists.
+
+### Long-session rebase rounding (measured: the tolerance was missed; the C++ fix is recorded with the engine changes below)
+
+`scripts/check-rebase-session.mjs` runs three sessions on the real engine (64 MiB glue, Node), with four resting bodies within 1 km of the start at planet radius:
+
+| session | rebases | worst body error within 4096 m | error at the end | first rebase over 1e-3 m |
+|---|---|---|---|---|
+| walk, 81 km out and back with a turn every 2 km | 74 | 1.46e-3 m | 1.33e-3 m | 70 |
+| wander, 5000 hops in a 3 km disc | 4446 | 6.5e-3 m | 3.2e-3 m | 114 |
+| shuttle, 5000 trips between two points | 5000 | 7.3e-5 m | 7.3e-5 m | none |
+
+Cause: `World::rebase` cast the shift to float32 and subtracted it in float32, while the origin moved by the exact float64 value. A JavaScript mirror of that arithmetic (`rebaseShift`, `rebaseBodyByShift` in `src/engine/physicsOrigin.js`) gives the engine's positions bit for bit at every step of all three sessions. A rebase that recomputes each resting body from its float64 placement stays at 1.2e-4 m on the same sessions. All bodies take the same shift error, so they do not drift against each other; they drift against the float64 terrain and vegetation. The existing 4 km walk in `check-relative-residuals.mjs` used `rebaseBody`, which is not the engine's arithmetic, so it understated the engine.
+
+### A host that never follows (narrowed)
+
+The engine follows every single placement itself since 170ebc7 (`spawn`, row 0 of a batch, `setPosition`, `addBox`, `addTrunk`, `addCharacter`), so a spawn at planet radius needs no `follow` call. The case left was a batch: the origin follows row 0 only, and the engine alone stores a second row at planet radius 0.2 m from its placement (the gate's control). `EngineWorld#spawnMany` now refuses any row more than 1024 m from row 0 with `BatchBeyondRebaseError` (code `batch-beyond-rebase`, with `row`, `distanceM`, `limitM`) before anything is staged. A batch within 1024 m of row 0 spawns with a worst row error of 2.4e-5 m. Witness: `scripts/check-follow-misuse.mjs`, 4 PASS. Open: a body that moves more than 1024 m from the origin under physics with no `follow`, and bodies left behind when a later placement moves the origin.
+
+### Collision placement option (decided for the two CPU options)
+
+`src/collision/joltHeightfield.js` wires `buildHeightfield` and `raycastDown` to the real Jolt host, and `scripts/check-collision-placement-options.mjs` measures both CPU options on 4096 placements from seed 12345, with `maxErrorM` set to 1e-3 m before the run and the error measured against the rendered triangle surface of the same samples.
+
+| dataset | option | max error | p99 error | resident bytes | copied in | query p50 |
+|---|---|---|---|---|---|---|
+| engine page, 16 by 16, relief 0.80 m | ground query | 0 m | 0 m | 0 | 0 | 0.19 µs |
+| | Jolt heightfield | 1.41e-3 m | 1.27e-3 m | 976 | 1,024 | 2.5 µs |
+| patch, 128 by 128, relief 12.8 m | ground query | 1.5e-14 m | 8.9e-15 m | 0 | 0 | 0.09 µs |
+| | Jolt heightfield | 3.71e-3 m | 2.86e-3 m | 43,712 | 65,536 | 4.0 µs |
+
+`chooseByMeasurement` returns `ground-query` on both, because the heightfield is over the tolerance: it stores heights at 8 bits per block, so its error grows with relief. The times are from one run on a shared host and are not thresholded. Caveats: on the patch the ground query is the same formula as the truth, so only the page row is an independent measurement; the heightfield was measured at Jolt's default block size; the scene is not the 1024-tier population. Open: the GPU option needs a browser dispatch and is not measured.
+
+### Device loss: what memory it holds (measured)
+
+`scripts/browser/device-loss-run.mjs` now drives the page over the devtools session, forces three collections after the recovery, and reads a `WeakRef` to the first engine module.
+
+| glue | first instance | second instance | first module collected after the loss | bytes held after collection | reload |
+|---|---|---|---|---|---|
+| default 512 MiB, model pool bound | 536,870,912 B | 536,870,912 B | yes | 0 | 151 ms |
+| by budget (`?glue=budget`, 64 MiB, no model pool) | 67,108,864 B | 67,108,864 B | yes | 0 | 149 ms |
+
+So a device loss does not leak the first instance once a collection runs. Until it runs, both instances are reserved: twice the tier, 1024 MiB with the default glue and 128 MiB when the glue is chosen by budget. Both runs end `ok: true` with zero creates after seal and zero allocations after warm-up (`build/diag/device-loss/run-default.json`, `run-budget.json`).
+
+Defect found and fixed in the page: it asked for a 64 MiB budget with the model pool bound, which this adapter's model plan refuses (`engine_models_bind_plan refused: the engine budget holds a smaller model tier than the device plans`), so the page failed before any loss. It now uses a 512 MiB budget with the model pool, and 64 MiB without it in the budget variant. Still open: rebinding on the live instance instead of creating a second one, which is an owner decision.
