@@ -76,6 +76,23 @@ gate('one noisy repeat with many ticks over budget does not fail the run, as Kag
   assert.equal(verdict.topTier.candidateOverBudget, 0)
 })
 
+gate('a tick over budget is left out only when the run marks it as the host, and the verdict carries the count and the rule', () => {
+  const limit = BASELINE.margin.overBudgetTicks
+  const results = run(12, 12, 0, limit + 3)
+  assert.equal(judge(BASELINE, results).ok, false, 'control: the same ticks with no host mark fail')
+  for (const c of results.configs.filter((c) => c.variant === 'base')) {
+    c.overBudgetHost = 3
+    c.hostRule = 'a tick over budget is the host when a counter moved in it'
+  }
+  const verdict = judge(BASELINE, results)
+  assert.equal(verdict.ok, true, verdict.failures.join('; '))
+  assert.deepEqual(verdict.topTier.candidateHostExcludedEach, Array(top.repeats).fill(3))
+  assert.deepEqual(verdict.topTier.candidateOverEach, Array(top.repeats).fill(limit))
+  assert.match(verdict.topTier.hostRule, /counter moved/)
+  for (const c of results.configs.filter((c) => c.variant === 'base')) c.overBudgetHost = 2
+  assert.equal(judge(BASELINE, results).ok, false, 'one tick more than the host marks cover still fails')
+})
+
 gate('missing reference rows, missing candidate rows, a missing marble tier and a run with no result each fail', () => {
   const noReference = run(12, 12)
   noReference.configs = noReference.configs.filter((c) => c.variant !== 'reference')

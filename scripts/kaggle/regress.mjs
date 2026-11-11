@@ -52,7 +52,9 @@ export const judge = (baseline, results) => {
   const candidate = rows('base')
   if (reference.length < repeats) failures.push('reference rows: ' + reference.length + ' of ' + repeats)
   if (candidate.length < repeats) failures.push('candidate rows: ' + candidate.length + ' of ' + repeats)
-  const top = { bodies, workers, referenceP99Ms: null, candidateP99Ms: null, p99LimitMs: null, referenceOverBudget: null, candidateOverBudget: null, overLimit: null, referenceOverEach: reference.map((c) => c.overBudget), candidateOverEach: candidate.map((c) => c.overBudget), referenceP99EachMs: reference.map((c) => c.p99Ms), candidateP99EachMs: candidate.map((c) => c.p99Ms) }
+  const hostOf = (c) => (Number.isInteger(c.overBudgetHost) ? c.overBudgetHost : 0)
+  const judgedOver = (c) => c.overBudget - hostOf(c)
+  const top = { bodies, workers, referenceP99Ms: null, candidateP99Ms: null, p99LimitMs: null, referenceOverBudget: null, candidateOverBudget: null, overLimit: null, referenceOverEach: reference.map(judgedOver), candidateOverEach: candidate.map(judgedOver), referenceHostExcludedEach: reference.map(hostOf), candidateHostExcludedEach: candidate.map(hostOf), hostRule: [...reference, ...candidate].map((c) => c.hostRule).find((rule) => typeof rule === 'string') ?? null, referenceP99EachMs: reference.map((c) => c.p99Ms), candidateP99EachMs: candidate.map((c) => c.p99Ms) }
   if (reference.length > 0 && candidate.length > 0) {
     top.referenceP99Ms = median(reference.map((c) => c.p99Ms))
     top.candidateP99Ms = median(candidate.map((c) => c.p99Ms))
@@ -116,5 +118,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   }
   const seen = verdict.machineClass
   console.log(seen.recorded ? 'machine class ' + seen.class + ': reference ' + verdict.topTier.referenceP99Ms + ' ms against its recorded ' + seen.recordedReferenceP99Ms + ' ms (limit ' + seen.referenceLimitMs + ')' : 'machine class ' + seen.class + ' (' + seen.modelName + ') has no record for this reference; node scripts/kaggle/regress.mjs record adds it')
+  const excluded = [...verdict.topTier.referenceHostExcludedEach, ...verdict.topTier.candidateHostExcludedEach].reduce((sum, n) => sum + n, 0)
+  console.log(excluded > 0 ? excluded + ' ticks over budget were not counted (reference ' + verdict.topTier.referenceHostExcludedEach.join(', ') + '; candidate ' + verdict.topTier.candidateHostExcludedEach.join(', ') + '): ' + verdict.topTier.hostRule : 'no tick over budget was excluded as the host')
   console.log('RESULT: PASS top tier median p99 ' + verdict.topTier.candidateP99Ms + ' ms against the reference ' + verdict.topTier.referenceP99Ms + ' ms (limit ' + verdict.topTier.p99LimitMs + '), ' + verdict.topTier.candidateOverBudget + ' ticks over budget in the median run against ' + verdict.topTier.referenceOverBudget + ' (limit ' + verdict.topTier.overLimit + ')')
 }

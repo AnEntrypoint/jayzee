@@ -107,7 +107,21 @@ const ceiling = () => {
   return runs
 }
 
-export const PLANS = Object.freeze({ ceiling, claim, matrix, variants, regress: regressWith(SIMD_GLUE), control: regressWith(SCALAR_GLUE) })
+export const STALL_REPEATS = 8
+export const STALL_POOL_FLAG = '--v8-pool-size=1'
+
+const stall = () => {
+  const runs = [calibrate()]
+  for (let repeat = 0; repeat < STALL_REPEATS; repeat++) {
+    runs.push(tick(SIMD_GLUE, TOP_TIER_BODIES, 4))
+    runs.push(tick(SIMD_GLUE, TOP_TIER_BODIES, 4, { nodeFlags: [STALL_POOL_FLAG], probe: true }))
+    runs.push(tick(SIMD_GLUE, TOP_TIER_BODIES, 3, { probe: true }))
+  }
+  runs.push(calibrate())
+  return runs
+}
+
+export const PLANS = Object.freeze({ ceiling, claim, stall, matrix, variants, regress: regressWith(SIMD_GLUE), control: regressWith(SCALAR_GLUE) })
 
 export const buildPlan = (mode = 'matrix') => {
   if (!Object.hasOwn(PLANS, mode)) throw new RangeError('unknown plan ' + mode)

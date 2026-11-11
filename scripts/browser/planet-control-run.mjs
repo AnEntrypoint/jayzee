@@ -30,6 +30,8 @@ if (run.error || !run.result) {
     tickMedianMs: r.tickMedianMs,
     workerTick: r.workerTick ?? null,
     physicsWarm: r.physicsWarm ?? null,
+    memoryBytes: r.memoryBytes ?? null,
+    memoryLargest: r.memoryLargest ?? null,
     errors: r.errors ?? [],
   }))
 }

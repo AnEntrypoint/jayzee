@@ -478,7 +478,7 @@ const run = async () => {
   const vegetationBlock = planetScene && VEGETATION && PATH === 'planet' ? createLeafBlock({ level: planetScene.spec.patchLevel, block: WITNESS_PATCH_BLOCK }) : null
   if (vegetationBlock) vegetationBlock.update(0, PLANET.radius, 0)
   const followVegetation = vegetationBlock ? createVegetationFollower({ scene: planetScene, block: vegetationBlock }) : null
-  const handoff = TIER === 1024 ? createPhysicsHandoff({ module, glue: new URL(TIER_GLUE, import.meta.url).href, players: TIER, budgetBytes: TIER_BUDGET, solverIterations: runConfig.solverIterations, workers: WORKERS, timeTicks: TIMED ? FRAMES : 0, path: { window: PATH_WINDOW, perFrame: PAGES_PER_FRAME, stepM: PATH_STEP_M, heightM: PATH_HEIGHT_M, baseY: BASE_Y } }) : null
+  const handoff = TIER === 1024 ? createPhysicsHandoff({ module, glue: new URL(TIER_GLUE, import.meta.url).href, players: TIER, budgetBytes: TIER_BUDGET, solverIterations: runConfig.solverIterations, workers: WORKERS, timeTicks: TIMED ? FRAMES : 0, path: { window: PATH_WINDOW, perFrame: PAGES_PER_FRAME, stepM: PATH_STEP_M, heightM: PATH_HEIGHT_M, baseY: BASE_Y }, warm: QUERY.get('warmRelease') === 'terminate' ? { terminateOnly: true } : true }) : null
   if (handoff) await handoff.ready
 
   const aspect = canvas.width / canvas.height
@@ -603,6 +603,11 @@ const run = async () => {
   result.threads = THREADS
   result.workers = WORKERS
   result.physicsWarm = handoff ? handoff.warm : null
+  if (QUERY.get('memory') === '1' && typeof performance.measureUserAgentSpecificMemory === 'function') {
+    const measured = await performance.measureUserAgentSpecificMemory()
+    result.memoryBytes = measured.bytes
+    result.memoryLargest = measured.breakdown.filter((entry) => entry.bytes > 0).sort((a, b) => b.bytes - a.bytes).slice(0, 4).map((entry) => ({ bytes: entry.bytes, types: entry.types, scopes: entry.attribution.map((owner) => owner.scope) }))
+  }
   result.glue = TIER_GLUE
   result.solverIterations = runConfig.solverIterations
   result.tickMedianMs = round2(median(column(2)))

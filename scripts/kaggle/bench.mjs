@@ -143,7 +143,11 @@ const listThreads = () => {
   }
 }
 const threads = listThreads()
+const ENGINE_POOL_THREADS = 3
+const isEngineThread = (index) => index === 0 || index >= threads.length - ENGINE_POOL_THREADS
 const threadWaitNs = new Float64Array(threads.length)
+const threadRunNs = new Float64Array(threads.length)
+const helperRunMs = new Float64Array(ticks)
 const waitMaxMs = new Float64Array(ticks)
 const waitSumMs = new Float64Array(ticks)
 const waitThread = new Int32Array(ticks).fill(-1)
@@ -151,11 +155,15 @@ const readThreadWaits = (tick) => {
   let worst = 0
   let sum = 0
   let who = -1
+  let helpers = 0
   for (let t = 0; t < threads.length; t++) {
     const length = readSync(threads[t].fd, counterBytes, 0, 128, 0)
     const waited = fieldAt(counterBytes, length, 1)
+    const ran = fieldAt(counterBytes, length, 0)
     const delta = waited - threadWaitNs[t]
+    if (!isEngineThread(t)) helpers += ran - threadRunNs[t]
     threadWaitNs[t] = waited
+    threadRunNs[t] = ran
     if (tick < 0) continue
     sum += delta
     if (delta > worst) {
@@ -167,6 +175,7 @@ const readThreadWaits = (tick) => {
   waitMaxMs[tick] = worst / NS_PER_MS
   waitSumMs[tick] = sum / NS_PER_MS
   waitThread[tick] = who
+  helperRunMs[tick] = helpers / NS_PER_MS
 }
 const activeOf = typeof module._engine_world_active_bodies === 'function' ? module._engine_world_active_bodies : null
 const active = new Int32Array(ticks)
@@ -193,22 +202,31 @@ const hostCounters = throttledAt[0] >= 0 && stealAt[0] >= 0
 const throttledIn = (tick) => throttledAt[tick + 1] - throttledAt[tick]
 const throttledUsecIn = (tick) => throttledUsecAt[tick + 1] - throttledUsecAt[tick]
 const stealIn = (tick) => stealAt[tick + 1] - stealAt[tick]
-const hostMoved = (tick) => hostCounters && (throttledIn(tick) > 0 || stealIn(tick) > 0)
+const RUNQUEUE_WAIT_MS = 5
+const HELPER_IDLE_MS = 1
+const throttledAround = (tick) => hostCounters && throttledIn(tick) > 0
+const stolenAround = (tick) => hostCounters && stealIn(tick) > 0
+const preemptedAround = (tick) => waitThread[tick] >= 0 && isEngineThread(waitThread[tick]) && waitMaxMs[tick] >= RUNQUEUE_WAIT_MS && helperRunMs[tick] < HELPER_IDLE_MS
 collections.push(...gcObserver.takeRecords())
 gcObserver.disconnect()
 const overTicks = []
 times.forEach((ms, tick) => {
-  if (ms > BUDGET_MS) overTicks.push([tick, round(ms, 2), activeOf ? active[tick] : null, hostCounters ? throttledIn(tick) : null, hostCounters ? round(throttledUsecIn(tick) / 1000, 2) : null, hostCounters ? stealIn(tick) : null, threads.length ? round(waitMaxMs[tick], 2) : null, waitThread[tick] >= 0 ? threads[waitThread[tick]].name : null, threads.length ? round(waitSumMs[tick], 2) : null])
-})
-const RUNQUEUE_WAIT_MS = 2
-let overBudgetRunqueueWait = 0
-times.forEach((ms, tick) => {
-  if (ms > BUDGET_MS && waitMaxMs[tick] >= RUNQUEUE_WAIT_MS) overBudgetRunqueueWait += 1
+  if (ms > BUDGET_MS) overTicks.push([tick, round(ms, 2), activeOf ? active[tick] : null, hostCounters ? throttledIn(tick) : null, hostCounters ? round(throttledUsecIn(tick) / 1000, 2) : null, hostCounters ? stealIn(tick) : null, threads.length ? round(waitMaxMs[tick], 2) : null, waitThread[tick] >= 0 ? (isEngineThread(waitThread[tick]) ? 'engine thread ' : 'helper thread ') + waitThread[tick] : null, threads.length ? round(waitSumMs[tick], 2) : null, threads.length ? round(helperRunMs[tick], 2) : null])
 })
 const sortedWaits = Float64Array.from(waitMaxMs).sort()
-let overBudgetHostThrottled = 0
+const sortedHelperRuns = Float64Array.from(helperRunMs).sort()
+let helperRunTotalMs = 0
+for (let tick = 0; tick < ticks; tick++) helperRunTotalMs += helperRunMs[tick]
+const hostOver = { throttled: 0, stolen: 0, preempted: 0, any: 0 }
 times.forEach((ms, tick) => {
-  if (ms > BUDGET_MS && hostMoved(tick)) overBudgetHostThrottled += 1
+  if (ms <= BUDGET_MS) return
+  const throttled = throttledAround(tick)
+  const stolen = stolenAround(tick)
+  const preempted = preemptedAround(tick)
+  if (throttled) hostOver.throttled += 1
+  if (stolen) hostOver.stolen += 1
+  if (preempted) hostOver.preempted += 1
+  if (throttled || stolen || preempted) hostOver.any += 1
 })
 let lastActiveTick = -1
 if (activeOf) active.forEach((count, tick) => {
@@ -231,12 +249,18 @@ emit({
   p99Ms: round(quantile(sorted, 0.99), 3),
   maxMs: round(sorted[sorted.length - 1], 3),
   overBudget: over(times),
-  overBudgetHostThrottled,
+  overBudgetHost: hostOver.any,
+  overBudgetHostThrottled: hostOver.throttled,
+  overBudgetHostStolen: hostOver.stolen,
+  overBudgetHostPreempted: hostOver.preempted,
+  hostRule: 'a tick over budget is the host when the cgroup throttle counter moved in it, or steal time moved in it, or an engine thread waited ' + RUNQUEUE_WAIT_MS + ' ms or more on the run queue in it while the helper threads of the process ran under ' + HELPER_IDLE_MS + ' ms',
   hostCounters,
-  overBudgetRunqueueWait,
   threadsWatched: threads.map((thread) => thread.name),
   waitMaxMedianMs: threads.length ? round(quantile(sortedWaits, 0.5), 3) : null,
   waitMaxP99Ms: threads.length ? round(quantile(sortedWaits, 0.99), 3) : null,
+  helperRunMedianMs: threads.length ? round(quantile(sortedHelperRuns, 0.5), 3) : null,
+  helperRunP99Ms: threads.length ? round(quantile(sortedHelperRuns, 0.99), 3) : null,
+  helperRunTotalMs: threads.length ? round(helperRunTotalMs, 1) : null,
   throttledPeriods: hostCounters ? throttledAt[ticks] - throttledAt[0] : null,
   throttledMs: hostCounters ? round((throttledUsecAt[ticks] - throttledUsecAt[0]) / 1000, 1) : null,
   stealJiffies: hostCounters ? stealAt[ticks] - stealAt[0] : null,

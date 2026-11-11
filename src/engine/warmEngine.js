@@ -49,7 +49,11 @@ export const warmEngine = async (glue, spec = {}) => {
   runScene(module, bodies, ticks)
   const release = () => {
     if (module === null) return
-    releaseEngineModule(module)
+    if (spec.terminateOnly === true) {
+      if (module.PThread) module.PThread.terminateAllThreads()
+    } else {
+      releaseEngineModule(module)
+    }
     module = null
   }
   return Object.freeze({ warmed: true, reason: null, bodies, ticks, ms: now() - started, release })
