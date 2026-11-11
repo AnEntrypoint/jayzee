@@ -3640,3 +3640,6 @@ Open after this pass:
 - Deviation: `CastShape` is registered only as Capsule moving against User1. Jolt casts the ShapeCast's own shape against bodies, and the planet is static, so a planet-moving cast has no caller in the engine. Registering it would be unreachable code.
 - Limit: the segment rule is exact only while the planet is locally spherical over the capsule's length. Terrain height varies over the capsule, so the contact is an approximation of the true capsule-terrain contact.
 - Witness: Phase B builds the threaded and non-threaded glues, and `npm test` must pass. The settle scenario cannot test this dispatch, because it spawns boxes and spheres only and no character, so its witness is recorded as unable to test it.
+
+Phase B (2026-11-11): the 64 MiB fixed glue built (sha256 ee77798f…) and the 512 MiB threaded glue built (sha256 185f7282…), both with exit 0. `npm test` exit 0, 5352 PASS, 0 FAIL, including the settle scenario on both tiers.
+Not witnessed: that the registrations take effect on both orders. Nothing in the JS surface calls the collide or cast path, so the build and `npm test` show the code compiles and the chain is green, not that the dispatch is reached. The character scenario (stretch 2) is the first caller and is its witness.
