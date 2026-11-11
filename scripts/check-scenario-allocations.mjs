@@ -16,7 +16,8 @@ const LOOPS = Object.freeze([
 ])
 const SECOND_WORLD_LOOPS = Object.freeze(['boss-fight', 'deathrun'])
 
-const measure = async (name, worldsBefore) => JSON.parse((await execFileAsync(process.execPath, [child, name, String(WARMUP_TICKS), String(COUNTED_TICKS), String(worldsBefore)], { encoding: 'utf8', maxBuffer: 1 << 22 })).stdout)
+const SYNCHRONOUS_OPTIMISER = '--no-concurrent-recompilation'
+const measure = async (name, worldsBefore) => JSON.parse((await execFileAsync(process.execPath, [SYNCHRONOUS_OPTIMISER, child, name, String(WARMUP_TICKS), String(COUNTED_TICKS), String(worldsBefore)], { encoding: 'utf8', maxBuffer: 1 << 22 })).stdout)
 
 const runs = new Map()
 for (const loop of LOOPS) runs.set(loop.name, await measure(loop.name, 0))
