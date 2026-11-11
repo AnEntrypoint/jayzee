@@ -25,5 +25,21 @@
     "p99Factor": 1.5,
     "basis": "The reference build is a fixed source, so only the machine, Node and the bench harness can move its figure. Kaggle runs 16 to 19 all landed on class GenuineIntel-6-79-0: the same build at the same count ran a median p99 of 13.5 ms in run 16 and 8.8 to 9.0 ms in runs 17 to 19, 1.5 times apart, while the single-thread calibration differed by 1.10 (636 against 575 ms). So one class spreads by about 1.4 times beyond what the calibration explains, and the limit is the recorded reference p99 times 1.5, times the ratio of the calibration of the run to the recorded one when the machine calibrates slower. A drift under that is not caught."
   },
-  "classes": {}
+  "classes": {
+    "AuthenticAMD-23-49-0": {
+      "modelName": "AMD EPYC 7B12",
+      "cores": "2",
+      "siblings": "4",
+      "cache": "512 KB",
+      "kaggleRun": 29,
+      "referenceCommit": "f4e63b04bc2c41e9c5cb1c08066154f99d9ed12d",
+      "bodies": 40960,
+      "workers": 4,
+      "singleMs": 503.7,
+      "referenceP99Ms": 6.693,
+      "candidateP99Ms": 6.71,
+      "candidateOverBudget": 0,
+      "holds": false
+    }
+  }
 }
