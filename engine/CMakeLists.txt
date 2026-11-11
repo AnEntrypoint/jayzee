@@ -33,6 +33,8 @@ set(CMAKE_BUILD_TYPE Release CACHE STRING "" FORCE)
 
 set(ENGINE_OPT_LEVEL "-O2" CACHE STRING "Optimisation level flag for the engine and Jolt")
 option(ENGINE_LTO "Link-time optimisation across the engine and Jolt" OFF)
+set(ENGINE_MOVING_LAYERS "1" CACHE STRING "Broadphase layers the moving bodies are spread over; Jolt rebuilds one layer tree per step")
+set(ENGINE_TOP_TIER_BODIES "10240" CACHE STRING "Body cap of the 1024-player plan; a measurement build raises it")
 add_compile_options(${ENGINE_OPT_LEVEL} -g0 -ffp-contract=off -fno-fast-math -fno-exceptions -fno-rtti)
 if(ENGINE_LTO)
   add_compile_options(-flto)
@@ -101,7 +103,7 @@ if(ENGINE_THREADS)
   math(EXPR ENGINE_POOL_STACK_BYTES "3 * 512 * 1024")
 endif()
 math(EXPR ENGINE_ARENA_BYTES "${ENGINE_TIER_BYTES} - 4 * 1024 * 1024 - ${ENGINE_POOL_STACK_BYTES}")
-target_compile_definitions(engine_core PRIVATE JPH_CROSS_PLATFORM_DETERMINISTIC ENGINE_ARENA_BYTES=${ENGINE_ARENA_BYTES}ull)
+target_compile_definitions(engine_core PRIVATE JPH_CROSS_PLATFORM_DETERMINISTIC ENGINE_ARENA_BYTES=${ENGINE_ARENA_BYTES}ull ENGINE_MOVING_LAYERS=${ENGINE_MOVING_LAYERS} ENGINE_TOP_TIER_BODIES=${ENGINE_TOP_TIER_BODIES})
 
 set(ENGINE_EXPORTS
   _engine_init

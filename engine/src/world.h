@@ -137,6 +137,9 @@ class World {
   void optimize();
   void setTick(std::uint64_t tick);
   void applyRadialGravity(JPH::PhysicsSystem& system, float dt);
+  void gravityRange(std::uint32_t begin, std::uint32_t end);
+  void syncRange(std::uint32_t begin, std::uint32_t end);
+  void forActiveRanges(std::uint32_t count, bool gravity);
   void updateCharacters(float dt);
 
   std::uint32_t count() const { return live_; }

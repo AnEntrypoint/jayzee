@@ -32,10 +32,17 @@ struct Capacity {
 };
 
 constexpr std::uint32_t kMaxPlayers = 1024;
-constexpr std::uint32_t kTopTierBodies = 20480;
-constexpr std::uint64_t kRenderFixedBytes = 1024ull * 1024ull;
+#if !defined(ENGINE_TOP_TIER_BODIES)
+#define ENGINE_TOP_TIER_BODIES 10240
+#endif
+
+constexpr std::uint32_t kTopTierBodies = ENGINE_TOP_TIER_BODIES;
+constexpr std::uint32_t kBaseTopTierBodies = 10240;
 constexpr std::uint64_t kRenderBytesPerBody = 136;
+constexpr std::uint64_t kRenderFixedBytes = 2ull * 1024ull * 1024ull - kBaseTopTierBodies * kRenderBytesPerBody;
 constexpr std::uint64_t kRenderBytes = kRenderFixedBytes + kTopTierBodies * kRenderBytesPerBody;
+
+static_assert(kTopTierBodies >= kBaseTopTierBodies && (kTopTierBodies - 2048) % kMaxPlayers == 0);
 constexpr std::uint64_t kHostReserveBytes = 16ull * 1024ull * 1024ull;
 
 bool plan(std::uint64_t budgetBytes, std::uint32_t players, std::uint32_t workers, Capacity& out);

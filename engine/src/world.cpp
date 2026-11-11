@@ -24,7 +24,6 @@
 #include <Jolt/Physics/Collision/Shape/CapsuleShape.h>
 #include <Jolt/Physics/Collision/Shape/SphereShape.h>
 #include <Jolt/Physics/PhysicsSettings.h>
-#include <Jolt/Physics/PhysicsStepListener.h>
 #include <Jolt/Physics/PhysicsSystem.h>
 #include <Jolt/RegisterTypes.h>
 
@@ -46,8 +45,21 @@ namespace engine {
 
 namespace {
 
+#if !defined(ENGINE_MOVING_LAYERS)
+#define ENGINE_MOVING_LAYERS 1
+#endif
+
 constexpr JPH::ObjectLayer kLayerNonMoving = 0;
 constexpr JPH::ObjectLayer kLayerMoving = 1;
+constexpr std::uint32_t kMovingLayers = ENGINE_MOVING_LAYERS;
+constexpr std::uint32_t kLayerCount = 1 + kMovingLayers;
+constexpr std::uint32_t kMinParallelRows = 1024;
+
+static_assert(kMovingLayers >= 1 && kMovingLayers <= 8);
+
+JPH::ObjectLayer movingLayerOf(std::uint32_t slot) {
+  return static_cast<JPH::ObjectLayer>(kLayerMoving + slot % kMovingLayers);
+}
 constexpr float kGroundHalfExtent = 4096.0f;
 constexpr float kConvexRadius = 0.05f;
 
@@ -69,29 +81,23 @@ T* carveArray(std::size_t count) {
 
 class BroadPhaseLayers final : public JPH::BroadPhaseLayerInterface {
  public:
-  BroadPhaseLayers() {
-    map_[kLayerNonMoving] = JPH::BroadPhaseLayer(0);
-    map_[kLayerMoving] = JPH::BroadPhaseLayer(1);
+  JPH::uint GetNumBroadPhaseLayers() const override { return kLayerCount; }
+
+  JPH::BroadPhaseLayer GetBroadPhaseLayer(JPH::ObjectLayer layer) const override {
+    return JPH::BroadPhaseLayer(static_cast<JPH::BroadPhaseLayer::Type>(layer));
   }
-
-  JPH::uint GetNumBroadPhaseLayers() const override { return 2; }
-
-  JPH::BroadPhaseLayer GetBroadPhaseLayer(JPH::ObjectLayer layer) const override { return map_[layer]; }
 
 #if defined(JPH_EXTERNAL_PROFILE) || defined(JPH_PROFILE_ENABLED)
   const char* GetBroadPhaseLayerName(JPH::BroadPhaseLayer layer) const override {
     return layer == JPH::BroadPhaseLayer(0) ? "non-moving" : "moving";
   }
 #endif
-
- private:
-  JPH::BroadPhaseLayer map_[2];
 };
 
 class ObjectVsBroadPhase final : public JPH::ObjectVsBroadPhaseLayerFilter {
  public:
   bool ShouldCollide(JPH::ObjectLayer layer, JPH::BroadPhaseLayer broad) const override {
-    if (layer == kLayerNonMoving) return broad == JPH::BroadPhaseLayer(1);
+    if (layer == kLayerNonMoving) return broad != JPH::BroadPhaseLayer(0);
     return true;
   }
 };
@@ -99,34 +105,24 @@ class ObjectVsBroadPhase final : public JPH::ObjectVsBroadPhaseLayerFilter {
 class ObjectPairs final : public JPH::ObjectLayerPairFilter {
  public:
   bool ShouldCollide(JPH::ObjectLayer a, JPH::ObjectLayer b) const override {
-    if (a == kLayerNonMoving) return b == kLayerMoving;
+    if (a == kLayerNonMoving) return b != kLayerNonMoving;
     return true;
   }
-};
-
-class RadialGravity final : public JPH::PhysicsStepListener {
- public:
-  explicit RadialGravity(World& owner) : owner_(owner) {}
-
-  void OnStep(const JPH::PhysicsStepListenerContext& context) override {
-    owner_.applyRadialGravity(*context.mPhysicsSystem, context.mDeltaTime);
-  }
-
- private:
-  World& owner_;
 };
 
 }
 
 struct World::Runtime {
-  Runtime(World& owner, std::uint64_t tempBytes, std::uint32_t workers)
+  Runtime(std::uint64_t tempBytes, std::uint32_t workers)
       : temp(static_cast<std::size_t>(tempBytes)),
 #if defined(ENGINE_THREADS)
-        jobs(JPH::cMaxPhysicsJobs, JPH::cMaxPhysicsBarriers, static_cast<int>(workers) - 1),
+        jobs(JPH::cMaxPhysicsJobs, JPH::cMaxPhysicsBarriers, static_cast<int>(workers) - 1)
 #else
-        jobs(JPH::cMaxPhysicsJobs),
+        jobs(JPH::cMaxPhysicsJobs)
 #endif
-        gravity(owner) {}
+  {
+    static_cast<void>(workers);
+  }
 
   BroadPhaseLayers broadPhase;
   ObjectVsBroadPhase objectVsBroadPhase;
@@ -149,7 +145,8 @@ struct World::Runtime {
   JPH::ShapeRefC planetShape;
   JPH::ShapeRefC vegetationShape;
   JPH::BodyIDVector rebaseIds;
-  RadialGravity gravity;
+  const JPH::BodyID* activeIds = nullptr;
+  float stepDt = 0.0f;
 };
 
 std::uint64_t allocationsTotal() {
@@ -220,7 +217,7 @@ Status World::configure(const Config& config) {
   physicsOrigin() = PhysicsOrigin{};
   void* raw = pool::allocateAligned(sizeof(Runtime), alignof(Runtime));
   if (raw == nullptr) return kFull;
-  runtime_ = new (raw) Runtime(*this, limits_.tempBytes, limits_.workers);
+  runtime_ = new (raw) Runtime(limits_.tempBytes, limits_.workers);
   runtime_->jobs.CreateJob("warm", JPH::Color::sGreen, [] {}, 0);
   capacity_ = config.capacity;
   statics_ = 0;
@@ -248,7 +245,6 @@ Status World::configure(const Config& config) {
   settings.mNumPositionSteps = config.iterations;
   settings.mPenetrationSlop = 0.0f;
   runtime_->physics.SetPhysicsSettings(settings);
-  runtime_->physics.AddStepListener(&runtime_->gravity);
   runtime_->rebaseIds.reserve(joltBodyCapacity(limits_));
 
   runtime_->sphere = new JPH::SphereShape(config.radius);
@@ -260,7 +256,7 @@ Status World::configure(const Config& config) {
 
   for (std::uint32_t slot = 0; slot < capacity_; ++slot) {
     JPH::BodyCreationSettings bodySettings(runtime_->sphere.GetPtr(), JPH::RVec3::sZero(), JPH::Quat::sIdentity(),
-                                           JPH::EMotionType::Dynamic, kLayerMoving);
+                                           JPH::EMotionType::Dynamic, movingLayerOf(slot));
     bodySettings.mRestitution = restitution_;
     bodySettings.mLinearDamping = drag_;
     bodySettings.mAllowSleeping = true;
@@ -731,14 +727,13 @@ void World::rebase(double x, double y, double z) {
   }
 }
 
-void World::applyRadialGravity(JPH::PhysicsSystem& system, float dt) {
-  if (runtime_ == nullptr || planetBody_ == kNoBody) return;
+void World::gravityRange(std::uint32_t begin, std::uint32_t end) {
   constexpr float kSleepSpeed = 0.5f;
   const PhysicsOrigin& o = physicsOrigin();
-  const JPH::BodyLockInterfaceNoLock& locks = system.GetBodyLockInterfaceNoLock();
-  const JPH::BodyID* active = system.GetActiveBodiesUnsafe(JPH::EBodyType::RigidBody);
-  const JPH::uint32 activeCount = system.GetNumActiveBodies(JPH::EBodyType::RigidBody);
-  for (JPH::uint32 i = 0; i < activeCount; ++i) {
+  const JPH::BodyLockInterfaceNoLock& locks = runtime_->physics.GetBodyLockInterfaceNoLock();
+  const JPH::BodyID* active = runtime_->activeIds;
+  const float dt = runtime_->stepDt;
+  for (std::uint32_t i = begin; i < end; ++i) {
     JPH::Body* body = locks.TryGetBody(active[i]);
     if (body == nullptr) continue;
     const JPH::uint64 tag = body->GetUserData();
@@ -756,6 +751,51 @@ void World::applyRadialGravity(JPH::PhysicsSystem& system, float dt) {
   }
 }
 
+void World::syncRange(std::uint32_t begin, std::uint32_t end) {
+  const JPH::BodyLockInterfaceNoLock& locks = runtime_->physics.GetBodyLockInterfaceNoLock();
+  const JPH::BodyID* active = runtime_->activeIds;
+  for (std::uint32_t i = begin; i < end; ++i) {
+    const JPH::Body* body = locks.TryGetBody(active[i]);
+    if (body == nullptr) continue;
+    const JPH::uint64 tag = body->GetUserData();
+    if (tag == 0 || alive_[tag - 1] == kSlotFree) continue;
+    const std::uint32_t slot = static_cast<std::uint32_t>(tag - 1);
+    sync(slot);
+    alive_[slot] = kSlotAwakeSynced;
+  }
+}
+
+void World::forActiveRanges(std::uint32_t count, bool gravity) {
+  const std::uint32_t lanes = static_cast<std::uint32_t>(runtime_->jobs.GetMaxConcurrency());
+  if (lanes > 1 && count >= kMinParallelRows) {
+    const std::uint32_t chunk = (count + lanes - 1) / lanes;
+    JPH::JobSystem::Barrier* barrier = runtime_->jobs.CreateBarrier();
+    for (std::uint32_t begin = 0; begin < count; begin += chunk) {
+      const std::uint32_t end = std::min(count, begin + chunk);
+      if (gravity) {
+        barrier->AddJob(runtime_->jobs.CreateJob("gravity rows", JPH::Color::sWhite, [this, begin, end] { gravityRange(begin, end); }));
+      } else {
+        barrier->AddJob(runtime_->jobs.CreateJob("readback rows", JPH::Color::sWhite, [this, begin, end] { syncRange(begin, end); }));
+      }
+    }
+    runtime_->jobs.WaitForJobs(barrier);
+    runtime_->jobs.DestroyBarrier(barrier);
+    return;
+  }
+  if (gravity) {
+    gravityRange(0, count);
+  } else {
+    syncRange(0, count);
+  }
+}
+
+void World::applyRadialGravity(JPH::PhysicsSystem& system, float dt) {
+  if (runtime_ == nullptr || planetBody_ == kNoBody) return;
+  runtime_->activeIds = system.GetActiveBodiesUnsafe(JPH::EBodyType::RigidBody);
+  runtime_->stepDt = dt;
+  forActiveRanges(system.GetNumActiveBodies(JPH::EBodyType::RigidBody), true);
+}
+
 void World::optimize() {
   if (runtime_ == nullptr) return;
   runtime_->physics.OptimizeBroadPhase();
@@ -768,20 +808,13 @@ void World::step(std::uint32_t steps) {
       updateCharacters(dt);
       {
         engine::phase::Scope scope(engine::phase::kPhysics);
+        applyRadialGravity(runtime_->physics, dt);
         runtime_->physics.Update(dt, 1, &runtime_->temp, &runtime_->jobs);
       }
       {
         engine::phase::Scope scope(engine::phase::kReadback);
-        const JPH::BodyInterface& bodies = runtime_->physics.GetBodyInterfaceNoLock();
-        const JPH::BodyID* active = runtime_->physics.GetActiveBodiesUnsafe(JPH::EBodyType::RigidBody);
-        const JPH::uint32 activeCount = runtime_->physics.GetNumActiveBodies(JPH::EBodyType::RigidBody);
-        for (JPH::uint32 i = 0; i < activeCount; ++i) {
-          const JPH::uint64 tag = bodies.GetUserData(active[i]);
-          if (tag == 0 || alive_[tag - 1] == kSlotFree) continue;
-          const std::uint32_t slot = static_cast<std::uint32_t>(tag - 1);
-          sync(slot);
-          alive_[slot] = kSlotAwakeSynced;
-        }
+        runtime_->activeIds = runtime_->physics.GetActiveBodiesUnsafe(JPH::EBodyType::RigidBody);
+        forActiveRanges(runtime_->physics.GetNumActiveBodies(JPH::EBodyType::RigidBody), false);
         for (std::uint32_t slot = 0; slot < fresh_; ++slot) {
           const std::uint8_t state = alive_[slot];
           if (state == kSlotAwakeSynced) {

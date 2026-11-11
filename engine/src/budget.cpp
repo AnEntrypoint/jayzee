@@ -29,7 +29,7 @@ struct Tier {
 constexpr Tier kTiers[] = {
     {16, 512, 32},
     {256, 1024, 16},
-    {kMaxPlayers, 4096, 16},
+    {kMaxPlayers, 2048, (kTopTierBodies - 2048) / kMaxPlayers},
 };
 
 constexpr std::uint32_t kStatics = 64;
