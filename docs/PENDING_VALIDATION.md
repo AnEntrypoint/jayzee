@@ -3914,3 +3914,20 @@ What is established: the threaded glue no longer calls the clock import at run t
 What is not established: the remaining ~25 KB over 600 frames (about 42 B per frame) is attributed to the stepper arrow. The earlier bisect put it at the `_engine_tick` call. The glue's import census shows no JS import called from the tick other than the clock, which does not run. The cause is not identified. Next step: read which import or V8 boundary the tick crosses with a native sampling profiler, or build a counted probe inside the tick.
 
 Not done: no push. The Phase B row that fails is the threaded allocation row, which the owner set as the push condition.
+
+### Threaded per-tick allocation: found and removed
+
+Counted probe: `build/diag/site-probe.mjs` and `build/diag/tick-only.mjs`. A `module._engine_tick(0)` call allocates nothing, and `module._engine_tick(1)` allocates about 24,400 B over 600 calls with no stepper in the loop (`build/diag/site-probe.mjs`, `SKIP=T` removes the allocation). Over 600 bare ticks the JS-side counters for `setTimeout`, `Atomics.notify`, `Atomics.waitAsync`, `performance.now` and `Worker.postMessage` record no per-tick calls (`build/diag/count-sites.mjs`).
+
+Cause: the glue sets `canBlock = !ENVIRONMENT_IS_WEB`, so the Node main thread reports that it supports atomic waits. The futex override then took `memory.atomic.wait32` on the main runtime thread, and V8 allocates for each such wait (the `int64` timeout is boxed). In a browser the main thread cannot block, so it always spun.
+
+Fix: `engine/src/futex_clockfree.cpp` spins on the runtime main thread regardless of `supports_wait`. Workers still use `memory.atomic.wait32`.
+
+Witness, final state, all `rc=0` or PASS:
+- Threaded glues rebuilt once: `build/diag/rebuild-threads5.log`.
+- `check:pose-allocations` on the threaded runtime: `"frameBytes":{"total":0,"own":0,"control":29328,"inheritedFromFramePath":0}`, `RESULT: PASS` (`build/diag/pose-alloc-threaded-5.log`).
+- `check:engine-threads`: PASS, `EXIT 0` (`build/diag/engine-threads-final5.log`).
+- `npm test`: 5,183 PASS, `NPM-EXIT 0` (`build/diag/phaseB-final5-npm-test.log`).
+- Planet configs: all four `ok true`, 0 missed frames (`build/diag/planet-phaseB-final5/*.json`, `PLANET-EXIT 0`).
+
+64-webgpu spike: earlier runs missed one frame at 25.27 ms (frame 665), 26.19 ms (frame 250), and passed on a rerun. Host load in this run: 4.60 before, 4.62 at most during the run, PID 901344 at 95% CPU throughout (`build/diag/host-before-phaseB.log`). The spike did not recur here. Its cause is not established, so it is recorded as intermittent, not fixed.

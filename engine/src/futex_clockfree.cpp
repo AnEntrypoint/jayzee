@@ -54,7 +54,7 @@ int timedWait(volatile int* addr, int val, const struct timespec* at) {
 extern "C" int emscripten_futex_wait(volatile void* addr, std::uint32_t val, double maxWaitMilliseconds) {
   if ((reinterpret_cast<std::uintptr_t>(addr) & 3) != 0) return -EINVAL;
   _emscripten_yield(0);
-  if (!_emscripten_thread_supports_atomics_wait()) return spinWait(addr, val, maxWaitMilliseconds);
+  if (emscripten_is_main_runtime_thread() || !_emscripten_thread_supports_atomics_wait()) return spinWait(addr, val, maxWaitMilliseconds);
   std::int64_t maxWaitNs = -1;
   if (maxWaitMilliseconds != INFINITY && maxWaitMilliseconds >= 0.0) {
     maxWaitNs = static_cast<std::int64_t>(maxWaitMilliseconds * 1000.0 * 1000.0);
