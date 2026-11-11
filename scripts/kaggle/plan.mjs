@@ -48,15 +48,15 @@ const variants = () => {
   return runs
 }
 
-const regress = () => {
+const regressWith = (candidate) => () => {
   const runs = []
   const { bodies, workers, repeats } = BASELINE.topTier
-  for (let repeat = 0; repeat < repeats; repeat++) for (const glue of [referenceGlue(BASELINE.referenceCommit), SIMD_GLUE]) runs.push(tick(glue, bodies, workers))
+  for (let repeat = 0; repeat < repeats; repeat++) for (const glue of [referenceGlue(BASELINE.referenceCommit), candidate]) runs.push(tick(glue, bodies, workers))
   for (let tier = 0; tier < MARBLE_TIERS; tier++) runs.push(marble(tier, BASELINE.marble.runs, BASELINE.marble.warmRuns))
   return runs
 }
 
-export const PLANS = Object.freeze({ matrix, variants, regress })
+export const PLANS = Object.freeze({ matrix, variants, regress: regressWith(SIMD_GLUE), control: regressWith(SCALAR_GLUE) })
 
 export const buildPlan = (mode = 'matrix') => {
   if (!Object.hasOwn(PLANS, mode)) throw new RangeError('unknown plan ' + mode)

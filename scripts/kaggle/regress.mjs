@@ -3,7 +3,7 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
-const verdictPath = join(root, 'build/kaggle/verdict.json')
+const MODES = Object.freeze({ regress: 'build/kaggle/verdict.json', control: 'build/kaggle/control-verdict.json' })
 
 const median = (values) => {
   const sorted = [...values].sort((a, b) => a - b)
@@ -48,8 +48,11 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const { BASELINE, KERNEL_REF } = await import('./plan.mjs')
   const { ensureReference } = await import('./reference.mjs')
   const { runOnKaggle } = await import('./run.mjs')
+  const mode = process.argv[2] ?? 'regress'
+  if (!Object.hasOwn(MODES, mode)) throw new RangeError('unknown mode ' + mode)
+  const verdictPath = join(root, MODES[mode])
   const reference = ensureReference(BASELINE.referenceCommit)
-  const { meta, results } = await runOnKaggle('regress', 'regression gate')
+  const { meta, results } = await runOnKaggle(mode, mode === 'control' ? 'negative control: scalar build as the candidate' : 'regression gate')
   const verdict = { kernel: KERNEL_REF, referenceCommit: BASELINE.referenceCommit, referenceBuilt: reference.built, ...meta, machine: results.cpuModel + ', ' + results.nproc + ' CPUs, Node ' + results.node, ...judge(BASELINE, results) }
   mkdirSync(dirname(verdictPath), { recursive: true })
   writeFileSync(verdictPath, JSON.stringify(verdict, null, 1) + '\n')
