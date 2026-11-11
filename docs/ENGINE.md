@@ -663,7 +663,7 @@ Open items, each with a cause, a hook and a gate. Their rows are in `OPEN_ITEMS`
 | 64-tier untimed, 0.04 ms residual | the earlier 64-tier rows had no timed flag | `PLANET_RUNS` runs the 64 tier with `timed=1` on both backends |
 | spoint frame-time harness | spoint has no planet frame-time path harness | `comparePlanetRuns` refuses unlike inputs |
 
-Not done in Phase A. The vegetation binding is not called from the page, so the 1024 witness fails on `vegetationBound` until the page binds the pool through `engine_vegetation_bind` with wasm-heap views. The planet witness has not been run, so its frame numbers are unknown until Phase B. The spoint harness is not written. The four open items stay open until their Phase B runs.
+The page binds the vegetation pool through `engine_vegetation_bind` with wasm-heap views (`bindVegetation` in `src/engine/planetScene.js`), and the 1024 witness reads `vegetationBound` from that call. The spoint harness is not written. The four open items stay open until their Phase B runs.
 
 Witness: `scripts/check-planet-witness.mjs` (`npm run check:planet-witness`, in `npm test`). It covers the scene counts, the refusals, the budget verdict on passing and failing runs, the 362.9 ms outlier, the adapter cases, the run plan, the comparison refusal, the open-item hooks, and the page exports.
 
@@ -718,6 +718,6 @@ Rebase error. A rebase rounds each body's relative position once, to float32. Th
 
 WebGPU visibility path. The culling and identification passes used a hard-coded placement, `(slot * 4 − 8, 0, −20)`, that was not the model offset. The cull (binding 9), the identification pass (binding 6) and the resolve pass (binding 6) read the per-slot relative offset `modelRel`, the same 64-slot buffer that the model draw uses, written each frame by `uploadModelOffsets`. The culling and drawing paths now use one offset each frame, and the gate fails if the placeholder returns.
 
-Not in this stretch. The WebGPU visibility path draws models but not vegetation. Vegetation has no identification pass, so adding it is a feature, not a precision fix. It is left open and recorded in `docs/PENDING_VALIDATION.md`.
+Vegetation in the visibility path. The visibility path draws vegetation in its front pass, after props and before terrain, as the forward path does. Vegetation instances have no entries in the ID buffer, so the resolve pass does not shade them. Identification of vegetation in the ID buffer is left open and recorded in `docs/PENDING_VALIDATION.md`.
 
 Witness: `scripts/check-relative-residuals.mjs` (`npm run check:relative-residuals`, in `npm test`). It covers the light round trip and its control, the rebase threshold and its constant, the walk and its control, the rebase cost, the C++ wiring of the physics origin, and the WebGPU offsets.

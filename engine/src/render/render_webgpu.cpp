@@ -1500,6 +1500,7 @@ void encodeVisibility(wgpu::CommandEncoder& encoder, wgpu::TextureView target) {
   frontDesc.depthStencilAttachment = &frontDepth;
   wgpu::RenderPassEncoder front = ENGINE_RENDER_CALL(encoder.BeginRenderPass(&frontDesc));
   drawProps(front);
+  drawVegetation(front);
   drawTerrain(front);
   ENGINE_RENDER_CALL(front.End());
 }

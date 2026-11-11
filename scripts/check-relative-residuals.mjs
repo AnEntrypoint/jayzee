@@ -110,6 +110,17 @@ gate('the render path places each body by its physics origin minus the frame ori
   assert.ok(js.includes("f64[lightPositions + slot * 3 + i] = finite(position[i], 'light position')"))
 })
 
+gate('the WebGPU visibility path draws vegetation in its front pass, after props and before terrain', () => {
+  const gpu = read('engine/src/render/render_webgpu.cpp')
+  const start = gpu.indexOf('void encodeVisibility(')
+  const end = gpu.indexOf('\n}\n', start)
+  const body = gpu.slice(start, end)
+  const props = body.indexOf('drawProps(front);')
+  const vegetation = body.indexOf('drawVegetation(front);')
+  const terrain = body.indexOf('drawTerrain(front);')
+  assert.ok(props >= 0 && vegetation > props && terrain > vegetation, 'front pass order is props, vegetation, terrain')
+})
+
 gate('the WebGPU visibility path culls and identifies models at their relative offsets, with no hard-coded placement', () => {
   const gpu = read('engine/src/render/render_webgpu.cpp')
   assert.equal(gpu.includes('f32(slot) * 4.0 - 8.0'), false)

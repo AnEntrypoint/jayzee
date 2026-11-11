@@ -3700,3 +3700,11 @@ Phase B (2026-11-11): no engine source changed in this stretch, so the glues are
 - Witness: Phase B runs the boss scenario on both tiers.
 
 Phase B (2026-11-11): the engine is unchanged in this stretch, so the glues are the stretch 4 builds. The boss fight scenario prints RESULT: PASS on both tiers (all five gates). `npm test` exit 0 with no FAIL lines.
+
+## Vegetation in the WebGPU visibility path (Phase A, 2026-11-11)
+
+- Finding: the visibility path (`encodeVisibility`) drew props and terrain in its front pass but not vegetation, so vegetation was missing on the visibility path while the forward path drew it. The ENGINE.md note at line 666 said the page did not bind vegetation, which was out of date: `bindVegetation` in `src/engine/planetScene.js` binds it.
+- Change: `engine/src/render/render_webgpu.cpp` `encodeVisibility` calls `drawVegetation(front)` between `drawProps` and `drawTerrain`, the same order as the forward path.
+- Change: `scripts/check-relative-residuals.mjs` gains the gate "the WebGPU visibility path draws vegetation in its front pass, after props and before terrain".
+- Change: `docs/ENGINE.md` lines near 666 and 721 are corrected. The 666 note now states that the page binds vegetation. The 721 note now states that vegetation is drawn in the front pass and is not identified in the ID buffer.
+- Limit: vegetation has no ID-buffer identification, so the resolve pass does not shade it and it is drawn over the resolved frame. That is the open part. The witness is the planet run on both backends.
