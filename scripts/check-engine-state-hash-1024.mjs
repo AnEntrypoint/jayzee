@@ -14,7 +14,10 @@ const pins = JSON.parse(readFileSync(join(root, 'engine/state-hashes.json'), 'ut
 const child = join(root, 'scripts/lib/stateHashChild.mjs')
 const execFileAsync = promisify(execFile)
 const runIsolated = async (glue, workers) => JSON.parse((await execFileAsync(process.execPath, [child, glueUrl(glue), String(workers)], { encoding: 'utf8', maxBuffer: 1 << 20 })).stdout)
-const [fixedRun, ...threadedRuns] = await Promise.all([runIsolated(FIXED_GLUE, 1), ...THREAD_COUNTS.map((workers) => runIsolated(THREADED_GLUE, workers))])
+const fixedPending = runIsolated(FIXED_GLUE, 1)
+const threadedRuns = []
+for (const workers of THREAD_COUNTS) threadedRuns.push(await runIsolated(THREADED_GLUE, workers))
+const fixedRun = await fixedPending
 const countRuns = new Map(THREAD_COUNTS.map((workers, at) => [workers, threadedRuns[at]]))
 const threadedRun = countRuns.get(THREADED_WORKERS) ?? await runIsolated(THREADED_GLUE, THREADED_WORKERS)
 const fixed = fixedRun.hash

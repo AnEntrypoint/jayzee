@@ -34,11 +34,10 @@ const report = []
 for (const pair of PAIRS) {
   const scenarios = {}
   for (const scenario of SCENARIOS) {
-    const [stoppedEarly, fixed, ...threaded] = await Promise.all([
-      runIsolated(pair, scenario, pair.fixed, 1, CONTROL_TICKS),
-      runIsolated(pair, scenario, pair.fixed, 1, WHOLE_SCENARIO),
-      ...THREAD_COUNTS.map((workers) => runIsolated(pair, scenario, pair.threaded, workers, WHOLE_SCENARIO)),
-    ])
+    const fixedPending = Promise.all([runIsolated(pair, scenario, pair.fixed, 1, CONTROL_TICKS), runIsolated(pair, scenario, pair.fixed, 1, WHOLE_SCENARIO)])
+    const threaded = []
+    for (const workers of THREAD_COUNTS) threaded.push(await runIsolated(pair, scenario, pair.threaded, workers, WHOLE_SCENARIO))
+    const [stoppedEarly, fixed] = await fixedPending
     scenarios[scenario] = { stoppedEarly, fixed, threaded }
   }
   report.push({ ...pair, fixedWasmSha256: wasmDigest(pair.fixed), threadedWasmSha256: wasmDigest(pair.threaded), scenarios })
