@@ -43,6 +43,41 @@ export const canaryStalls = (results, stallMs = CANARY_STALL_MS) => {
   return stalls
 }
 
+export const PHASE_BIN_S = 0.5
+export const FULL_WORKERS = 4
+
+export const overBudgetTimes = (results, workers = FULL_WORKERS) => {
+  const originS = results.startedAtEpochS ?? 0
+  const events = []
+  results.configs.forEach((row, index) => {
+    if (row.kind !== 'tick' || row.workers !== workers || !Array.isArray(row.overTicks)) return
+    for (const tick of row.overTicks) {
+      if (Number.isFinite(tick.epochMs)) events.push({ row: index, role: row.role, tick: tick.tick, ms: tick.ms, host: tick.host === true, atS: round(tick.epochMs / 1000 - originS) })
+    }
+  })
+  return events
+}
+
+export const densestPhase = (events, periodS = PERIOD_S, binS = PHASE_BIN_S) => {
+  if (events.length === 0) return null
+  const bins = new Array(Math.round(periodS / binS)).fill(0)
+  for (const event of events) bins[Math.floor((((event.atS % periodS) + periodS) % periodS) / binS) % bins.length] += 1
+  let best = 0
+  for (let i = 1; i < bins.length; i++) {
+    if (bins[i] > bins[best]) best = i
+  }
+  return round(best * binS + binS / 2)
+}
+
+export const nearPhase = (events, phaseS, periodS = PERIOD_S, nearS = NEAR_S) => {
+  if (phaseS === null) return { events: events.length, near: 0, phaseS: null, chanceShare: round((2 * nearS) / periodS) }
+  const off = (atS) => {
+    const d = (((atS - phaseS) % periodS) + periodS) % periodS
+    return Math.min(d, periodS - d)
+  }
+  return { events: events.length, near: events.filter((event) => off(event.atS) <= nearS).length, phaseS, chanceShare: round((2 * nearS) / periodS) }
+}
+
 export const phaseShare = (events, periodS = PERIOD_S, nearS = NEAR_S) => {
   if (events.length === 0) return { events: 0, near: 0, phaseS: null, chanceShare: round((2 * nearS) / periodS) }
   let x = 0
@@ -86,5 +121,9 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     const unseen = stalls.filter((stall) => stall.unseen)
     console.log('CANARY ' + JSON.stringify({ rows: results.configs.filter((row) => row.kind === 'canary').map((row) => ({ threads: row.threads, seconds: row.seconds, gapCount: row.gapCount, over5Ms: row.over5Ms, over5MsUnseen: row.over5MsUnseen, widestMs: row.widestMs })), stalls: stalls.length, unseen: unseen.length, unseenPhase: phaseShare(unseen), benchPhase: phaseShare(events.filter((event) => event.clock === 'stamped')), bothPhase: phaseShare([...unseen, ...events.filter((event) => event.clock === 'stamped')]) }))
     for (const stall of unseen.slice(0, 40)) console.log('STALL ' + JSON.stringify(stall))
+    const full = stalls.filter((stall) => stall.threads >= FULL_WORKERS)
+    const phaseS = densestPhase(full)
+    const over = overBudgetTimes(results)
+    console.log('LATTICE ' + JSON.stringify({ periodS: PERIOD_S, phaseFromCanaryS: phaseS, canaryStallsOnFullThreads: nearPhase(full, phaseS), canaryStallsOnOneThread: stalls.filter((stall) => stall.threads === 1).length, benchTicksOverBudget: nearPhase(over, phaseS), benchTicksOverBudgetOffThePhase: over.filter((event) => nearPhase([event], phaseS).near === 0).map((event) => ({ row: event.row, role: event.role, tick: event.tick, ms: event.ms, host: event.host, atS: event.atS })) }))
   }
 }

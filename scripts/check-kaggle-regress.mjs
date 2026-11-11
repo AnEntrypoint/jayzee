@@ -8,7 +8,7 @@ import { decide } from './kaggle/push-gate.mjs'
 import { repeatedSpikes } from './kaggle/spikes.mjs'
 import { BASELINE, PROFILE_REPEATS, PROFILE_UNRECLAIMED_REPEATS, PROFILE_VARIANT, RECLAIM_OFF, buildPlan } from './kaggle/plan.mjs'
 import { describeSlowTick } from './kaggle/tickProfile.mjs'
-import { canaryStalls, periodFit, phaseShare, slowTickTimes } from './kaggle/slowTickClock.mjs'
+import { canaryStalls, densestPhase, nearPhase, overBudgetTimes, periodFit, phaseShare, slowTickTimes } from './kaggle/slowTickClock.mjs'
 import { PIPE_BYTES, distinctDryRows, judgePreflight } from './kaggle/preflight.mjs'
 import { spawnSync } from 'node:child_process'
 import { referenceGlue } from './kaggle/reference.mjs'
@@ -407,6 +407,13 @@ gate('canary stalls and stamped slow ticks are placed on one clock, and their sh
   assert.ok(Math.abs(share.phaseS - 3.24) < 0.05, 'phase ' + share.phaseS)
   assert.equal(phaseShare([{ atS: 1 }, { atS: 6 }, { atS: 3.4 }, { atS: 8.5 }]).near <= 2, true)
   assert.equal(phaseShare([]).events, 0)
+  const lattice = [{ atS: 240.05 }, { atS: 250.09 }, { atS: 260.05 }, { atS: 233.0 }, { atS: 270.12 }]
+  assert.equal(densestPhase(lattice), 0.25)
+  assert.equal(densestPhase([]), null)
+  assert.deepEqual(nearPhase(lattice, 0.25), { events: 5, near: 4, phaseS: 0.25, chanceShare: 0.15 })
+  assert.equal(nearPhase([{ atS: 109.84 }], 0.25).near, 1)
+  const stamped = { startedAtEpochS: 1000, configs: [{ kind: 'tick', workers: 4, role: 'gate', overTicks: [{ tick: 9, ms: 18, host: true, epochMs: 1090070 }, { tick: 12, ms: 19, host: false }] }, { kind: 'tick', workers: 1, role: 'record', overTicks: [{ tick: 1, ms: 30, host: false, epochMs: 1001000 }] }] }
+  assert.deepEqual(overBudgetTimes(stamped), [{ row: 0, role: 'gate', tick: 9, ms: 18, host: true, atS: 90.07 }])
 })
 
 gate('the regress plan carries the profile build at the top tier as rows the gate does not judge', () => {

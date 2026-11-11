@@ -4617,10 +4617,20 @@ Kaggle runs, all private, class GenuineIntel-6-79-0: run 36 stopped at its first
 
 Open: what the 10-second host activity is; what the other holders of the driver lock are when no browser of this project is running.
 
-## Phase K, pending (2026-11-12): one Kaggle run per stretch, and whether the 10-second stall is ours
+## Phase K (2026-11-12): one Kaggle run per stretch, and whether the 10-second stall is ours
 
 Ranked list of what is left, top first: (1) one-run measurement pipeline, this phase; (2) the 10-second host activity, canary rows in this phase's run; (3) raise the awake budget, needs engine work on the broadphase and the planet pair; (4) settle time at 131072, waits on 3; (5) other holders of the graphics driver lock, only processes visible from this container can be named; (6) AMD class record, waits on a run that lands on that class; (7) Jolt's profiler compiled into the production glues; (8) one retry when a witness page fails to open; (9) host witness on the patched Jolt; (10) measure-memory on the final tree.
 
 Phase A commit, with the witness it needs in Phase B:
 
 - `scripts/kaggle/preflight.mjs`, `kernel.py.tmpl`, `plan.mjs`, `run.mjs`, `emit.mjs`, `pipeProbe.mjs`, `canary.mjs`, `bench.mjs`, `slowTickClock.mjs`: the real kernel script runs dry on this host before anything is uploaded, each distinct row once at 4096 bodies and 40 ticks with a budget that marks every tick, plus a 300 KB result line; the kernel records a row it cannot read and goes on; every row and every over-budget tick carries a clock stamp; a canary with no engine in it spins one and then four threads and records every gap. Witness: `node scripts/kaggle/preflight.mjs regress` with no failure; `check:kaggle-regress` (three new lines); one Kaggle gate run that completes every planned row; `node scripts/kaggle/slowTickClock.mjs <results>` saying whether the canary has the unseen stalls on the bench's 10-second phase.
+
+### Phase B of Phase K (2026-11-12): one run, and the stall is not ours
+
+One Kaggle run for the stretch, run 39 (private, class GenuineIntel-6-79-0, 625 s): 42 of 42 planned rows, no failed row, after a dry run of 21 distinct rows in 38 s whose largest result line was 300,048 bytes. Gate: mean awake tick 7.815 ms against the reference 7.896 ms (limit 8.686), quiet-tick p99 10.215 against 10.132 ms (limit 12.665), 0 ticks over budget in the median run against 0. The engine glues are unchanged.
+
+- Dry run: `node scripts/kaggle/preflight.mjs regress` gives no failure; with the run 36 defect put back it fails on the 300 KB row ("unreadable result: Unterminated string") and the kernel still runs every other row.
+- Canary: one spinning thread, 2 rows of 45 s, no stall (widest gap 1.5 and 1.7 ms). Four spinning threads, 2 rows of 45 s: 62 stalls of 4 ms or more, 47 on one phase of a 10 s period, the wait visible on the run queue in all but one. Bench ticks over budget at 4 workers: 19 of 22 on that same phase. The bench process is ruled out as the origin.
+- The session is a real Linux 6.18 kernel with a quota of 4 CPUs, not a user-space kernel.
+
+Open: what in the Kaggle session wakes every 10 s; the one tick per run that is off the phase with no wait (18.5 ms at tick 155 of one gate row in run 39).
