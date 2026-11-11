@@ -27,5 +27,6 @@
   "check:planet-witness-scene": "Builds the witness scene three times on the 1024-tier engine and runs one camera lap.",
   "check:alloc-audit": "Sixteen rows of 50,000 calls each under a 1 MiB semi-space.",
   "check:scenario-combat-bots": "Two runs on four tiers, with the duel and its wall and ridge controls.",
-  "check:scenario-planet-landing": "Two runs of 480 ticks on four tiers."
+  "check:scenario-planet-landing": "Two runs of 480 ticks on four tiers.",
+  "check:engine-release": "Loads seven threaded 512 MiB instances in turn and waits for the collector after each."
 }
