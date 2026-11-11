@@ -6,7 +6,7 @@
 
 namespace engine::phase {
 
-enum Id : unsigned { kPages = 0, kInputs = 1, kPhysics = 2, kReadback = 3, kPlan = 4, kBackend = 5, kAcquire = 6, kUpload = 7, kSubmit = 8, kEncode = 9, kCount = 10 };
+enum Id : unsigned { kPages = 0, kInputs = 1, kPhysics = 2, kReadback = 3, kPlan = 4, kBackend = 5, kAcquire = 6, kUpload = 7, kSubmit = 8, kEncode = 9, kUploadVegetation = 10, kUploadProps = 11, kUploadPages = 12, kCount = 13 };
 
 #if defined(ENGINE_PHASE_TIMERS)
 

@@ -1,6 +1,7 @@
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { runRenderWitness } from './render-witness.mjs'
+import { witnessBrowser } from './ownDisplay.mjs'
 import { PLANET_RUNS, planetQuery } from '../../src/engine/planetWitness.js'
 
 const root = resolve(fileURLToPath(new URL('../..', import.meta.url)))
@@ -10,7 +11,8 @@ const config = PLANET_RUNS.find((run) => String(run.tier) === tierText && run.ba
 if (!config) throw new RangeError('unknown configuration ' + label)
 const query = planetQuery(config, Number(framesArg)) + (extra ? '&' + extra : '')
 const traced = process.env.TRACE === '1'
-const run = await runRenderWitness({ root, port: Number(portArg), query, trace: traced, gpuTrace: traced, timeoutMs: 240000 })
+const own = await witnessBrowser(root)
+const run = await runRenderWitness({ root, port: Number(portArg), query, trace: traced, gpuTrace: traced, timeoutMs: 240000, debugPort: own.debugPort }).finally(() => own.stop())
 if (run.error || !run.result) {
   console.log(JSON.stringify({ label, extra, error: run.error ?? 'no result' }))
   process.exitCode = 1

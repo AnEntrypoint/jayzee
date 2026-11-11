@@ -2,7 +2,7 @@ import { loadEngineModule, resolvePlan } from '../src/engine/EngineWorld.js'
 import { configureWorld } from '../src/engine/sceneSetup.js'
 import { readLayout } from '../src/engine/bridge.js'
 
-const PHASES = ['pages', 'inputs', 'physics', 'readback', 'plan', 'backend', 'acquire', 'upload', 'submit', 'encode']
+const PHASES = ['pages', 'inputs', 'physics', 'readback', 'plan', 'backend', 'acquire', 'upload', 'submit', 'encode', 'uploadVegetation', 'uploadProps', 'uploadPages']
 const [glue, ticksArg = "300", workersArg = "4", budgetArg = String(512 * 1024 * 1024), warmArg = "60", iterArg] = process.argv.slice(2)
 const ticks = Number(ticksArg)
 const warm = Number(warmArg)

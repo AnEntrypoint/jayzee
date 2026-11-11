@@ -1585,18 +1585,24 @@ int frame(const SceneView& scene, const FramePlan& plan, const Camera& camera) {
   {
     engine::phase::Scope scope(engine::phase::kUpload);
     writeBuffer(cameraBuf, 0, &camera, kCameraBytes);
-    uploadVegetation(camera, scene.origin);
+    {
+      engine::phase::Scope part(engine::phase::kUploadVegetation);
+      uploadVegetation(camera, scene.origin);
+    }
     uploadModelOffsets(scene.origin);
     std::uint32_t propArgs[kPropClasses * 4];
-    for (std::uint32_t c = 0; c < kPropClasses; ++c) {
-      const std::uint32_t count = plan.propCount[c];
-      if (count != 0) {
-        writeBuffer(instanceBuf[c], 0, plan.propRecords + c * plan.bodySlots * kRecordWords, static_cast<std::uint64_t>(count) * kRecordBytes);
+    {
+      engine::phase::Scope part(engine::phase::kUploadProps);
+      for (std::uint32_t c = 0; c < kPropClasses; ++c) {
+        const std::uint32_t count = plan.propCount[c];
+        if (count != 0) {
+          writeBuffer(instanceBuf[c], 0, plan.propRecords + c * plan.bodySlots * kRecordWords, static_cast<std::uint64_t>(count) * kRecordBytes);
+        }
+        propArgs[c * 4 + 0] = kPropVertices;
+        propArgs[c * 4 + 1] = count;
+        propArgs[c * 4 + 2] = 0;
+        propArgs[c * 4 + 3] = 0;
       }
-      propArgs[c * 4 + 0] = kPropVertices;
-      propArgs[c * 4 + 1] = count;
-      propArgs[c * 4 + 2] = 0;
-      propArgs[c * 4 + 3] = 0;
     }
     if (std::memcmp(propArgsShadow, propArgs, sizeof propArgs) != 0) {
       std::memcpy(propArgsShadow, propArgs, sizeof propArgs);
@@ -1644,6 +1650,7 @@ int frame(const SceneView& scene, const FramePlan& plan, const Camera& camera) {
       writeBuffer(counterBuf, 0, kZeroCounters, kCounterBytes);
     }
 
+    engine::phase::Scope pages(engine::phase::kUploadPages);
     for (std::uint32_t u = 0; u < plan.uploadCount;) {
       const std::uint32_t end = uploadRunEnd(plan, u);
       writeLayers(heightTex, plan.uploadLayer[u], end - u, scene.pages->pageSamples(static_cast<int>(plan.uploadSlot[u])), kPageSide, 4);

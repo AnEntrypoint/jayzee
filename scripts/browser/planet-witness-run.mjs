@@ -5,6 +5,7 @@ import { cpus, loadavg } from 'node:os'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { runRenderWitness } from './render-witness.mjs'
+import { witnessBrowser } from './ownDisplay.mjs'
 import { THROTTLE_SAMPLE_MS, THROTTLE_SLACK_MS, excuseHostThrottled, isHostThrottledGap, throttledBetween } from './hostThrottle.mjs'
 import { PLANET_FRAME_BUDGET_MS, PLANET_MISSED_FRAME_MS, PLANET_RUNS, planetQuery, planetVerdict } from '../../src/engine/planetWitness.js'
 
@@ -237,6 +238,9 @@ const frameCases = (result, samples, gapInfo, gpuRows = [], throttleSamples = []
 const summary = []
 let failed = 0
 const only = process.env.PLANET_ONLY
+const own = await witnessBrowser(root)
+let stopped = null
+try {
 for (const config of PLANET_RUNS.filter((run) => !only || only === run.tier + '-' + run.backend)) {
   const label = config.tier + '-' + config.backend
   const started = Date.now()
@@ -248,7 +252,7 @@ for (const config of PLANET_RUNS.filter((run) => !only || only === run.tier + '-
   const stopGpu = sampleGpu(gpuRows)
   const throttleSamples = []
   const throttleTimer = setInterval(() => throttleSamples.push({ epochMs: Date.now(), ...readCgroupCpu() }), THROTTLE_SAMPLE_MS)
-  const run = await runRenderWitness({ root, port, query: planetQuery(config, frames), trace: true, gpuTrace: true, timeoutMs: RUN_TIMEOUT_MS })
+  const run = await runRenderWitness({ root, port, query: planetQuery(config, frames), trace: true, gpuTrace: true, timeoutMs: RUN_TIMEOUT_MS, debugPort: own.debugPort })
   stop.done = true
   clearInterval(throttleTimer)
   await sampling
@@ -271,8 +275,11 @@ for (const config of PLANET_RUNS.filter((run) => !only || only === run.tier + '-
   const wallMaxMs = run.result ? run.result.wallIntervalMaxMs : null
   summary.push({ label, wallMs, ok: verdict.ok, workMaxMs: verdict.maxMs, workP99Ms: verdict.p99Ms, wallMaxMs, workerTick: run.result?.workerTick ?? null, missedFrames: cases.length, hostThrottledIntervals: verdict.hostThrottledIntervals ?? 0, frameCases: cases.map((c) => ({ frame: c.frame, intervalMs: c.intervalMs, workMs: c.workMs, classification: c.classification, maxLoad1: c.maxLoad1, gapMs: c.gapMs, mainThreadBusyMs: c.mainThreadBusyMs, topInWindow: c.topInWindow })), load, failures: verdict.failures })
 }
+} finally {
+  stopped = await own.stop()
+}
 
-console.log(JSON.stringify({ outDir, budgetMs: 16.7, runs: summary }, null, 1))
+console.log(JSON.stringify({ outDir, budgetMs: 16.7, browser: { ownDisplay: own.display, stopped }, runs: summary }, null, 1))
 if (failed > 0) {
   console.error('planet witness: ' + failed + ' of ' + PLANET_RUNS.length + ' runs missed the budget or a requirement')
   process.exitCode = 1

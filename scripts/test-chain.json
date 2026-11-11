@@ -291,6 +291,7 @@
   "check:engine-awake-budget",
   "check:engine-release",
   "check:engine-airborne",
+  "check:own-display",
   "check:engine-pools",
   "check:engine-planet",
   "check:engine-vegetation",

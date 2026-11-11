@@ -3,6 +3,7 @@ import { spawn } from 'node:child_process'
 import { writeFileSync } from 'node:fs'
 import { connectCdp } from './cdp-client.mjs'
 import { poll, projectDebugPort, sleep, stopChild } from './page-witness.mjs'
+import { witnessBrowser } from './ownDisplay.mjs'
 const root = fileURLToPath(new URL('../..', import.meta.url)).replace(/\/$/, '')
 const [query, out] = process.argv.slice(2)
 const port = 8853
@@ -10,7 +11,8 @@ const live = []
 const server = spawn(process.execPath, [root + '/scripts/browser/serve-root.mjs', String(port)], { cwd: root, stdio: 'ignore' })
 live.push(server)
 const url = 'http://127.0.0.1:' + port + '/scripts/browser/engine-render.html?' + query
-const { send, close } = await connectCdp(projectDebugPort(root), { sendTimeoutMs: 120000 })
+const own = await witnessBrowser(root)
+const { send, close } = await connectCdp(own.debugPort ?? projectDebugPort(root), { sendTimeoutMs: 120000 })
 let targetId = null
 try {
   await poll(async () => (await fetch(url)).status === 200, 60, 200);
@@ -34,4 +36,5 @@ try {
   if (targetId) await send('Target.closeTarget', { targetId }).catch(() => {})
   close()
   stopChild(server, live)
+  await own.stop()
 }

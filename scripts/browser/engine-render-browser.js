@@ -483,7 +483,7 @@ const run = async () => {
 
   const aspect = canvas.width / canvas.height
   const frameTimes = new Float64Array(FRAMES)
-  const PHASE_NAMES = ['pages', 'inputs', 'physics', 'readback', 'plan', 'backend', 'acquire', 'upload', 'submit', 'encode']
+  const PHASE_NAMES = ['pages', 'inputs', 'physics', 'readback', 'plan', 'backend', 'acquire', 'upload', 'submit', 'encode', 'uploadVegetation', 'uploadProps', 'uploadPages']
   const phaseCount = TIMED && module._engine_phase_count ? module._engine_phase_count() : 0
   const ROW_FIELDS = 7
   const ROW_WIDTH = ROW_FIELDS + phaseCount

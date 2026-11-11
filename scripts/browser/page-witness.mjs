@@ -40,7 +40,7 @@ export const projectDebugPort = (root, readText = (path) => readFileSync(path, '
 export const whenSet = (name) => '(() => { const value = window[' + JSON.stringify(name) + ']; return value ? JSON.stringify(value) : null })()'
 
 const TRACE_CATEGORIES = 'devtools.timeline,disabled-by-default-devtools.timeline,disabled-by-default-devtools.timeline.frame,toplevel'
-const GPU_TRACE_CATEGORIES = 'gpu,viz,cc,disabled-by-default-gpu.service,gpu.dawn,disabled-by-default-gpu.dawn'
+const GPU_TRACE_CATEGORIES = 'gpu,viz,cc,ipc,mojom,disabled-by-default-gpu.service,gpu.dawn,disabled-by-default-gpu.dawn'
 
 const startTrace = async ({ send, on, off }, categories) => {
   const chunks = []
