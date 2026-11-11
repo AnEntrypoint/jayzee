@@ -9,7 +9,21 @@ const median = (values) => [...values].sort((a, b) => a - b)[Math.floor(values.l
 const knobsOf = (c) => Object.fromEntries(!c.knobs || c.knobs === 'none' ? [] : c.knobs.split(',').map((pair) => pair.split('=')))
 const budgetOf = (c) => Number(knobsOf(c).awake ?? c.awakeBudget ?? 0)
 const otherKnobs = (c) => Object.entries(knobsOf(c)).filter(([key]) => key !== 'awake').map(([key, value]) => ', ' + key + ' ' + value).join('')
-const buildOf = (c) => (c.variant === 'reference' ? 'unbudgeted reference' : (budgetOf(c) === 0 ? 'candidate, every body awake' : 'candidate, awake budget ' + budgetOf(c)) + otherKnobs(c))
+const UNBUDGETED = 'de44d1f9addb'
+const HELD_IN_WORLD = '675210968a34'
+const sourceOf = (c) => {
+  const glue = String(c.args?.[0] ?? '')
+  if (glue.includes(UNBUDGETED)) return 'build before the budget'
+  if (glue.includes(HELD_IN_WORLD)) return 'build that held bodies in the world'
+  if (c.variant === 'reference') return 'reference build'
+  return 'candidate'
+}
+const flagsOf = (c) => (c.nodeFlags?.length ? ', node ' + c.nodeFlags.join(' ') : '')
+const buildOf = (c) => {
+  const source = sourceOf(c)
+  if (source === 'build before the budget') return source
+  return source + (budgetOf(c) === 0 ? ', every body awake' : ', awake budget ' + budgetOf(c)) + otherKnobs(c) + flagsOf(c)
+}
 
 export const summarise = (runs, budgetMs) => {
   const classes = new Map()
@@ -48,7 +62,7 @@ export const summarise = (runs, budgetMs) => {
 }
 
 export const render = (classes, budgetMs) => {
-  const lines = ['## Physics claim per Kaggle machine class', '', 'Written by \`node scripts/kaggle/claims.mjs\` from the result files of \`' + KERNEL_REF + '\` named below. A row holds when every repeat has zero ticks over ' + budgetMs + ' ms and a p99 at or under it, warmed, 900 ticks, the whole worker tick timed. The unbudgeted reference is the build before the awake budget, with every body awake from tick 0. The class is vendor, family, model and stepping from /proc/cpuinfo.', '']
+  const lines = ['## Physics claim per Kaggle machine class', '', 'Written by \`node scripts/kaggle/claims.mjs\` from the result files of \`' + KERNEL_REF + '\` named below. A row holds when every repeat has zero ticks over ' + budgetMs + ' ms and a p99 at or under it, warmed, 900 ticks, the whole worker tick timed. The build before the budget has every body awake from tick 0, and the build that held bodies in the world kept a held body asleep at its spawn point. The class is vendor, family, model and stepping from /proc/cpuinfo.', '']
   for (const c of classes) {
     const m = c.machine
     const lscpu = m.lscpu ?? {}

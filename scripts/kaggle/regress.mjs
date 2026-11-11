@@ -58,11 +58,19 @@ export const judge = (baseline, results) => {
   const p99Of = (c) => (onQuiet ? c.p99QuietMs : c.p99Ms)
   const hostOf = (c) => (Number.isInteger(c.overBudgetHost) ? c.overBudgetHost : 0)
   const judgedOver = (c) => c.overBudget - hostOf(c)
-  const top = { bodies, workers, referenceP99Ms: null, candidateP99Ms: null, p99LimitMs: null, referenceOverBudget: null, candidateOverBudget: null, overLimit: null, referenceOverEach: reference.map(judgedOver), candidateOverEach: candidate.map(judgedOver), referenceHostExcludedEach: reference.map(hostOf), candidateHostExcludedEach: candidate.map(hostOf), hostRule: [...reference, ...candidate].map((c) => c.hostRule).find((rule) => typeof rule === 'string') ?? null, p99Basis: onQuiet ? 'quiet ticks' : 'every tick', referenceP99EachMs: reference.map(p99Of), candidateP99EachMs: candidate.map(p99Of), referenceP99EveryTickEachMs: reference.map((c) => c.p99Ms), candidateP99EveryTickEachMs: candidate.map((c) => c.p99Ms), referenceQuietTicksEach: reference.map((c) => c.quietTicks ?? null), candidateQuietTicksEach: candidate.map((c) => c.quietTicks ?? null) }
+  const meanBasis = (rows) => rows.length > 0 && rows.every((c) => Number.isFinite(c.activeMeanMs))
+  const onMean = meanBasis(reference) && meanBasis(candidate)
+  const top = { bodies, workers, referenceActiveMeanMs: null, candidateActiveMeanMs: null, activeMeanLimitMs: null, referenceActiveMeanEachMs: reference.map((c) => c.activeMeanMs ?? null), candidateActiveMeanEachMs: candidate.map((c) => c.activeMeanMs ?? null), referenceP99Ms: null, candidateP99Ms: null, p99LimitMs: null, referenceOverBudget: null, candidateOverBudget: null, overLimit: null, referenceOverEach: reference.map(judgedOver), candidateOverEach: candidate.map(judgedOver), referenceHostExcludedEach: reference.map(hostOf), candidateHostExcludedEach: candidate.map(hostOf), hostRule: [...reference, ...candidate].map((c) => c.hostRule).find((rule) => typeof rule === 'string') ?? null, p99Basis: onQuiet ? 'quiet ticks' : 'every tick', referenceP99EachMs: reference.map(p99Of), candidateP99EachMs: candidate.map(p99Of), referenceP99EveryTickEachMs: reference.map((c) => c.p99Ms), candidateP99EveryTickEachMs: candidate.map((c) => c.p99Ms), referenceQuietTicksEach: reference.map((c) => c.quietTicks ?? null), candidateQuietTicksEach: candidate.map((c) => c.quietTicks ?? null) }
   if (reference.length > 0 && candidate.length > 0) {
     top.referenceP99Ms = median(reference.map(p99Of))
     top.candidateP99Ms = median(candidate.map(p99Of))
     top.p99LimitMs = Number(Math.max(top.referenceP99Ms * baseline.margin.p99Factor, top.referenceP99Ms + baseline.margin.p99FloorMs).toFixed(3))
+    if (onMean) {
+      top.referenceActiveMeanMs = median(top.referenceActiveMeanEachMs)
+      top.candidateActiveMeanMs = median(top.candidateActiveMeanEachMs)
+      top.activeMeanLimitMs = Number((top.referenceActiveMeanMs * baseline.margin.meanFactor).toFixed(3))
+      if (top.candidateActiveMeanMs > top.activeMeanLimitMs) failures.push('top tier median of the mean tick while bodies are awake ' + top.candidateActiveMeanMs + ' ms is over ' + top.activeMeanLimitMs + ' ms (the reference build ran ' + top.referenceActiveMeanMs + ' ms in the same run, times ' + baseline.margin.meanFactor + ')')
+    }
     top.referenceOverBudget = median(top.referenceOverEach)
     top.candidateOverBudget = median(top.candidateOverEach)
     top.overLimit = Math.floor(top.referenceOverBudget * baseline.margin.overBudgetFactor) + baseline.margin.overBudgetTicks
@@ -125,5 +133,6 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const excluded = [...verdict.topTier.referenceHostExcludedEach, ...verdict.topTier.candidateHostExcludedEach].reduce((sum, n) => sum + n, 0)
   console.log(excluded > 0 ? excluded + ' ticks over budget were not counted (reference ' + verdict.topTier.referenceHostExcludedEach.join(', ') + '; candidate ' + verdict.topTier.candidateHostExcludedEach.join(', ') + '): ' + verdict.topTier.hostRule : 'no tick over budget was excluded as the host')
   console.log('p99 judged over ' + verdict.topTier.p99Basis + '; over every tick the medians are ' + median(verdict.topTier.candidateP99EveryTickEachMs) + ' ms against ' + median(verdict.topTier.referenceP99EveryTickEachMs) + ' ms')
+  if (verdict.topTier.activeMeanLimitMs !== null) console.log('mean tick while bodies are awake: ' + verdict.topTier.candidateActiveMeanMs + ' ms against the reference ' + verdict.topTier.referenceActiveMeanMs + ' ms (limit ' + verdict.topTier.activeMeanLimitMs + ')')
   console.log('RESULT: PASS top tier median p99 ' + verdict.topTier.candidateP99Ms + ' ms against the reference ' + verdict.topTier.referenceP99Ms + ' ms (limit ' + verdict.topTier.p99LimitMs + '), ' + verdict.topTier.candidateOverBudget + ' ticks over budget in the median run against ' + verdict.topTier.referenceOverBudget + ' (limit ' + verdict.topTier.overLimit + ')')
 }

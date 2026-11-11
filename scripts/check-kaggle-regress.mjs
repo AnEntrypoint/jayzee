@@ -39,15 +39,17 @@ gate('a candidate whose median p99 is past the reference times the margin fails,
   assert.match(verdict.failures.join(' '), /median p99/)
 })
 
-gate('near 6 ms the p99 limit is the reference plus the floor, so the spread of identical builds in Kaggle runs 21 and 22 passes and a 20 percent loss fails', () => {
-  assert.ok(BASELINE.margin.p99FloorMs > 0 && BASELINE.margin.p99FloorMs <= 2)
+gate('the p99 limit is the larger of the reference times the factor and the reference plus the floor: the floor governs a 2 ms tier and the factor a 6 ms one', () => {
+  const { p99Factor, p99FloorMs } = BASELINE.margin
+  assert.ok(p99FloorMs > 0 && p99FloorMs <= 2)
+  assert.ok(2 + p99FloorMs > 2 * p99Factor && 5.829 * p99Factor > 5.829 + p99FloorMs)
+  assert.equal(judge(BASELINE, run(2, 2 + p99FloorMs - 0.01)).ok, true)
+  assert.equal(judge(BASELINE, run(2, 2 + p99FloorMs + 0.01)).ok, false)
   assert.equal(judge(BASELINE, run(5.829, 6.156)).ok, true)
-  assert.equal(judge(BASELINE, run(6.831, 6.26)).ok, true)
-  assert.equal(judge(BASELINE, run(5.829, 5.829 + BASELINE.margin.p99FloorMs - 0.01)).ok, true)
-  const verdict = judge(BASELINE, run(5.829, 5.829 + BASELINE.margin.p99FloorMs + 0.01))
+  assert.equal(judge(BASELINE, run(5.829, 5.829 * p99Factor - 0.01)).ok, true)
+  const verdict = judge(BASELINE, run(5.829, 5.829 * p99Factor + 0.01))
   assert.equal(verdict.ok, false)
   assert.match(verdict.failures.join(' '), /median p99/)
-  assert.equal(judge(BASELINE, run(5.829, 5.829 * 1.2)).ok, false)
 })
 
 gate('the p99 is the median of the repeats, so one slow repeat does not fail the run', () => {
@@ -93,7 +95,7 @@ gate('a tick over budget is left out only when the run marks it as the host, and
   assert.equal(judge(BASELINE, results).ok, false, 'one tick more than the host marks cover still fails')
 })
 
-gate('the p99 is judged over quiet ticks when every row has them: the every-tick spread of identical builds in Kaggle run 27 passes, and a build slower in quiet ticks fails', () => {
+gate('the p99 is judged over quiet ticks when every row has them: the identical builds of Kaggle run 27 are judged on their quiet ticks, and a build slower in quiet ticks fails', () => {
   const everyTick = { reference: [9.589, 6.68, 7.961, 9.148, 6.808], base: [8.645, 11.371, 6.539, 9.301, 9.672] }
   const noisy = (quietReference, quietCandidate) => {
     const results = run(0, 0)
@@ -110,16 +112,34 @@ gate('the p99 is judged over quiet ticks when every row has them: the every-tick
   const control = noisy(6.4, 6.5)
   for (const c of control.configs) delete c.p99QuietMs
   const raw = judge(BASELINE, control)
-  assert.equal(raw.ok, false, 'control: judged over every tick, run 27 fails two identical builds')
   assert.equal(raw.topTier.p99Basis, 'every tick')
+  assert.equal(raw.topTier.candidateP99Ms, 9.301)
+  assert.ok(raw.topTier.candidateP99Ms > raw.topTier.referenceP99Ms * 1.1, 'control: over every tick the identical builds of run 27 are 17 percent apart')
   const quiet = judge(BASELINE, noisy(6.4, 6.5))
   assert.equal(quiet.ok, true, quiet.failures.join('; '))
   assert.equal(quiet.topTier.p99Basis, 'quiet ticks')
   assert.equal(quiet.topTier.candidateP99Ms, 6.5)
-  assert.match(judge(BASELINE, noisy(6.4, 7.9)).failures.join(' '), /median p99 over quiet ticks/)
+  assert.match(judge(BASELINE, noisy(6.4, 6.4 * BASELINE.margin.p99Factor + 0.1)).failures.join(' '), /median p99 over quiet ticks/)
   const fewQuiet = noisy(6.4, 6.5)
   fewQuiet.configs.find((c) => c.variant === 'base').quietTicks = 100
   assert.equal(judge(BASELINE, fewQuiet).topTier.p99Basis, 'every tick', 'a row with under half its ticks quiet puts the run back on every tick')
+})
+
+gate('the build is compared on the mean tick while bodies are awake: 8 percent over the reference passes, 12 percent fails, though the p99 is the same', () => {
+  const withMeans = (referenceMean, candidateMean) => {
+    const results = run(9, 9)
+    for (const c of results.configs.filter((c) => c.kind === 'tick')) c.activeMeanMs = c.variant === 'reference' ? referenceMean : candidateMean
+    return results
+  }
+  assert.ok(BASELINE.margin.meanFactor > 1 && BASELINE.margin.meanFactor <= 1.15)
+  const inside = judge(BASELINE, withMeans(5.5, 5.5 * 1.08))
+  assert.equal(inside.ok, true, inside.failures.join('; '))
+  assert.equal(inside.topTier.referenceActiveMeanMs, 5.5)
+  const outside = judge(BASELINE, withMeans(5.5, 5.5 * 1.12))
+  assert.equal(outside.ok, false)
+  assert.match(outside.failures.join(' '), /mean tick while bodies are awake/)
+  assert.equal(judge(BASELINE, withMeans(5.39, 5.57)).ok, true, 'run 27, identical builds')
+  assert.equal(judge(BASELINE, run(9, 9)).topTier.activeMeanLimitMs, null, 'rows with no mean are judged on the p99 and the count alone')
 })
 
 gate('missing reference rows, missing candidate rows, a missing marble tier and a run with no result each fail', () => {

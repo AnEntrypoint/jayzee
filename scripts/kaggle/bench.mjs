@@ -236,6 +236,10 @@ if (activeOf) active.forEach((count, tick) => {
   if (count > 0) lastActiveTick = tick
 })
 
+const activeEnd = lastActiveTick >= BOOT_TICKS ? lastActiveTick + 1 : ticks
+let activeSumMs = 0
+for (let tick = BOOT_TICKS; tick < activeEnd; tick++) activeSumMs += times[tick]
+const activeMeanMs = activeEnd > BOOT_TICKS ? activeSumMs / (activeEnd - BOOT_TICKS) : null
 const layout = readLayout(module)
 const sorted = Float64Array.from(times).sort()
 const settle = times.subarray(Math.min(ticks, BOOT_TICKS), Math.min(ticks, SETTLE_END))
@@ -252,6 +256,8 @@ emit({
   p99Ms: round(quantile(sorted, 0.99), 3),
   maxMs: round(sorted[sorted.length - 1], 3),
   overBudget: over(times),
+  activeMeanMs: activeMeanMs === null ? null : round(activeMeanMs, 3),
+  activeTicks: activeEnd - BOOT_TICKS,
   quietTicks: quietTimes.length,
   p99QuietMs: quietTimes.length ? round(quantile(quietTimes, 0.99), 3) : null,
   quietRule: 'a tick is quiet when the throttle counter and steal time did not move in it and no engine thread waited ' + QUIET_WAIT_MS + ' ms or more on the run queue with the helper threads idle',
