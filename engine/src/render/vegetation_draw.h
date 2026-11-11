@@ -94,7 +94,7 @@ inline std::uint32_t planUploads(Bound& b, Upload* out, std::uint32_t maxOut, st
       b.dirty[slot] = 0;
       continue;
     }
-    if (spent + slotBytes > budgetBytes) return n;
+    if (spent + slotBytes > budgetBytes && (spent > 0 || budgetBytes == 0)) return n;
     if (n + b.species > maxOut) return n;
     for (std::uint32_t s = 0; s < b.species; ++s) {
       const std::uint64_t bytes = static_cast<std::uint64_t>(b.counts[indexOf(b, s, slot)]) * kMatrixBytes;

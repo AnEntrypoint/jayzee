@@ -163,6 +163,12 @@ export class EngineWorld {
     return this.#module._engine_world_rebase_count()
   }
 
+  waitCounts() {
+    const read = this.#module._engine_wait_count
+    if (typeof read !== 'function') return null
+    return { mainSpinWaits: read(0), spinTimeouts: read(1), workerWaits: read(2), timedSlices: read(3), yields: read(4) }
+  }
+
   addBox(box) {
     if (!Array.isArray(box) || box.length !== BOX_WORDS || !box.every(isFiniteNumber)) throw new RangeError('a box is six finite numbers: min x, y, z then max x, y, z')
     const status = this.#module._engine_world_add_box(box[0], box[1], box[2], box[3], box[4], box[5])

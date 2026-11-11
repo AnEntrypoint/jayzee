@@ -1317,6 +1317,10 @@ void uploadVegetation(const Camera& camera, const engine::render::FrameOrigin& o
   }
   const std::uint32_t drawCount = veg::planDraws(b, reinterpret_cast<const float*>(camera.planes), frameOrigin, vegDraws, veg::kMaxSpecies * veg::kMaxSlots);
   vegDrawCount = drawCount == veg::kPlanBad ? 0 : drawCount;
+  std::uint32_t instances = 0;
+  for (std::uint32_t i = 0; i < vegDrawCount; ++i) instances += vegDraws[i].count;
+  engine::render::counters().vegetationDraws = vegDrawCount;
+  engine::render::counters().vegetationInstances = instances;
 }
 
 void drawVegetation(wgpu::RenderPassEncoder& pass) {

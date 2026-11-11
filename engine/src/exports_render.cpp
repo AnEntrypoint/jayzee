@@ -129,6 +129,8 @@ EMSCRIPTEN_KEEPALIVE int engine_render_frame() {
   if (rnd::renderState == nullptr || rnd::counters().ready == 0) return engine::kNotConfigured;
   rnd::RenderState& state = *rnd::renderState;
   rnd::counters().apiCalls = 0;
+  rnd::counters().vegetationDraws = 0;
+  rnd::counters().vegetationInstances = 0;
   rnd::SceneView scene{};
   scene.transforms = engine::world().transforms();
   scene.bodyCount = engine::world().bodyCapacity();
@@ -322,6 +324,14 @@ EMSCRIPTEN_KEEPALIVE std::uint64_t engine_render_checksum() {
 
 EMSCRIPTEN_KEEPALIVE std::uint32_t engine_render_visible(std::uint32_t cls) {
   return cls < rnd::kPropClasses ? rnd::counters().visible[cls] : 0u;
+}
+
+EMSCRIPTEN_KEEPALIVE std::uint32_t engine_render_vegetation_draws() {
+  return rnd::counters().vegetationDraws;
+}
+
+EMSCRIPTEN_KEEPALIVE std::uint32_t engine_render_vegetation_instances() {
+  return rnd::counters().vegetationInstances;
 }
 
 EMSCRIPTEN_KEEPALIVE std::uint32_t engine_render_pages() {

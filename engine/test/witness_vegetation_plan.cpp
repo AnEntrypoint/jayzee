@@ -417,12 +417,19 @@ void vegetationPlan() {
   }
   setDirty(1);
   fillSentinels();
-  const std::uint32_t none = veg::planUploads(b, gUploads, kPairs, starved);
-  const std::uint32_t noneAgain = veg::planUploads(b, gUploads, kPairs, starved);
-  check(none == 0 && noneAgain == 0 && gUploads[0].species == kSentinel && residentDirty() == residentSlots,
-        "vegetation plan: a budget one byte below the first dirty slot uploads nothing, and every resident slot stays dirty on each call");
-  check(fitting > 0, "vegetation plan: that starved plan also holds back later slots that would fit, because the plan stops at the first slot that does not");
-  observe("vegetation plan later slots held back behind the oversized one", fitting);
+  const std::uint32_t alone = veg::planUploads(b, gUploads, kPairs, starved);
+  bool onlyFirstSlot = alone > 0;
+  for (std::uint32_t i = 0; i < alone; ++i) onlyFirstSlot = onlyFirstSlot && gUploads[i].slot == 0;
+  check(onlyFirstSlot && gDirty[0] == 0 && residentDirty() == residentSlots - 1,
+        "vegetation plan: a slot one byte larger than the budget is uploaded alone, as the only slot of its frame, and its flag clears");
+  std::uint32_t starvedFrames = 1;
+  while (residentDirty() > 0 && starvedFrames < 4 * kSlots) {
+    veg::planUploads(b, gUploads, kPairs, starved);
+    starvedFrames += 1;
+  }
+  check(residentDirty() == 0 && fitting > 0, "vegetation plan: the slots behind an oversized slot are uploaded on the following frames, so an oversized slot cannot stall the field");
+  observe("vegetation plan frames to drain behind an oversized first slot", starvedFrames);
+  setDirty(1);
   check(veg::planUploads(b, gUploads, kPairs, 0) == 0 && residentDirty() == residentSlots, "vegetation plan: a zero byte budget uploads nothing and clears no resident flag");
   std::memcpy(gCounts, savedCounts, sizeof gCounts);
   residentSlots = 0;

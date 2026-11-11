@@ -42,7 +42,7 @@ const EXPECT_EXPORTS = [
 const EXPECT_LAYOUT = {
   MaterialSlot: 40,
   LightSlot: 32,
-  PagePlacement: 40,
+  PagePlacement: 56,
   Camera: 224,
   Transform: 28,
 }

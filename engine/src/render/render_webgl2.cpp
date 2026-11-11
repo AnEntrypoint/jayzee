@@ -368,6 +368,10 @@ std::uint32_t drawVegetation(const Camera& camera, const engine::render::FrameOr
   const double frameOrigin[3] = {origin.x, origin.y, origin.z};
   const std::uint32_t drawCount = veg::planDraws(b, reinterpret_cast<const float*>(camera.planes), frameOrigin, draws, veg::kMaxSpecies * veg::kMaxSlots);
   if (drawCount == veg::kPlanBad) return 0;
+  std::uint32_t instances = 0;
+  for (std::uint32_t i = 0; i < drawCount; ++i) instances += draws[i].count;
+  engine::render::counters().vegetationDraws = drawCount;
+  engine::render::counters().vegetationInstances = instances;
   ENGINE_RENDER_CALL(glUseProgram(vegProgram));
   ENGINE_RENDER_CALL(glBindVertexArray(vegVao));
   for (std::uint32_t i = 0; i < drawCount; ++i) {

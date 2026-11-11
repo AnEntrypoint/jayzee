@@ -160,6 +160,10 @@ int initialize(std::uint32_t players, std::uint32_t workers, double budgetBytes)
 
 }
 
+#if defined(ENGINE_THREADS)
+extern "C" std::uint32_t engine_futex_wait_count(int kind);
+#endif
+
 extern "C" {
 
 EMSCRIPTEN_KEEPALIVE double engine_heap_inuse_bytes() {
@@ -361,6 +365,15 @@ EMSCRIPTEN_KEEPALIVE int engine_sim_active_bodies() {
   return static_cast<int>(engine::world().activeBodies());
 }
 #endif
+
+EMSCRIPTEN_KEEPALIVE std::uint32_t engine_wait_count(int kind) {
+#if defined(ENGINE_THREADS)
+  return engine_futex_wait_count(kind);
+#else
+  (void)kind;
+  return 0u;
+#endif
+}
 
 EMSCRIPTEN_KEEPALIVE std::uint64_t engine_ticks() {
   return engine::world().tick();

@@ -24,7 +24,7 @@ export const DEFAULT_SCENE = Object.freeze({
 })
 
 export const WITNESS_PATCH_CAPACITY = 256
-export const WITNESS_PATCH_BLOCK = 8
+export const WITNESS_PATCH_BLOCK = 4
 export const WITNESS_ENTITY_CAP_M = 120
 const POLE_FACE = 2
 
@@ -143,6 +143,12 @@ export const buildPlanetScene = ({ spec: overrides = {}, module, now, generate =
     generateMs += now() - t0
     if (gapsBefore !== null) generateHeightCallsOutsidePages += gapQueries() - gapsBefore
   }
+  const streamStep = (patchIdsNow) => {
+    const gapsBefore = gapQueries()
+    if (patchIdsNow !== null) vegetation.sync(patchIdsNow)
+    vegetation.step()
+    if (gapsBefore !== null) generateHeightCallsOutsidePages += gapQueries() - gapsBefore
+  }
   const placementHeightCallsOutsidePages = gapsAtStart === null ? null : gapQueries() - gapsAtStart
   if (generate) generatePending()
 
@@ -167,5 +173,5 @@ export const buildPlanetScene = ({ spec: overrides = {}, module, now, generate =
     }
   }
 
-  return { spec, area, population, colliders, vegetation, report, generate: generatePending }
+  return { spec, area, population, colliders, vegetation, report, generate: generatePending, streamStep }
 }

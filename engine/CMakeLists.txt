@@ -118,6 +118,7 @@ set(ENGINE_EXPORTS
   _engine_set_tick
   _engine_tick
   _engine_ticks
+  _engine_wait_count
   _engine_memory_bytes
   _engine_body_count
   _engine_pose_bytes
@@ -256,6 +257,8 @@ set(ENGINE_EXPORTS
   _engine_render_unplace_page
   _engine_render_uploads
   _engine_render_visible
+  _engine_render_vegetation_draws
+  _engine_render_vegetation_instances
   _engine_snapshot_capacity_bytes
   _engine_snapshot_encode
   _engine_snapshot_offset

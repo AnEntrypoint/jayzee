@@ -61,6 +61,7 @@ export const planetVerdict = (result, expected) => {
       if (scene.entities !== PLANET_ENTITY_COUNT) failures.push('scene entities ' + scene.entities + ' is not ' + PLANET_ENTITY_COUNT)
       if (!scene.colliderCounts || scene.colliderCounts.dynamic !== PLANET_ENTITY_COUNT) failures.push('dynamic colliders are not ' + PLANET_ENTITY_COUNT)
       if (scene.vegetationBound !== true) failures.push('vegetation is not bound to the draw path')
+      if (!result.vegetation || !(result.vegetation.instances > 0)) failures.push('no vegetation instance was drawn in the last frame')
       if (typeof scene.generateHeightCallsOutsidePages !== 'number') failures.push('the scene does not report how many vegetation heights fell outside the loaded pages')
       else if (scene.generateHeightCallsOutsidePages > scene.generatedInstances * PLANET_VEGETATION_OUTSIDE_SHARE) failures.push('vegetation heights outside the loaded pages: ' + scene.generateHeightCallsOutsidePages + ' of ' + scene.generatedInstances)
     }

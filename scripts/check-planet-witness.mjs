@@ -22,6 +22,7 @@ const good = (over = {}) => ({
   tier: 1024,
   players: PLANET_ENTITY_COUNT,
   adapter: { api: 'webgpu', isFallbackAdapter: false, description: 'NVIDIA' },
+  vegetation: { draws: 64, instances: 7808 },
   frameTimesMs: frames(10),
   wallIntervalsMs: frames(10),
   allocationsSinceWarmup: '0',
@@ -116,6 +117,8 @@ gate('the verdict fails on a short run, a wrong player count, a missing scene, a
   assert.equal(planetVerdict(good({ scene: undefined }), webgpu1024).ok, false)
   assert.equal(planetVerdict(good({ scene: { ...goodScene, vegetationBound: null } }), webgpu1024).ok, false)
   assert.equal(planetVerdict(good({ scene: { ...goodScene, generateHeightCallsOutsidePages: 79 } }), webgpu1024).ok, false)
+  assert.equal(planetVerdict(good({ vegetation: { draws: 0, instances: 0 } }), webgpu1024).ok, false)
+  assert.equal(planetVerdict(good({ vegetation: null }), webgpu1024).ok, false)
   assert.equal(planetVerdict(good({ scene: { ...goodScene, generateHeightCallsOutsidePages: null } }), webgpu1024).ok, false)
   assert.equal(planetVerdict(good({ scene: { ...goodScene, generateHeightCallsOutsidePages: 78 } }), webgpu1024).ok, true)
   assert.equal(planetVerdict(good({ scene: { ...goodScene, colliderCounts: { dynamic: 1000 } } }), webgpu1024).ok, false)

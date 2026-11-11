@@ -3,7 +3,8 @@ import { cellOrigin, PAGE_SIDE, PAGE_U_EDGE, PAGE_V_EDGE, planetCellSize } from 
 import { solverIterationsFor } from '../../src/engine/solverIterations.js'
 import { createPhysicsHandoff } from '../../src/engine/physicsHandoff.js'
 import { readLayout } from '../../src/engine/bridge.js'
-import { buildPlanetScene, witnessSceneSpec } from '../../src/engine/planetScene.js'
+import { WITNESS_PATCH_BLOCK, buildPlanetScene, witnessSceneSpec } from '../../src/engine/planetScene.js'
+import { createLeafBlock, createVegetationFollower } from '../../src/engine/vegetationStream.js'
 import { relativeLookAt } from '../../src/engine/cameraRelative.js'
 
 const QUERY = new URLSearchParams(location.search)
@@ -465,6 +466,9 @@ const run = async () => {
     module._engine_page_apply()
     planetScene.generate()
   }
+  const vegetationBlock = planetScene && PATH === 'planet' ? createLeafBlock({ level: planetScene.spec.patchLevel, block: WITNESS_PATCH_BLOCK }) : null
+  if (vegetationBlock) vegetationBlock.update(0, PLANET.radius, 0)
+  const followVegetation = vegetationBlock ? createVegetationFollower({ scene: planetScene, block: vegetationBlock, radiusM: PLANET.radius }) : null
   const handoff = TIER === 1024 ? createPhysicsHandoff({ module, glue: new URL(TIER_GLUE, import.meta.url).href, players: TIER, budgetBytes: TIER_BUDGET, solverIterations: runConfig.solverIterations, timeTicks: TIMED ? FRAMES : 0, path: { window: PATH_WINDOW, perFrame: PAGES_PER_FRAME, stepM: PATH_STEP_M, heightM: PATH_HEIGHT_M } }) : null
   if (handoff) await handoff.ready
 
@@ -507,6 +511,7 @@ const run = async () => {
         else module._engine_tick(TICK_STEPS)
         const tickEnd = performance.now()
         renderer.setCamera(PATH === 'planet' ? planetCamera(module, renderer, frame, aspect, surface) : orbitCamera(frame, aspect, surface))
+        if (followVegetation) followVegetation(CAMERA.eye[0], CAMERA.eye[1], CAMERA.eye[2], pageQueue.stageKey.length + pageQueue.releaseKey.length)
         if (MODELS) modelsStep(module, frame)
         if (DRAW) {
           const status = renderer.frame()
@@ -616,6 +621,7 @@ const run = async () => {
     result.checksum = String(lastStats.checksum)
     result.sceneDigest = sceneDigest(module, placed, lastCamera)
     result.visible = lastStats.visible
+    result.vegetation = { draws: lastStats.vegetationDraws, instances: lastStats.vegetationInstances, blockMoves: vegetationBlock ? vegetationBlock.moves : null }
     result.pages = lastStats.pages
     result.uploads = lastStats.uploads
     result.lights = lastStats.lights

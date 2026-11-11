@@ -147,6 +147,8 @@ struct Counters {
   std::uint32_t cullPassA;
   std::uint32_t cullCandidates;
   std::uint32_t cullPassB;
+  std::uint32_t vegetationDraws;
+  std::uint32_t vegetationInstances;
   std::uint32_t cullFresh;
   std::uint32_t countReadback;
 };

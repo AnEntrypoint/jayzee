@@ -284,5 +284,19 @@
   "check:engine-raycast",
   "check:engine-shapecast",
   "check:scenario-character-terrain",
-  "check:engine-seal"
+  "check:engine-seal",
+  "check:engine-core",
+  "check:engine-world",
+  "check:engine-sleep",
+  "check:engine-pools",
+  "check:engine-planet",
+  "check:engine-vegetation",
+  "check:engine-codecs",
+  "check:engine-materials",
+  "check:engine-interest",
+  "check:engine-render",
+  "check:engine-isolation",
+  "check:engine-tiers",
+  "check:engine-leak",
+  "check:client-resource-pools"
 ]

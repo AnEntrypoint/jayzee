@@ -9,6 +9,8 @@ import { solverIterationsFor } from '../src/engine/solverIterations.js'
 import { createPlanetStreamer } from '../src/engine/planetStream.js'
 import { WITNESS_ENTITY_CAP_M, WITNESS_PATCH_BLOCK, buildPlanetScene, witnessSceneSpec } from '../src/engine/planetScene.js'
 import { patchLeaf } from '../src/engine/vegetationPatches.js'
+import { createLeafBlock, createVegetationFollower } from '../src/engine/vegetationStream.js'
+import { PATH_PERIOD_FRAMES } from '../src/engine/planetStream.js'
 
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)))
 const GLUE = pathToFileURL(resolve(root, 'engine/out/engine-core-1024mib-threads.mjs')).href
@@ -29,7 +31,29 @@ const sceneOn = async (spec, generateAfterPages) => {
   return scene.report()
 }
 
+const orbit = async (spec) => {
+  const module = await loadEngineModule(GLUE, resolvePlan({ players: 1024, workers: 2, budgetBytes: 512 * MIB }))
+  configureWorld(module, solverIterationsFor(readLayout(module).players))
+  const scene = buildPlanetScene({ module, now: () => performance.now(), generate: false, spec })
+  const streamer = createPlanetStreamer(module, { window: BROWSER_PAGE_WINDOW })
+  module._engine_page_apply()
+  scene.generate()
+  const block = createLeafBlock({ level: spec.patchLevel, block: WITNESS_PATCH_BLOCK })
+  block.update(0, PLANET.radius, 0)
+  const firstIds = block.ids.slice()
+  const follow = createVegetationFollower({ scene, block, radiusM: PLANET.radius })
+  const atStart = scene.report()
+  for (let frame = 0; frame < PATH_PERIOD_FRAMES; frame++) {
+    module._engine_page_apply()
+    const spot = streamer.step(frame)
+    follow(spot[0], spot[1], spot[2], streamer.pending)
+  }
+  return { atStart, atEnd: scene.report(), moves: block.moves, firstIds, lastIds: block.ids.slice() }
+}
+
 const spec = witnessSceneSpec(PLANET.radius)
+const lap = await orbit(spec)
+console.log('orbit ' + JSON.stringify({ moves: lap.moves, generatedAtStart: lap.atStart.generatedInstances, generatedAtEnd: lap.atEnd.generatedInstances, outsideAtEnd: lap.atEnd.generateHeightCallsOutsidePages, patches: lap.atEnd.patches, deferred: lap.atEnd.patchesDeferred }))
 const witness = await sceneOn(spec, true)
 const grid = await sceneOn({}, false)
 console.log('witness scene ' + JSON.stringify({ ...witness, generateMs: undefined, vegetationPlan: undefined }))
@@ -61,6 +85,15 @@ gate('vegetation generated after the pages are staged reads its heights from loa
 
 gate('control: the default grid scene at latitude 0.3 reads no loaded page at all, so the gate above is not vacuous', () => {
   assert.equal(grid.placementHeightCallsOutsidePages + grid.generateHeightCallsOutsidePages, grid.heightCalls)
+})
+
+gate('one lap of the camera orbit moves the leaf block, streams patches in and out with none deferred, and keeps the heights on loaded pages', () => {
+  assert.deepEqual(lap.firstIds, spec.patchIds)
+  assert.ok(lap.moves >= 4, 'the block moved only ' + lap.moves + ' times')
+  assert.ok(lap.atEnd.generatedInstances > lap.atStart.generatedInstances, 'no patch was generated during the lap')
+  assert.equal(lap.atEnd.patches, spec.patchIds.length)
+  assert.equal(lap.atEnd.patchesDeferred, 0)
+  assert.ok(lap.atEnd.generateHeightCallsOutsidePages <= lap.atEnd.generatedInstances * OUTSIDE_SHARE_LIMIT, lap.atEnd.generateHeightCallsOutsidePages + ' of ' + lap.atEnd.generatedInstances + ' instance heights fell outside the loaded pages')
 })
 
 finish()

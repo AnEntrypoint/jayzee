@@ -50,10 +50,13 @@ const run = async (glue, workers) => {
   const world = await createEngineWorld({ ...WORLD, workers }, glue)
   const handles = spawnIslands(world)
   const callsBefore = inWindow()
+  const waitsBefore = world.waitCounts()
   const started = process.hrtime.bigint()
   openWindow()
   for (let t = 0; t < TICKS; t++) world.step()
   closeWindow()
+  const waitsAfter = world.waitCounts()
+  const waits = Object.fromEntries(Object.keys(waitsAfter).map((key) => [key, waitsAfter[key] - waitsBefore[key]]))
   const wallMs = Number(process.hrtime.bigint() - started) / 1e6
   const positions = []
   const p = [0, 0, 0]
@@ -61,7 +64,7 @@ const run = async (glue, workers) => {
     world.position(handle, p)
     positions.push(p[0], p[1], p[2])
   }
-  return { workers, positions, clockCalls: inWindow() - callsBefore, workerHooks: Atomics.load(counters, CLOCK_WORKER_HOOKS) - hooksBefore, wallMs, hash: world.hash() }
+  return { workers, positions, clockCalls: inWindow() - callsBefore, workerHooks: Atomics.load(counters, CLOCK_WORKER_HOOKS) - hooksBefore, wallMs, hash: world.hash(), waits }
 }
 
 const worstGap = (a, b) => {
@@ -129,6 +132,16 @@ gate('the threaded build with 4 workers gives the same positions and state hash 
 gate('the threaded build agrees with the fixed build within 1 mm after ' + TICKS + ' ticks, with 2 workers and with 4', () => {
   assert.ok(worstGap(fixed.positions, twoA.positions) < AGREEMENT_M, 'worst gap with 2 workers is ' + worstGap(fixed.positions, twoA.positions) + ' m')
   assert.ok(worstGap(fixed.positions, fourA.positions) < AGREEMENT_M, 'worst gap with 4 workers is ' + worstGap(fixed.positions, fourA.positions) + ' m')
+})
+
+gate('the threaded runs wait during the ticks: the main thread enters spin waits and the workers enter atomic waits, and the fixed build enters none', () => {
+  for (const r of runs) console.log('INFO waits with ' + r.workers + ' worker' + (r.workers === 1 ? '' : 's') + ': ' + JSON.stringify(r.waits))
+  assert.deepEqual(fixed.waits, { mainSpinWaits: 0, spinTimeouts: 0, workerWaits: 0, timedSlices: 0, yields: 0 })
+  for (const r of runs.filter((entry) => entry !== fixed)) {
+    assert.ok(r.waits.mainSpinWaits > 0, r.workers + ' workers: the main thread entered no spin wait')
+    assert.ok(r.waits.workerWaits > 0, r.workers + ' workers: no worker entered an atomic wait')
+    assert.equal(r.waits.spinTimeouts, 0, r.workers + ' workers: a main-thread spin wait timed out')
+  }
 })
 
 gate('no thread reads performance.now during the ticks of any run, fixed or threaded', () => {
