@@ -65,6 +65,8 @@ if (flag('--write-times')) {
   const total = rows.reduce((sum, row) => sum + row[1], 0)
   const lines = ['# Check times', '', 'Written by \`npm test -- --write-times\` from \`build/checks/timings.json\`, the last wall time of each check on this host. A check over 2 s carries its reason from \`scripts/test-slow-reasons.json\`.', '', 'Sum of the checks: ' + (total / 1000).toFixed(1) + ' s across ' + rows.length + ' entries. The checks run four at a time, so the wall time of a full run is lower; the runner prints it.', '', '| check | wall ms | serial | reason when over 2 s |', '|---|---|---|---|']
   for (const [name, ms] of rows) lines.push('| \`' + name + '\` | ' + ms + ' | ' + (SERIAL.has(name) ? 'yes' : '') + ' | ' + (ms > 2000 ? (reasons[name] ?? 'NO REASON RECORDED') : '') + ' |')
+  const kaggleRecord = join(root, 'scripts', 'kaggle', 'record.md')
+  if (existsSync(kaggleRecord)) lines.push('', readFileSync(kaggleRecord, 'utf8').trimEnd())
   writeFileSync(join(root, 'docs', 'CHECK_TIMES.md'), lines.join('\n') + '\n')
   console.log('docs/CHECK_TIMES.md: ' + rows.length + ' rows')
   process.exit(0)

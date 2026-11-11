@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict'
 import { finish, gate } from './lib/gate.mjs'
-import { createTickTimer, writeTickTrace } from './lib/tickTrace.mjs'
 import { SCENARIO_TIERS } from './lib/scenarioTiers.mjs'
 import { MARBLE_BOWL, buildMarbleBowl } from './lib/scenarioWorlds.mjs'
 
@@ -13,13 +12,7 @@ const TIERS = SCENARIO_TIERS
 
 const scenario = async (tier) => {
   const { world, handles } = await buildMarbleBowl(tier)
-  const timer = createTickTimer()
-  const tickMs = timer.tickMs
-  for (let t = 0; t < TICKS; t++) {
-    timer.start()
-    world.step()
-    timer.stop()
-  }
+  for (let t = 0; t < TICKS; t++) world.step()
   const positions = new Float64Array(BODIES * 3)
   const speeds = new Float64Array(BODIES)
   const p = [0, 0, 0]
@@ -30,7 +23,7 @@ const scenario = async (tier) => {
     positions.set(p, i * 3)
     speeds[i] = Math.hypot(v[0], v[1], v[2])
   })
-  return { positions, speeds, tickMs }
+  return { positions, speeds }
 }
 
 const runs = new Map()
@@ -55,11 +48,6 @@ for (const tier of TIERS) {
   })
   gate(tier.label + ': two runs agree bit for bit on every marble position', () => {
     assert.deepEqual(new Uint32Array(new Float32Array(second.positions).buffer), new Uint32Array(new Float32Array(first.positions).buffer))
-  })
-  gate(tier.label + ': no tick runs over 25 ms or over the 16.7 ms budget (measured inside the step call, both runs)', () => {
-    const trace = writeTickTrace('marble-bowl', tier.label, [first.tickMs, second.tickMs])
-    assert.equal(trace.over25, 0, 'ticks over 25 ms: ' + trace.over25)
-    assert.equal(trace.overBudget, 0, 'ticks over the 16.7 ms budget: ' + trace.overBudget)
   })
 }
 

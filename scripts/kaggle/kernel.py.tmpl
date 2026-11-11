@@ -1,0 +1,101 @@
+import hashlib, io, json, os, shutil, subprocess, tarfile, time, urllib.request
+
+PAYLOAD_SHA256 = "__PAYLOAD_SHA256__"
+PAYLOAD_NAME = "bench.bin"
+INPUT = os.environ.get("JAYZEE_BENCH_INPUT", "/kaggle/input")
+NODE_VERSION = "24.22.0"
+RUN_LIMIT_S = 600
+WORK = os.environ.get("JAYZEE_BENCH_WORK", "/tmp/jayzee-bench")
+RESULTS = os.environ.get("JAYZEE_BENCH_RESULTS", "/kaggle/working/results.json")
+ONLY = os.environ.get("JAYZEE_BENCH_ONLY")
+
+
+def node_ok(path):
+    try:
+        out = subprocess.run([path, "--version"], capture_output=True, text=True, timeout=20).stdout.strip()
+        return int(out.lstrip("v").split(".")[0]) >= 22
+    except Exception:
+        return False
+
+
+def find_node():
+    system = shutil.which("node")
+    if system and node_ok(system):
+        return system
+    dest = "/tmp/node-v%s" % NODE_VERSION
+    binary = os.path.join(dest, "bin", "node")
+    if not node_ok(binary):
+        url = "https://nodejs.org/dist/v%s/node-v%s-linux-x64.tar.xz" % (NODE_VERSION, NODE_VERSION)
+        data = urllib.request.urlopen(url, timeout=600).read()
+        with tarfile.open(fileobj=io.BytesIO(data), mode="r:xz") as archive:
+            archive.extractall("/tmp")
+        os.rename("/tmp/node-v%s-linux-x64" % NODE_VERSION, dest)
+    return binary
+
+
+def read_payload():
+    found = [os.path.join(folder, name) for folder, _, names in os.walk(INPUT) for name in names if name == PAYLOAD_NAME]
+    if not found:
+        raise FileNotFoundError("no %s under %s" % (PAYLOAD_NAME, INPUT))
+    with open(found[0], "rb") as handle:
+        data = handle.read()
+    digest = hashlib.sha256(data).hexdigest()
+    if digest != PAYLOAD_SHA256:
+        raise ValueError("stale dataset: %s has sha256 %s, the kernel expects %s" % (found[0], digest, PAYLOAD_SHA256))
+    return data
+
+
+def save(results):
+    os.makedirs(os.path.dirname(RESULTS), exist_ok=True)
+    with open(RESULTS, "w") as handle:
+        json.dump(results, handle)
+
+
+def run_one(node, run):
+    args = list(run["args"])
+    if run["glueArg"] >= 0:
+        args[run["glueArg"]] = os.path.join(WORK, args[run["glueArg"]])
+    began = time.time()
+    try:
+        done = subprocess.run([node] + run["nodeFlags"] + [os.path.join(WORK, run["script"])] + args,
+                              capture_output=True, text=True, cwd=WORK, timeout=RUN_LIMIT_S)
+        lines = [line[len("RESULT "):] for line in done.stdout.splitlines() if line.startswith("RESULT ")]
+        entry = json.loads(lines[-1]) if lines else {"error": "no result", "exit": done.returncode, "stderr": done.stderr[-800:]}
+    except subprocess.TimeoutExpired:
+        entry = {"error": "timeout after %d s" % RUN_LIMIT_S}
+    entry["script"] = run["script"]
+    entry["args"] = run["args"]
+    entry["nodeFlags"] = run["nodeFlags"]
+    entry["runS"] = round(time.time() - began, 1)
+    return entry
+
+
+def main():
+    started = time.time()
+    shutil.rmtree(WORK, ignore_errors=True)
+    os.makedirs(WORK)
+    with tarfile.open(fileobj=io.BytesIO(read_payload()), mode="r:gz") as archive:
+        archive.extractall(WORK)
+    with open(os.path.join(WORK, "plan.json")) as handle:
+        plan = json.load(handle)
+    node = find_node()
+    version = subprocess.run([node, "--version"], capture_output=True, text=True).stdout.strip()
+    cpu_model = next((line.split(":", 1)[1].strip() for line in open("/proc/cpuinfo") if line.startswith("model name")), "unknown")
+    results = {"startedAtEpochS": started, "payloadSha256": PAYLOAD_SHA256, "node": version, "cpuModel": cpu_model, "nproc": os.cpu_count(),
+               "budgetMs": plan["budgetMs"], "ticks": plan["ticks"], "arenaBudgetBytes": plan["arenaBudgetBytes"],
+               "plannedRuns": len(plan["runs"]), "configs": []}
+    print("node", version, "cpu", cpu_model, "nproc", os.cpu_count(), "runs", len(plan["runs"]), flush=True)
+    runs = plan["runs"] if ONLY is None else [plan["runs"][int(i)] for i in ONLY.split(",")]
+    for run in runs:
+        entry = run_one(node, run)
+        results["configs"].append(entry)
+        shown = dict(entry)
+        shown.pop("traceMs", None)
+        print("RESULT " + json.dumps(shown), flush=True)
+        save(results)
+    results["totalS"] = round(time.time() - started, 1)
+    save(results)
+    print("DONE", json.dumps({"totalS": results["totalS"], "configs": len(results["configs"])}), flush=True)
+
+
+main()
