@@ -360,6 +360,15 @@ void World::characterPosition(float* out) const {
   out[2] = static_cast<float>(at.GetZ() + o.z);
 }
 
+void World::characterBodyPosition(float* out) const {
+  out[0] = out[1] = out[2] = 0.0f;
+  if (runtime_ == nullptr || runtime_->character == nullptr) return;
+  const JPH::RVec3 at = runtime_->character->GetPosition();
+  out[0] = static_cast<float>(at.GetX());
+  out[1] = static_cast<float>(at.GetY());
+  out[2] = static_cast<float>(at.GetZ());
+}
+
 void World::updateCharacter(float dt) {
   if (runtime_ == nullptr || runtime_->character == nullptr) return;
   const PhysicsOrigin& o = physicsOrigin();

@@ -97,6 +97,7 @@ class World {
   void setCharacterVelocity(const float* velocity);
   bool characterSupported() const;
   void characterPosition(float* out) const;
+  void characterBodyPosition(float* out) const;
   std::int64_t spawn(const float* position, const float* velocity);
   int spawnBatch(const float* rows, std::uint32_t count, std::uint32_t* handles);
   Status despawn(std::uint32_t handle);

@@ -146,6 +146,13 @@ export class EngineWorld {
     return this.#module._engine_character_supported() === 1
   }
 
+  characterBodyPosition(out = [0, 0, 0]) {
+    out[0] = this.#module._engine_character_body_x()
+    out[1] = this.#module._engine_character_body_y()
+    out[2] = this.#module._engine_character_body_z()
+    return out
+  }
+
   characterPosition(out = [0, 0, 0]) {
     out[0] = this.#module._engine_character_x()
     out[1] = this.#module._engine_character_y()

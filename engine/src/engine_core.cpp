@@ -226,6 +226,24 @@ EMSCRIPTEN_KEEPALIVE int engine_character_supported() {
   return engine::world().characterSupported() ? 1 : 0;
 }
 
+EMSCRIPTEN_KEEPALIVE float engine_character_body_x() {
+  float out[3];
+  engine::world().characterBodyPosition(out);
+  return out[0];
+}
+
+EMSCRIPTEN_KEEPALIVE float engine_character_body_y() {
+  float out[3];
+  engine::world().characterBodyPosition(out);
+  return out[1];
+}
+
+EMSCRIPTEN_KEEPALIVE float engine_character_body_z() {
+  float out[3];
+  engine::world().characterBodyPosition(out);
+  return out[2];
+}
+
 EMSCRIPTEN_KEEPALIVE float engine_character_x() {
   float out[3];
   engine::world().characterPosition(out);

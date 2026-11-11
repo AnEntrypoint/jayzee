@@ -3661,3 +3661,11 @@ Not witnessed: that the registrations take effect on both orders. Nothing in the
 - Change: `EngineWorld.follow` wraps `engine_follow`. The scenario rebases onto the character before stepping, because at a 6.37 × 10⁶ m body position float32 steps are 0.5 m.
 - Witness: `scripts/check-scenario-character.mjs` on the 64 MiB fixed glue (sha256 4269352f…, the final build) and the 512 MiB threaded glue (sha256 84d3cdcc…, the final build). All six gates PASS on both tiers, and the scenario prints RESULT: PASS, exit 0. `npm test` exit 0 with no FAIL lines.
 - Limit: the planet pages are not streamed in this scenario, so `heightAt` returns 0 and the surface is the sphere. Slopes and terrain steps are not exercised.
+
+## Deathrun scenario: checkpoint course on the planet (Phase A, 2026-11-11)
+
+- Source: spoint apps/deathrun (checkpoint course with a finish). The jayzee core is the physics only: one runner walks a course of three checkpoints at 20, 40 and 60 m of arc on the surface and steers toward each in the tangent plane at 6 m/s. spoint's leaderboard, HUD and respawn are app runtime and are not ported.
+- Change: `engine/src/world.cpp`, `engine_core.cpp`, the export list, and `src/engine/EngineWorld.js` add `characterBodyPosition`, read in the body frame, where the origin is at the rest centre. World-frame reads quantise to 0.5 m at this radius, so the course reads body coordinates.
+- Change: `scripts/check-scenario-deathrun.mjs`, run as `check:scenario-deathrun` and appended to `npm test`. Gates per tier: all three checkpoints in order within 900 ticks, radial error within 0.1 m and supported after the 30-tick landing, two runs agree bit for bit on the finish tick and final position, worst tick work within 16.7 ms.
+- Limit: no respawn, no minimum-height reset, and no terrain. The leaderboard and HUD are not ported.
+- Witness: Phase B, both glues rebuilt and the deathrun scenario on both tiers.
