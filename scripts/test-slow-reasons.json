@@ -1,5 +1,5 @@
 {
-  "check:pose-allocations": "2000 warm-up frames of the 1024-player threaded tick, about 21 ms each. With 300 or 700 warm-up frames the sampler still sees one-off function-level allocations (10128 B and 1224 B) from V8 tier-up, so the warm-up cannot be shortened without a false failure.",
+  "check:pose-allocations": "2000 warm-up frames of the 1024-player threaded tick on the planet-surface scene, the spawn the render witness uses, at about 4 ms a frame. On the flat scene the bodies fall off the ground box under planet gravity and never sleep, so each frame costs about 20 ms and the same warm-up takes 88 s. With 300 or 700 warm-up frames the sampler still sees one-off function-level allocations (10128 B and 1224 B) from V8 tier-up, so the warm-up cannot be shortened without a false failure. Counted frames are sampled per allocation.",
   "check:engine-state-hash-1024": "Five isolated 1024-tier runs of 120 ticks (fixed, and 2, 4, 7, 8 workers). They now run at the same time; before, they ran one after another and the 4-worker run was done twice (29 s).",
   "check:gc-witness": "20000 measured ticks and 20000 control ticks under a GC observer. The count is the claim, so the ticks stay.",
   "check:elevation-ab": "Runs spoint A/B elevation script at the fixture N and compares its output line for line.",
@@ -21,7 +21,7 @@
   "check:scenario-lockstep-rts": "Six peers per tier on four tiers.",
   "check:scenario-deathrun": "Six runs per tier on four tiers.",
   "check:scenario-boss-fight": "Six runs per tier on four tiers.",
-  "check:engine-tiers": "10240 bodies settle for 365 ticks on the fixed 512 MiB build, twice; the carve count after warm-up is the claim.",
+  "check:engine-tiers": "The settle row spawns 10240 bodies at the scene spacing (1.2 m, above the 1.0 m diameter) and steps 360 ticks, so the counted window covers the fall and the sleep. At 0.6 m spacing the bodies overlapped and the same row took 62 s, and that overlap case is no longer covered by this gate.",
   "check:engine-host-witness": "Compiles the native witness when a source under engine/src or engine/test changed; 0.4 s otherwise.",
   "check:scenario-character-terrain": "Four tiers of slope, step and descent runs with their controls.",
   "check:planet-witness-scene": "Builds the witness scene three times on the 1024-tier engine and runs one camera lap.",

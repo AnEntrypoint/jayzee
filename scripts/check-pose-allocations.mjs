@@ -5,7 +5,7 @@ import { Session } from 'node:inspector/promises'
 import { finish, gate } from './lib/gate.mjs'
 import { loadEngineModule, resolvePlan } from '../src/engine/EngineWorld.js'
 import { readLayout } from '../src/engine/bridge.js'
-import { configureWorld } from '../src/engine/sceneSetup.js'
+import { configureWorld, PLANET_RADIUS_M } from '../src/engine/sceneSetup.js'
 import { solverIterationsFor } from '../src/engine/solverIterations.js'
 import { createPlanetStreamer } from '../src/engine/planetStream.js'
 import { attachPoseRegion, poseRegionBuffers } from '../src/engine/poseRegion.js'
@@ -23,7 +23,7 @@ const started = Date.now()
 const plan = resolvePlan({ players: 1024, workers: 2, budgetBytes: 512 * MIB })
 const module = await loadEngineModule(GLUE, plan)
 const layout = readLayout(module)
-configureWorld(module, solverIterationsFor(layout.players))
+configureWorld(module, solverIterationsFor(layout.players), PLANET_RADIUS_M)
 const streamer = createPlanetStreamer(module)
 const poseBytes = module._engine_pose_bytes()
 const reserve = module._engine_pose_reserve()

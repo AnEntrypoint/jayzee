@@ -8,6 +8,7 @@
 namespace engine::render::webgpu {
 
 int init(const char* selector, std::uint32_t width, std::uint32_t height);
+void setPresentMode(std::uint32_t mode);
 int frame(const SceneView& scene, const FramePlan& plan, const Camera& camera);
 
 }

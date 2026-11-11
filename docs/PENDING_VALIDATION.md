@@ -4470,3 +4470,10 @@ The PAUSED controlled run: it starts two busy loops to pause, which loads the sh
 - The 1024-webgpu residual is not cleared. With no samplers and tracing on, two runs gave 2 and 0 intervals over 25 ms. In the dump of the 2-interval run, the GPU process decoder blocked 150 ms on 312 bytes of commands while a thread ran `vulkan_swap_chain.cc PostSubBufferAsync` for the same 150 ms. The other two dumps had at most 10 ms in that call. The present path is one candidate, not a proven single cause. Still OPEN.
 - The boot transient is open: ticks 0 and 1 take about 220 ms each and the settling ticks 5 to 15 ms, which is over the 16.7 ms budget for those ticks.
 - Not done in this stretch: `check:pose-allocations` and `check:engine-tiers` were not split or shortened, and their wall times are unchanged in `docs/CHECK_TIMES.md`.
+
+## Phase D (2026-11-11): narrower gates, reproducible Jolt build, WebGPU present control
+
+- `check:pose-allocations`: 88.1 s to 12.5 s. The gate spawned bodies on the flat scene under planet gravity, where they never sleep and each frame cost about 20 ms. It now spawns at `PLANET_RADIUS_M`, as the render witness does. Control still detects the 29,328 B allocation and the four PASS lines are unchanged.
+- `check:engine-tiers`: 78.6 s to 4.6 s. The settle row spawns at `BODY_SPACING_M` (1.2 m) instead of 0.6 m overlapping spheres. The overlap case took 62 s and is no longer covered by this row. That is a coverage loss, recorded in `scripts/test-slow-reasons.json`.
+- Jolt build: the CMake fetch was replaced by `engine/deps/JoltPhysics-0373ec0d….tar.gz`, checked by sha256 in `engine/build.sh`. A clean 1024 threaded build takes 28 s and reproduces its output hash. Before this, a configure hung for 580 s, and a shallow fetch timed out at 90 s.
+- WebGPU present: a `present=` control (`engine_render_set_present_mode`, FIFO or Mailbox) was added to the WebGPU surface. Six traced 1024-WebGPU runs gave, over 25 ms, FIFO 0, 2 and 1 (plus the 3 earlier runs at 9, 5 and 0), and Mailbox 8, 131 and 0. Host load was 9 to 12. No setting gave zero over three runs. FIFO stays the default. The residual 1024-WebGPU stall is OPEN.

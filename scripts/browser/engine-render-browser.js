@@ -15,6 +15,7 @@ const DRAW = QUERY.get('draw') !== '0'
 const MODELS = QUERY.get('models') === '1'
 const HOLD_END = QUERY.get('hold') === '1'
 const VEGETATION = QUERY.get('veg') !== '0'
+const PRESENT = { fifo: 0, mailbox: 1, immediate: 2 }[QUERY.get('present') ?? 'fifo'] ?? 0
 const THREADS = QUERY.get('threads') === '1' && TIER === 1024
 const WORKERS = THREADS ? 4 : 1
 const LARGE_MEMORY = TIER === 1024 || MODELS
@@ -466,7 +467,7 @@ const run = async () => {
   let planetScene = null
   let worldReady = false
   const beforeSeal = TIER === 1024 ? (module) => { setupWorld(module); worldReady = true; planetScene = buildPlanetScene({ module, now: () => performance.now(), generate: false, spec: witnessSceneSpec(PLANET.radius) }) } : null
-  const renderer = await loadRenderer({ glue: new URL(TIER_GLUE, import.meta.url).href, canvas, navigatorLike, requested, players: TIER, workers: WORKERS, budgetBytes: TIER_BUDGET, beforeSeal, models: TIER === 1024 || MODELS })
+  const renderer = await loadRenderer({ glue: new URL(TIER_GLUE, import.meta.url).href, canvas, navigatorLike, requested, players: TIER, workers: WORKERS, budgetBytes: TIER_BUDGET, beforeSeal, presentMode: PRESENT, models: TIER === 1024 || MODELS })
   const module = renderer.module
   const placed = []
   const surface = setupScene(module, renderer, placed, worldReady)

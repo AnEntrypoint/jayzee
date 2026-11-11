@@ -55,7 +55,7 @@ FetchContent_Declare(
   JoltPhysics
   GIT_REPOSITORY https://github.com/jrouwe/JoltPhysics.git
   GIT_TAG 0373ec0dd762e4bc2f6acdb08371ee84fa23c6db
-  GIT_SHALLOW FALSE
+  GIT_SHALLOW TRUE
   SOURCE_SUBDIR Build
 )
 FetchContent_MakeAvailable(JoltPhysics)
@@ -251,6 +251,7 @@ set(ENGINE_EXPORTS
   _engine_render_set_occlusion
   _engine_render_occlusion
   _engine_render_set_count_readback
+  _engine_render_set_present_mode
   _engine_render_cull_ready
   _engine_render_cull_counts
   _engine_models_slot_of

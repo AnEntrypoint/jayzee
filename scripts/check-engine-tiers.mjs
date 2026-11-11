@@ -4,6 +4,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { gate, finish } from './lib/gate.mjs'
 import { createEngineWorld, loadEngineModule, resolvePlan } from '../src/engine/EngineWorld.js'
 import { readLayout } from '../src/engine/bridge.js'
+import { BODY_SPACING_M } from '../src/engine/sceneSetup.js'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const glue64 = pathToFileURL(join(root, 'engine/out/engine-core-64mib.mjs')).href
@@ -54,7 +55,7 @@ gate('the 1024 tier holds 10240 bodies: a full world spawns, steps and keeps its
 
 gate('the 1024 tier carves nothing from the arena after warm-up, with 10240 bodies settling', async () => {
   const world = await createEngineWorld({ players: 1024, budgetBytes: 512 * MIB, capacity: 10240, gravity: -9.8 }, glue512)
-  const rows = Array.from({ length: 10240 }, (_, i) => ({ position: [(i % 100) * 0.6 - 30, 1 + (i % 5), Math.floor(i / 100) * 0.6 - 30], velocity: [0, 0, 0] }))
+  const rows = Array.from({ length: 10240 }, (_, i) => ({ position: [(i % 100) * BODY_SPACING_M - 30, 1 + (i % 5), Math.floor(i / 100) * BODY_SPACING_M - 30], velocity: [0, 0, 0] }))
   world.spawnMany(rows)
   for (let i = 0; i < 60; i++) world.step()
   world.markWarmup()

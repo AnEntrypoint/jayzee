@@ -1511,6 +1511,12 @@ void encodeVisibility(wgpu::CommandEncoder& encoder, wgpu::TextureView target) {
 
 }
 
+wgpu::PresentMode presentChoice = wgpu::PresentMode::Fifo;
+
+void setPresentMode(std::uint32_t mode) {
+  presentChoice = mode == 1 ? wgpu::PresentMode::Mailbox : mode == 2 ? wgpu::PresentMode::Immediate : wgpu::PresentMode::Fifo;
+}
+
 int init(const char* selector, std::uint32_t width, std::uint32_t height) {
   if (!acceptCreate()) return engine::kRange;
   if (ready) return engine::kOk;
@@ -1533,7 +1539,7 @@ int init(const char* selector, std::uint32_t width, std::uint32_t height) {
   config.usage = wgpu::TextureUsage::RenderAttachment | wgpu::TextureUsage::CopySrc;
   config.width = width;
   config.height = height;
-  config.presentMode = wgpu::PresentMode::Fifo;
+  config.presentMode = presentChoice;
   config.alphaMode = wgpu::CompositeAlphaMode::Opaque;
   surface.Configure(&config);
 

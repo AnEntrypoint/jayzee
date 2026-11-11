@@ -29,5 +29,6 @@ if (run.error || !run.result) {
     frameTimeP99Ms: r.frameTimeP99Ms,
     tickMedianMs: r.tickMedianMs,
     workerTick: r.workerTick ?? null,
+    errors: r.errors ?? [],
   }))
 }

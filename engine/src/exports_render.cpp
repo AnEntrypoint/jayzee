@@ -12,6 +12,7 @@
 #include "planet_frame.h"
 #include "render/render_backend.h"
 #include "render/render_frame.h"
+#include "render/render_webgpu.h"
 #include "render/render_webgl2.h"
 #include "render/render_webgpu.h"
 #include "textures.h"
@@ -289,6 +290,11 @@ EMSCRIPTEN_KEEPALIVE int engine_render_set_occlusion(std::uint32_t on) {
 
 EMSCRIPTEN_KEEPALIVE std::uint32_t engine_render_occlusion() {
   return rnd::modelSettings().occlusion;
+}
+
+EMSCRIPTEN_KEEPALIVE int engine_render_set_present_mode(std::uint32_t mode) {
+  rnd::webgpu::setPresentMode(mode);
+  return engine::kOk;
 }
 
 EMSCRIPTEN_KEEPALIVE void engine_render_set_count_readback(std::uint32_t on) {

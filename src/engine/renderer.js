@@ -231,7 +231,7 @@ export const createRenderer = (module, backend, { modelTier = -1, device = null,
   })
 }
 
-export const loadRenderer = async ({ glue = DEFAULT_GLUE, canvas, navigatorLike = globalThis.navigator, requested = 'auto', players = 64, workers = 1, budgetBytes = 67108864, beforeSeal = null, models = true } = {}) => {
+export const loadRenderer = async ({ glue = DEFAULT_GLUE, canvas, navigatorLike = globalThis.navigator, requested = 'auto', players = 64, workers = 1, budgetBytes = 67108864, beforeSeal = null, models = true, presentMode = 0 } = {}) => {
   if (!canvas) throw new TypeError('loadRenderer needs a canvas')
   ensureCanvasId(canvas)
   const backend = chooseBackend(requested, Boolean(navigatorLike && navigatorLike.gpu))
@@ -241,6 +241,7 @@ export const loadRenderer = async ({ glue = DEFAULT_GLUE, canvas, navigatorLike 
   const factory = (await import(glue)).default
   const module = await factory(options)
   status(module._engine_init(players, workers, budgetBytes), 'engine_init')
+  if (presentMode) status(module._engine_render_set_present_mode(presentMode), 'engine_render_set_present_mode')
   const modelTier = models ? bindModelPool(module, device, navigatorLike) : -1
   status(module._engine_render_init(backend), 'engine_render_init')
   if (beforeSeal) beforeSeal(module)
