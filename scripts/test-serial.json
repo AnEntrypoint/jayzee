@@ -9,7 +9,6 @@
   "check:scenario-combat-bots",
   "check:scenario-lockstep-rts",
   "check:scenario-boss-fight",
-  "check:scenario-marble-bowl",
   "check:scenario-planet-landing",
   "check:scenario-projectile-volley",
   "check:vegetation-allocations",
