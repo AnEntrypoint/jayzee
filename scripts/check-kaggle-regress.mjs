@@ -39,6 +39,17 @@ gate('a candidate whose median p99 is past the reference times the margin fails,
   assert.match(verdict.failures.join(' '), /median p99/)
 })
 
+gate('near 6 ms the p99 limit is the reference plus the floor, so the spread of identical builds in Kaggle runs 21 and 22 passes and a 20 percent loss fails', () => {
+  assert.ok(BASELINE.margin.p99FloorMs > 0 && BASELINE.margin.p99FloorMs <= 2)
+  assert.equal(judge(BASELINE, run(5.829, 6.156)).ok, true)
+  assert.equal(judge(BASELINE, run(6.831, 6.26)).ok, true)
+  assert.equal(judge(BASELINE, run(5.829, 5.829 + BASELINE.margin.p99FloorMs - 0.01)).ok, true)
+  const verdict = judge(BASELINE, run(5.829, 5.829 + BASELINE.margin.p99FloorMs + 0.01))
+  assert.equal(verdict.ok, false)
+  assert.match(verdict.failures.join(' '), /median p99/)
+  assert.equal(judge(BASELINE, run(5.829, 5.829 * 1.2)).ok, false)
+})
+
 gate('the p99 is the median of the repeats, so one slow repeat does not fail the run', () => {
   const results = run(12, 12)
   results.configs.find((c) => c.variant === 'base').p99Ms = 40

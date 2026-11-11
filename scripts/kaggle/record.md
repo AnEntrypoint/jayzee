@@ -4,7 +4,7 @@ Written by `node scripts/kaggle/record.mjs` from one `kaggle kernels output` rea
 
 - Budget: 16.7 ms per tick, 900 ticks per configuration. Ticks 0 and 1 are the boot ticks, ticks 2 to 299 the settle window, and ticks from 300 the steady window. The timed call is the whole worker tick: page streaming, follow, `engine_tick` and the pose export.
 - Arena plan: 1024 players under a 1073741824 byte budget.
-- Machine: Intel(R) Xeon(R) CPU @ 2.20GHz, 4 CPUs, Node v22.23.4.
+- Machine: Intel(R) Xeon(R) CPU @ 2.20GHz, 4 CPUs, Node v22.23.4, machine class GenuineIntel-6-79-0 (2 cores, 4 threads).
 - Pushed 2026-11-11T16:26:16.997Z. Queue wait 7 s from the push to the first line of the script. Run time 201.3 s for 42 of 42 planned runs.
 - engine-core-1024mib-threads.mjs, warmed: 12288 bodies hold the budget at p99 with zero ticks over budget (workers 3, 4, 6); in the steady window alone 12288 bodies hold it (workers 1, 2, 3, 4, 6).
 - engine-core-1024mib-threads-simd.mjs, warmed: 12288 bodies hold the budget at p99 with zero ticks over budget (workers 1, 2, 3, 4, 6); in the steady window alone 12288 bodies hold it (workers 1, 2, 3, 4, 6).

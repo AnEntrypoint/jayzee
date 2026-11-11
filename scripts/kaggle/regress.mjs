@@ -56,11 +56,11 @@ export const judge = (baseline, results) => {
   if (reference.length > 0 && candidate.length > 0) {
     top.referenceP99Ms = median(reference.map((c) => c.p99Ms))
     top.candidateP99Ms = median(candidate.map((c) => c.p99Ms))
-    top.p99LimitMs = Number((top.referenceP99Ms * baseline.margin.p99Factor).toFixed(3))
+    top.p99LimitMs = Number(Math.max(top.referenceP99Ms * baseline.margin.p99Factor, top.referenceP99Ms + baseline.margin.p99FloorMs).toFixed(3))
     top.referenceOverBudget = median(top.referenceOverEach)
     top.candidateOverBudget = median(top.candidateOverEach)
     top.overLimit = Math.floor(top.referenceOverBudget * baseline.margin.overBudgetFactor) + baseline.margin.overBudgetTicks
-    if (top.candidateP99Ms > top.p99LimitMs) failures.push('top tier median p99 ' + top.candidateP99Ms + ' ms is over ' + top.p99LimitMs + ' ms (the reference build ran ' + top.referenceP99Ms + ' ms in the same run, times ' + baseline.margin.p99Factor + ')')
+    if (top.candidateP99Ms > top.p99LimitMs) failures.push('top tier median p99 ' + top.candidateP99Ms + ' ms is over ' + top.p99LimitMs + ' ms (the reference build ran ' + top.referenceP99Ms + ' ms in the same run; the limit is the larger of that times ' + baseline.margin.p99Factor + ' and that plus ' + baseline.margin.p99FloorMs + ' ms)')
     if (top.candidateOverBudget > top.overLimit) failures.push('top tier ticks over ' + results.budgetMs + ' ms in the median run: ' + top.candidateOverBudget + ', limit ' + top.overLimit + ' (the reference build had ' + top.referenceOverBudget + ' in the same kernel run)')
   }
   const marbles = results.configs.filter((c) => c.kind === 'marble-bowl')

@@ -7,9 +7,10 @@
   },
   "margin": {
     "p99Factor": 1.1,
+    "p99FloorMs": 1,
     "overBudgetFactor": 1.25,
     "overBudgetTicks": 2,
-    "basis": "Kaggle run 9: seven builds with the same cost within noise gave median p99 from 19.24 to 20.50 ms at 10240 bodies (6 percent) and 22.35 to 24.65 ms at 12288 (10 percent), and ticks over budget per three runs from 103 to 157 on a slow machine. Between machines the same build ran 11.7 ms (run 7), 13.6 ms (run 8) and 20.5 ms (run 9), so the gate compares with a reference build in the same run and not with a recorded absolute figure. Kaggle run 12, the same source as reference and candidate: p99 13.5 to 14.3 ms and 13.7 to 14.5 ms over five runs each, zero ticks over budget, except one candidate run at 19.5 ms with 17 ticks over. So both figures are judged on the median run, with 10 percent on the p99 and 25 percent plus 2 ticks on the count."
+    "basis": "Kaggle run 9: seven builds with the same cost within noise gave median p99 from 19.24 to 20.50 ms at 10240 bodies (6 percent) and 22.35 to 24.65 ms at 12288 (10 percent), and ticks over budget per three runs from 103 to 157 on a slow machine. Between machines the same build ran 11.7 ms (run 7), 13.6 ms (run 8) and 20.5 ms (run 9), so the gate compares with a reference build in the same run and not with a recorded absolute figure. Kaggle run 12, the same source as reference and candidate: p99 13.5 to 14.3 ms and 13.7 to 14.5 ms over five runs each, zero ticks over budget, except one candidate run at 19.5 ms with 17 ticks over. So both figures are judged on the median run, with 10 percent on the p99 and 25 percent plus 2 ticks on the count. With the awake budget the top tier runs near 6 ms, where 10 percent is 0.6 ms: Kaggle runs 21 and 22, the same source as reference and candidate, gave medians of 6.83 against 6.26 ms and 5.83 against 6.16 ms, with single repeats from 5.56 to 9.84 ms. So the p99 limit is the larger of the reference times 1.10 and the reference plus 1 ms."
   },
   "marble": {
     "tiers": 4,
@@ -23,5 +24,21 @@
     "p99Factor": 1.25,
     "basis": "The reference build is a fixed source, so only the machine, Node and the bench harness can move its figure. On one machine class its three repeats in Kaggle run 15 were within 1 percent of each other; between runs of one class the spread is taken as 25 percent until more runs of a class are recorded. The limit is the recorded reference p99 times this factor, times the ratio of the single-thread calibration of the run to the recorded one when the machine calibrates slower."
   },
-  "classes": {}
+  "classes": {
+    "GenuineIntel-6-79-0": {
+      "modelName": "Intel(R) Xeon(R) CPU @ 2.20GHz",
+      "cores": "2",
+      "siblings": "4",
+      "cache": "56320 KB",
+      "kaggleRun": 22,
+      "referenceCommit": "675210968a34dcddaa949615b39e55c594bd68d0",
+      "bodies": 12288,
+      "workers": 4,
+      "singleMs": 599.8,
+      "referenceP99Ms": 5.829,
+      "candidateP99Ms": 6.156,
+      "candidateOverBudget": 0,
+      "holds": true
+    }
+  }
 }
