@@ -3682,3 +3682,10 @@ Phase B (2026-11-11): both glues rebuilt (64 MiB sha256 e5bfb97f…, 512 MiB thr
 - Witness: Phase B, both glues rebuilt and the bots scenario on both tiers.
 
 Phase B (2026-11-11): both glues rebuilt (64 MiB sha256 16dba745…, 512 MiB threaded sha256 2521a27f…). The character, deathrun and combat-bots scenarios print RESULT: PASS on both tiers. `npm test` exit 0 with no FAIL lines.
+
+## Lockstep RTS scenario: two squads, delayed orders and checksums (Phase A, 2026-11-11)
+
+- Source: spoint apps/lockstep-rts (two squads of units that seek, separate and attack, on a fixed step). The jayzee core is eight characters in two squads of four on the planet, with the same steering (sight 9 m, attack 1.6 m, separation 1.1 m with gain 6, speed 4 m/s, damage 12, cooldown 0.6 s). spoint's UI, player IDs and rendering are not ported.
+- Lockstep: orders are issued on a schedule and applied three ticks after issue (input delay 3). Two peers run in separate worlds on the same schedule and compare a checksum every 30 ticks (FNV over the body-frame positions and health, as Float32 bits). A third peer gets one divergent order at tick 90, which applies at tick 93, and must be caught first at tick 120.
+- Change: `scripts/check-scenario-lockstep-rts.mjs`, run as `check:scenario-lockstep-rts` and appended to `npm test`. Gates per tier: every order applies exactly 3 ticks after it is issued, units take damage, two peers agree at every checkpoint, the divergent peer is caught at tick 120, two runs agree bit for bit on positions and health, worst tick work within 16.7 ms.
+- Limit: the checksum is a JS-side hash, not the engine's state hash. Orders are scripted, not player input. The engine itself is unchanged in this stretch, so the glues from stretch 4 are the ones under test.
