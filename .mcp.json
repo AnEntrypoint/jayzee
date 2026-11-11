@@ -1,12 +1,9 @@
 {
   "mcpServers": {
     "playwriter": {
-      "command": "npx",
+      "command": "node",
       "args": [
-        "-y",
-        "-p",
-        "github:AnEntrypoint/pw#1488a92",
-        "playwriter-project"
+        "/workspace/jayzee/.playwriter/pw-243db69/pw/bin/playwriter-project"
       ],
       "env": {
         "PLAYWRITER_TELEMETRY": "0",
