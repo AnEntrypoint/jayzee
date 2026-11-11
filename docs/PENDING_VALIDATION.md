@@ -3708,3 +3708,13 @@ Phase B (2026-11-11): the engine is unchanged in this stretch, so the glues are 
 - Change: `scripts/check-relative-residuals.mjs` gains the gate "the WebGPU visibility path draws vegetation in its front pass, after props and before terrain".
 - Change: `docs/ENGINE.md` lines near 666 and 721 are corrected. The 666 note now states that the page binds vegetation. The 721 note now states that vegetation is drawn in the front pass and is not identified in the ID buffer.
 - Limit: vegetation has no ID-buffer identification, so the resolve pass does not shade it and it is drawn over the resolved frame. That is the open part. The witness is the planet run on both backends.
+
+## Vegetation visibility pass: planet witness, Phase B (2026-11-11), NOT GREEN
+
+- Build: the 64 MiB fixed glue and the 1024 MiB threaded glue rebuilt with exit 0. `check-relative-residuals` passes, including the new vegetation front-pass gate.
+- Witness: `scripts/browser/planet-witness-run.mjs` run five times on the four configs (1024 and 64 tier, WebGPU and WebGL2), 900 frames each, output in build/diag/planet-run1 to planet-run5.
+- Result, twenty verdicts: the 1024 tier work is never above 1.85 ms (p99 0.73 to 1.24 ms). The 64 tier work is never above 3.68 ms except one frame, 29.42 ms, on 64 WebGL2 in run 2 (frame 88).
+- Failures: run 1, 1024 WebGPU, one rAF interval of 43.21 ms (frame 615; that frame's work was 1.83 ms). Run 2, 64 WebGL2, two intervals (first 28.5 ms, frame 83) and the 29.42 ms work frame. Run 2, 64 WebGPU, one interval of 25.41 ms (frame 387). Run 5, 64 WebGPU, one interval of 26.6 ms (frame 206). Runs 3 and 4 pass all four configs.
+- Cause, as far as the evidence goes: every run shares the host with the owner's exe process at about 94% CPU, and the load average was 3.1 to 3.7 on 16 CPUs. The rAF gaps are in the scheduler, not the frame work. The 29.42 ms frame is on the WebGL2 path, which the change does not touch (only `encodeVisibility` changed). The cause of that single frame is not identified.
+- Status: Phase B is not green. The rule is that a 1024 run over 16.7 ms is a defect, and the 1024 runs pass, but the 64-tier missed-frame and single-frame failures are not explained. The vegetation change is not pushed. Its commit stays local.
+- Limit: the 1024 WebGPU vegetation draw is in the front pass after the models, so its cost is included in the 1024 work numbers above.
