@@ -8,7 +8,9 @@ import { decide } from './kaggle/push-gate.mjs'
 import { repeatedSpikes } from './kaggle/spikes.mjs'
 import { BASELINE, PROFILE_REPEATS, PROFILE_UNRECLAIMED_REPEATS, PROFILE_VARIANT, RECLAIM_OFF, buildPlan } from './kaggle/plan.mjs'
 import { describeSlowTick } from './kaggle/tickProfile.mjs'
-import { periodFit, slowTickTimes } from './kaggle/slowTickClock.mjs'
+import { canaryStalls, periodFit, phaseShare, slowTickTimes } from './kaggle/slowTickClock.mjs'
+import { PIPE_BYTES, distinctDryRows, judgePreflight } from './kaggle/preflight.mjs'
+import { spawnSync } from 'node:child_process'
 import { referenceGlue } from './kaggle/reference.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -303,7 +305,8 @@ gate('every class in the baseline is recorded for a full commit with a positive 
 gate('the regress plan runs the reference and the candidate alternately at the top tier, warmed, then the marble tiers after a warm run, between two calibrations', () => {
   const plan = buildPlan('regress')
   assert.equal(plan.runs[0].script, 'scripts/kaggle/calibrate.mjs')
-  assert.equal(plan.runs.at(-1).script, 'scripts/kaggle/calibrate.mjs')
+  assert.equal(plan.runs.filter((r) => r.dryOnly !== true).at(-1).script, 'scripts/kaggle/calibrate.mjs')
+  assert.deepEqual(plan.runs.filter((r) => r.dryOnly === true).map((r) => r.script), ['scripts/kaggle/pipeProbe.mjs'])
   const ticks = plan.runs.filter((r) => r.role === 'gate')
   assert.equal(ticks.length, top.repeats * 2)
   const record = plan.runs.filter((r) => r.role === 'record')
@@ -351,6 +354,59 @@ gate('slow ticks are placed on the clock of the kernel run, and gaps that are wh
   const boot = row(null)
   boot.traceMs[0] = 40
   assert.equal(slowTickTimes({ configs: [boot] }).length, 0)
+})
+
+gate('a result line of 300 KB, over the 64 KB of a pipe, arrives whole through the shared emit', () => {
+  const whole = spawnSync(process.execPath, [join(root, 'scripts/kaggle/pipeProbe.mjs'), '300000'], { encoding: 'utf8' })
+  const line = whole.stdout.split('\n').find((text) => text.startsWith('RESULT '))
+  assert.ok(line.length > 300000)
+  assert.equal(JSON.parse(line.slice(7)).filler.length, 300000)
+  assert.ok(line.length > PIPE_BYTES)
+  for (const script of ['bench.mjs', 'canary.mjs', 'pipeProbe.mjs']) {
+    const source = readFileSync(join(root, 'scripts/kaggle', script), 'utf8')
+    assert.ok(source.includes("import { emitResult } from './emit.mjs'"), script + ' does not use the shared emit')
+    assert.ok(!/console\.log\('RESULT/.test(source), script + ' logs its result and may exit before the pipe is drained')
+  }
+})
+
+gate('the dry run judges every distinct row: a failed row, a missing field, a short plan and a run with no line over the pipe size are each refused', () => {
+  const plan = buildPlan('regress')
+  const distinct = distinctDryRows(plan)
+  assert.ok(distinct.length < plan.runs.length && distinct.length >= 15, distinct.length + ' distinct rows')
+  const stamp = { startedAtEpochS: 1, endedAtEpochS: 2 }
+  const good = distinct.map((run) => {
+    if (run.script.endsWith('bench.mjs')) return { ...stamp, script: run.script, args: run.dryArgs, kind: 'tick', resultBytes: 50000, p99Ms: 1, maxMs: 1, overBudget: 1, activeMeanMs: 1, p99QuietMs: 1, loopStartedEpochMs: 5, arenaBytes: 9, overTicks: [{ epochMs: 7 }], profile: { slow: [{}] } }
+    if (run.script.endsWith('marble.mjs')) return { ...stamp, script: run.script, args: run.dryArgs, kind: 'marble-bowl', resultBytes: 900, cpuP99Ms: 1, cpuMaxMs: 1, perRun: [] }
+    if (run.script.endsWith('canary.mjs')) return { ...stamp, script: run.script, args: run.dryArgs, kind: 'canary', resultBytes: 300, gapCount: 0, over5Ms: 0, startedEpochMs: 4 }
+    if (run.script.endsWith('pipeProbe.mjs')) return { ...stamp, script: run.script, args: run.dryArgs, kind: 'pipe-probe', resultBytes: 300040, bytes: 300000, filler: 'x' }
+    return { ...stamp, script: run.script, args: run.dryArgs, kind: 'calibrate', resultBytes: 200, singleMs: 500 }
+  })
+  assert.deepEqual(judgePreflight({ dry: true, configs: good }, plan), { failures: [], rows: distinct.length, mostResultBytes: 300040 })
+  const failuresOf = (configs, dry = true) => judgePreflight({ dry, configs }, plan).failures
+  assert.match(failuresOf(good, false)[0], /did not run dry/)
+  assert.match(failuresOf(good.slice(1))[0], /ran \d+ rows of \d+/)
+  assert.match(failuresOf(good.map((row, i) => (i === 1 ? { ...row, error: 'unreadable result: Unterminated string' } : row)))[0], /unreadable result/)
+  assert.match(failuresOf(good.map((row, i) => (i === 1 ? { ...row, p99QuietMs: null } : row)))[0], /has no p99QuietMs/)
+  assert.match(failuresOf(good.map((row) => (row.kind === 'tick' ? { ...row, overTicks: [] } : row)))[0], /marked no tick as over/)
+  assert.match(failuresOf(good.map((row) => (row.kind === 'pipe-probe' ? { ...row, resultBytes: 4000 } : row)))[0], /no result line was over/)
+})
+
+gate('canary stalls and stamped slow ticks are placed on one clock, and their share near one phase of the ten-second period is counted', () => {
+  const results = { startedAtEpochS: 1000, configs: [
+    { kind: 'canary', threads: 1, seconds: 45, gaps: [{ thread: 0, epochMs: 1003200, gapMs: 6.5, runQueueMs: 0 }, { thread: 0, epochMs: 1013300, gapMs: 6.8, runQueueMs: 0.2 }, { thread: 0, epochMs: 1017000, gapMs: 7, runQueueMs: 6.9 }, { thread: 0, epochMs: 1018000, gapMs: 2, runQueueMs: 0 }] },
+    { kind: 'tick', runS: 9, loopStartedEpochMs: 1021000, traceMs: [5, 5, 5, ...Array.from({ length: 440 }, () => 5), 30, 5] },
+  ] }
+  const stalls = canaryStalls(results)
+  assert.deepEqual(stalls.map((stall) => [stall.atS, stall.unseen]), [[3.2, true], [13.3, true], [17, false]])
+  const ticks = slowTickTimes(results)
+  assert.deepEqual(ticks.map((tick) => [tick.tick, tick.clock]), [[443, 'stamped']])
+  assert.ok(Math.abs(ticks[0].atS - 23.215) < 0.011)
+  const share = phaseShare([...stalls.filter((stall) => stall.unseen), ...ticks])
+  assert.equal(share.events, 3)
+  assert.equal(share.near, 3)
+  assert.ok(Math.abs(share.phaseS - 3.24) < 0.05, 'phase ' + share.phaseS)
+  assert.equal(phaseShare([{ atS: 1 }, { atS: 6 }, { atS: 3.4 }, { atS: 8.5 }]).near <= 2, true)
+  assert.equal(phaseShare([]).events, 0)
 })
 
 gate('the regress plan carries the profile build at the top tier as rows the gate does not judge', () => {

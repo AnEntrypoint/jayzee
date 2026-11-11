@@ -29,9 +29,27 @@ export const VARIANT_WORKERS = 4
 export const VARIANT_REPEATS = 3
 export const variantGlue = (name) => 'build/variants/' + name + '/engine-core-1024mib-threads-simd.mjs'
 
-const calibrate = () => ({ script: 'scripts/kaggle/calibrate.mjs', nodeFlags: [], args: [], glueArg: -1, probe: false })
-const tick = (glue, bodies, workers, extra = {}) => ({ script: 'scripts/kaggle/bench.mjs', nodeFlags: extra.nodeFlags ?? [], args: [glue, String(bodies), String(workers), String(extra.ticks ?? TICKS), String(ARENA_BUDGET_BYTES), String(extra.iterations ?? 'default'), extra.scene ?? 'planet', extra.warm === false ? 'cold' : 'warm', extra.warmSpec ?? 'default', extra.knobs ?? 'none'], glueArg: 0, probe: extra.probe === true, role: extra.role ?? (extra.probe === true ? 'probe' : 'matrix') })
-const marble = (tier, runs = MARBLE_RUNS, warmRuns = 0) => ({ script: 'scripts/kaggle/marble.mjs', nodeFlags: [], args: [String(tier), String(runs), String(warmRuns)], glueArg: -1, probe: false })
+export const DRY_BODIES = 4096
+export const DRY_TICKS = 40
+export const DRY_BUDGET_KNOB = 'budget=0.01'
+export const DRY_CANARY_SECONDS = 2
+export const CANARY_SECONDS = 45
+
+const calibrate = () => ({ script: 'scripts/kaggle/calibrate.mjs', nodeFlags: [], args: [], dryArgs: [], glueArg: -1, probe: false })
+const tickArgs = (glue, bodies, workers, ticks, extra, knobs) => [glue, String(bodies), String(workers), String(ticks), String(ARENA_BUDGET_BYTES), String(extra.iterations ?? 'default'), extra.scene ?? 'planet', extra.warm === false ? 'cold' : 'warm', extra.warmSpec ?? 'default', knobs]
+const tick = (glue, bodies, workers, extra = {}) => ({
+  script: 'scripts/kaggle/bench.mjs',
+  nodeFlags: extra.nodeFlags ?? [],
+  args: tickArgs(glue, bodies, workers, extra.ticks ?? TICKS, extra, extra.knobs ?? 'none'),
+  dryArgs: tickArgs(glue, Math.min(bodies, DRY_BODIES), workers, DRY_TICKS, extra, extra.knobs ? extra.knobs + ',' + DRY_BUDGET_KNOB : DRY_BUDGET_KNOB),
+  glueArg: 0,
+  probe: extra.probe === true,
+  role: extra.role ?? (extra.probe === true ? 'probe' : 'matrix'),
+})
+const marble = (tier, runs = MARBLE_RUNS, warmRuns = 0) => ({ script: 'scripts/kaggle/marble.mjs', nodeFlags: [], args: [String(tier), String(runs), String(warmRuns)], dryArgs: [String(tier), '1', '0'], glueArg: -1, probe: false })
+export const PIPE_PROBE_BYTES = 300000
+const pipeProbe = () => ({ script: 'scripts/kaggle/pipeProbe.mjs', nodeFlags: [], args: [String(PIPE_PROBE_BYTES)], dryArgs: [String(PIPE_PROBE_BYTES)], glueArg: -1, probe: true, role: 'pipe-probe', dryOnly: true })
+const canary = (threads, seconds = CANARY_SECONDS) => ({ script: 'scripts/kaggle/canary.mjs', nodeFlags: [], args: [String(seconds), String(threads)], dryArgs: [String(DRY_CANARY_SECONDS), String(threads)], glueArg: -1, probe: true, role: 'canary' })
 
 const matrix = () => {
   const runs = []
@@ -52,8 +70,9 @@ const variants = () => {
 
 export const RECORD_WORKERS = Object.freeze([1, 2, 3, 6])
 export const PROFILE_VARIANT = 'profile'
-export const PROFILE_REPEATS = 20
-export const PROFILE_UNRECLAIMED_REPEATS = 10
+export const PROFILE_REPEATS = 10
+export const PROFILE_UNRECLAIMED_REPEATS = 0
+export const CANARY_THREADS = Object.freeze([1, 4])
 export const RECLAIM_OFF = 'reclaim=off'
 export const SETTLE_TICKS = 3000
 export const VIEW_BODIES = 40960
@@ -66,6 +85,7 @@ const regressWith = (candidate) => () => {
   runs.push(calibrate())
   for (let repeat = 0; repeat < repeats; repeat++) for (const glue of [referenceGlue(BASELINE.referenceCommit), candidate]) runs.push(tick(glue, bodies, workers, { role: 'gate' }))
   for (let tier = 0; tier < MARBLE_TIERS; tier++) runs.push(marble(tier, BASELINE.marble.runs, BASELINE.marble.warmRuns))
+  for (const threads of CANARY_THREADS) runs.push(canary(threads))
   for (const count of RECORD_WORKERS) runs.push(tick(candidate, bodies, count, { role: 'record' }))
   for (const glue of TICK_GLUES.filter((path) => path !== candidate)) runs.push(tick(glue, bodies, workers, { role: 'record' }))
   runs.push(tick(candidate, bodies, workers, { warm: false, role: 'record' }))
@@ -74,6 +94,7 @@ const regressWith = (candidate) => () => {
   for (const knobs of VIEW_KNOBS) runs.push(tick(candidate, VIEW_BODIES, workers, { role: 'record', knobs }))
   for (let repeat = 0; repeat < PROFILE_REPEATS; repeat++) runs.push(tick(variantGlue(PROFILE_VARIANT), bodies, workers, { role: 'profile' }))
   for (let repeat = 0; repeat < PROFILE_UNRECLAIMED_REPEATS; repeat++) runs.push(tick(variantGlue(PROFILE_VARIANT), bodies, workers, { role: 'profile', knobs: RECLAIM_OFF }))
+  for (const threads of CANARY_THREADS) runs.push(canary(threads))
   runs.push(calibrate())
   return runs
 }
@@ -173,5 +194,5 @@ export const PLANS = Object.freeze({ stretch, ceiling, claim, stall, matrix, var
 
 export const buildPlan = (mode = 'matrix') => {
   if (!Object.hasOwn(PLANS, mode)) throw new RangeError('unknown plan ' + mode)
-  return { mode, budgetMs: BUDGET_MS, ticks: TICKS, arenaBudgetBytes: ARENA_BUDGET_BYTES, runs: PLANS[mode]() }
+  return { mode, budgetMs: BUDGET_MS, ticks: TICKS, arenaBudgetBytes: ARENA_BUDGET_BYTES, runs: [...PLANS[mode](), pipeProbe()] }
 }

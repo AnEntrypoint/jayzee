@@ -8,6 +8,9 @@ RUN_LIMIT_S = 600
 WORK = os.environ.get("JAYZEE_BENCH_WORK", "/tmp/jayzee-bench")
 RESULTS = os.environ.get("JAYZEE_BENCH_RESULTS", "/kaggle/working/results.json")
 ONLY = os.environ.get("JAYZEE_BENCH_ONLY")
+DRY = os.environ.get("JAYZEE_BENCH_DRY") == "1"
+NODE = os.environ.get("JAYZEE_BENCH_NODE")
+TAIL_BYTES = 400
 
 
 def node_ok(path):
@@ -19,7 +22,7 @@ def node_ok(path):
 
 
 def find_node():
-    system = shutil.which("node")
+    system = NODE or shutil.which("node")
     if system and node_ok(system):
         return system
     dest = "/tmp/node-v%s" % NODE_VERSION
@@ -72,11 +75,16 @@ def machine():
         info["lscpu"] = {line.split(":", 1)[0].strip(): line.split(":", 1)[1].strip() for line in text.splitlines() if line.split(":", 1)[0].strip() in wanted}
     except Exception as error:
         info["lscpu"] = {"error": str(error)}
+    for name, path in (("cgroupCpuMax", "/sys/fs/cgroup/cpu.max"), ("kernelRelease", "/proc/sys/kernel/osrelease"), ("procVersion", "/proc/version"), ("cmdline", "/proc/cmdline"), ("pressureCpu", "/proc/pressure/cpu")):
+        try:
+            with open(path) as handle:
+                info[name] = handle.read().strip()[:TAIL_BYTES]
+        except Exception:
+            info[name] = None
     try:
-        with open("/sys/fs/cgroup/cpu.max") as handle:
-            info["cgroupCpuMax"] = handle.read().strip()
-    except Exception:
-        info["cgroupCpuMax"] = None
+        info["dmesgHead"] = subprocess.run(["dmesg"], capture_output=True, text=True, timeout=20).stdout[:TAIL_BYTES]
+    except Exception as error:
+        info["dmesgHead"] = "unreadable: " + str(error)[:120]
     return info
 
 
@@ -86,20 +94,38 @@ def save(results):
         json.dump(results, handle)
 
 
+def parse_result(done):
+    lines = [line[len("RESULT "):] for line in done.stdout.splitlines() if line.startswith("RESULT ")]
+    if not lines:
+        return {"error": "no result", "exit": done.returncode, "stderr": done.stderr[-800:]}
+    try:
+        entry = json.loads(lines[-1])
+    except ValueError as error:
+        return {"error": "unreadable result: " + str(error)[:160], "exit": done.returncode, "resultBytes": len(lines[-1]), "resultTail": lines[-1][-TAIL_BYTES:], "stderr": done.stderr[-800:]}
+    if not isinstance(entry, dict):
+        return {"error": "the result is not an object", "resultBytes": len(lines[-1])}
+    entry["resultBytes"] = len(lines[-1])
+    return entry
+
+
 def run_one(node, run):
-    args = list(run["args"])
+    given = run["dryArgs"] if DRY else run["args"]
+    args = list(given)
     if run["glueArg"] >= 0:
         args[run["glueArg"]] = os.path.join(WORK, args[run["glueArg"]])
     began = time.time()
     try:
         done = subprocess.run([node] + run["nodeFlags"] + [os.path.join(WORK, run["script"])] + args,
                               capture_output=True, text=True, cwd=WORK, timeout=RUN_LIMIT_S)
-        lines = [line[len("RESULT "):] for line in done.stdout.splitlines() if line.startswith("RESULT ")]
-        entry = json.loads(lines[-1]) if lines else {"error": "no result", "exit": done.returncode, "stderr": done.stderr[-800:]}
+        entry = parse_result(done)
     except subprocess.TimeoutExpired:
         entry = {"error": "timeout after %d s" % RUN_LIMIT_S}
+    except Exception as error:
+        entry = {"error": "the run could not start: " + str(error)[:200]}
+    entry["startedAtEpochS"] = round(began, 3)
+    entry["endedAtEpochS"] = round(time.time(), 3)
     entry["script"] = run["script"]
-    entry["args"] = run["args"]
+    entry["args"] = given
     entry["nodeFlags"] = run["nodeFlags"]
     entry["probe"] = run["probe"]
     entry["role"] = run.get("role")
@@ -140,7 +166,7 @@ def summarise(configs):
                 "updateErrors": max((row.get("updateErrors") or 0) for row in good),
             })
         else:
-            line["results"] = [{name: row.get(name) for name in ("kind", "refused", "error", "status", "singleMs", "memoryMs", "cpuP99Ms", "cpuMaxMs", "cpuOver25", "tier") if row.get(name) is not None} for row in rows]
+            line["results"] = [{name: row.get(name) for name in ("kind", "refused", "error", "status", "singleMs", "memoryMs", "cpuP99Ms", "cpuMaxMs", "cpuOver25", "tier", "threads", "gapCount", "over5Ms", "over5MsUnseen", "widestMs") if row.get(name) is not None} for row in rows]
         lines.append(line)
     return lines
 
@@ -159,12 +185,21 @@ def main():
     results = {"startedAtEpochS": started, "payloadSha256": PAYLOAD_SHA256, "node": version, "cpuModel": cpu_model, "nproc": os.cpu_count(), "machine": machine(),
                "budgetMs": plan["budgetMs"], "ticks": plan["ticks"], "arenaBudgetBytes": plan["arenaBudgetBytes"],
                "plannedRuns": len(plan["runs"]), "configs": []}
-    print("node", version, "cpu", cpu_model, "nproc", os.cpu_count(), "runs", len(plan["runs"]), flush=True)
-    runs = plan["runs"] if ONLY is None else [plan["runs"][int(i)] for i in ONLY.split(",")]
+    planned = [run for run in plan["runs"] if DRY or not run.get("dryOnly")]
+    results["plannedRuns"] = len(planned)
+    runs = planned if ONLY is None else [planned[int(i)] for i in ONLY.split(",")]
+    results["dry"] = DRY
+    if DRY:
+        distinct = {}
+        for run in runs:
+            distinct.setdefault(json.dumps([run["script"], run["dryArgs"], run["nodeFlags"]]), run)
+        runs = list(distinct.values())
     for run in runs:
         entry = run_one(node, run)
         results["configs"].append(entry)
         save(results)
+        if entry.get("error") or entry.get("refused"):
+            print("ROW FAILED " + json.dumps({name: entry.get(name) for name in ("script", "args", "error", "refused", "exit", "resultBytes")}), flush=True)
     results["totalS"] = round(time.time() - started, 1)
     results["summary"] = summarise(results["configs"])
     for line in results["summary"]:

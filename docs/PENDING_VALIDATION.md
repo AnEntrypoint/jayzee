@@ -4616,3 +4616,11 @@ Kaggle runs, all private, class GenuineIntel-6-79-0: run 36 stopped at its first
 5. Gate, run 38: mean awake tick 6.61 ms against the reference 6.698 ms (limit 7.368), quiet-tick p99 8.724 against 8.529 ms (limit 10.661), 0 ticks over budget in the median run against 1. The production glues are byte for byte the ones of the reference commit (`pins changed: 0` after the rebuild).
 
 Open: what the 10-second host activity is; what the other holders of the driver lock are when no browser of this project is running.
+
+## Phase K, pending (2026-11-12): one Kaggle run per stretch, and whether the 10-second stall is ours
+
+Ranked list of what is left, top first: (1) one-run measurement pipeline, this phase; (2) the 10-second host activity, canary rows in this phase's run; (3) raise the awake budget, needs engine work on the broadphase and the planet pair; (4) settle time at 131072, waits on 3; (5) other holders of the graphics driver lock, only processes visible from this container can be named; (6) AMD class record, waits on a run that lands on that class; (7) Jolt's profiler compiled into the production glues; (8) one retry when a witness page fails to open; (9) host witness on the patched Jolt; (10) measure-memory on the final tree.
+
+Phase A commit, with the witness it needs in Phase B:
+
+- `scripts/kaggle/preflight.mjs`, `kernel.py.tmpl`, `plan.mjs`, `run.mjs`, `emit.mjs`, `pipeProbe.mjs`, `canary.mjs`, `bench.mjs`, `slowTickClock.mjs`: the real kernel script runs dry on this host before anything is uploaded, each distinct row once at 4096 bodies and 40 ticks with a budget that marks every tick, plus a 300 KB result line; the kernel records a row it cannot read and goes on; every row and every over-budget tick carries a clock stamp; a canary with no engine in it spins one and then four threads and records every gap. Witness: `node scripts/kaggle/preflight.mjs regress` with no failure; `check:kaggle-regress` (three new lines); one Kaggle gate run that completes every planned row; `node scripts/kaggle/slowTickClock.mjs <results>` saying whether the canary has the unseen stalls on the bench's 10-second phase.

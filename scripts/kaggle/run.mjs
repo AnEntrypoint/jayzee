@@ -3,6 +3,7 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync, existsSync } from 'node
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { DATASET_REF, KERNEL_REF } from './plan.mjs'
+import { preflight } from './preflight.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 const POLL_MS = 20000
@@ -16,6 +17,8 @@ const kaggle = (args, timeout = 600000) => {
 const pause = (ms) => new Promise((done) => setTimeout(done, ms))
 
 export const runOnKaggle = async (mode, note) => {
+  const dry = preflight(mode)
+  if (dry.failures.length > 0) throw new Error('the dry run of the kernel failed, so nothing was uploaded: ' + dry.failures.slice(0, 6).join(' ; '))
   const packed = JSON.parse(execFileSync('node', [join(root, 'scripts/kaggle/pack.mjs'), mode], { cwd: root, encoding: 'utf8' }).trim().split('\n').pop())
   const uploaded = kaggle(['datasets', 'version', '-p', 'build/kaggle/dataset', '-m', note, '-q'])
   if (uploaded.status !== 0) throw new Error('dataset version failed: ' + uploaded.text.slice(-400))
@@ -47,7 +50,8 @@ export const runOnKaggle = async (mode, note) => {
   if (!existsSync(resultsPath)) throw new Error('kernel ended ' + state + ' with no results.json: ' + fetched.text.slice(-400))
   const results = JSON.parse(readFileSync(resultsPath, 'utf8'))
   if (results.payloadSha256 !== packed.payloadSha256) throw new Error('results are for payload ' + results.payloadSha256 + ', not ' + packed.payloadSha256)
-  const meta = { mode, version: Number(version[1]), pushedAt, state, payloadSha256: packed.payloadSha256, resultsPath, queueWaitS: Number((results.startedAtEpochS - Date.parse(pushedAt) / 1000).toFixed(0)), runS: results.totalS ?? null, configs: results.configs.length, plannedRuns: results.plannedRuns }
+  const failedRows = results.configs.filter((row) => row.error || row.refused).map((row) => ({ script: row.script, args: row.args, error: row.error ?? null, refused: row.refused ?? null }))
+  const meta = { mode, version: Number(version[1]), pushedAt, state, preflight: { rows: dry.rows, seconds: dry.seconds, mostResultBytes: dry.mostResultBytes }, failedRows, payloadSha256: packed.payloadSha256, resultsPath, queueWaitS: Number((results.startedAtEpochS - Date.parse(pushedAt) / 1000).toFixed(0)), runS: results.totalS ?? null, configs: results.configs.length, plannedRuns: results.plannedRuns }
   writeFileSync(join(outDir, 'meta.json'), JSON.stringify(meta, null, 1) + '\n')
   return { meta, results }
 }

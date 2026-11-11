@@ -10,8 +10,9 @@ import { createPoseStepper } from '../../src/engine/poseHandoffCore.js'
 import { warmEngine } from '../../src/engine/warmEngine.js'
 import { createTickProbe } from './tickProbe.mjs'
 import { canProfile, createTickProfile } from './tickProfile.mjs'
+import { emitResult } from './emit.mjs'
 
-const BUDGET_MS = 16.7
+const FRAME_BUDGET_MS = 16.7
 const BOOT_TICKS = 2
 const SETTLE_END = 300
 const TRACE_TICKS = 900
@@ -21,6 +22,8 @@ const PLAYERS = 1024
 
 const [glue, bodiesArg, workersArg, ticksArg, budgetArg, iterationsArg = 'default', scene = 'planet', warmArg = 'cold', warmSpecArg = 'default', knobsArg = 'none'] = process.argv.slice(2)
 const knobs = Object.fromEntries(knobsArg === 'none' ? [] : knobsArg.split(',').map((pair) => pair.split('=')))
+const BUDGET_MS = knobs.budget !== undefined ? Number(knobs.budget) : FRAME_BUDGET_MS
+if (!(BUDGET_MS > 0)) throw new RangeError('the budget knob must be a number of milliseconds above zero')
 const bodies = Number(bodiesArg)
 const workers = Number(workersArg)
 const ticks = Number(ticksArg)
@@ -33,9 +36,7 @@ const warm = warmArg === 'warm'
 const variantOf = (path) => (path.includes('/variants/') ? path.split('/').at(-2) : path.includes('/reference/') ? 'reference' : 'base')
 const base = { kind: 'tick', scene, warm, warmSpec: warmSpecArg, knobs: knobsArg, variant: variantOf(glue), glue: glue.split('/').pop(), bodies, workers, iterations, budgetMs: BUDGET_MS, budgetBytes, ticks, cpus: availableParallelism(), execArgv: process.execArgv }
 
-const emit = (result) => {
-  process.stdout.write('RESULT ' + JSON.stringify(result) + '\n', () => process.exit(0))
-}
+const emit = emitResult
 const round = (ms, digits) => Number(ms.toFixed(digits))
 const quantile = (sorted, p) => sorted[Math.min(sorted.length - 1, Math.floor(p * sorted.length))]
 const over = (values) => values.reduce((n, ms) => n + (ms > BUDGET_MS ? 1 : 0), 0)
@@ -95,6 +96,7 @@ const collections = []
 const gcObserver = new PerformanceObserver((list) => collections.push(...list.getEntries()))
 gcObserver.observe({ entryTypes: ['gc'] })
 const loopStarted = performance.now()
+const loopStartedEpochMs = Date.now()
 const times = new Float64Array(ticks)
 const tickAt = new Float64Array(ticks)
 held[0] = heldOf ? heldOf() : 0
@@ -121,7 +123,7 @@ const overTicks = []
 times.forEach((ms, tick) => {
   if (ms <= BUDGET_MS) return
   const gcInTickMs = collections.reduce((sum, entry) => sum + (entry.startTime < tickAt[tick] + ms && entry.startTime + entry.duration > tickAt[tick] ? entry.duration : 0), 0)
-  overTicks.push({ ...probe.describe(tick, ms), gcInTickMs: round(gcInTickMs, 2), awake: activeOf ? active[tick] : null, released: heldOf ? held[tick] - held[tick + 1] : null, airborne: airborneOf ? airborne[tick] : null })
+  overTicks.push({ ...probe.describe(tick, ms), epochMs: Math.round(loopStartedEpochMs + tickAt[tick] - loopStarted), gcInTickMs: round(gcInTickMs, 2), awake: activeOf ? active[tick] : null, released: heldOf ? held[tick] - held[tick + 1] : null, airborne: airborneOf ? airborne[tick] : null })
 })
 const lastTickWith = (counts) => {
   let last = -1
@@ -146,6 +148,7 @@ emit({
   awakeBudget,
   tuning: knobs.tune !== undefined ? Number(knobs.tune) : null,
   warmMs: warmed ? round(warmed.ms, 1) : null,
+  loopStartedEpochMs,
   warmed: warmed ? warmed.warmed : null,
   warmReclaim: warmReclaim ? { collected: warmReclaim.collected, nudges: warmReclaim.nudges, ms: round(warmReclaim.ms, 1) } : null,
   loadMs: round(loadMs, 1),
