@@ -105,12 +105,8 @@ set(ENGINE_EXPORTS
   _engine_character_add
   _engine_character_set_velocity
   _engine_character_supported
-  _engine_character_x
-  _engine_character_y
-  _engine_character_z
-  _engine_character_body_x
-  _engine_character_body_y
-  _engine_character_body_z
+  _engine_character_axis
+  _engine_character_body_axis
   _engine_spawn
   _engine_set_position
   _engine_set_velocity

@@ -39,18 +39,18 @@ const scenario = async (tier) => {
   }
   for (let t = 0; t < STAND_TICKS; t++) {
     step()
-    if (t >= STAND_TICKS - SETTLE_WINDOW) trail.push(Array.from(world.characterPosition(p)))
+    if (t >= STAND_TICKS - SETTLE_WINDOW) trail.push(Array.from(world.characterPosition(0, p)))
   }
-  const standing = Array.from(world.characterPosition(p))
-  const supportedStanding = world.characterSupported()
+  const standing = Array.from(world.characterPosition(0, p))
+  const supportedStanding = world.characterSupported(0)
   const startWalk = standing.slice()
-  world.setCharacterVelocity([WALK_SPEED_M_S, 0, 0])
+  world.setCharacterVelocity(0, [WALK_SPEED_M_S, 0, 0])
   for (let t = 0; t < WALK_TICKS; t++) {
     step()
-    world.setCharacterVelocity([WALK_SPEED_M_S, 0, 0])
+    world.setCharacterVelocity(0, [WALK_SPEED_M_S, 0, 0])
   }
-  const walked = Array.from(world.characterPosition(p))
-  const supportedWalking = world.characterSupported()
+  const walked = Array.from(world.characterPosition(0, p))
+  const supportedWalking = world.characterSupported(0)
   return { standing, startWalk, walked, trail, restingDistance, supportedStanding, supportedWalking, tickMs }
 }
 

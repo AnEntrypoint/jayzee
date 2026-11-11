@@ -134,29 +134,31 @@ export class EngineWorld {
   addCharacter({ position, radius, halfHeight }) {
     checkVector(position, 'character position')
     if (![radius, halfHeight].every(isFiniteNumber)) throw new RangeError('character radius and halfHeight must be finite numbers')
-    this.#write(this.#module._engine_character_add(position[0], position[1], position[2], radius, halfHeight), 'character')
+    const index = this.#module._engine_character_add(position[0], position[1], position[2], radius, halfHeight)
+    if (index < 0) throw engineError(index, 'engine refused the character')
+    return index
   }
 
-  setCharacterVelocity(velocity) {
+  setCharacterVelocity(index, velocity) {
     checkVector(velocity, 'character velocity')
-    this.#module._engine_character_set_velocity(velocity[0], velocity[1], velocity[2])
+    this.#module._engine_character_set_velocity(index, velocity[0], velocity[1], velocity[2])
   }
 
-  characterSupported() {
-    return this.#module._engine_character_supported() === 1
+  characterSupported(index) {
+    return this.#module._engine_character_supported(index) === 1
   }
 
-  characterBodyPosition(out = [0, 0, 0]) {
-    out[0] = this.#module._engine_character_body_x()
-    out[1] = this.#module._engine_character_body_y()
-    out[2] = this.#module._engine_character_body_z()
+  characterPosition(index, out = [0, 0, 0]) {
+    out[0] = this.#module._engine_character_axis(index, 0)
+    out[1] = this.#module._engine_character_axis(index, 1)
+    out[2] = this.#module._engine_character_axis(index, 2)
     return out
   }
 
-  characterPosition(out = [0, 0, 0]) {
-    out[0] = this.#module._engine_character_x()
-    out[1] = this.#module._engine_character_y()
-    out[2] = this.#module._engine_character_z()
+  characterBodyPosition(index, out = [0, 0, 0]) {
+    out[0] = this.#module._engine_character_body_axis(index, 0)
+    out[1] = this.#module._engine_character_body_axis(index, 1)
+    out[2] = this.#module._engine_character_body_axis(index, 2)
     return out
   }
 

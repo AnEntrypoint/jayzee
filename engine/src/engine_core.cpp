@@ -217,49 +217,25 @@ EMSCRIPTEN_KEEPALIVE int engine_character_add(float x, float y, float z, float r
   return engine::world().addCharacter(spec);
 }
 
-EMSCRIPTEN_KEEPALIVE void engine_character_set_velocity(float vx, float vy, float vz) {
+EMSCRIPTEN_KEEPALIVE void engine_character_set_velocity(std::uint32_t index, float vx, float vy, float vz) {
   const float velocity[3] = {vx, vy, vz};
-  engine::world().setCharacterVelocity(velocity);
+  engine::world().setCharacterVelocity(index, velocity);
 }
 
-EMSCRIPTEN_KEEPALIVE int engine_character_supported() {
-  return engine::world().characterSupported() ? 1 : 0;
+EMSCRIPTEN_KEEPALIVE int engine_character_supported(std::uint32_t index) {
+  return engine::world().characterSupported(index) ? 1 : 0;
 }
 
-EMSCRIPTEN_KEEPALIVE float engine_character_body_x() {
+EMSCRIPTEN_KEEPALIVE float engine_character_axis(std::uint32_t index, std::uint32_t axis) {
   float out[3];
-  engine::world().characterBodyPosition(out);
-  return out[0];
+  engine::world().characterPosition(index, out);
+  return out[axis];
 }
 
-EMSCRIPTEN_KEEPALIVE float engine_character_body_y() {
+EMSCRIPTEN_KEEPALIVE float engine_character_body_axis(std::uint32_t index, std::uint32_t axis) {
   float out[3];
-  engine::world().characterBodyPosition(out);
-  return out[1];
-}
-
-EMSCRIPTEN_KEEPALIVE float engine_character_body_z() {
-  float out[3];
-  engine::world().characterBodyPosition(out);
-  return out[2];
-}
-
-EMSCRIPTEN_KEEPALIVE float engine_character_x() {
-  float out[3];
-  engine::world().characterPosition(out);
-  return out[0];
-}
-
-EMSCRIPTEN_KEEPALIVE float engine_character_y() {
-  float out[3];
-  engine::world().characterPosition(out);
-  return out[1];
-}
-
-EMSCRIPTEN_KEEPALIVE float engine_character_z() {
-  float out[3];
-  engine::world().characterPosition(out);
-  return out[2];
+  engine::world().characterBodyPosition(index, out);
+  return out[axis];
 }
 
 EMSCRIPTEN_KEEPALIVE double engine_spawn(float px, float py, float pz, float vx, float vy, float vz) {

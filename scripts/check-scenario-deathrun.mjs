@@ -42,7 +42,7 @@ const scenario = async (tier) => {
   let finishTick = null
   let tick = 0
   for (; tick < FINISH_LIMIT_TICKS && next < checkpoints.length; tick++) {
-    world.characterBodyPosition(body)
+    world.characterBodyPosition(0, body)
     const up = [body[0] - planetCentre[0], body[1] - planetCentre[1], body[2] - planetCentre[2]]
     const upLength = Math.hypot(...up)
     const normal = up.map((v) => v / upLength)
@@ -57,14 +57,14 @@ const scenario = async (tier) => {
     const along = toTarget[0] * normal[0] + toTarget[1] * normal[1] + toTarget[2] * normal[2]
     const tangent = toTarget.map((v, i) => v - along * normal[i])
     const tangentLength = Math.hypot(...tangent)
-    world.setCharacterVelocity(tangentLength > 0 ? tangent.map((v) => (v / tangentLength) * RUN_SPEED_M_S) : [0, 0, 0])
+    world.setCharacterVelocity(0, tangentLength > 0 ? tangent.map((v) => (v / tangentLength) * RUN_SPEED_M_S) : [0, 0, 0])
     const started = performance.now()
     world.step()
     tickMs.push(performance.now() - started)
     radial.push(upLength - centreRadius)
-    supported.push(world.characterSupported())
+    supported.push(world.characterSupported(0))
   }
-  world.characterBodyPosition(body)
+  world.characterBodyPosition(0, body)
   return { reached, finishTick, body: body.slice(), tickMs, radial, supported, ticks: tick }
 }
 

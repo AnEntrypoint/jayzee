@@ -132,9 +132,12 @@ struct World::Runtime {
 #endif
   JPH::PhysicsSystem physics;
   JPH::CharacterVirtualSettings characterSettings;
-  JPH::Ref<JPH::CharacterVirtual> character;
-  JPH::Vec3 characterCommand = JPH::Vec3::sZero();
-  JPH::Vec3 characterFall = JPH::Vec3::sZero();
+  JPH::Ref<JPH::CharacterVirtual> characters[kMaxCharacters];
+  JPH::Vec3 characterCommand[kMaxCharacters];
+  JPH::Vec3 characterFall[kMaxCharacters];
+  std::uint32_t characterCount = 0;
+  float characterRadius = 0.0f;
+  float characterHalfHeight = 0.0f;
   JPH::ShapeRefC sphere;
   JPH::ShapeRefC planetShape;
   JPH::ShapeRefC vegetationShape;
@@ -332,65 +335,78 @@ JPH::RVec3 toBody(const float* p) {
 
 }
 
-Status World::addCharacter(const float* spec) {
+int World::addCharacter(const float* spec) {
   if (runtime_ == nullptr) return kNotConfigured;
-  if (runtime_->character != nullptr) return kFull;
   if (!(spec[3] > 0.0f) || !(spec[4] >= 0.0f)) return kRange;
-  runtime_->characterSettings.mShape = new JPH::CapsuleShape(spec[4], spec[3]);
-  runtime_->character = new JPH::CharacterVirtual(&runtime_->characterSettings, toBody(spec), JPH::Quat::sIdentity(), &runtime_->physics);
-  return kOk;
+  Runtime& r = *runtime_;
+  if (r.characterCount >= kMaxCharacters) return kFull;
+  if (r.characterCount == 0) {
+    r.characterSettings.mShape = new JPH::CapsuleShape(spec[4], spec[3]);
+    r.characterRadius = spec[3];
+    r.characterHalfHeight = spec[4];
+  } else if (spec[3] != r.characterRadius || spec[4] != r.characterHalfHeight) {
+    return kRange;
+  }
+  const std::uint32_t index = r.characterCount;
+  r.characters[index] = new JPH::CharacterVirtual(&r.characterSettings, toBody(spec), JPH::Quat::sIdentity(), &r.physics);
+  r.characterCount += 1;
+  return static_cast<int>(index);
 }
 
-void World::setCharacterVelocity(const float* velocity) {
-  if (runtime_ == nullptr) return;
-  runtime_->characterCommand = JPH::Vec3(velocity[0], velocity[1], velocity[2]);
+void World::setCharacterVelocity(std::uint32_t index, const float* velocity) {
+  if (runtime_ == nullptr || index >= runtime_->characterCount) return;
+  runtime_->characterCommand[index] = JPH::Vec3(velocity[0], velocity[1], velocity[2]);
 }
 
-bool World::characterSupported() const {
-  return runtime_ != nullptr && runtime_->character != nullptr && runtime_->character->IsSupported();
+bool World::characterSupported(std::uint32_t index) const {
+  return runtime_ != nullptr && index < runtime_->characterCount && runtime_->characters[index]->IsSupported();
 }
 
-void World::characterPosition(float* out) const {
+void World::characterPosition(std::uint32_t index, float* out) const {
   out[0] = out[1] = out[2] = 0.0f;
-  if (runtime_ == nullptr || runtime_->character == nullptr) return;
+  if (runtime_ == nullptr || index >= runtime_->characterCount) return;
   const PhysicsOrigin& o = physicsOrigin();
-  const JPH::RVec3 at = runtime_->character->GetPosition();
+  const JPH::RVec3 at = runtime_->characters[index]->GetPosition();
   out[0] = static_cast<float>(at.GetX() + o.x);
   out[1] = static_cast<float>(at.GetY() + o.y);
   out[2] = static_cast<float>(at.GetZ() + o.z);
 }
 
-void World::characterBodyPosition(float* out) const {
+void World::characterBodyPosition(std::uint32_t index, float* out) const {
   out[0] = out[1] = out[2] = 0.0f;
-  if (runtime_ == nullptr || runtime_->character == nullptr) return;
-  const JPH::RVec3 at = runtime_->character->GetPosition();
+  if (runtime_ == nullptr || index >= runtime_->characterCount) return;
+  const JPH::RVec3 at = runtime_->characters[index]->GetPosition();
   out[0] = static_cast<float>(at.GetX());
   out[1] = static_cast<float>(at.GetY());
   out[2] = static_cast<float>(at.GetZ());
 }
 
-void World::updateCharacter(float dt) {
-  if (runtime_ == nullptr || runtime_->character == nullptr) return;
+void World::updateCharacters(float dt) {
+  if (runtime_ == nullptr) return;
+  Runtime& r = *runtime_;
   const PhysicsOrigin& o = physicsOrigin();
-  const JPH::RVec3 at = runtime_->character->GetPosition();
-  const double x = at.GetX() + o.x;
-  const double y = at.GetY() + o.y;
-  const double z = at.GetZ() + o.z;
-  const double distance = std::sqrt(x * x + y * y + z * z);
-  JPH::Vec3 gravity = JPH::Vec3::sZero();
-  if (distance > 0.0) {
-    const double scale = -static_cast<double>(planetGravity_) / distance;
-    gravity = JPH::Vec3(static_cast<float>(x * scale), static_cast<float>(y * scale), static_cast<float>(z * scale));
+  const JPH::DefaultBroadPhaseLayerFilter broad(r.objectVsBroadPhase, kLayerMoving);
+  const JPH::DefaultObjectLayerFilter object(r.objectPairs, kLayerMoving);
+  for (std::uint32_t i = 0; i < r.characterCount; ++i) {
+    JPH::Ref<JPH::CharacterVirtual>& c = r.characters[i];
+    const JPH::RVec3 at = c->GetPosition();
+    const double x = at.GetX() + o.x;
+    const double y = at.GetY() + o.y;
+    const double z = at.GetZ() + o.z;
+    const double distance = std::sqrt(x * x + y * y + z * z);
+    JPH::Vec3 gravity = JPH::Vec3::sZero();
+    if (distance > 0.0) {
+      const double scale = -static_cast<double>(planetGravity_) / distance;
+      gravity = JPH::Vec3(static_cast<float>(x * scale), static_cast<float>(y * scale), static_cast<float>(z * scale));
+    }
+    if (c->IsSupported()) {
+      r.characterFall[i] = JPH::Vec3::sZero();
+    } else {
+      r.characterFall[i] += gravity * dt;
+    }
+    c->SetLinearVelocity(r.characterCommand[i] + r.characterFall[i]);
+    c->Update(dt, gravity, broad, object, JPH::BodyFilter(), JPH::ShapeFilter(), r.temp);
   }
-  if (runtime_->character->IsSupported()) {
-    runtime_->characterFall = JPH::Vec3::sZero();
-  } else {
-    runtime_->characterFall += gravity * dt;
-  }
-  runtime_->character->SetLinearVelocity(runtime_->characterCommand + runtime_->characterFall);
-  const JPH::DefaultBroadPhaseLayerFilter broad(runtime_->objectVsBroadPhase, kLayerMoving);
-  const JPH::DefaultObjectLayerFilter object(runtime_->objectPairs, kLayerMoving);
-  runtime_->character->Update(dt, gravity, broad, object, JPH::BodyFilter(), JPH::ShapeFilter(), runtime_->temp);
 }
 
 Status World::addTrunk(const float* trunk) {
@@ -506,7 +522,9 @@ void World::rebase(double x, double y, double z) {
       if (index == planetBody_ || index == vegetationBody_) continue;
       bodies.SetPosition(id, bodies.GetPosition(id) - shift, JPH::EActivation::DontActivate);
     }
-    if (runtime_->character != nullptr) runtime_->character->SetPosition(runtime_->character->GetPosition() - shift);
+    for (std::uint32_t i = 0; i < runtime_->characterCount; ++i) {
+      runtime_->characters[i]->SetPosition(runtime_->characters[i]->GetPosition() - shift);
+    }
   }
   o.x = x;
   o.y = y;
@@ -545,7 +563,7 @@ void World::step(std::uint32_t steps) {
   const float dt = 1.0f / static_cast<float>(tickRate_);
   for (std::uint32_t s = 0; s < steps; ++s) {
     if (runtime_ != nullptr) {
-      updateCharacter(dt);
+      updateCharacters(dt);
       {
         engine::phase::Scope scope(engine::phase::kPhysics);
         runtime_->physics.Update(dt, 1, &runtime_->temp, &runtime_->jobs);

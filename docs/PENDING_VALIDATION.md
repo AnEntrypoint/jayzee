@@ -3671,3 +3671,12 @@ Not witnessed: that the registrations take effect on both orders. Nothing in the
 - Witness: Phase B, both glues rebuilt and the deathrun scenario on both tiers.
 
 Phase B (2026-11-11): both glues rebuilt (64 MiB sha256 e5bfb97f…, 512 MiB threaded sha256 81345e61…). The deathrun scenario prints RESULT: PASS on both tiers (all eight gates). `npm test` exit 0 with no FAIL lines.
+
+## Combat bots scenario: eight characters on the planet (Phase A, 2026-11-11)
+
+- Source: spoint apps/combat-bot (seek, shoot the nearest visible player, wander). The jayzee core is physics plus the combat rules: eight bots on a ring 10 m of arc from the pole, each steering to its nearest living enemy at 3.5 m/s, stopping 8 m away, firing every 15 ticks for 20 damage within 40 m. Health is 100. spoint's HUD, backfill, wander, editor props and steering library are not ported.
+- Change: the engine holds up to 16 characters, one shared capsule. `addCharacter` returns the index, and the velocity, support and position reads take it. `World::updateCharacters` integrates each character's gravity and command. Rebase shifts all of them.
+- Change: `EngineWorld` methods take the character index, and the character and deathrun scenarios pass index 0.
+- Change: `scripts/check-scenario-combat-bots.mjs`, run as `check:scenario-combat-bots` and appended to `npm test`. Gates per tier: at least half the bots eliminated and the kill log agrees with the deaths, living bots within 0.1 m of the surface and supported after the settle window, two runs agree bit for bit on every health value and the final positions, worst tick work within 16.7 ms.
+- Limit: characters do not collide with each other (they are not bodies), so bots pass through one another. Line of sight is not tested, so a shot ignores walls.
+- Witness: Phase B, both glues rebuilt and the bots scenario on both tiers.

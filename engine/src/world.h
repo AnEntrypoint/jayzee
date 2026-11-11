@@ -19,6 +19,7 @@ constexpr std::uint32_t kNoBody = 0xffffffffu;
 constexpr std::uint16_t kLastGeneration = 0xfffeu;
 constexpr std::uint16_t kRetiredGeneration = 0xffffu;
 constexpr std::uint32_t kFixedJoltBodies = 3;
+constexpr std::uint32_t kMaxCharacters = 16;
 
 constexpr std::uint32_t joltBodyCapacity(const budget::Capacity& c) {
   return c.bodies + c.statics + c.trunks + kFixedJoltBodies;
@@ -93,11 +94,11 @@ class World {
   Status configurePlanet(double radius, double cellSize, double gravity, double maxHeight);
   Status attachVegetation();
   Status addTrunk(const float* trunk);
-  Status addCharacter(const float* spec);
-  void setCharacterVelocity(const float* velocity);
-  bool characterSupported() const;
-  void characterPosition(float* out) const;
-  void characterBodyPosition(float* out) const;
+  int addCharacter(const float* spec);
+  void setCharacterVelocity(std::uint32_t index, const float* velocity);
+  bool characterSupported(std::uint32_t index) const;
+  void characterPosition(std::uint32_t index, float* out) const;
+  void characterBodyPosition(std::uint32_t index, float* out) const;
   std::int64_t spawn(const float* position, const float* velocity);
   int spawnBatch(const float* rows, std::uint32_t count, std::uint32_t* handles);
   Status despawn(std::uint32_t handle);
@@ -107,7 +108,7 @@ class World {
   void step(std::uint32_t steps);
   void setTick(std::uint64_t tick);
   void applyRadialGravity(JPH::PhysicsSystem& system, float dt);
-  void updateCharacter(float dt);
+  void updateCharacters(float dt);
 
   std::uint32_t count() const { return live_; }
   std::uint32_t slotExtent() const { return fresh_; }
