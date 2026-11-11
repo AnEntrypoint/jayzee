@@ -3643,3 +3643,12 @@ Open after this pass:
 
 Phase B (2026-11-11): the 64 MiB fixed glue built (sha256 ee77798f…) and the 512 MiB threaded glue built (sha256 185f7282…), both with exit 0. `npm test` exit 0, 5352 PASS, 0 FAIL, including the settle scenario on both tiers.
 Not witnessed: that the registrations take effect on both orders. Nothing in the JS surface calls the collide or cast path, so the build and `npm test` show the code compiles and the chain is green, not that the dispatch is reached. The character scenario (stretch 2) is the first caller and is its witness.
+
+## Character controller: CharacterVirtual on the planet (Phase A, 2026-11-11)
+
+- Change: `engine/src/world.cpp` adds one `JPH::CharacterVirtual` with a capsule shape (`addCharacter`), a velocity setter, a supported query and a position read in world coordinates. `World::step` runs `Update` with radial gravity (the same formula as `applyRadialGravity`) before the rigid bodies. `rebase` shifts the character with the bodies.
+- Change: `engine/src/engine_core.cpp` and the export list in `engine/CMakeLists.txt` add `engine_character_add`, `_set_velocity`, `_supported`, and `_x`, `_y`, `_z`.
+- Change: `src/engine/EngineWorld.js` adds `addCharacter`, `setCharacterVelocity`, `characterSupported` and `characterPosition`.
+- Change: `scripts/check-scenario-character.mjs`, run as `check:scenario-character` and appended to the `npm test` chain. It places the character at the planet pole, lets it stand 180 ticks, then walks it 1 m/s for 60 ticks. Gates per tier: supported after standing and after walking (this is the first caller of the stretch 1 capsule dispatch, so supported is its witness), resting distance within 0.05 m, no drift over 30 ticks, walked distance within 0.05 m of 1 m, two runs agree bit for bit, worst tick work within 16.7 ms.
+- Limit: no stair step or slope walk; `Update` only, not `ExtendedUpdate`. The character is one, not one per player. Stepping with the origin shifted is covered only by the rebase line.
+- Witness: Phase B, both glues built, `npm test` and the character scenario on both tiers.

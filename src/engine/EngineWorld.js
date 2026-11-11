@@ -126,6 +126,28 @@ export class EngineWorld {
     return handle
   }
 
+  addCharacter({ position, radius, halfHeight }) {
+    checkVector(position, 'character position')
+    if (![radius, halfHeight].every(isFiniteNumber)) throw new RangeError('character radius and halfHeight must be finite numbers')
+    this.#write(this.#module._engine_character_add(position[0], position[1], position[2], radius, halfHeight), 'character')
+  }
+
+  setCharacterVelocity(velocity) {
+    checkVector(velocity, 'character velocity')
+    this.#module._engine_character_set_velocity(velocity[0], velocity[1], velocity[2])
+  }
+
+  characterSupported() {
+    return this.#module._engine_character_supported() === 1
+  }
+
+  characterPosition(out = [0, 0, 0]) {
+    out[0] = this.#module._engine_character_x()
+    out[1] = this.#module._engine_character_y()
+    out[2] = this.#module._engine_character_z()
+    return out
+  }
+
   spawnMany(rows) {
     if (!Array.isArray(rows)) throw new TypeError('spawnMany takes an array of { position, velocity } rows')
     if (rows.length > this.#capacity - this.#alive.size) {

@@ -9,8 +9,10 @@
 #include <Jolt/Core/TempAllocator.h>
 #include <Jolt/Physics/Body/BodyCreationSettings.h>
 #include <Jolt/Physics/Body/Body.h>
+#include <Jolt/Physics/Character/CharacterVirtual.h>
 #include <Jolt/Physics/Body/BodyInterface.h>
 #include <Jolt/Physics/Collision/BroadPhase/BroadPhaseLayer.h>
+#include <Jolt/Physics/Collision/ObjectLayer.h>
 #include <Jolt/Physics/Collision/Shape/BoxShape.h>
 #include <Jolt/Physics/Collision/Shape/CapsuleShape.h>
 #include <Jolt/Physics/Collision/Shape/SphereShape.h>
@@ -129,6 +131,8 @@ struct World::Runtime {
   JPH::JobSystemSingleThreaded jobs;
 #endif
   JPH::PhysicsSystem physics;
+  JPH::CharacterVirtualSettings characterSettings;
+  JPH::Ref<JPH::CharacterVirtual> character;
   JPH::ShapeRefC sphere;
   JPH::ShapeRefC planetShape;
   JPH::ShapeRefC vegetationShape;
@@ -317,6 +321,52 @@ Status World::attachVegetation() {
   return kOk;
 }
 
+Status World::addCharacter(const float* spec) {
+  if (runtime_ == nullptr) return kNotConfigured;
+  if (runtime_->character != nullptr) return kFull;
+  if (!(spec[3] > 0.0f) || !(spec[4] >= 0.0f)) return kRange;
+  runtime_->characterSettings.mShape = new JPH::CapsuleShape(spec[4], spec[3]);
+  runtime_->character = new JPH::CharacterVirtual(&runtime_->characterSettings, toBody(spec), JPH::Quat::sIdentity(), &runtime_->physics);
+  return kOk;
+}
+
+void World::setCharacterVelocity(const float* velocity) {
+  if (runtime_ == nullptr || runtime_->character == nullptr) return;
+  runtime_->character->SetLinearVelocity(JPH::Vec3(velocity[0], velocity[1], velocity[2]));
+}
+
+bool World::characterSupported() const {
+  return runtime_ != nullptr && runtime_->character != nullptr && runtime_->character->IsSupported();
+}
+
+void World::characterPosition(float* out) const {
+  out[0] = out[1] = out[2] = 0.0f;
+  if (runtime_ == nullptr || runtime_->character == nullptr) return;
+  const PhysicsOrigin& o = physicsOrigin();
+  const JPH::RVec3 at = runtime_->character->GetPosition();
+  out[0] = static_cast<float>(at.GetX() + o.x);
+  out[1] = static_cast<float>(at.GetY() + o.y);
+  out[2] = static_cast<float>(at.GetZ() + o.z);
+}
+
+void World::updateCharacter(float dt) {
+  if (runtime_ == nullptr || runtime_->character == nullptr) return;
+  const PhysicsOrigin& o = physicsOrigin();
+  const JPH::RVec3 at = runtime_->character->GetPosition();
+  const double x = at.GetX() + o.x;
+  const double y = at.GetY() + o.y;
+  const double z = at.GetZ() + o.z;
+  const double distance = std::sqrt(x * x + y * y + z * z);
+  JPH::Vec3 gravity = JPH::Vec3::sZero();
+  if (distance > 0.0) {
+    const double scale = -static_cast<double>(planetGravity_) / distance;
+    gravity = JPH::Vec3(static_cast<float>(x * scale), static_cast<float>(y * scale), static_cast<float>(z * scale));
+  }
+  const JPH::DefaultBroadPhaseLayerFilter broad(runtime_->objectVsBroadPhase, kLayerMoving);
+  const JPH::DefaultObjectLayerFilter object(runtime_->objectPairs, kLayerMoving);
+  runtime_->character->Update(dt, gravity, broad, object, JPH::BodyFilter(), JPH::ShapeFilter(), runtime_->temp);
+}
+
 Status World::addTrunk(const float* trunk) {
   if (runtime_ == nullptr) return kNotConfigured;
   if (trunkBodies_ == limits_.trunks) return kFull;
@@ -439,6 +489,7 @@ void World::rebase(double x, double y, double z) {
       if (index == planetBody_ || index == vegetationBody_) continue;
       bodies.SetPosition(id, bodies.GetPosition(id) - shift, JPH::EActivation::DontActivate);
     }
+    if (runtime_->character != nullptr) runtime_->character->SetPosition(runtime_->character->GetPosition() - shift);
   }
   o.x = x;
   o.y = y;
@@ -477,6 +528,7 @@ void World::step(std::uint32_t steps) {
   const float dt = 1.0f / static_cast<float>(tickRate_);
   for (std::uint32_t s = 0; s < steps; ++s) {
     if (runtime_ != nullptr) {
+      updateCharacter(dt);
       {
         engine::phase::Scope scope(engine::phase::kPhysics);
         runtime_->physics.Update(dt, 1, &runtime_->temp, &runtime_->jobs);

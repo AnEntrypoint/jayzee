@@ -212,6 +212,38 @@ EMSCRIPTEN_KEEPALIVE int engine_world_add_trunk(float x, float y, float z, float
   return engine::world().addTrunk(trunk);
 }
 
+EMSCRIPTEN_KEEPALIVE int engine_character_add(float x, float y, float z, float radius, float halfHeight) {
+  const float spec[5] = {x, y, z, radius, halfHeight};
+  return engine::world().addCharacter(spec);
+}
+
+EMSCRIPTEN_KEEPALIVE void engine_character_set_velocity(float vx, float vy, float vz) {
+  const float velocity[3] = {vx, vy, vz};
+  engine::world().setCharacterVelocity(velocity);
+}
+
+EMSCRIPTEN_KEEPALIVE int engine_character_supported() {
+  return engine::world().characterSupported() ? 1 : 0;
+}
+
+EMSCRIPTEN_KEEPALIVE float engine_character_x() {
+  float out[3];
+  engine::world().characterPosition(out);
+  return out[0];
+}
+
+EMSCRIPTEN_KEEPALIVE float engine_character_y() {
+  float out[3];
+  engine::world().characterPosition(out);
+  return out[1];
+}
+
+EMSCRIPTEN_KEEPALIVE float engine_character_z() {
+  float out[3];
+  engine::world().characterPosition(out);
+  return out[2];
+}
+
 EMSCRIPTEN_KEEPALIVE double engine_spawn(float px, float py, float pz, float vx, float vy, float vz) {
   const float position[3] = {px, py, pz};
   const float velocity[3] = {vx, vy, vz};
