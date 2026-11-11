@@ -1,5 +1,5 @@
 {
-  "referenceCommit": "de44d1f9addb5193ff617350bc6e75b2306c8923",
+  "referenceCommit": "387172ef47a404d9a10e50195fff824606effd9d",
   "topTier": {
     "bodies": 12288,
     "workers": 4,
@@ -19,15 +19,9 @@
     "over25": 0,
     "basis": "Kaggle runs 8 and 9: every tick over 16.7 ms in a first run falls at the first impact (ticks 75 to 83) on cold code; later runs peak at 12 to 20.3 ms of CPU time with zero runqueue wait, and p99 stays at or under 15.0 ms."
   },
-  "recorded": {
-    "kaggleRun": 11,
-    "machine": "the fastest of four seen",
-    "bodies": 12288,
-    "workers": 4,
-    "p99Ms": 11.415,
-    "overBudget": 0,
-    "settleMaxMs": 12.054,
-    "headroomMs": 5.285,
-    "note": "On the run 8 machine 12288 bodies missed (p99 16.6 ms, 7 ticks over) and on the run 9 machine 10240 did not hold."
-  }
+  "drift": {
+    "p99Factor": 1.25,
+    "basis": "The reference build is a fixed source, so only the machine, Node and the bench harness can move its figure. On one machine class its three repeats in Kaggle run 15 were within 1 percent of each other; between runs of one class the spread is taken as 25 percent until more runs of a class are recorded. The limit is the recorded reference p99 times this factor, times the ratio of the single-thread calibration of the run to the recorded one when the machine calibrates slower."
+  },
+  "classes": {}
 }

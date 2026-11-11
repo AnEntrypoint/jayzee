@@ -27,7 +27,7 @@ const onPlanet = scene === 'planet'
 const baseY = onPlanet ? PLANET_RADIUS_M : 0
 const FLAT_SPOT = Float64Array.of(0, 25, 60)
 const warm = warmArg === 'warm'
-const base = { kind: 'tick', scene, warm, warmSpec: warmSpecArg, knobs: knobsArg, variant: glue.includes('/variants/') ? glue.split('/').at(-2) : glue.includes('/reference/') ? 'reference' : 'base', glue: glue.split('/').pop(), bodies, workers, iterations, budgetMs: BUDGET_MS, budgetBytes, ticks, cpus: availableParallelism(), execArgv: process.execArgv }
+const base = { kind: 'tick', scene, warm, warmSpec: warmSpecArg, knobs: knobsArg, awakeBudget: knobs.awake !== undefined ? Number(knobs.awake) : TIER_1024.awakeBudget, variant: glue.includes('/variants/') ? glue.split('/').at(-2) : glue.includes('/reference/') ? 'reference' : 'base', glue: glue.split('/').pop(), bodies, workers, iterations, budgetMs: BUDGET_MS, budgetBytes, ticks, cpus: availableParallelism(), execArgv: process.execArgv }
 
 const emit = (result) => {
   console.log('RESULT ' + JSON.stringify(result))
@@ -55,7 +55,10 @@ if (status !== 0) emit({ ...base, refused: 'world-configure', status })
 if (!onPlanet) module._engine_world_add_box(...GROUND)
 const knobStatus = []
 if (knobs.sleep !== undefined) knobStatus.push(module._engine_world_set_sleep(Number(knobs.sleep), DEFAULT_POINT_SLEEP_SPEED))
-if (knobs.awake !== undefined) knobStatus.push(module._engine_world_set_awake_budget(Number(knobs.awake)))
+const budgetSetter = typeof module._engine_world_set_awake_budget === 'function'
+const awakeBudget = knobs.awake !== undefined ? Number(knobs.awake) : budgetSetter ? TIER_1024.awakeBudget : 0
+if (budgetSetter) knobStatus.push(module._engine_world_set_awake_budget(awakeBudget))
+else if (awakeBudget !== 0) knobStatus.push(-1)
 if (knobs.asleep !== undefined) knobStatus.push(module._engine_world_set_spawn_asleep(1))
 if (knobStatus.some((code) => code !== 0)) emit({ ...base, refused: 'knob', status: knobStatus })
 const perRow = Math.ceil(Math.sqrt(bodies))

@@ -288,6 +288,7 @@
   "check:engine-core",
   "check:engine-world",
   "check:engine-sleep",
+  "check:engine-awake-budget",
   "check:engine-pools",
   "check:engine-planet",
   "check:engine-vegetation",

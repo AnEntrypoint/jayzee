@@ -322,7 +322,7 @@ Status World::configurePlanet(double radius, double cellSize, double gravity, do
   planetBody_ = id.GetIndexAndSequenceNumber();
   planetGravity_ = static_cast<float>(gravity);
   for (std::uint32_t slot = 0; slot < fresh_; ++slot) {
-    if (alive_[slot] == kSlotAlive && !spawnAsleep_) runtime_->physics.GetBodyInterface().ActivateBody(JPH::BodyID(bodyIds_[slot]));
+    if (alive_[slot] != kSlotFree && alive_[slot] != kSlotHeld && !spawnAsleep_) runtime_->physics.GetBodyInterface().ActivateBody(JPH::BodyID(bodyIds_[slot]));
   }
   return kOk;
 }

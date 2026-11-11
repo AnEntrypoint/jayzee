@@ -56,6 +56,7 @@
     "check:engine-bridge": "node scripts/check-engine-bridge.mjs",
     "check:engine-threads": "node scripts/check-engine-threads.mjs",
     "check:engine-sleep": "node scripts/check-engine-sleep.mjs",
+    "check:engine-awake-budget": "node scripts/check-engine-awake-budget.mjs",
     "check:engine-pools": "node scripts/check-engine-pools.mjs",
     "check:asset-pipeline": "node scripts/check-asset-pipeline.mjs",
     "check:types": "tsc -p tsconfig.json",

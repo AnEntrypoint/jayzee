@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { finish, gate } from './lib/gate.mjs'
-import { judge } from './kaggle/regress.mjs'
+import { classRecord, judge } from './kaggle/regress.mjs'
 import { decide } from './kaggle/push-gate.mjs'
 import { BASELINE, buildPlan } from './kaggle/plan.mjs'
 import { referenceGlue } from './kaggle/reference.mjs'
@@ -15,9 +15,13 @@ const top = BASELINE.topTier
 const tick = (variant, p99Ms, overBudget) => ({ kind: 'tick', variant, bodies: top.bodies, workers: top.workers, warm: true, p99Ms, overBudget })
 const marble = (tier, cpuP99Ms, cpuOver25) => ({ kind: 'marble-bowl', tier, clockSource: 'schedstat', spikeMs: 25, cpuP99Ms, cpuMaxMs: cpuP99Ms + 2, cpuOver25, cpuOverBudget: 0, wallP99Ms: 40, wallMaxMs: 60, wallOver25: 9, wallOverBudget: 30 })
 const marbles = () => Array.from({ length: BASELINE.marble.tiers }, (_, i) => marble('tier ' + i, 12, 0))
-const run = (referenceP99, candidateP99, referenceOver = 0, candidateOver = 0, extra = marbles()) => ({
+const CLASS = 'TestVendor-1-2-3'
+const SINGLE_MS = 500
+const calibration = (singleMs = SINGLE_MS) => ({ kind: 'calibrate', singleMs, memoryMs: 170, laneSlowdown: 1.02 })
+const run = (referenceP99, candidateP99, referenceOver = 0, candidateOver = 0, extra = marbles(), singleMs = SINGLE_MS) => ({
   budgetMs: BUDGET_MS,
-  configs: [...Array.from({ length: top.repeats }, () => tick('reference', referenceP99, referenceOver)), ...Array.from({ length: top.repeats }, () => tick('base', candidateP99, candidateOver)), ...extra],
+  machine: { class: CLASS, modelName: 'Test CPU', cores: '2', siblings: '4', cache: '512 KB' },
+  configs: [calibration(singleMs + 3), calibration(singleMs), ...Array.from({ length: top.repeats }, () => tick('reference', referenceP99, referenceOver)), ...Array.from({ length: top.repeats }, () => tick('base', candidateP99, candidateOver)), ...extra],
 })
 
 gate('a candidate that matches the reference build passes, on a fast machine and on a slow one', () => {
@@ -92,8 +96,81 @@ gate('the push gate refuses a missing verdict, a verdict for another payload and
   assert.equal(decide({ ok: true, payloadSha256: 'a'.repeat(64), version: 3 }, 'a'.repeat(64)).ok, true)
 })
 
-gate('the regress plan runs the reference and the candidate alternately at the top tier, warmed, then the marble tiers after a warm run', () => {
+const withClass = (entry) => ({ ...BASELINE, classes: { [CLASS]: { referenceCommit: BASELINE.referenceCommit, singleMs: SINGLE_MS, referenceP99Ms: 12, holds: true, ...entry } } })
+
+gate('a class with no record passes and is reported as unrecorded, and results with no class or no calibration fail', () => {
+  const verdict = judge(BASELINE, run(12, 12))
+  assert.equal(verdict.ok, true)
+  assert.equal(verdict.machineClass.recorded, false)
+  assert.equal(verdict.machineClass.class, CLASS)
+  assert.equal(verdict.machineClass.singleMs, SINGLE_MS)
+  const noClass = run(12, 12)
+  delete noClass.machine
+  assert.match(judge(BASELINE, noClass).failures.join(' '), /no machine class/)
+  const noCalibration = run(12, 12)
+  noCalibration.configs = noCalibration.configs.filter((c) => c.kind !== 'calibrate')
+  assert.match(judge(BASELINE, noCalibration).failures.join(' '), /no calibration/)
+})
+
+gate('on a recorded class the reference build fails when it runs past its recorded p99 times the drift factor, though the candidate matches it', () => {
+  const limit = 12 * BASELINE.drift.p99Factor
+  assert.equal(judge(withClass({ holds: false }), run(limit - 0.01, limit - 0.01)).ok, true)
+  const verdict = judge(withClass({ holds: false }), run(limit + 0.01, limit + 0.01))
+  assert.equal(verdict.ok, false)
+  assert.match(verdict.failures.join(' '), /the reference build itself ran/)
+  assert.equal(judge(BASELINE, run(limit + 0.01, limit + 0.01)).ok, true, 'the same figures on an unrecorded class are the control')
+})
+
+gate('a machine that calibrates slower than its class record raises the reference limit by that ratio, and a faster one does not lower it', () => {
+  const limit = 12 * BASELINE.drift.p99Factor
+  const slow = judge(withClass({ holds: false }), run(limit * 1.15, limit * 1.15, 0, 0, marbles(), SINGLE_MS * 1.2))
+  assert.equal(slow.ok, true, slow.failures.join('; '))
+  assert.equal(slow.machineClass.calibrationScale, 1.2)
+  assert.equal(judge(withClass({ holds: false }), run(limit * 1.25, limit * 1.25, 0, 0, marbles(), SINGLE_MS * 1.2)).ok, false)
+  const fast = judge(withClass({ holds: false }), run(limit - 0.01, limit - 0.01, 0, 0, marbles(), SINGLE_MS * 0.8))
+  assert.equal(fast.ok, true)
+  assert.equal(fast.machineClass.calibrationScale, 1)
+})
+
+gate('a class recorded as holding fails when the candidate has a tick over budget in the median run or a p99 over it', () => {
+  assert.equal(judge(withClass({}), run(12, 12)).ok, true)
+  assert.match(judge(withClass({}), run(12, 12, 0, 1)).failures.join(' '), /recorded as holding/)
+  assert.match(judge(withClass({ referenceP99Ms: 16 }), run(16, 16.8)).failures.join(' '), /recorded as holding/)
+  assert.equal(judge(withClass({ holds: false }), run(12, 12, 0, 1)).ok, true)
+})
+
+gate('a class record made for another reference commit is not judged and is reported as stale', () => {
+  const stale = withClass({ referenceCommit: 'f'.repeat(40), referenceP99Ms: 1 })
+  const verdict = judge(stale, run(12, 12))
+  assert.equal(verdict.ok, true)
+  assert.equal(verdict.machineClass.recorded, false)
+  assert.equal(verdict.machineClass.staleRecord, true)
+})
+
+gate('a passing verdict becomes a class record with its reference figure and calibration, and a failed one is refused', () => {
+  const verdict = { ...judge(BASELINE, run(12, 11.5)), version: 16, referenceCommit: BASELINE.referenceCommit }
+  const { name, entry } = classRecord(verdict)
+  assert.equal(name, CLASS)
+  assert.deepEqual({ referenceP99Ms: entry.referenceP99Ms, candidateP99Ms: entry.candidateP99Ms, singleMs: entry.singleMs, holds: entry.holds, kaggleRun: entry.kaggleRun, referenceCommit: entry.referenceCommit }, { referenceP99Ms: 12, candidateP99Ms: 11.5, singleMs: SINGLE_MS, holds: true, kaggleRun: 16, referenceCommit: BASELINE.referenceCommit })
+  const missed = { ...judge(BASELINE, run(18, 18, 3, 3)), version: 16, referenceCommit: BASELINE.referenceCommit }
+  assert.equal(classRecord(missed).entry.holds, false)
+  assert.throws(() => classRecord({ ...verdict, ok: false }), /failed verdict/)
+})
+
+gate('every class in the baseline is recorded for a full commit with a positive calibration and reference figure', () => {
+  for (const [name, entry] of Object.entries(BASELINE.classes)) {
+    assert.match(name, /^[A-Za-z]+-\d+-\d+-\d+$/, name)
+    assert.match(entry.referenceCommit, /^[0-9a-f]{40}$/)
+    assert.ok(entry.singleMs > 0 && entry.referenceP99Ms > 0, name)
+    assert.equal(typeof entry.holds, 'boolean')
+  }
+  assert.ok(BASELINE.drift.p99Factor > 1 && BASELINE.drift.p99Factor < 2)
+})
+
+gate('the regress plan runs the reference and the candidate alternately at the top tier, warmed, then the marble tiers after a warm run, between two calibrations', () => {
   const plan = buildPlan('regress')
+  assert.equal(plan.runs[0].script, 'scripts/kaggle/calibrate.mjs')
+  assert.equal(plan.runs.at(-1).script, 'scripts/kaggle/calibrate.mjs')
   const ticks = plan.runs.filter((r) => r.glueArg >= 0)
   assert.equal(ticks.length, top.repeats * 2)
   ticks.forEach((r, i) => {
@@ -102,7 +179,7 @@ gate('the regress plan runs the reference and the candidate alternately at the t
     assert.equal(r.args[7], 'warm')
   })
   assert.equal(ticks[0].args[0], referenceGlue(BASELINE.referenceCommit))
-  const marbleRuns = plan.runs.filter((r) => r.glueArg < 0)
+  const marbleRuns = plan.runs.filter((r) => r.script === 'scripts/kaggle/marble.mjs')
   assert.equal(marbleRuns.length, BASELINE.marble.tiers)
   marbleRuns.forEach((r) => assert.deepEqual(r.args.slice(1), [String(BASELINE.marble.runs), String(BASELINE.marble.warmRuns)]))
   assert.ok(BASELINE.marble.warmRuns >= 1)

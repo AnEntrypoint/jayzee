@@ -67,6 +67,8 @@ if (flag('--write-times')) {
   for (const [name, ms] of rows) lines.push('| \`' + name + '\` | ' + ms + ' | ' + (SERIAL.has(name) ? 'yes' : '') + ' | ' + (ms > 2000 ? (reasons[name] ?? 'NO REASON RECORDED') : '') + ' |')
   const kaggleRecord = join(root, 'scripts', 'kaggle', 'record.md')
   if (existsSync(kaggleRecord)) lines.push('', readFileSync(kaggleRecord, 'utf8').trimEnd())
+  const kaggleClaims = join(root, 'scripts', 'kaggle', 'claims.md')
+  if (existsSync(kaggleClaims)) lines.push('', readFileSync(kaggleClaims, 'utf8').trimEnd())
   writeFileSync(join(root, 'docs', 'CHECK_TIMES.md'), lines.join('\n') + '\n')
   console.log('docs/CHECK_TIMES.md: ' + rows.length + ' rows')
   process.exit(0)
