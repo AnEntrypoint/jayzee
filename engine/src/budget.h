@@ -47,7 +47,7 @@ constexpr std::uint32_t kRenderBodySlots = arena::kBytes >= kTopTierArenaBytes ?
 constexpr std::uint64_t kRenderBytes = kRenderFixedBytes + kRenderBodySlots * kRenderBytesPerBody;
 
 static_assert(kTopTierBodies >= kCompactTopTierBodies && (kTopTierBodies - 2048) % kMaxPlayers == 0);
-static_assert(kTopTierBodies <= 65536);
+static_assert(kTopTierBodies <= 131072);
 constexpr std::uint64_t kHostReserveBytes = 16ull * 1024ull * 1024ull;
 
 bool plan(std::uint64_t budgetBytes, std::uint32_t players, std::uint32_t workers, Capacity& out);

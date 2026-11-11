@@ -9,6 +9,7 @@ const glue = pathToFileURL(join(root, 'engine/out/engine-core-64mib-timed.mjs'))
 const BODIES = 256
 const RADIUS = 0.5
 const DROP_M = 40
+const EDGE_CLEARANCE_M = 16
 const PLANET = { radius: 6371000, cellSize: 1000, gravity: 9.8, maxHeight: 8000 }
 const POSITION_WORDS = 3
 const TUNE_AIRBORNE = 4
@@ -22,8 +23,8 @@ const boot = async (tuning) => {
   assert.equal(module._engine_planet_configure(PLANET.radius, PLANET.cellSize, PLANET.gravity, PLANET.maxHeight), 0)
   assert.equal(module._engine_world_set_tuning(tuning), 0)
   for (let i = 0; i < BODIES; i++) {
-    const x = (i % 32) * 2 - 32
-    const z = Math.floor(i / 32) * 2 - 16
+    const x = EDGE_CLEARANCE_M + (i % 32) * 2
+    const z = EDGE_CLEARANCE_M + Math.floor(i / 32) * 2
     const y = PLANET.radius + module._engine_planet_height(x, PLANET.radius, z) + DROP_M + (i % 5)
     assert.equal(module._engine_spawn(x, y, z, 0, 0, 0), i)
   }

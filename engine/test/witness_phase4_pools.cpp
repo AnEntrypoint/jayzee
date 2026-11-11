@@ -12,7 +12,7 @@ using engine::test::check;
 using engine::test::observe;
 
 constexpr std::uint32_t kRetireCapacity = 2;
-constexpr std::uint32_t kRetireCycles = kLastGeneration + 1u;
+constexpr std::uint32_t kRetireCycles = kBodyLastGeneration + 1u;
 constexpr std::uint32_t kChurnCapacity = 64;
 constexpr std::uint32_t kChurnBatchSize = 16;
 constexpr std::uint32_t kChurnBatches = 625;
@@ -65,7 +65,7 @@ void staleGenerationRefused() {
   const double position[3] = {0.0f, kDropHeight, 0.0f};
   const double velocity[3] = {0.0f, 0.0f, 0.0f};
   const std::uint32_t handle = static_cast<std::uint32_t>(w->spawn(position, velocity));
-  check(w->despawn(handle ^ (1u << 16)) == kBadId, "phase 4: a handle with the wrong generation is refused");
+  check(w->despawn(handle ^ (1u << kSlotBits)) == kBadId, "phase 4: a handle with the wrong generation is refused");
   check(w->despawn(handle) == kOk, "phase 4: the live handle still despawns");
 }
 
@@ -89,16 +89,16 @@ void retirement() {
     if (w->despawn(handle) != kBadId) immediateRefused = false;
     if (cycle + 1 == kRetireCycles - 1) retiredBeforeLast = w->retiredSlots();
   }
-  check(everyCycleOk, "phase 4: 65535 spawn and despawn cycles on one slot all succeed");
+  check(everyCycleOk, "phase 4: 32767 spawn and despawn cycles on one slot all succeed");
   check(immediateRefused, "phase 4: a despawned handle is refused by a second despawn");
-  check(retiredBeforeLast == 0, "phase 4: no slot retires before its generation 65534 despawn");
-  check(w->retiredSlots() == 1, "phase 4: the slot retires on its generation 65534 despawn");
-  check((retireHandles[kRetireCycles - 1] >> 16) == kLastGeneration, "phase 4: the last issued handle carries generation 65534");
+  check(retiredBeforeLast == 0, "phase 4: no slot retires before its generation 32766 despawn");
+  check(w->retiredSlots() == 1, "phase 4: the slot retires on its generation 32766 despawn");
+  check((retireHandles[kRetireCycles - 1] >> kSlotBits) == kBodyLastGeneration, "phase 4: the last issued handle carries generation 32766");
   check(allRefused(*w, retireHandles, kRetireCycles), "phase 4: every issued handle is refused after its slot was reused");
   const std::int64_t next = w->spawn(position, velocity);
   check(next >= 0 && (static_cast<std::uint32_t>(next) & kSlotMask) == 1, "phase 4: the next spawn lands in slot 1");
   check(w->spawn(position, velocity) < 0, "phase 4: with the retired slot out of use, a further spawn is refused");
-  observe("phase 4: retired slots after 65535 cycles of one slot", static_cast<double>(w->retiredSlots()));
+  observe("phase 4: retired slots after 32767 cycles of one slot", static_cast<double>(w->retiredSlots()));
 }
 
 void churn() {

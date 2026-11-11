@@ -18,7 +18,9 @@ struct PhysicsOrigin;
 namespace engine {
 
 constexpr std::uint32_t kMaxIterations = 32;
-constexpr std::uint32_t kSlotMask = 0xffffu;
+constexpr std::uint32_t kSlotBits = 17;
+constexpr std::uint32_t kSlotMask = (1u << kSlotBits) - 1u;
+constexpr std::uint32_t kMaxBodySlots = 1u << kSlotBits;
 constexpr std::uint32_t kBatchWords = 6;
 constexpr std::uint32_t kNoBody = 0xffffffffu;
 constexpr std::uint8_t kSlotFree = 0;
@@ -36,6 +38,8 @@ constexpr std::uint32_t kTuneAll = kTuneGravityAfterStep | kTuneWholeIslands | k
 constexpr std::uint32_t kDefaultTuning = 0u;
 constexpr std::uint16_t kLastGeneration = 0xfffeu;
 constexpr std::uint16_t kRetiredGeneration = 0xffffu;
+constexpr std::uint16_t kBodyLastGeneration = static_cast<std::uint16_t>((1u << (32 - kSlotBits)) - 2u);
+constexpr std::uint16_t kBodyRetiredGeneration = static_cast<std::uint16_t>(kBodyLastGeneration + 1u);
 constexpr std::uint32_t kFixedJoltBodies = 3;
 constexpr std::uint32_t kMaxCharacters = 16;
 

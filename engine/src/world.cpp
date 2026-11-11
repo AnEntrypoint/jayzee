@@ -514,7 +514,7 @@ void World::classify(std::uint32_t joltBody, QueryHit& out) const {
   }
   const std::uint32_t slot = static_cast<std::uint32_t>(tag - 1);
   out.kind = kHitBody;
-  out.handle = (static_cast<std::uint32_t>(generations_[slot]) << 16) | slot;
+  out.handle = (static_cast<std::uint32_t>(generations_[slot]) << kSlotBits) | slot;
 }
 
 int World::castRay(const double* origin, const double* direction, QueryHit& out) {
@@ -659,7 +659,7 @@ int World::spawnBatch(const double* rows, std::uint32_t count, std::uint32_t* ha
     batch[i] = id;
     alive_[slot] = kSlotAlive;
     live_ += 1;
-    handles[i] = (static_cast<std::uint32_t>(generations_[slot]) << 16) | static_cast<std::uint32_t>(slot);
+    handles[i] = (static_cast<std::uint32_t>(generations_[slot]) << kSlotBits) | static_cast<std::uint32_t>(slot);
   }
   const std::uint32_t woken = wakeCount(count);
   if (woken > 0) {
@@ -700,8 +700,8 @@ Status World::despawn(std::uint32_t handle) {
   if (alive_[slot] != kSlotHeld) bodies.RemoveBody(id);
   alive_[slot] = kSlotFree;
   live_ -= 1;
-  if (generations_[slot] == kLastGeneration) {
-    generations_[slot] = kRetiredGeneration;
+  if (generations_[slot] == kBodyLastGeneration) {
+    generations_[slot] = kBodyRetiredGeneration;
     retired_ += 1;
     return kOk;
   }
@@ -1062,7 +1062,7 @@ std::uint32_t World::activeBodies() const {
 int World::resolve(std::uint32_t handle) const {
   const std::uint32_t slot = handle & kSlotMask;
   if (slot >= fresh_ || alive_[slot] == 0) return -1;
-  if (generations_[slot] != (handle >> 16)) return -1;
+  if (generations_[slot] != (handle >> kSlotBits)) return -1;
   return static_cast<int>(slot);
 }
 

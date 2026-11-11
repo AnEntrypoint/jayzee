@@ -2,7 +2,7 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import assert from 'node:assert/strict'
 import { gate, finish } from './lib/gate.mjs'
-import { createEngineWorld } from '../src/engine/EngineWorld.js'
+import { LAST_BODY_GENERATION, SLOT_BITS, SLOT_MASK, createEngineWorld } from '../src/engine/EngineWorld.js'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const glue = pathToFileURL(join(root, 'engine/out/engine-core-64mib.mjs')).href
@@ -18,7 +18,7 @@ gate('a despawned slot is reused under a new generation, and the old handle is r
   const first = world.spawn([0, 3, 0])
   world.despawn(first)
   const reused = world.spawn([0, 4, 0])
-  assert.equal(reused, 1 << 16)
+  assert.equal(reused, 1 << SLOT_BITS)
   assert.throws(() => world.despawn(first), RangeError)
   assert.throws(() => world.position(first), RangeError)
   assert.deepEqual(world.position(reused), [0, 4, 0])
@@ -34,11 +34,12 @@ gate('a slot retires at its last generation: its handles stay refused, and the s
     if (world.retiredSlots > 0) break
     handle = world.spawn([0, 3, 0])
   }
-  assert.equal(issued.length, 65535)
-  assert.equal(new Set(issued).size, 65535)
+  assert.equal(issued.length, LAST_BODY_GENERATION + 1)
+  assert.equal(new Set(issued).size, LAST_BODY_GENERATION + 1)
+  assert.equal(issued.at(-1) >>> SLOT_BITS, LAST_BODY_GENERATION)
   for (const old of issued) assert.throws(() => world.despawn(old), RangeError)
   const next = world.spawn([0, 3, 0])
-  assert.equal(next & 0xffff, 1)
+  assert.equal(next & SLOT_MASK, 1)
   assert.equal(world.retiredSlots, 1)
   assert.equal(world.count, 1)
   assert.throws(() => world.spawn([0, 3, 0]), RangeError)

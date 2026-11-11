@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { gate, finish } from './lib/gate.mjs'
-import { loadEngineModule } from '../src/engine/EngineWorld.js'
+import { SLOT_MASK, loadEngineModule } from '../src/engine/EngineWorld.js'
 import { createInterest, INTEREST } from '../src/engine/interest.js'
 
 const BODIES = 1024
@@ -38,7 +38,7 @@ const handles = []
 for (let i = 0; i < BODIES; i++) {
   const handle = module._engine_spawn(bodyX(i), 0.5, bodyZ(i), 0, 0, 0)
   assert.ok(handle >= 0, 'spawn ' + i + ' failed')
-  assert.equal(handle & 0xffff, i)
+  assert.equal(handle & SLOT_MASK, i)
   handles.push(handle)
 }
 module._engine_tick(1)
