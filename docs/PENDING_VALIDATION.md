@@ -3844,3 +3844,28 @@ Witness, final tree:
   - 64-webgpu: wall 18512 ms, workMax 3.39 ms, missed 0.
   - 64-webgl2: wall 18005 ms, workMax 3.25 ms, missed 0.
 - `npm test` with the gate in the chain: exit 0, 264 PASS, 0 FAIL, log build/diag/stretch2-npmtest2.log.
+
+## Stretch 3: physics scenarios on device-sized static pools, with traces (Phase A, Phase B witness)
+
+Scope reading: the scenarios are the six that exist, deathrun, combat bots, lockstep RTS, boss fight, character, and settle. This stretch adds no new scenario. It sizes each one's body pool from the device tier and writes a tick trace for each run.
+
+Phase A changes:
+- `src/engine/poolPlan.js`: `bodyPoolCapacity(players)`, the one place a scenario's pool is sized. 2048 bodies at 64 players, 10240 at 1024 players, the same tiers the render page already uses.
+- Every scenario world takes `capacity: bodyPoolCapacity(tier.players)`. Before this, each gate had a fixed 8, 16 or 256 bodies, so the pool was the scenario's size, not the device's.
+- `scripts/lib/tickTrace.mjs`: `writeTickTrace(scenario, label, runs)` writes each run's per-tick work to `build/diag/scenarios/<scenario>-<tier>.json` with max, p99, the count over 16.7 ms and the count over 25 ms.
+- Each gate's worst-tick check became two checks: zero ticks over 25 ms and zero over the 16.7 ms budget, in both runs. Settle had no tick timing before, so it now times its loop.
+
+Phase B witness, `npm run check:scenario-<name>` on each gate, both tiers, both runs:
+
+| scenario | gate wall | ticks per run | run 1 max ms | run 2 max ms | over 16.7 ms | over 25 ms |
+|---|---|---|---|---|---|---|
+| deathrun | 871 ms | 576 | 3.19 (64) 3.78 (1024) | 0.08 (64) 0.77 (1024) | 0 | 0 |
+| combat-bots | 813 ms | 91 | 3.08 (64) 3.61 (1024) | 0.09 (64) 0.11 (1024) | 0 | 0 |
+| lockstep-rts | 1319 ms | 360 | 3.98 (64) 3.68 (1024) | 0.13 (64) 0.19 (1024) | 0 | 0 |
+| boss-fight | 837 ms | 391 | 3.47 (64) 3.69 (1024) | 0.09 (64) 0.18 (1024) | 0 | 0 |
+| character | 796 ms | 240 | 3.39 (64) 3.14 (1024) | 0.09 (64) 0.13 (1024) | 0 | 0 |
+| settle | 878 ms | 240 | 3.60 (64) 3.80 (1024) | 0.53 (64) 0.34 (1024) | 0 | 0 |
+
+Every scenario's trace file is in build/diag/scenarios/. The run 1 maxima are the first-call cost, and the run 2 maxima are below 1 ms.
+
+`npm test`: exit 0, 264 PASS, 0 FAIL, wall 2m26.110s.

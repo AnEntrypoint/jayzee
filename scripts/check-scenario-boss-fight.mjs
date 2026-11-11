@@ -3,6 +3,8 @@ import { join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { finish, gate } from './lib/gate.mjs'
 import { createEngineWorld } from '../src/engine/EngineWorld.js'
+import { bodyPoolCapacity } from '../src/engine/poolPlan.js'
+import { writeTickTrace } from './lib/tickTrace.mjs'
 import { PLANET } from '../src/engine/sceneSetup.js'
 
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)))
@@ -23,14 +25,13 @@ const PLAYER_FIRE_INTERVAL_TICKS = 30
 const SETTLE_TICKS = 60
 const TICK_LIMIT = 1800
 const RADIAL_TOLERANCE_M = 0.1
-const TICK_BUDGET_MS = 16.7
 const TIERS = Object.freeze([
   { label: '64 MiB fixed', glue: 'engine/out/engine-core-64mib.mjs', players: 64, workers: 1, budgetBytes: 64 * 1024 * 1024 },
   { label: '512 MiB threaded, 2 workers', glue: 'engine/out/engine-core-512mib-threads.mjs', players: 1024, workers: 2, budgetBytes: 512 * 1024 * 1024 },
 ])
 
 const scenario = async (tier) => {
-  const world = await createEngineWorld({ capacity: 8, tickRate: 60, gravity: -9.8, drag: 0, radius: 0.5, restitution: 0, players: tier.players, workers: tier.workers, budgetBytes: tier.budgetBytes }, glueUrl(tier.glue))
+  const world = await createEngineWorld({ capacity: bodyPoolCapacity(tier.players), tickRate: 60, gravity: -9.8, drag: 0, radius: 0.5, restitution: 0, players: tier.players, workers: tier.workers, budgetBytes: tier.budgetBytes }, glueUrl(tier.glue))
   world.configurePlanet(PLANET)
   const anchor = world.height(0, PLANET.radius, 0)
   const centreRadius = PLANET.radius + anchor + CHARACTER_RADIUS + CHARACTER_HALF_HEIGHT
@@ -119,9 +120,10 @@ for (const tier of TIERS) {
     assert.deepEqual(second.bossHealth, first.bossHealth)
     assert.deepEqual(new Uint32Array(new Float32Array(second.final).buffer), new Uint32Array(new Float32Array(first.final).buffer))
   })
-  gate(tier.label + ': the worst tick work time is within the 16.7 ms budget (measured inside the step call, both runs)', () => {
-    const worst = Math.max(...first.tickMs, ...second.tickMs)
-    assert.ok(worst <= TICK_BUDGET_MS, 'worst tick work ' + worst.toFixed(2) + ' ms')
+  gate(tier.label + ': no tick runs over 25 ms or over the 16.7 ms budget (measured inside the step call, both runs)', () => {
+    const trace = writeTickTrace('boss-fight', tier.label, [first.tickMs, second.tickMs])
+    assert.equal(trace.over25, 0, 'ticks over 25 ms: ' + trace.over25)
+    assert.equal(trace.overBudget, 0, 'ticks over the 16.7 ms budget: ' + trace.overBudget)
   })
 }
 
