@@ -250,6 +250,28 @@ gate('a cone picks the bodies in front of the eye before nearer ones behind it, 
   assert.deepEqual(plain, range(BUDGET, BUDGET + plain.length))
 })
 
+gate('the release view read from the frame scratch, as the frame path sets it, releases the same first wave as the one passed by value', async () => {
+  const firstWave = async (setView) => {
+    const module = await boot({ budget: BUDGET })
+    const start = positions(module)
+    const mid = BUDGET + Math.floor((BODIES - BUDGET) / 2)
+    const eye = eyeAt(module, mid, 3)
+    const target = [start[(BODIES - 1) * 3], eye[1], start[(BODIES - 1) * 3 + 2]]
+    assert.equal(setView(module, eye, target), 0)
+    let wave = []
+    for (let guard = 0; guard < SETTLE_TICKS && wave.length === 0; guard++) wave = releasedAfter(module, 1).filter((slot) => slot >= BUDGET)
+    return wave
+  }
+  const byValue = await firstWave((module, eye, target) => module._engine_world_set_release_view(eye[0], eye[1], eye[2], target[0] - eye[0], target[1] - eye[1], target[2] - eye[2], 0.5, 1000))
+  const byScratch = await firstWave((module, eye, target) => {
+    const at = module._engine_frame_scratch() >> 3
+    module.HEAPF64.set([eye[0], eye[1], eye[2], 0, target[0], target[1], target[2], 0.5, 1000], at)
+    return module._engine_release_view_scratch()
+  })
+  assert.ok(byValue.length > 0)
+  assert.deepEqual(byScratch, byValue)
+})
+
 gate('the release view refuses a value that is not finite, a cone outside -1 to 1 and a range that is not above zero', async () => {
   const module = await boot({ budget: BUDGET })
   for (const bad of [[NaN, 0, 0, 1, 0, 0, 0.5, 10], [0, 0, 0, Infinity, 0, 0, 0.5, 10], [0, 0, 0, 1, 0, 0, 1.5, 10], [0, 0, 0, 1, 0, 0, 0.5, 0], [0, 0, 0, 1, 0, 0, 0.5, NaN]]) {

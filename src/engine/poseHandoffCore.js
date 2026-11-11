@@ -45,13 +45,23 @@ export const createPoseHandoffCore = ({ module, region, reserve, send }) => {
 
 export const RELEASE_VIEW_COS = 0.6
 export const RELEASE_VIEW_RANGE_M = 400
+const SCRATCH_VIEW_TARGET = 4
+const SCRATCH_VIEW_COS = 7
+const SCRATCH_VIEW_RANGE = 8
 
 export const createPoseStepper = ({ module, streamer, region, reserve }) => {
   const heapPose = new Uint8Array(module.HEAPU8.buffer, reserve, region.poseBytes)
   const { poseBytes } = region
   const at = module._engine_frame_scratch() >> 3
   const heap = module.HEAPF64
-  const target = typeof module._engine_world_set_release_view === 'function' && streamer.viewTarget ? streamer.viewTarget : null
+  const viewed = typeof module._engine_release_view_scratch === 'function' && Boolean(streamer.viewTarget)
+  if (viewed) {
+    heap[at + SCRATCH_VIEW_TARGET] = streamer.viewTarget[0]
+    heap[at + SCRATCH_VIEW_TARGET + 1] = streamer.viewTarget[1]
+    heap[at + SCRATCH_VIEW_TARGET + 2] = streamer.viewTarget[2]
+    heap[at + SCRATCH_VIEW_COS] = RELEASE_VIEW_COS
+    heap[at + SCRATCH_VIEW_RANGE] = RELEASE_VIEW_RANGE_M
+  }
   return (slot) => {
     const frame = region.frameOf(slot)
     const spot = streamer.step(frame)
@@ -59,7 +69,7 @@ export const createPoseStepper = ({ module, streamer, region, reserve }) => {
     heap[at + 1] = spot[1]
     heap[at + 2] = spot[2]
     if (module._engine_follow_scratch() !== 0) throw new Error('engine_follow refused at frame ' + frame)
-    if (target !== null && module._engine_world_set_release_view(spot[0], spot[1], spot[2], target[0] - spot[0], target[1] - spot[1], target[2] - spot[2], RELEASE_VIEW_COS, RELEASE_VIEW_RANGE_M) !== 0) throw new Error('engine_world_set_release_view refused at frame ' + frame)
+    if (viewed && module._engine_release_view_scratch() !== 0) throw new Error('engine_release_view_scratch refused at frame ' + frame)
     module._engine_tick(1)
     if (module._engine_pose_export(reserve, poseBytes) !== poseBytes) throw new Error('engine_pose_export refused at frame ' + frame)
     region.view(slot).set(heapPose)

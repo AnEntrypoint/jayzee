@@ -8,7 +8,12 @@
 
 namespace {
 
-double frameScratch[4] = {};
+constexpr int kScratchSpot = 0;
+constexpr int kScratchHeight = 3;
+constexpr int kScratchViewTarget = 4;
+constexpr int kScratchViewCos = 7;
+constexpr int kScratchViewRange = 8;
+double frameScratch[9] = {};
 
 }
 
@@ -46,7 +51,14 @@ EMSCRIPTEN_KEEPALIVE int engine_follow_scratch() {
 }
 
 EMSCRIPTEN_KEEPALIVE void engine_planet_height_scratch() {
-  frameScratch[3] = engine_planet_height(frameScratch[0], frameScratch[1], frameScratch[2]);
+  frameScratch[kScratchHeight] = engine_planet_height(frameScratch[0], frameScratch[1], frameScratch[2]);
+}
+
+EMSCRIPTEN_KEEPALIVE int engine_release_view_scratch() {
+  const double* eye = frameScratch + kScratchSpot;
+  const double* target = frameScratch + kScratchViewTarget;
+  const double direction[3] = {target[0] - eye[0], target[1] - eye[1], target[2] - eye[2]};
+  return engine::world().setReleaseView(eye, direction, frameScratch[kScratchViewCos], frameScratch[kScratchViewRange]);
 }
 
 }

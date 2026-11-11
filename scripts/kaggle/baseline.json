@@ -1,7 +1,7 @@
 {
-  "referenceCommit": "f4e63b04bc2c41e9c5cb1c08066154f99d9ed12d",
+  "referenceCommit": "da854b21c1eabb513bf82e14d700080973467052",
   "topTier": {
-    "bodies": 40960,
+    "bodies": 131072,
     "workers": 4,
     "repeats": 5
   },

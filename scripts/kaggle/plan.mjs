@@ -54,7 +54,7 @@ export const RECORD_WORKERS = Object.freeze([1, 2, 3, 6])
 export const SETTLE_TICKS = 3000
 export const VIEW_BODIES = 40960
 export const TUNE_DEFAULT_BY_SLOT = 28
-export const VIEW_KNOBS = Object.freeze(['still=1', 'still=1,tune=' + TUNE_DEFAULT_BY_SLOT, 'tune=' + TUNE_DEFAULT_BY_SLOT])
+export const VIEW_KNOBS = Object.freeze(['none', 'tune=' + TUNE_DEFAULT_BY_SLOT, 'still=1', 'still=1,tune=' + TUNE_DEFAULT_BY_SLOT])
 
 const regressWith = (candidate) => () => {
   const runs = []
