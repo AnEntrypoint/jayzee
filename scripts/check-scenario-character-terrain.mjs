@@ -4,7 +4,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { finish, gate } from './lib/gate.mjs'
 import { createEngineWorld } from '../src/engine/EngineWorld.js'
 import { bodyPoolCapacity } from '../src/engine/poolPlan.js'
-import { writeTickTrace } from './lib/tickTrace.mjs'
+import { createTickTimer, writeTickTrace } from './lib/tickTrace.mjs'
 import { PLANET } from '../src/engine/sceneSetup.js'
 import { createPoleTerrain } from './lib/polePages.mjs'
 
@@ -84,7 +84,8 @@ const scenario = async (tier, tuning) => {
   const residentPages = world.residentPages()
 
   const body = [0, 0, 0]
-  const tickMs = []
+  const timer = createTickTimer()
+  const tickMs = timer.tickMs
   const read = (walker) => {
     world.characterBodyPosition(walker.index, body)
     const position = [body[0] + origin[0], body[1] + origin[1], body[2] + origin[2]]
@@ -93,9 +94,9 @@ const scenario = async (tier, tuning) => {
     return { position, alongU, alongV, altitude, supported: world.characterSupported(walker.index) }
   }
   const step = () => {
-    const started = performance.now()
+    timer.start()
     world.step()
-    tickMs.push(performance.now() - started)
+    timer.stop()
   }
   for (let t = 0; t < SETTLE_TICKS; t++) step()
   const settled = walkers.map((walker) => read(walker))

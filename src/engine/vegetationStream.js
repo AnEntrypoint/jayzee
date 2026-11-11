@@ -54,11 +54,11 @@ export const createLeafBlock = ({ level, block }) => {
 
 const SETTLED_FRAMES = 2
 
-export const createVegetationFollower = ({ scene, block, radiusM }) => {
+export const createVegetationFollower = ({ scene, block }) => {
   let settled = 0
-  return (x, heightM, z, pagesPending) => {
+  return (x, y, z, pagesPending) => {
     settled = pagesPending > 0 ? 0 : settled + 1
-    const moved = settled >= SETTLED_FRAMES && block.update(x, radiusM + heightM, z)
+    const moved = settled >= SETTLED_FRAMES && block.update(x, y, z)
     scene.streamStep(moved ? block.ids : null)
     return moved
   }

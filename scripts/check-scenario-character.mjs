@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { finish, gate } from './lib/gate.mjs'
 import { createEngineWorld } from '../src/engine/EngineWorld.js'
 import { bodyPoolCapacity } from '../src/engine/poolPlan.js'
-import { writeTickTrace } from './lib/tickTrace.mjs'
+import { createTickTimer, writeTickTrace } from './lib/tickTrace.mjs'
 import { SCENARIO_TIERS, glueUrl } from './lib/scenarioTiers.mjs'
 import { PLANET } from '../src/engine/sceneSetup.js'
 
@@ -24,13 +24,14 @@ const scenario = async (tier) => {
   const restingDistance = PLANET.radius + anchor + CHARACTER_RADIUS + CHARACTER_HALF_HEIGHT
   world.addCharacter({ position: [0, restingDistance + 0.5, 0], radius: CHARACTER_RADIUS, halfHeight: CHARACTER_HALF_HEIGHT })
   world.follow([0, restingDistance, 0])
-  const tickMs = []
+  const timer = createTickTimer()
+  const tickMs = timer.tickMs
   const trail = []
   const p = [0, 0, 0]
   const step = () => {
-    const started = performance.now()
+    timer.start()
     world.step()
-    tickMs.push(performance.now() - started)
+    timer.stop()
   }
   for (let t = 0; t < STAND_TICKS; t++) {
     step()

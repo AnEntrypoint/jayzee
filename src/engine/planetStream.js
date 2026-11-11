@@ -9,12 +9,12 @@ export const PATH_PERIOD_FRAMES = 720
 export const PATH_STEP_M = (2 * Math.PI * CAMERA_RADIUS) / PATH_PERIOD_FRAMES
 const FILL_CLASSES = 97
 
-export const cameraEngineSpot = (frame, surface, stepM, heightM, out) => {
+export const cameraEngineSpot = (frame, surface, stepM, heightM, out, baseY = 0) => {
   const angle = frame * (stepM / CAMERA_RADIUS)
   const x = Math.sin(angle) * CAMERA_RADIUS
   const z = Math.cos(angle) * CAMERA_RADIUS
   out[0] = x
-  out[1] = surface(x, z) + heightM
+  out[1] = baseY + surface(x, z) + heightM
   out[2] = z
   return out
 }
@@ -33,7 +33,7 @@ const fillTemplates = () => {
 
 const fillClass = (face, cx, cy) => (((face * 7 + cx * 31 + cy * 17) % FILL_CLASSES) + FILL_CLASSES) % FILL_CLASSES
 
-export const createPlanetStreamer = (module, { sink = null, window = PATH_WINDOW, perFrame = PAGES_PER_FRAME, heightM = CAMERA_HEIGHT } = {}) => {
+export const createPlanetStreamer = (module, { sink = null, window = PATH_WINDOW, perFrame = PAGES_PER_FRAME, heightM = CAMERA_HEIGHT, baseY = 0 } = {}) => {
   const surface = configurePlanet(module)
   const ref = cellOf(module, 0, PLANET.radius, 0)
   const cells = 4 * window * window
@@ -44,7 +44,7 @@ export const createPlanetStreamer = (module, { sink = null, window = PATH_WINDOW
   const pathCell = new Int32Array(3 * PATH_PERIOD_FRAMES)
 
   for (let f = 0; f < PATH_PERIOD_FRAMES; f++) {
-    cameraEngineSpot(f, surface, PATH_STEP_M, heightM, spot)
+    cameraEngineSpot(f, surface, PATH_STEP_M, heightM, spot, baseY)
     pathSpot.set(spot, 3 * f)
     const cell = locateCell(module, spot[0], PLANET.radius, spot[2], probe)
     pathCell[3 * f] = cell.face

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { finish, gate } from './lib/gate.mjs'
 import { PLANET } from '../src/engine/sceneSetup.js'
-import { writeTickTrace } from './lib/tickTrace.mjs'
+import { createTickTimer, writeTickTrace } from './lib/tickTrace.mjs'
 import { SCENARIO_TIERS } from './lib/scenarioTiers.mjs'
 import { PLANET_LANDING, buildPlanetLanding } from './lib/scenarioWorlds.mjs'
 
@@ -14,11 +14,12 @@ const TIERS = SCENARIO_TIERS
 
 const scenario = async (tier) => {
   const { world, handles } = await buildPlanetLanding(tier)
-  const tickMs = []
+  const timer = createTickTimer()
+  const tickMs = timer.tickMs
   for (let t = 0; t < TICKS; t++) {
-    const started = performance.now()
+    timer.start()
     world.step()
-    tickMs.push(performance.now() - started)
+    timer.stop()
   }
   const gaps = new Float64Array(BODIES)
   const p = [0, 0, 0]

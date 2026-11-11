@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { finish, gate } from './lib/gate.mjs'
-import { writeTickTrace } from './lib/tickTrace.mjs'
+import { createTickTimer, writeTickTrace } from './lib/tickTrace.mjs'
 import { SCENARIO_TIERS } from './lib/scenarioTiers.mjs'
 import { PROJECTILE_VOLLEY, buildProjectileVolley } from './lib/scenarioWorlds.mjs'
 
@@ -17,13 +17,14 @@ const TIERS = SCENARIO_TIERS
 
 const scenario = async (tier) => {
   const { world, handles } = await buildProjectileVolley(tier)
-  const tickMs = []
+  const timer = createTickTimer()
+  const tickMs = timer.tickMs
   const trajectory = []
   const p = [0, 0, 0]
   for (let t = 0; t < TICKS; t++) {
-    const started = performance.now()
+    timer.start()
     world.step()
-    tickMs.push(performance.now() - started)
+    timer.stop()
     if (t < TRAJECTORY_TICKS) {
       world.position(handles[0], p)
       trajectory.push(p.slice())

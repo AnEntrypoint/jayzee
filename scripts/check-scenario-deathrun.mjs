@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { finish, gate } from './lib/gate.mjs'
-import { writeTickTrace } from './lib/tickTrace.mjs'
+import { createTickTimer, writeTickTrace } from './lib/tickTrace.mjs'
 import { SCENARIO_TIERS } from './lib/scenarioTiers.mjs'
 import { DEATHRUN, DEATHRUN_COURSES, DEATHRUN_STATUS, createDeathrun } from './lib/deathrun.mjs'
 
@@ -14,15 +14,16 @@ const TIERS = SCENARIO_TIERS
 
 const scenario = async (tier, courseName) => {
   const run = await createDeathrun(tier, courseName)
-  const tickMs = []
+  const timer = createTickTimer()
+  const tickMs = timer.tickMs
   const height = []
   const supported = []
   const sinceSpawn = []
   while (!run.over) {
     if (!run.decide()) continue
-    const started = performance.now()
+    timer.start()
     run.step()
-    tickMs.push(performance.now() - started)
+    timer.stop()
     run.record()
     height.push(run.feetHeightM)
     supported.push(run.state.supported)

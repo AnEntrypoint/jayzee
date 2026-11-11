@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { finish, gate } from './lib/gate.mjs'
 import { createEngineWorld } from '../src/engine/EngineWorld.js'
 import { bodyPoolCapacity } from '../src/engine/poolPlan.js'
-import { writeTickTrace } from './lib/tickTrace.mjs'
+import { createTickTimer, writeTickTrace } from './lib/tickTrace.mjs'
 import { SCENARIO_TIERS, glueUrl } from './lib/scenarioTiers.mjs'
 import { PLANET } from '../src/engine/sceneSetup.js'
 import { createPoleTerrain } from './lib/polePages.mjs'
@@ -93,7 +93,8 @@ const scenario = async (tier) => {
   let blockedShots = 0
   const body = [0, 0, 0]
   const positions = bots.map(() => [0, 0, 0])
-  const tickMs = []
+  const timer = createTickTimer()
+  const tickMs = timer.tickMs
   const radial = []
   const supported = []
   const health = []
@@ -148,9 +149,9 @@ const scenario = async (tier) => {
         if (nearest.health <= 0) kills.push({ tick, killer: bots.indexOf(bot), victim: bots.indexOf(nearest) })
       }
     }
-    const started = performance.now()
+    timer.start()
     world.step()
-    tickMs.push(performance.now() - started)
+    timer.stop()
     bots.forEach((bot, i) => {
       world.characterBodyPosition(bot.index, body)
       if (bot.health > 0) {

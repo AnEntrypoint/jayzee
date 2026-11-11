@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { finish, gate } from './lib/gate.mjs'
-import { writeTickTrace } from './lib/tickTrace.mjs'
+import { createTickTimer, writeTickTrace } from './lib/tickTrace.mjs'
 import { SCENARIO_TIERS } from './lib/scenarioTiers.mjs'
 import { MARBLE_BOWL, buildMarbleBowl } from './lib/scenarioWorlds.mjs'
 
@@ -13,11 +13,12 @@ const TIERS = SCENARIO_TIERS
 
 const scenario = async (tier) => {
   const { world, handles } = await buildMarbleBowl(tier)
-  const tickMs = []
+  const timer = createTickTimer()
+  const tickMs = timer.tickMs
   for (let t = 0; t < TICKS; t++) {
-    const started = performance.now()
+    timer.start()
     world.step()
-    tickMs.push(performance.now() - started)
+    timer.stop()
   }
   const positions = new Float64Array(BODIES * 3)
   const speeds = new Float64Array(BODIES)

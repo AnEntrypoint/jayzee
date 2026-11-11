@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { finish, gate } from './lib/gate.mjs'
-import { writeTickTrace } from './lib/tickTrace.mjs'
+import { createTickTimer, writeTickTrace } from './lib/tickTrace.mjs'
 import { SCENARIO_TIERS } from './lib/scenarioTiers.mjs'
 import { BOSS_FIGHT, createBossFight } from './lib/bossFight.mjs'
 
@@ -15,14 +15,15 @@ const TIERS = SCENARIO_TIERS
 
 const scenario = async (tier, options) => {
   const fight = await createBossFight(tier, options)
-  const tickMs = []
+  const timer = createTickTimer()
+  const tickMs = timer.tickMs
   const radial = []
   const bossHealth = []
   const playerTrail = []
   while (fight.decide()) {
-    const started = performance.now()
+    timer.start()
     fight.step()
-    tickMs.push(performance.now() - started)
+    timer.stop()
     fight.record()
     radial.push({ tick: fight.state.tick - 1, error: fight.state.bossRadialError, supported: fight.state.bossSupported, playerError: fight.state.playerRadialError, playerSupported: fight.state.playerSupported })
     bossHealth.push(fight.state.bossHealth)

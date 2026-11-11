@@ -9,6 +9,7 @@ import { PLANET_FRAME_BUDGET_MS, PLANET_MISSED_FRAME_MS, PLANET_RUNS, planetQuer
 
 const execFileAsync = promisify(execFile)
 const SAMPLE_MS = 50
+const RUN_TIMEOUT_MS = 240000
 
 const root = resolve(fileURLToPath(new URL('../..', import.meta.url)))
 const outDir = resolve(root, process.argv[2] ?? 'build/diag/planet')
@@ -179,7 +180,7 @@ for (const config of PLANET_RUNS.filter((run) => !only || only === run.tier + '-
   const samples = []
   const stop = { done: false }
   const sampling = sampleHost(samples, stop)
-  const run = await runRenderWitness({ root, port, query: planetQuery(config, frames), trace: true, gpuTrace: true })
+  const run = await runRenderWitness({ root, port, query: planetQuery(config, frames), trace: true, gpuTrace: true, timeoutMs: RUN_TIMEOUT_MS })
   stop.done = true
   await sampling
   const wallMs = Date.now() - started

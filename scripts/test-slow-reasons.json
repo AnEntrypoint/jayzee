@@ -20,5 +20,9 @@
   "check:scenario-allocations": "30000 warm-up ticks per loop, one loop per process.",
   "check:scenario-lockstep-rts": "Six peers per tier on four tiers.",
   "check:scenario-deathrun": "Six runs per tier on four tiers.",
-  "check:scenario-boss-fight": "Six runs per tier on four tiers."
+  "check:scenario-boss-fight": "Six runs per tier on four tiers.",
+  "check:engine-tiers": "10240 bodies settle for 365 ticks on the fixed 512 MiB build, twice; the carve count after warm-up is the claim.",
+  "check:engine-host-witness": "Compiles the native witness when a source under engine/src or engine/test changed; 0.4 s otherwise.",
+  "check:scenario-character-terrain": "Four tiers of slope, step and descent runs with their controls.",
+  "check:planet-witness-scene": "Builds the witness scene three times on the 1024-tier engine and runs one camera lap."
 }

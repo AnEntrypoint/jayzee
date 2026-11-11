@@ -18,7 +18,7 @@ const timedTick = (slot) => {
 
 const boot = async ({ glue, players, budgetBytes, workers, solverIterations, path, pose, timeTicks }) => {
   const module = await loadEngineModule(glue, resolvePlan({ players, budgetBytes, workers }))
-  configureWorld(module, solverIterations)
+  configureWorld(module, solverIterations, path && path.baseY ? path.baseY : 0)
   const streamer = createPlanetStreamer(module, path)
   const poseBytes = module._engine_pose_bytes()
   const reserve = module._engine_pose_reserve()

@@ -14,6 +14,7 @@ const TIMED = QUERY.get('timed') === '1'
 const DRAW = QUERY.get('draw') !== '0'
 const MODELS = QUERY.get('models') === '1'
 const HOLD_END = QUERY.get('hold') === '1'
+const VEGETATION = QUERY.get('veg') !== '0'
 const THREADS = QUERY.get('threads') === '1' && TIER === 1024
 const WORKERS = THREADS ? 4 : 1
 const LARGE_MEMORY = TIER === 1024 || MODELS
@@ -118,10 +119,10 @@ const setupWorld = (module) => {
   runConfig.solverIterations = SOLVER_ITERATIONS_QUERY === null ? solverIterationsFor(readLayout(module).players) : Number(SOLVER_ITERATIONS_QUERY)
   const status = module._engine_world_configure(WORLD.capacity, WORLD.tickRate, WORLD.gravity, WORLD.drag, WORLD.radius, WORLD.restitution, runConfig.solverIterations)
   if (status !== 0) throw new Error('world configure status ' + status)
-  module._engine_world_add_box(...GROUND)
+  if (BASE_Y === 0) module._engine_world_add_box(...GROUND)
   for (let i = 0; i < BODIES; i++) {
     const at = TIER === 1024 ? [(i % 100) * 0.6 - 30, 1 + (i % 5), Math.floor(i / 100) * 0.6 - 30] : [(i % 32) * 2 - 32, 2 + (i % 5), Math.floor(i / 32) * 2 - 16]
-    module._engine_spawn(at[0], at[1], at[2], 0, 0, 0)
+    module._engine_spawn(at[0], BASE_Y + at[1], at[2], 0, 0, 0)
   }
 }
 
@@ -179,6 +180,7 @@ const PATH = FLYOVER || QUERY.get('path') === 'planet' ? 'planet' : 'orbit'
 const PATH_SPEED_M_PER_S = FLYOVER ? 300 : 30
 const PATH_STEP_M = PATH_SPEED_M_PER_S / 60
 const PATH_HEIGHT_M = FLYOVER ? 250 : CAMERA_HEIGHT
+const BASE_Y = PATH === 'planet' ? PLANET.radius : 0
 const pagePlacement = new Map()
 const PART_NAMES = ["stage", "fill", "commit", "place"]
 const PART_CAP = 1 << 16
@@ -312,9 +314,9 @@ const planetCamera = (module, renderer, frame, aspect, surface) => {
   }
   streamPages(module, renderer, PAGES_PER_FRAME)
   CAMERA.eye[0] = x
-  CAMERA.eye[1] = surface(x, z) + PATH_HEIGHT_M
+  CAMERA.eye[1] = BASE_Y + surface(x, z) + PATH_HEIGHT_M
   CAMERA.eye[2] = z
-  relativeLookAt(CAMERA.eye, ORIGIN, UP, VIEW)
+  relativeLookAt(CAMERA.eye, PLANET_TARGET, UP, VIEW)
   perspective(CAMERA_FOV, aspect, NEAR, FAR, PROJ)
   multiply(PROJ, VIEW, CAMERA.viewProj)
   return CAMERA
@@ -332,13 +334,14 @@ const setupScene = (module, renderer, placed, worldReady = false) => {
   renderer.setAlbedo(1, checker())
   for (let i = 0; i < LIGHTS; i++) {
     const angle = (i / LIGHTS) * Math.PI * 2
-    renderer.setLight(i, { position: [Math.cos(angle) * 30, 12, Math.sin(angle) * 30], radius: 60, colour: [1, 0.95, 0.85], intensity: 0.8 })
+    renderer.setLight(i, { position: [Math.cos(angle) * 30, BASE_Y + 12, Math.sin(angle) * 30], radius: 60, colour: [1, 0.95, 0.85], intensity: 0.8 })
   }
   renderer.setLightCount(LIGHTS)
   return surface
 }
 
 const ORIGIN = [0, 0, 0]
+const PLANET_TARGET = [0, BASE_Y, 0]
 const UP = [0, 1, 0]
 const VIEW = new Float64Array(16)
 const PROJ = new Float64Array(16)
@@ -462,14 +465,14 @@ const run = async () => {
   const module = renderer.module
   const placed = []
   const surface = setupScene(module, renderer, placed, worldReady)
-  if (planetScene) {
+  if (planetScene && VEGETATION) {
     module._engine_page_apply()
     planetScene.generate()
   }
-  const vegetationBlock = planetScene && PATH === 'planet' ? createLeafBlock({ level: planetScene.spec.patchLevel, block: WITNESS_PATCH_BLOCK }) : null
+  const vegetationBlock = planetScene && VEGETATION && PATH === 'planet' ? createLeafBlock({ level: planetScene.spec.patchLevel, block: WITNESS_PATCH_BLOCK }) : null
   if (vegetationBlock) vegetationBlock.update(0, PLANET.radius, 0)
-  const followVegetation = vegetationBlock ? createVegetationFollower({ scene: planetScene, block: vegetationBlock, radiusM: PLANET.radius }) : null
-  const handoff = TIER === 1024 ? createPhysicsHandoff({ module, glue: new URL(TIER_GLUE, import.meta.url).href, players: TIER, budgetBytes: TIER_BUDGET, solverIterations: runConfig.solverIterations, timeTicks: TIMED ? FRAMES : 0, path: { window: PATH_WINDOW, perFrame: PAGES_PER_FRAME, stepM: PATH_STEP_M, heightM: PATH_HEIGHT_M } }) : null
+  const followVegetation = vegetationBlock ? createVegetationFollower({ scene: planetScene, block: vegetationBlock }) : null
+  const handoff = TIER === 1024 ? createPhysicsHandoff({ module, glue: new URL(TIER_GLUE, import.meta.url).href, players: TIER, budgetBytes: TIER_BUDGET, solverIterations: runConfig.solverIterations, workers: WORKERS, timeTicks: TIMED ? FRAMES : 0, path: { window: PATH_WINDOW, perFrame: PAGES_PER_FRAME, stepM: PATH_STEP_M, heightM: PATH_HEIGHT_M, baseY: BASE_Y } }) : null
   if (handoff) await handoff.ready
 
   const aspect = canvas.width / canvas.height

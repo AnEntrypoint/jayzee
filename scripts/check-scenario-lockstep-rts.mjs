@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { finish, gate } from './lib/gate.mjs'
-import { writeTickTrace } from './lib/tickTrace.mjs'
+import { createTickTimer, writeTickTrace } from './lib/tickTrace.mjs'
 import { SCENARIO_TIERS } from './lib/scenarioTiers.mjs'
 import { LOCKSTEP, createLockstepMatch, lockstepSchedule } from './lib/lockstepMatch.mjs'
 import { stateHash } from './lib/stateHash1024.mjs'
@@ -20,12 +20,13 @@ const firstCheckpointAfter = (tick) => (Math.floor(tick / LOCKSTEP.checkpointTic
 const play = async (tier, variant) => {
   const schedule = lockstepSchedule(variant, DELAY_SEED)
   const match = await createLockstepMatch(tier, schedule)
-  const tickMs = []
+  const timer = createTickTimer()
+  const tickMs = timer.tickMs
   for (let tick = 0; tick < LOCKSTEP.matchTicks; tick++) {
     match.decide()
-    const started = performance.now()
+    timer.start()
     match.step()
-    tickMs.push(performance.now() - started)
+    timer.stop()
     match.record()
   }
   const finalEngine = match.engineHash()

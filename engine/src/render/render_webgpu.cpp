@@ -1282,7 +1282,7 @@ bool ensureVegetation(const engine::render::vegetation::Bound& b) {
     for (std::uint32_t slot = 0; slot < b.slots; ++slot) {
       wgpu::BindGroupEntry vegBindings[kVegBindings];
       vegBindings[0] = bufferBinding(0, cameraBuf, kCameraBytes);
-      vegBindings[1] = bufferBindingAt(1, vegBuf[sp], slot * slotBytes, slotBytes);
+      vegBindings[1] = bufferBinding(1, vegBuf[sp], static_cast<std::uint64_t>(b.slots) * slotBytes);
       vegBindings[2] = bufferBinding(2, materialBuf, kMaterialBytes);
       vegBindings[3] = bufferBinding(3, lightBuf, kLightBytes);
       vegBindings[4] = viewBinding(4, albedoView);
@@ -1330,7 +1330,7 @@ void drawVegetation(wgpu::RenderPassEncoder& pass) {
   for (std::uint32_t i = 0; i < vegDrawCount; ++i) {
     const engine::render::vegetation::Draw& d = vegDraws[i];
     ENGINE_RENDER_CALL(pass.SetBindGroup(0, vegGroup[engine::render::vegetation::indexOf(b, d.species, d.slot)]));
-    ENGINE_RENDER_CALL(pass.Draw(kPropVertices, d.count));
+    ENGINE_RENDER_CALL(pass.Draw(kPropVertices, d.count, 0, d.slot * b.capacity));
   }
 }
 

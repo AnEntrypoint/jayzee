@@ -41,12 +41,12 @@ const orbit = async (spec) => {
   const block = createLeafBlock({ level: spec.patchLevel, block: WITNESS_PATCH_BLOCK })
   block.update(0, PLANET.radius, 0)
   const firstIds = block.ids.slice()
-  const follow = createVegetationFollower({ scene, block, radiusM: PLANET.radius })
+  const follow = createVegetationFollower({ scene, block })
   const atStart = scene.report()
   for (let frame = 0; frame < PATH_PERIOD_FRAMES; frame++) {
     module._engine_page_apply()
     const spot = streamer.step(frame)
-    follow(spot[0], spot[1], spot[2], streamer.pending)
+    follow(spot[0], PLANET.radius + spot[1], spot[2], streamer.pending)
   }
   return { atStart, atEnd: scene.report(), moves: block.moves, firstIds, lastIds: block.ids.slice() }
 }
