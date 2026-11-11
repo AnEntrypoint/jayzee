@@ -626,7 +626,7 @@ int World::spawnBatch(const double* rows, std::uint32_t count, std::uint32_t* ha
     const JPH::BodyID id(bodyIds_[slot]);
     bodies.SetPositionAndRotation(id, toBody(row), JPH::Quat::sIdentity(), JPH::EActivation::DontActivate);
     batch[i] = id;
-    alive_[slot] = 1;
+    alive_[slot] = kSlotAlive;
     live_ += 1;
     handles[i] = (static_cast<std::uint32_t>(generations_[slot]) << 16) | static_cast<std::uint32_t>(slot);
   }
@@ -650,7 +650,7 @@ Status World::despawn(std::uint32_t handle) {
   JPH::BodyInterface& bodies = runtime_->physics.GetBodyInterface();
   const JPH::BodyID id(bodyIds_[slot]);
   bodies.RemoveBody(id);
-  alive_[slot] = 0;
+  alive_[slot] = kSlotFree;
   live_ -= 1;
   if (generations_[slot] == kLastGeneration) {
     generations_[slot] = kRetiredGeneration;
@@ -771,8 +771,14 @@ void World::step(std::uint32_t steps) {
       }
       {
         engine::phase::Scope scope(engine::phase::kReadback);
+        const JPH::BodyInterface& bodies = runtime_->physics.GetBodyInterfaceNoLock();
         for (std::uint32_t slot = 0; slot < fresh_; ++slot) {
-          if (alive_[slot] != 0) sync(slot);
+          const std::uint8_t state = alive_[slot];
+          if (state == kSlotFree) continue;
+          const bool active = bodies.IsActive(JPH::BodyID(bodyIds_[slot]));
+          if (!active && state == kSlotAsleepSynced) continue;
+          sync(slot);
+          alive_[slot] = active ? kSlotAlive : kSlotAsleepSynced;
         }
       }
     }
@@ -783,6 +789,9 @@ void World::step(std::uint32_t steps) {
 Status World::applyPoses(const Transform* rows, std::uint32_t count) {
   if (transforms_ == nullptr || count != limits_.bodies) return kRange;
   std::memcpy(transforms_, rows, static_cast<std::size_t>(count) * sizeof(Transform));
+  for (std::uint32_t slot = 0; slot < fresh_; ++slot) {
+    if (alive_[slot] != kSlotFree) alive_[slot] = kSlotAlive;
+  }
   return kOk;
 }
 

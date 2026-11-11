@@ -29,6 +29,7 @@ if (run.error || !run.result) {
     frameTimeP99Ms: r.frameTimeP99Ms,
     tickMedianMs: r.tickMedianMs,
     workerTick: r.workerTick ?? null,
+    physicsWarm: r.physicsWarm ?? null,
     errors: r.errors ?? [],
   }))
 }
