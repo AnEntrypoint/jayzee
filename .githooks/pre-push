@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+exec node "$(git rev-parse --show-toplevel)/scripts/kaggle/push-gate.mjs"

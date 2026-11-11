@@ -5,6 +5,7 @@ import { MARBLE_BOWL, buildMarbleBowl } from '../lib/scenarioWorlds.mjs'
 
 const tier = SCENARIO_TIERS[Number(process.argv[2])]
 const RUNS = Number(process.argv[3])
+const WARM_RUNS = Number(process.argv[4] ?? '0')
 const SHOWN_TICKS = 12
 
 const round = (ms) => Number(ms.toFixed(3))
@@ -37,6 +38,7 @@ const timedRun = async () => {
   }
 }
 
+for (let r = 0; r < WARM_RUNS; r++) await timedRun()
 const perRun = []
 for (let r = 0; r < RUNS; r++) perRun.push(await timedRun())
 console.log('RESULT ' + JSON.stringify({
@@ -47,6 +49,7 @@ console.log('RESULT ' + JSON.stringify({
   bodies: MARBLE_BOWL.bodies,
   ticks: MARBLE_BOWL.ticks,
   runs: RUNS,
+  warmRuns: WARM_RUNS,
   budgetMs: FRAME_BUDGET_MS,
   spikeMs: SPIKE_MS,
   clockSource: TICK_CLOCK_SOURCE,

@@ -298,6 +298,7 @@
   "check:engine-isolation",
   "check:engine-tiers",
   "check:engine-warm",
+  "check:kaggle-regress",
   "check:engine-leak",
   "check:client-resource-pools"
 ]

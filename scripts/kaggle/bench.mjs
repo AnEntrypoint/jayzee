@@ -14,7 +14,7 @@ const SETTLE_END = 300
 const TRACE_TICKS = 320
 const PLAYERS = 1024
 
-const [glue, bodiesArg, workersArg, ticksArg, budgetArg, iterationsArg = 'default', scene = 'planet', warmArg = 'cold'] = process.argv.slice(2)
+const [glue, bodiesArg, workersArg, ticksArg, budgetArg, iterationsArg = 'default', scene = 'planet', warmArg = 'cold', warmSpecArg = 'default'] = process.argv.slice(2)
 const bodies = Number(bodiesArg)
 const workers = Number(workersArg)
 const ticks = Number(ticksArg)
@@ -24,7 +24,7 @@ const onPlanet = scene === 'planet'
 const baseY = onPlanet ? PLANET_RADIUS_M : 0
 const FLAT_SPOT = Float64Array.of(0, 25, 60)
 const warm = warmArg === 'warm'
-const base = { kind: 'tick', scene, warm, glue: glue.split('/').pop(), bodies, workers, iterations, budgetMs: BUDGET_MS, budgetBytes, ticks, cpus: availableParallelism(), execArgv: process.execArgv }
+const base = { kind: 'tick', scene, warm, warmSpec: warmSpecArg, variant: glue.includes('/variants/') ? glue.split('/').at(-2) : glue.includes('/reference/') ? 'reference' : 'base', glue: glue.split('/').pop(), bodies, workers, iterations, budgetMs: BUDGET_MS, budgetBytes, ticks, cpus: availableParallelism(), execArgv: process.execArgv }
 
 const emit = (result) => {
   console.log('RESULT ' + JSON.stringify(result))
@@ -34,7 +34,8 @@ const round = (ms, digits) => Number(ms.toFixed(digits))
 const quantile = (sorted, p) => sorted[Math.min(sorted.length - 1, Math.floor(p * sorted.length))]
 const over = (values) => values.reduce((n, ms) => n + (ms > BUDGET_MS ? 1 : 0), 0)
 
-const warmed = warm ? await warmEngine(glue) : null
+const warmSpec = warmSpecArg === 'default' ? {} : { bodies: Number(warmSpecArg.split('x')[0]), ticks: Number(warmSpecArg.split('x')[1]) }
+const warmed = warm ? await warmEngine(glue, warmSpec) : null
 const loadStarted = performance.now()
 let module
 try {

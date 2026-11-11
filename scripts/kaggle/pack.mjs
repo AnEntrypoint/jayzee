@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createHash } from 'node:crypto'
-import { DATASET_REF, KERNEL_REF, TICK_GLUES, buildPlan } from './plan.mjs'
+import { DATASET_REF, KERNEL_REF, buildPlan } from './plan.mjs'
 import { SCENARIO_TIERS } from '../lib/scenarioTiers.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
@@ -11,7 +11,9 @@ const out = join(root, 'build/kaggle')
 const stage = join(out, 'stage')
 const plan = buildPlan(process.argv[2] ?? 'matrix')
 const entries = [...new Set(plan.runs.map((run) => run.script))]
-const glues = [...new Set([...TICK_GLUES, ...SCENARIO_TIERS.map((tier) => tier.glue)])]
+const tickGlues = plan.runs.filter((run) => run.glueArg >= 0).map((run) => run.args[run.glueArg])
+const scenarioGlues = plan.runs.some((run) => run.glueArg < 0) ? SCENARIO_TIERS.map((tier) => tier.glue) : []
+const glues = [...new Set([...tickGlues, ...scenarioGlues])]
 
 rmSync(stage, { recursive: true, force: true })
 mkdirSync(stage, { recursive: true })

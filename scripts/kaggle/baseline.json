@@ -1,0 +1,22 @@
+{
+  "referenceCommit": "6f7775d9108a38712177206bfbe54dc3c0748b1f",
+  "topTier": {
+    "bodies": 10240,
+    "workers": 4,
+    "repeats": 5
+  },
+  "margin": {
+    "p99Factor": 1.1,
+    "overBudgetFactor": 1.25,
+    "overBudgetTicks": 5,
+    "basis": "Kaggle run 9: seven builds with the same cost within noise gave median p99 from 19.24 to 20.50 ms at 10240 bodies (6 percent) and 22.35 to 24.65 ms at 12288 (10 percent), and ticks over budget per three runs from 103 to 157 on a slow machine. Between machines the same build ran 11.7 ms (run 7), 13.6 ms (run 8) and 20.5 ms (run 9), so the gate compares with a reference build in the same run and not with a recorded absolute figure."
+  },
+  "marble": {
+    "tiers": 4,
+    "runs": 4,
+    "warmRuns": 1,
+    "p99Ms": 16.7,
+    "over25": 0,
+    "basis": "Kaggle runs 8 and 9: every tick over 16.7 ms in a first run falls at the first impact (ticks 75 to 83) on cold code; later runs peak at 12 to 20.3 ms of CPU time with zero runqueue wait, and p99 stays at or under 15.0 ms."
+  }
+}

@@ -16,7 +16,7 @@ const failed = results.configs.filter((c) => c.error)
 const marbles = results.configs.filter((c) => c.kind === 'marble-bowl')
 const matrix = ticks.filter((c) => !c.probe)
 const probes = ticks.filter((c) => c.probe)
-const label = (c) => c.glue + (c.warm ? ', warmed' : ', cold')
+const label = (c) => (c.variant && c.variant !== 'base' ? c.variant + ' build of ' : '') + c.glue + (c.warm ? ', warmed' : ', cold')
 const holds = (c) => c.p99Ms <= results.budgetMs && c.overBudget === 0
 const cell = (value) => (value === null || value === undefined ? '' : String(value))
 
@@ -33,7 +33,7 @@ const steadyGoalpost = (glue) => {
   return { bodies, workers: holding.filter((c) => c.bodies === bodies).map((c) => c.workers) }
 }
 
-const tickRow = (c) => '| ' + [c.glue.replace('engine-core-', '').replace('.mjs', '') + (c.scene === 'planet' ? '' : ', ' + c.scene + ' scene') + (c.warm ? ', warmed' : ', cold'), c.bodies, c.workers, c.iterations, c.nodeFlags.join(' '), c.medianMs, c.p99Ms, c.maxMs, c.overBudget, c.bootTicksMs.join(' / '), c.settleP99Ms, c.settleMaxMs, c.settleOverBudget, c.steadyMedianMs, c.steadyP99Ms, c.steadyOverBudget, c.arenaUsedBytes, c.arenaBytes, c.warmMs, c.loadMs, c.runS].map(cell).join(' | ') + ' |'
+const tickRow = (c) => '| ' + [(c.variant && c.variant !== 'base' ? c.variant + ' ' : '') + c.glue.replace('engine-core-', '').replace('.mjs', '') + (c.scene === 'planet' ? '' : ', ' + c.scene + ' scene') + (c.warm ? ', warmed' : ', cold'), c.bodies, c.workers, c.iterations, [...c.nodeFlags, c.warmSpec && c.warmSpec !== 'default' ? 'warm run ' + c.warmSpec : ''].join(' ').trim(), c.medianMs, c.p99Ms, c.maxMs, c.overBudget, c.bootTicksMs.join(' / '), c.settleP99Ms, c.settleMaxMs, c.settleOverBudget, c.steadyMedianMs, c.steadyP99Ms, c.steadyOverBudget, c.arenaUsedBytes, c.arenaBytes, c.warmMs, c.loadMs, c.runS].map(cell).join(' | ') + ' |'
 const tickHead = ['| glue | bodies | workers | solver iterations | node flags | median ms | p99 ms | max ms | ticks over budget | ticks 0 and 1 ms | settle p99 ms | settle max ms | settle over budget | steady median ms | steady p99 ms | steady over budget | arena used bytes | arena bytes | warm-up ms | load ms | run s |', '|' + '---|'.repeat(21)]
 
 const glues = [...new Set(matrix.filter((c) => !c.refused).map(label))]
@@ -62,11 +62,11 @@ const lines = [
   ...tickHead,
   ...probes.filter((c) => !c.refused).map(tickRow),
   '',
-  'Marble bowl (' + cell(marbles[0]?.bodies) + ' marbles, ' + cell(marbles[0]?.ticks) + ' ticks, ' + cell(marbles[0]?.runs) + ' runs per tier), the timing claim that left `check:scenario-marble-bowl`:',
+  'Marble bowl (' + cell(marbles[0]?.bodies) + ' marbles, ' + cell(marbles[0]?.ticks) + ' ticks, ' + cell(marbles[0]?.runs) + ' timed runs per tier after ' + cell(marbles[0]?.warmRuns) + ' warm run). CPU time is the main thread\'s run time from the scheduler statistics; wall time is beside it:',
   '',
-  '| tier | workers | p99 ms | max ms | ticks over ' + results.budgetMs + ' ms | ticks over 25 ms | run s |',
-  '|---|---|---|---|---|---|---|',
-  ...marbles.map((c) => '| ' + [c.tier, c.workers, c.p99Ms, c.maxMs, c.overBudget, c.over25, c.runS].map(cell).join(' | ') + ' |'),
+  '| tier | workers | clock | CPU p99 ms | CPU max ms | CPU ticks over ' + results.budgetMs + ' ms | CPU ticks over 25 ms | wall p99 ms | wall max ms | wall ticks over ' + results.budgetMs + ' ms | run s |',
+  '|' + '---|'.repeat(11),
+  ...marbles.map((c) => '| ' + [c.tier, c.workers, c.clockSource, c.cpuP99Ms, c.cpuMaxMs, c.cpuOverBudget, c.cpuOver25, c.wallP99Ms, c.wallMaxMs, c.wallOverBudget, c.runS].map(cell).join(' | ') + ' |'),
 ]
 writeFileSync(join(here, 'record.md'), lines.join('\n') + '\n')
 console.log(lines.slice(4, 12 + glues.length).join('\n'))
