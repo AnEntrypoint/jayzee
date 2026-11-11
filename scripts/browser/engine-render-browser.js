@@ -602,6 +602,7 @@ const run = async () => {
   result.timed = TIMED
   result.threads = THREADS
   result.workers = WORKERS
+  result.physicsWarm = handoff ? handoff.warm : null
   result.glue = TIER_GLUE
   result.solverIterations = runConfig.solverIterations
   result.tickMedianMs = round2(median(column(2)))

@@ -6,6 +6,7 @@ import { solverIterationsFor } from '../../src/engine/solverIterations.js'
 import { createPlanetStreamer } from '../../src/engine/planetStream.js'
 import { attachPoseRegion, poseRegionBuffers } from '../../src/engine/poseRegion.js'
 import { createPoseStepper } from '../../src/engine/poseHandoffCore.js'
+import { warmEngine } from '../../src/engine/warmEngine.js'
 
 const BUDGET_MS = 16.7
 const BOOT_TICKS = 2
@@ -13,7 +14,7 @@ const SETTLE_END = 300
 const TRACE_TICKS = 320
 const PLAYERS = 1024
 
-const [glue, bodiesArg, workersArg, ticksArg, budgetArg, iterationsArg = 'default', scene = 'planet'] = process.argv.slice(2)
+const [glue, bodiesArg, workersArg, ticksArg, budgetArg, iterationsArg = 'default', scene = 'planet', warmArg = 'cold'] = process.argv.slice(2)
 const bodies = Number(bodiesArg)
 const workers = Number(workersArg)
 const ticks = Number(ticksArg)
@@ -22,7 +23,8 @@ const iterations = iterationsArg === 'default' ? solverIterationsFor(PLAYERS) : 
 const onPlanet = scene === 'planet'
 const baseY = onPlanet ? PLANET_RADIUS_M : 0
 const FLAT_SPOT = Float64Array.of(0, 25, 60)
-const base = { kind: 'tick', scene, glue: glue.split('/').pop(), bodies, workers, iterations, budgetMs: BUDGET_MS, budgetBytes, ticks, cpus: availableParallelism(), execArgv: process.execArgv }
+const warm = warmArg === 'warm'
+const base = { kind: 'tick', scene, warm, glue: glue.split('/').pop(), bodies, workers, iterations, budgetMs: BUDGET_MS, budgetBytes, ticks, cpus: availableParallelism(), execArgv: process.execArgv }
 
 const emit = (result) => {
   console.log('RESULT ' + JSON.stringify(result))
@@ -32,6 +34,7 @@ const round = (ms, digits) => Number(ms.toFixed(digits))
 const quantile = (sorted, p) => sorted[Math.min(sorted.length - 1, Math.floor(p * sorted.length))]
 const over = (values) => values.reduce((n, ms) => n + (ms > BUDGET_MS ? 1 : 0), 0)
 
+const warmed = warm ? await warmEngine(glue) : null
 const loadStarted = performance.now()
 let module
 try {
@@ -39,6 +42,7 @@ try {
 } catch (error) {
   emit({ ...base, refused: error.code ?? error.name, message: String(error.message).slice(0, 200) })
 }
+if (warmed) warmed.release()
 const loadMs = performance.now() - loadStarted
 
 const setupStarted = performance.now()
@@ -73,6 +77,8 @@ const settleSorted = Float64Array.from(settle).sort()
 const steadySorted = Float64Array.from(steady).sort()
 emit({
   ...base,
+  warmMs: warmed ? round(warmed.ms, 1) : null,
+  warmed: warmed ? warmed.warmed : null,
   loadMs: round(loadMs, 1),
   setupMs: round(setupMs, 1),
   medianMs: round(quantile(sorted, 0.5), 3),

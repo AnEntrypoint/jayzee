@@ -3,6 +3,7 @@ import { configureWorld } from './sceneSetup.js'
 import { createPlanetStreamer } from './planetStream.js'
 import { attachPoseRegion } from './poseRegion.js'
 import { createPoseStepper } from './poseHandoffCore.js'
+import { warmEngine } from './warmEngine.js'
 
 let tickSlot = null
 let tickMs = null
@@ -16,8 +17,10 @@ const timedTick = (slot) => {
   return out
 }
 
-const boot = async ({ glue, players, budgetBytes, workers, solverIterations, path, pose, timeTicks }) => {
+const boot = async ({ glue, players, budgetBytes, workers, solverIterations, path, pose, timeTicks, warm }) => {
+  const warmed = warm === false ? null : await warmEngine(glue, warm === true ? {} : warm)
   const module = await loadEngineModule(glue, resolvePlan({ players, budgetBytes, workers }))
+  if (warmed) warmed.release()
   configureWorld(module, solverIterations, path && path.baseY ? path.baseY : 0)
   const streamer = createPlanetStreamer(module, path)
   const poseBytes = module._engine_pose_bytes()
@@ -25,7 +28,7 @@ const boot = async ({ glue, players, budgetBytes, workers, solverIterations, pat
   const region = attachPoseRegion(pose)
   tickSlot = createPoseStepper({ module, streamer, region, reserve })
   if (timeTicks > 0) tickMs = new Float64Array(timeTicks)
-  self.postMessage({ type: 'ready', poseBytes })
+  self.postMessage({ type: 'ready', poseBytes, warm: warmed ? { warmed: warmed.warmed, reason: warmed.reason, bodies: warmed.bodies, ticks: warmed.ticks, ms: warmed.ms } : null })
 }
 
 self.onmessage = (event) => {

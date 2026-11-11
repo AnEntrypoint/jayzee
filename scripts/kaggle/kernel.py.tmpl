@@ -66,6 +66,7 @@ def run_one(node, run):
     entry["script"] = run["script"]
     entry["args"] = run["args"]
     entry["nodeFlags"] = run["nodeFlags"]
+    entry["probe"] = run["probe"]
     entry["runS"] = round(time.time() - began, 1)
     return entry
 

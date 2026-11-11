@@ -14,28 +14,29 @@ const ticks = results.configs.filter((c) => c.kind === 'tick')
 const refused = results.configs.filter((c) => c.refused)
 const failed = results.configs.filter((c) => c.error)
 const marbles = results.configs.filter((c) => c.kind === 'marble-bowl')
-const matrix = ticks.filter((c) => c.nodeFlags.length === 0 && c.args.length === 5)
-const probes = ticks.filter((c) => !matrix.includes(c))
+const matrix = ticks.filter((c) => !c.probe)
+const probes = ticks.filter((c) => c.probe)
+const label = (c) => c.glue + (c.warm ? ', warmed' : ', cold')
 const holds = (c) => c.p99Ms <= results.budgetMs && c.overBudget === 0
 const cell = (value) => (value === null || value === undefined ? '' : String(value))
 
 const goalpost = (glue) => {
-  const holding = matrix.filter((c) => c.glue === glue && holds(c))
+  const holding = matrix.filter((c) => label(c) === glue && holds(c))
   if (holding.length === 0) return null
   const bodies = Math.max(...holding.map((c) => c.bodies))
   return { bodies, workers: holding.filter((c) => c.bodies === bodies).map((c) => c.workers) }
 }
 const steadyGoalpost = (glue) => {
-  const holding = matrix.filter((c) => c.glue === glue && c.steadyP99Ms <= results.budgetMs && c.steadyOverBudget === 0)
+  const holding = matrix.filter((c) => label(c) === glue && c.steadyP99Ms <= results.budgetMs && c.steadyOverBudget === 0)
   if (holding.length === 0) return null
   const bodies = Math.max(...holding.map((c) => c.bodies))
   return { bodies, workers: holding.filter((c) => c.bodies === bodies).map((c) => c.workers) }
 }
 
-const tickRow = (c) => '| ' + [c.glue.replace('engine-core-', '').replace('.mjs', '') + (c.scene === 'planet' ? '' : ', ' + c.scene + ' scene'), c.bodies, c.workers, c.iterations, c.nodeFlags.join(' '), c.medianMs, c.p99Ms, c.maxMs, c.overBudget, c.bootTicksMs.join(' / '), c.settleP99Ms, c.settleMaxMs, c.settleOverBudget, c.steadyMedianMs, c.steadyP99Ms, c.steadyOverBudget, c.arenaUsedBytes, c.arenaBytes, c.runS].map(cell).join(' | ') + ' |'
-const tickHead = ['| glue | bodies | workers | solver iterations | node flags | median ms | p99 ms | max ms | ticks over budget | ticks 0 and 1 ms | settle p99 ms | settle max ms | settle over budget | steady median ms | steady p99 ms | steady over budget | arena used bytes | arena bytes | run s |', '|' + '---|'.repeat(19)]
+const tickRow = (c) => '| ' + [c.glue.replace('engine-core-', '').replace('.mjs', '') + (c.scene === 'planet' ? '' : ', ' + c.scene + ' scene') + (c.warm ? ', warmed' : ', cold'), c.bodies, c.workers, c.iterations, c.nodeFlags.join(' '), c.medianMs, c.p99Ms, c.maxMs, c.overBudget, c.bootTicksMs.join(' / '), c.settleP99Ms, c.settleMaxMs, c.settleOverBudget, c.steadyMedianMs, c.steadyP99Ms, c.steadyOverBudget, c.arenaUsedBytes, c.arenaBytes, c.warmMs, c.loadMs, c.runS].map(cell).join(' | ') + ' |'
+const tickHead = ['| glue | bodies | workers | solver iterations | node flags | median ms | p99 ms | max ms | ticks over budget | ticks 0 and 1 ms | settle p99 ms | settle max ms | settle over budget | steady median ms | steady p99 ms | steady over budget | arena used bytes | arena bytes | warm-up ms | load ms | run s |', '|' + '---|'.repeat(21)]
 
-const glues = [...new Set(matrix.map((c) => c.glue))]
+const glues = [...new Set(matrix.filter((c) => !c.refused).map(label))]
 const lines = [
   '## Kaggle physics run',
   '',

@@ -297,6 +297,7 @@
   "check:engine-render",
   "check:engine-isolation",
   "check:engine-tiers",
+  "check:engine-warm",
   "check:engine-leak",
   "check:client-resource-pools"
 ]

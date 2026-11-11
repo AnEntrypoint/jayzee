@@ -3,7 +3,7 @@ import { createPoseHandoffCore } from './poseHandoffCore.js'
 
 export const HANDOFF_POOL = 3
 
-export const createPhysicsHandoff = ({ module, glue, players, budgetBytes, workers = 1, solverIterations, path, pool = HANDOFF_POOL, timeTicks = 0 }) => {
+export const createPhysicsHandoff = ({ module, glue, players, budgetBytes, workers = 1, solverIterations, path, pool = HANDOFF_POOL, timeTicks = 0, warm = true }) => {
   const worker = new Worker(new URL('./physicsWorker.js', import.meta.url), { type: 'module' })
   const poseBytes = module._engine_pose_bytes()
   const reserve = module._engine_pose_reserve()
@@ -40,13 +40,14 @@ export const createPhysicsHandoff = ({ module, glue, players, budgetBytes, worke
       const message = event.data
       if (message.type === 'ready') {
         if (message.poseBytes !== poseBytes) return reject(new Error('pose bytes differ: worker ' + message.poseBytes + ' page ' + poseBytes))
+        handoff.warm = message.warm
         worker.onmessage = onPose
         resolve(handoff)
       } else reject(new Error(message.message))
     }
   })
 
-  worker.postMessage({ type: 'boot', glue, players, budgetBytes, workers, solverIterations, path, pose: buffers, timeTicks })
+  worker.postMessage({ type: 'boot', glue, players, budgetBytes, workers, solverIterations, path, pose: buffers, timeTicks, warm })
   handoff.requestFrame = core.request
   handoff.close = () => worker.terminate()
   return handoff
