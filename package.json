@@ -58,6 +58,7 @@
     "check:engine-sleep": "node scripts/check-engine-sleep.mjs",
     "check:engine-awake-budget": "node scripts/check-engine-awake-budget.mjs",
     "check:engine-release": "node --expose-gc scripts/check-engine-release.mjs",
+    "check:engine-airborne": "node scripts/check-engine-airborne.mjs",
     "check:engine-pools": "node scripts/check-engine-pools.mjs",
     "check:asset-pipeline": "node scripts/check-asset-pipeline.mjs",
     "check:types": "tsc -p tsconfig.json",

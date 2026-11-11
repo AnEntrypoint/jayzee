@@ -6,8 +6,13 @@
 #include "budget.h"
 
 namespace JPH {
+class Body;
 class BodyInterface;
 class PhysicsSystem;
+}
+
+namespace engine {
+struct PhysicsOrigin;
 }
 
 namespace engine {
@@ -24,7 +29,11 @@ constexpr std::uint8_t kSlotHeld = 4;
 constexpr std::uint32_t kNoHeld = 0xffffffffu;
 constexpr std::uint32_t kTuneGravityAfterStep = 1u;
 constexpr std::uint32_t kTuneWholeIslands = 2u;
-constexpr std::uint32_t kTuneAll = kTuneGravityAfterStep | kTuneWholeIslands;
+constexpr std::uint32_t kTuneAirborne = 4u;
+constexpr std::uint32_t kTuneBroadphaseInterval = 8u;
+constexpr std::uint32_t kTuneReleaseBySlot = 16u;
+constexpr std::uint32_t kTuneAll = kTuneGravityAfterStep | kTuneWholeIslands | kTuneAirborne | kTuneBroadphaseInterval | kTuneReleaseBySlot;
+constexpr std::uint32_t kDefaultTuning = 0u;
 constexpr std::uint16_t kLastGeneration = 0xfffeu;
 constexpr std::uint16_t kRetiredGeneration = 0xffffu;
 constexpr std::uint32_t kFixedJoltBodies = 3;
@@ -145,6 +154,7 @@ class World {
   Status setTuning(std::uint32_t flags);
   Status setSleep(float seconds, float pointSpeed);
   std::uint32_t heldBodies() const;
+  std::uint32_t airborneBodies() const;
   std::uint32_t wakeCount(std::uint32_t count) const;
   void releaseHeld();
   void setTick(std::uint64_t tick);
@@ -174,6 +184,9 @@ class World {
   int allocateSlot();
   void sync(std::uint32_t slot);
   void hide(std::uint32_t slot);
+  void pull(JPH::Body& body, std::uint32_t slot, const PhysicsOrigin& o, float dt);
+  void applyAirLayers();
+  Status applyTuning(std::uint32_t flags);
   void rebase(double x, double y, double z);
   void removeBody(std::uint32_t index);
   void releaseRuntime();
@@ -211,6 +224,9 @@ class World {
   double* positions_ = nullptr;
   double* velocities_ = nullptr;
   Transform* transforms_ = nullptr;
+  std::uint8_t* air_ = nullptr;
+  float* ceiling_ = nullptr;
+  float radius_ = 0.0f;
 };
 
 World& world();

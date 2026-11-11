@@ -217,6 +217,33 @@ double heightAt(Planet& terrain, double x, double y, double z) {
   return s00 + ty * (s01 - s00) + tx * (s11 - s01);
 }
 
+double ceilingAt(const Planet& terrain, double x, double y, double z, double reachMetres) {
+  constexpr double kMetricSlack = 2.0;
+  const FaceLocal local = worldToFaceLocal(x, y, z, terrain.radius);
+  const double offsetX = (local.ox + terrain.radius) / terrain.cellSize;
+  const double offsetY = (local.oy + terrain.radius) / terrain.cellSize;
+  const int cx = clampIndex(static_cast<int>(std::floor(offsetX)), terrain.cellsPerFace);
+  const int cy = clampIndex(static_cast<int>(std::floor(offsetY)), terrain.cellsPerFace);
+  const double last = kPageSide - 1;
+  const double span = kMetricSlack * reachMetres * last / terrain.cellSize;
+  const double gx = clampUnit(offsetX - cx) * last;
+  const double gy = clampUnit(offsetY - cy) * last;
+  if (gx - span < 0.0 || gy - span < 0.0 || gx + span > last || gy + span > last) return std::numeric_limits<double>::infinity();
+  std::int64_t key = 0;
+  const int slot = packCellKey(local.face, cx, cy, terrain.cellsPerFace, key) ? terrain.pages.lookup(key) : -1;
+  if (slot < 0) return 0.0;
+  const int i0 = static_cast<int>(gx - span);
+  const int j0 = static_cast<int>(gy - span);
+  const int i1 = std::min(static_cast<int>(gx + span) + 1, kPageSide - 1);
+  const int j1 = std::min(static_cast<int>(gy + span) + 1, kPageSide - 1);
+  const float* s = terrain.pages.pageSamples(slot);
+  float highest = s[j0 * kPageSide + i0];
+  for (int j = j0; j <= j1; ++j) {
+    for (int i = i0; i <= i1; ++i) highest = std::max(highest, s[j * kPageSide + i]);
+  }
+  return highest;
+}
+
 SurfaceSample sampleSurface(Planet& terrain, double x, double y, double z, PageCursor& cursor) {
   SurfaceSample out;
   const double point[3] = {x, y, z};

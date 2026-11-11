@@ -103,7 +103,7 @@ if(ENGINE_THREADS)
   math(EXPR ENGINE_POOL_STACK_BYTES "3 * 512 * 1024")
 endif()
 math(EXPR ENGINE_ARENA_BYTES "${ENGINE_TIER_BYTES} - 4 * 1024 * 1024 - ${ENGINE_POOL_STACK_BYTES}")
-target_compile_definitions(engine_core PRIVATE JPH_CROSS_PLATFORM_DETERMINISTIC ENGINE_ARENA_BYTES=${ENGINE_ARENA_BYTES}ull ENGINE_MOVING_LAYERS=${ENGINE_MOVING_LAYERS})
+target_compile_definitions(engine_core PRIVATE JPH_CROSS_PLATFORM_DETERMINISTIC ENGINE_ARENA_BYTES=${ENGINE_ARENA_BYTES}ull ENGINE_MOVING_LAYERS=${ENGINE_MOVING_LAYERS} ENGINE_BROADPHASE_INTERVAL)
 if(ENGINE_BODY_CAP)
   target_compile_definitions(engine_core PRIVATE ENGINE_TOP_TIER_BODIES=${ENGINE_BODY_CAP})
 endif()
@@ -117,6 +117,7 @@ set(ENGINE_EXPORTS
   _engine_world_set_spawn_asleep
   _engine_world_set_sleep
   _engine_world_held_bodies
+  _engine_world_airborne_bodies
   _engine_world_active_bodies
   _engine_world_add_box
   _engine_world_add_trunk

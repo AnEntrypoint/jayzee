@@ -1,0 +1,45 @@
+--- a/Jolt/Physics/Collision/BroadPhase/BroadPhaseQuadTree.cpp
++++ b/Jolt/Physics/Collision/BroadPhase/BroadPhaseQuadTree.cpp
+@@ -11,6 +11,8 @@
+ 
+ JPH_NAMESPACE_BEGIN
+ 
++uint32 BroadPhaseQuadTree::sRebuildInterval = 1;
++
+ BroadPhaseQuadTree::~BroadPhaseQuadTree()
+ {
+ 	delete [] mLayers;
+@@ -108,6 +110,13 @@
+ 	UpdateState update_state;
+ 	UpdateStateImpl *update_state_impl = reinterpret_cast<UpdateStateImpl *>(&update_state);
+ 
++	const uint32 update_step = mUpdateStep++;
++	if (sRebuildInterval > 1 && update_step % sRebuildInterval != 0)
++	{
++		update_state_impl->mTree = nullptr;
++		return update_state;
++	}
++
+ 	// Loop until we've seen all layers
+ 	for (uint iteration = 0; iteration < mNumLayers; ++iteration)
+ 	{
+--- a/Jolt/Physics/Collision/BroadPhase/BroadPhaseQuadTree.h
++++ b/Jolt/Physics/Collision/BroadPhase/BroadPhaseQuadTree.h
+@@ -46,6 +46,8 @@
+ 	virtual void			ReportStats() override;
+ #endif // JPH_TRACK_BROADPHASE_STATS
+ 
++	static uint32			sRebuildInterval;
++
+ private:
+ 	/// Helper struct for AddBodies handle
+ 	struct LayerState
+@@ -103,6 +105,8 @@
+ 
+ 	/// This is the next tree to update in UpdatePrepare()
+ 	uint32					mNextLayerToUpdate = 0;
++
++	uint32					mUpdateStep = 0;
+ };
+ 
+ JPH_NAMESPACE_END

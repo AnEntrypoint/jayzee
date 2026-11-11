@@ -22,13 +22,19 @@ build_dir="$root/build/engine-$variant-${tier}mib$simd_suffix"
 source "$emsdk_dir/emsdk_env.sh" >/dev/null
 jolt_pin=0373ec0dd762e4bc2f6acdb08371ee84fa23c6db
 jolt_sha256=b7345eed117bf73208e2be93075b278c9b47d3a52d7101d1056eff718ac9eb44
+jolt_patch="$here/deps/jolt-broadphase-interval.patch"
+jolt_patch_tag="$(sha256sum "$jolt_patch" | cut -c1-12)"
 if [ -z "${JOLT_SOURCE:-}" ]; then
-  JOLT_SOURCE="$root/build/deps/JoltPhysics-$jolt_pin"
-  if [ ! -f "$JOLT_SOURCE/Build/CMakeLists.txt" ]; then
+  jolt_home="$root/build/deps/patched-$jolt_patch_tag"
+  JOLT_SOURCE="$jolt_home/JoltPhysics-$jolt_pin"
+  if [ ! -f "$jolt_home/ready" ]; then
     archive="$here/deps/JoltPhysics-$jolt_pin.tar.gz"
     test "$(sha256sum "$archive" | cut -d' ' -f1)" = "$jolt_sha256" || { echo "Jolt archive sha256 mismatch: $archive" >&2; exit 3; }
-    mkdir -p "$root/build/deps"
-    tar -xzf "$archive" -C "$root/build/deps"
+    rm -rf "$jolt_home"
+    mkdir -p "$jolt_home"
+    tar -xzf "$archive" -C "$jolt_home"
+    patch -p1 -s -d "$JOLT_SOURCE" < "$jolt_patch"
+    touch "$jolt_home/ready"
   fi
 fi
 jolt_arg=(-DFETCHCONTENT_SOURCE_DIR_JOLTPHYSICS="$JOLT_SOURCE")

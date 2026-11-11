@@ -64,7 +64,7 @@ constexpr std::uint64_t kHeapReserveBytes = 2633240;
 #endif
 
 constexpr std::uint64_t kBodyRowBytes = 2 * sizeof(std::uint32_t) + sizeof(std::uint16_t) + sizeof(std::uint8_t) + 6 * sizeof(double) +
-                                        sizeof(Transform) + sizeof(std::uint32_t) + kBatchWords * sizeof(double) + sizeof(std::uint32_t);
+                                        sizeof(Transform) + sizeof(std::uint32_t) + kBatchWords * sizeof(double) + sizeof(std::uint32_t) + sizeof(std::uint8_t) + sizeof(float);
 
 constexpr std::uint32_t kCompactBodiesPerPlayer = (kCompactTopTierBodies - 2048) / kMaxPlayers;
 

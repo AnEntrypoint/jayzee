@@ -12,6 +12,9 @@
 #include <Jolt/Physics/Character/CharacterVirtual.h>
 #include <Jolt/Physics/Body/BodyInterface.h>
 #include <Jolt/Physics/Collision/BroadPhase/BroadPhaseLayer.h>
+#if defined(ENGINE_BROADPHASE_INTERVAL)
+#include <Jolt/Physics/Collision/BroadPhase/BroadPhaseQuadTree.h>
+#endif
 #include <Jolt/Physics/Collision/CastResult.h>
 #include <Jolt/Physics/Collision/CollideShape.h>
 #include <Jolt/Physics/Collision/CollisionCollectorImpl.h>
@@ -29,6 +32,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <new>
 
 #include "arena.h"
@@ -50,15 +54,31 @@ namespace {
 #endif
 
 constexpr JPH::ObjectLayer kLayerNonMoving = 0;
-constexpr JPH::ObjectLayer kLayerMoving = 1;
+constexpr JPH::ObjectLayer kLayerPlanet = 1;
+constexpr JPH::ObjectLayer kLayerMoving = 2;
 constexpr std::uint32_t kMovingLayers = ENGINE_MOVING_LAYERS;
-constexpr std::uint32_t kLayerCount = 1 + kMovingLayers;
+constexpr JPH::ObjectLayer kLayerAirborne = static_cast<JPH::ObjectLayer>(kLayerMoving + kMovingLayers);
+constexpr std::uint32_t kBroadLayerCount = kLayerMoving + kMovingLayers;
 constexpr std::uint32_t kMinParallelRows = 1024;
+constexpr std::uint8_t kAirNow = 1;
+constexpr std::uint8_t kAirWanted = 2;
+constexpr std::uint32_t kCeilingTicks = 4;
+constexpr double kCeilingSlackMetres = 1.0;
+constexpr double kAirMarginMetres = 0.1;
+constexpr std::uint32_t kBroadphaseRebuildSteps = 4;
 
 static_assert(kMovingLayers >= 1 && kMovingLayers <= 8);
 
 JPH::ObjectLayer movingLayerOf(std::uint32_t slot) {
   return static_cast<JPH::ObjectLayer>(kLayerMoving + slot % kMovingLayers);
+}
+
+JPH::ObjectLayer airborneLayerOf(std::uint32_t slot) {
+  return static_cast<JPH::ObjectLayer>(kLayerAirborne + slot % kMovingLayers);
+}
+
+constexpr bool isAirborneLayer(JPH::ObjectLayer layer) {
+  return layer >= kLayerAirborne;
 }
 constexpr float kGroundHalfExtent = 4096.0f;
 constexpr float kConvexRadius = 0.05f;
@@ -81,15 +101,16 @@ T* carveArray(std::size_t count) {
 
 class BroadPhaseLayers final : public JPH::BroadPhaseLayerInterface {
  public:
-  JPH::uint GetNumBroadPhaseLayers() const override { return kLayerCount; }
+  JPH::uint GetNumBroadPhaseLayers() const override { return kBroadLayerCount; }
 
   JPH::BroadPhaseLayer GetBroadPhaseLayer(JPH::ObjectLayer layer) const override {
-    return JPH::BroadPhaseLayer(static_cast<JPH::BroadPhaseLayer::Type>(layer));
+    const JPH::ObjectLayer tree = isAirborneLayer(layer) ? static_cast<JPH::ObjectLayer>(layer - kMovingLayers) : layer;
+    return JPH::BroadPhaseLayer(static_cast<JPH::BroadPhaseLayer::Type>(tree));
   }
 
 #if defined(JPH_EXTERNAL_PROFILE) || defined(JPH_PROFILE_ENABLED)
   const char* GetBroadPhaseLayerName(JPH::BroadPhaseLayer layer) const override {
-    return layer == JPH::BroadPhaseLayer(0) ? "non-moving" : "moving";
+    return layer == JPH::BroadPhaseLayer(0) ? "non-moving" : layer == JPH::BroadPhaseLayer(1) ? "planet" : "moving";
   }
 #endif
 };
@@ -97,7 +118,9 @@ class BroadPhaseLayers final : public JPH::BroadPhaseLayerInterface {
 class ObjectVsBroadPhase final : public JPH::ObjectVsBroadPhaseLayerFilter {
  public:
   bool ShouldCollide(JPH::ObjectLayer layer, JPH::BroadPhaseLayer broad) const override {
-    if (layer == kLayerNonMoving) return broad != JPH::BroadPhaseLayer(0);
+    const bool fixedTree = broad == JPH::BroadPhaseLayer(0) || broad == JPH::BroadPhaseLayer(1);
+    if (layer < kLayerMoving) return !fixedTree;
+    if (isAirborneLayer(layer)) return broad != JPH::BroadPhaseLayer(1);
     return true;
   }
 };
@@ -105,7 +128,9 @@ class ObjectVsBroadPhase final : public JPH::ObjectVsBroadPhaseLayerFilter {
 class ObjectPairs final : public JPH::ObjectLayerPairFilter {
  public:
   bool ShouldCollide(JPH::ObjectLayer a, JPH::ObjectLayer b) const override {
-    if (a == kLayerNonMoving) return b != kLayerNonMoving;
+    if (a < kLayerMoving && b < kLayerMoving) return false;
+    if (a == kLayerPlanet && isAirborneLayer(b)) return false;
+    if (b == kLayerPlanet && isAirborneLayer(a)) return false;
     return true;
   }
 };
@@ -196,8 +221,10 @@ Status World::bind(const budget::Capacity& capacity) {
   positions_ = carveArray<double>(n * 3);
   velocities_ = carveArray<double>(n * 3);
   transforms_ = carveArray<Transform>(n);
+  air_ = carveArray<std::uint8_t>(n);
+  ceiling_ = carveArray<float>(n);
   if (bodyIds_ == nullptr || batch_ == nullptr || freeSlots_ == nullptr || generations_ == nullptr || alive_ == nullptr ||
-      positions_ == nullptr || velocities_ == nullptr || transforms_ == nullptr) {
+      positions_ == nullptr || velocities_ == nullptr || transforms_ == nullptr || air_ == nullptr || ceiling_ == nullptr) {
     return kFull;
   }
   limits_ = capacity;
@@ -236,6 +263,9 @@ Status World::configure(const Config& config) {
   trunkBodies_ = 0;
   std::fill(generations_, generations_ + limits_.bodies, static_cast<std::uint16_t>(0));
   std::fill(alive_, alive_ + limits_.bodies, static_cast<std::uint8_t>(0));
+  std::fill(air_, air_ + limits_.bodies, static_cast<std::uint8_t>(0));
+  std::fill(ceiling_, ceiling_ + limits_.bodies, std::numeric_limits<float>::quiet_NaN());
+  radius_ = config.radius;
 
   runtime_->physics.Init(joltBodyCapacity(limits_), 0, joltPairCapacity(limits_), joltContactCapacity(limits_), runtime_->broadPhase,
                          runtime_->objectVsBroadPhase, runtime_->objectPairs);
@@ -246,6 +276,8 @@ Status World::configure(const Config& config) {
   settings.mPenetrationSlop = 0.0f;
   runtime_->physics.SetPhysicsSettings(settings);
   runtime_->rebaseIds.reserve(joltBodyCapacity(limits_));
+  tuning_ = 0;
+  if (applyTuning(kDefaultTuning) != kOk) return kRange;
 
   runtime_->sphere = new JPH::SphereShape(config.radius);
   JPH::ShapeRefC ground = new JPH::BoxShape(JPH::Vec3(kGroundHalfExtent, 1.0f, kGroundHalfExtent), kConvexRadius);
@@ -316,7 +348,7 @@ Status World::configurePlanet(double radius, double cellSize, double gravity, do
   runtime_->physics.SetGravity(JPH::Vec3::sZero());
   runtime_->planetShape = new planet::PlanetShape(planet::state(), static_cast<float>(radius + maxHeight));
   JPH::BodyCreationSettings settings(runtime_->planetShape.GetPtr(), JPH::RVec3::sZero(), JPH::Quat::sIdentity(),
-                                     JPH::EMotionType::Static, kLayerNonMoving);
+                                     JPH::EMotionType::Static, kLayerPlanet);
   const JPH::BodyID id = runtime_->physics.GetBodyInterface().CreateAndAddBody(settings, JPH::EActivation::DontActivate);
   if (id.IsInvalid()) return kFull;
   planetBody_ = id.GetIndexAndSequenceNumber();
@@ -621,6 +653,9 @@ int World::spawnBatch(const double* rows, std::uint32_t count, std::uint32_t* ha
     if (slot < 0) return kFull;
     const JPH::BodyID id(bodyIds_[slot]);
     bodies.SetPositionAndRotation(id, toBody(row), JPH::Quat::sIdentity(), JPH::EActivation::DontActivate);
+    if ((air_[slot] & kAirNow) != 0) bodies.SetObjectLayer(id, movingLayerOf(static_cast<std::uint32_t>(slot)));
+    air_[slot] = 0;
+    ceiling_[slot] = std::numeric_limits<float>::quiet_NaN();
     batch[i] = id;
     alive_[slot] = kSlotAlive;
     live_ += 1;
@@ -690,6 +725,7 @@ Status World::setPosition(std::uint32_t handle, const double* position) {
   } else {
     bodies.SetPosition(id, toBody(position), JPH::EActivation::Activate);
   }
+  ceiling_[slot] = std::numeric_limits<float>::quiet_NaN();
   sync(static_cast<std::uint32_t>(slot));
   return kOk;
 }
@@ -763,9 +799,7 @@ void World::rebase(double x, double y, double z) {
   }
 }
 
-namespace {
-
-void pull(JPH::Body& body, const PhysicsOrigin& o, float gravity, float dt) {
+void World::pull(JPH::Body& body, std::uint32_t slot, const PhysicsOrigin& o, float dt) {
   constexpr float kSleepSpeed = 0.5f;
   const JPH::RVec3 position = body.GetCenterOfMassPosition();
   const double x = position.GetX() + o.x;
@@ -773,12 +807,39 @@ void pull(JPH::Body& body, const PhysicsOrigin& o, float gravity, float dt) {
   const double z = position.GetZ() + o.z;
   const double distance = std::sqrt(x * x + y * y + z * z);
   if (!(distance > 0.0)) return;
-  const double scale = -static_cast<double>(gravity) * dt / distance;
+  const double scale = -static_cast<double>(planetGravity_) * dt / distance;
   body.SetLinearVelocityClamped(body.GetLinearVelocity() + JPH::Vec3(static_cast<float>(x * scale), static_cast<float>(y * scale), static_cast<float>(z * scale)));
-  const bool mayRest = body.GetLinearVelocity().Length() < kSleepSpeed;
+  const float speed = body.GetLinearVelocity().Length();
+  const bool mayRest = speed < kSleepSpeed;
   if (body.GetAllowSleeping() != mayRest) body.SetAllowSleeping(mayRest);
+  if ((tuning_ & kTuneAirborne) == 0) return;
+  float ceiling = ceiling_[slot];
+  if (ceiling != ceiling || (tick_ + slot) % kCeilingTicks == 0) {
+    const double horizon = static_cast<double>(dt) * kCeilingTicks;
+    const double reach = (static_cast<double>(speed) + static_cast<double>(planetGravity_) * horizon) * horizon + radius_ + kCeilingSlackMetres;
+    ceiling = static_cast<float>(planet::ceilingAt(planet::state(), x, y, z, reach));
+    ceiling_[slot] = ceiling;
+  }
+  const double clearance = distance - planet::state().radius - static_cast<double>(ceiling) - radius_;
+  const bool airborne = clearance > static_cast<double>(speed) * dt + kAirMarginMetres;
+  air_[slot] = static_cast<std::uint8_t>((air_[slot] & kAirNow) | (airborne ? kAirWanted : 0));
 }
 
+void World::applyAirLayers() {
+  if ((tuning_ & kTuneAirborne) == 0 || planetBody_ == kNoBody) return;
+  JPH::BodyInterface& bodies = runtime_->physics.GetBodyInterfaceNoLock();
+  for (std::uint32_t slot = 0; slot < fresh_; ++slot) {
+    const std::uint8_t flags = air_[slot];
+    const bool now = (flags & kAirNow) != 0;
+    const bool wanted = (flags & kAirWanted) != 0;
+    if (now == wanted) continue;
+    if (alive_[slot] == kSlotFree || alive_[slot] == kSlotHeld) {
+      air_[slot] = now ? static_cast<std::uint8_t>(kAirNow | kAirWanted) : 0;
+      continue;
+    }
+    bodies.SetObjectLayer(JPH::BodyID(bodyIds_[slot]), wanted ? airborneLayerOf(slot) : movingLayerOf(slot));
+    air_[slot] = wanted ? static_cast<std::uint8_t>(kAirNow | kAirWanted) : 0;
+  }
 }
 
 void World::gravityRange(std::uint32_t begin, std::uint32_t end) {
@@ -791,7 +852,7 @@ void World::gravityRange(std::uint32_t begin, std::uint32_t end) {
     if (body == nullptr) continue;
     const JPH::uint64 tag = body->GetUserData();
     if (tag == 0 || alive_[tag - 1] == kSlotFree) continue;
-    pull(*body, o, planetGravity_, dt);
+    pull(*body, static_cast<std::uint32_t>(tag - 1), o, dt);
   }
 }
 
@@ -808,7 +869,7 @@ void World::syncRange(std::uint32_t begin, std::uint32_t end) {
     const std::uint32_t slot = static_cast<std::uint32_t>(tag - 1);
     sync(slot);
     alive_[slot] = kSlotAwakeSynced;
-    if (pullAfter) pull(*body, o, planetGravity_, runtime_->stepDt);
+    if (pullAfter) pull(*body, slot, o, runtime_->stepDt);
   }
 }
 
@@ -887,11 +948,28 @@ Status World::setAwakeBudget(std::uint32_t bodies) {
 
 Status World::setTuning(std::uint32_t flags) {
   if (runtime_ == nullptr) return kNotConfigured;
+  return applyTuning(flags);
+}
+
+Status World::applyTuning(std::uint32_t flags) {
   if ((flags & ~kTuneAll) != 0) return kRange;
+#if defined(ENGINE_BROADPHASE_INTERVAL)
+  JPH::BroadPhaseQuadTree::sRebuildInterval = (flags & kTuneBroadphaseInterval) != 0 ? kBroadphaseRebuildSteps : 1;
+#else
+  if ((flags & kTuneBroadphaseInterval) != 0) return kRange;
+#endif
+  const bool wasAirborne = (tuning_ & kTuneAirborne) != 0;
   tuning_ = flags;
   JPH::PhysicsSettings settings = runtime_->physics.GetPhysicsSettings();
   settings.mUseLargeIslandSplitter = (flags & kTuneWholeIslands) == 0;
   runtime_->physics.SetPhysicsSettings(settings);
+  if (wasAirborne && (flags & kTuneAirborne) == 0) {
+    JPH::BodyInterface& bodies = runtime_->physics.GetBodyInterfaceNoLock();
+    for (std::uint32_t slot = 0; slot < fresh_; ++slot) {
+      if ((air_[slot] & kAirNow) != 0) bodies.SetObjectLayer(JPH::BodyID(bodyIds_[slot]), movingLayerOf(slot));
+      air_[slot] = 0;
+    }
+  }
   return kOk;
 }
 
@@ -909,6 +987,12 @@ Status World::setSleep(float seconds, float pointSpeed) {
   settings.mPointVelocitySleepThreshold = pointSpeed;
   runtime_->physics.SetPhysicsSettings(settings);
   return kOk;
+}
+
+std::uint32_t World::airborneBodies() const {
+  std::uint32_t airborne = 0;
+  for (std::uint32_t slot = 0; slot < fresh_; ++slot) airborne += (air_[slot] & kAirNow) != 0 && alive_[slot] != kSlotFree ? 1 : 0;
+  return airborne;
 }
 
 std::uint32_t World::heldBodies() const {
@@ -932,6 +1016,7 @@ void World::step(std::uint32_t steps) {
         releaseHeld();
         runtime_->stepDt = dt;
         if ((tuning_ & kTuneGravityAfterStep) == 0) applyRadialGravity(runtime_->physics, dt);
+        applyAirLayers();
         runtime_->physics.Update(dt, 1, &runtime_->temp, &runtime_->jobs);
       }
       {

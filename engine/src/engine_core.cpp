@@ -235,6 +235,10 @@ EMSCRIPTEN_KEEPALIVE int engine_world_set_sleep(float seconds, float pointSpeed)
   return engine::world().setSleep(seconds, pointSpeed);
 }
 
+EMSCRIPTEN_KEEPALIVE int engine_world_airborne_bodies() {
+  return static_cast<int>(engine::world().airborneBodies());
+}
+
 EMSCRIPTEN_KEEPALIVE int engine_world_held_bodies() {
   return static_cast<int>(engine::world().heldBodies());
 }
