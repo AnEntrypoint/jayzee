@@ -217,6 +217,9 @@ const sortedWaits = Float64Array.from(waitMaxMs).sort()
 const sortedHelperRuns = Float64Array.from(helperRunMs).sort()
 let helperRunTotalMs = 0
 for (let tick = 0; tick < ticks; tick++) helperRunTotalMs += helperRunMs[tick]
+const QUIET_WAIT_MS = 1
+const waitedAround = (tick) => waitThread[tick] >= 0 && isEngineThread(waitThread[tick]) && waitMaxMs[tick] >= QUIET_WAIT_MS && helperRunMs[tick] < HELPER_IDLE_MS
+const quietTimes = times.filter((ms, tick) => !throttledAround(tick) && !stolenAround(tick) && !waitedAround(tick)).sort()
 const hostOver = { throttled: 0, stolen: 0, preempted: 0, any: 0 }
 times.forEach((ms, tick) => {
   if (ms <= BUDGET_MS) return
@@ -249,6 +252,9 @@ emit({
   p99Ms: round(quantile(sorted, 0.99), 3),
   maxMs: round(sorted[sorted.length - 1], 3),
   overBudget: over(times),
+  quietTicks: quietTimes.length,
+  p99QuietMs: quietTimes.length ? round(quantile(quietTimes, 0.99), 3) : null,
+  quietRule: 'a tick is quiet when the throttle counter and steal time did not move in it and no engine thread waited ' + QUIET_WAIT_MS + ' ms or more on the run queue with the helper threads idle',
   overBudgetHost: hostOver.any,
   overBudgetHostThrottled: hostOver.throttled,
   overBudgetHostStolen: hostOver.stolen,

@@ -52,17 +52,21 @@ export const judge = (baseline, results) => {
   const candidate = rows('base')
   if (reference.length < repeats) failures.push('reference rows: ' + reference.length + ' of ' + repeats)
   if (candidate.length < repeats) failures.push('candidate rows: ' + candidate.length + ' of ' + repeats)
+  const QUIET_SHARE = 0.5
+  const quietBasis = (rows) => rows.length > 0 && rows.every((c) => Number.isFinite(c.p99QuietMs) && c.quietTicks >= QUIET_SHARE * c.ticks)
+  const onQuiet = quietBasis(reference) && quietBasis(candidate)
+  const p99Of = (c) => (onQuiet ? c.p99QuietMs : c.p99Ms)
   const hostOf = (c) => (Number.isInteger(c.overBudgetHost) ? c.overBudgetHost : 0)
   const judgedOver = (c) => c.overBudget - hostOf(c)
-  const top = { bodies, workers, referenceP99Ms: null, candidateP99Ms: null, p99LimitMs: null, referenceOverBudget: null, candidateOverBudget: null, overLimit: null, referenceOverEach: reference.map(judgedOver), candidateOverEach: candidate.map(judgedOver), referenceHostExcludedEach: reference.map(hostOf), candidateHostExcludedEach: candidate.map(hostOf), hostRule: [...reference, ...candidate].map((c) => c.hostRule).find((rule) => typeof rule === 'string') ?? null, referenceP99EachMs: reference.map((c) => c.p99Ms), candidateP99EachMs: candidate.map((c) => c.p99Ms) }
+  const top = { bodies, workers, referenceP99Ms: null, candidateP99Ms: null, p99LimitMs: null, referenceOverBudget: null, candidateOverBudget: null, overLimit: null, referenceOverEach: reference.map(judgedOver), candidateOverEach: candidate.map(judgedOver), referenceHostExcludedEach: reference.map(hostOf), candidateHostExcludedEach: candidate.map(hostOf), hostRule: [...reference, ...candidate].map((c) => c.hostRule).find((rule) => typeof rule === 'string') ?? null, p99Basis: onQuiet ? 'quiet ticks' : 'every tick', referenceP99EachMs: reference.map(p99Of), candidateP99EachMs: candidate.map(p99Of), referenceP99EveryTickEachMs: reference.map((c) => c.p99Ms), candidateP99EveryTickEachMs: candidate.map((c) => c.p99Ms), referenceQuietTicksEach: reference.map((c) => c.quietTicks ?? null), candidateQuietTicksEach: candidate.map((c) => c.quietTicks ?? null) }
   if (reference.length > 0 && candidate.length > 0) {
-    top.referenceP99Ms = median(reference.map((c) => c.p99Ms))
-    top.candidateP99Ms = median(candidate.map((c) => c.p99Ms))
+    top.referenceP99Ms = median(reference.map(p99Of))
+    top.candidateP99Ms = median(candidate.map(p99Of))
     top.p99LimitMs = Number(Math.max(top.referenceP99Ms * baseline.margin.p99Factor, top.referenceP99Ms + baseline.margin.p99FloorMs).toFixed(3))
     top.referenceOverBudget = median(top.referenceOverEach)
     top.candidateOverBudget = median(top.candidateOverEach)
     top.overLimit = Math.floor(top.referenceOverBudget * baseline.margin.overBudgetFactor) + baseline.margin.overBudgetTicks
-    if (top.candidateP99Ms > top.p99LimitMs) failures.push('top tier median p99 ' + top.candidateP99Ms + ' ms is over ' + top.p99LimitMs + ' ms (the reference build ran ' + top.referenceP99Ms + ' ms in the same run; the limit is the larger of that times ' + baseline.margin.p99Factor + ' and that plus ' + baseline.margin.p99FloorMs + ' ms)')
+    if (top.candidateP99Ms > top.p99LimitMs) failures.push('top tier median p99 over ' + top.p99Basis + ' ' + top.candidateP99Ms + ' ms is over ' + top.p99LimitMs + ' ms (the reference build ran ' + top.referenceP99Ms + ' ms in the same run; the limit is the larger of that times ' + baseline.margin.p99Factor + ' and that plus ' + baseline.margin.p99FloorMs + ' ms)')
     if (top.candidateOverBudget > top.overLimit) failures.push('top tier ticks over ' + results.budgetMs + ' ms in the median run: ' + top.candidateOverBudget + ', limit ' + top.overLimit + ' (the reference build had ' + top.referenceOverBudget + ' in the same kernel run)')
   }
   const marbles = results.configs.filter((c) => c.kind === 'marble-bowl')
@@ -120,5 +124,6 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   console.log(seen.recorded ? 'machine class ' + seen.class + ': reference ' + verdict.topTier.referenceP99Ms + ' ms against its recorded ' + seen.recordedReferenceP99Ms + ' ms (limit ' + seen.referenceLimitMs + ')' : 'machine class ' + seen.class + ' (' + seen.modelName + ') has no record for this reference; node scripts/kaggle/regress.mjs record adds it')
   const excluded = [...verdict.topTier.referenceHostExcludedEach, ...verdict.topTier.candidateHostExcludedEach].reduce((sum, n) => sum + n, 0)
   console.log(excluded > 0 ? excluded + ' ticks over budget were not counted (reference ' + verdict.topTier.referenceHostExcludedEach.join(', ') + '; candidate ' + verdict.topTier.candidateHostExcludedEach.join(', ') + '): ' + verdict.topTier.hostRule : 'no tick over budget was excluded as the host')
+  console.log('p99 judged over ' + verdict.topTier.p99Basis + '; over every tick the medians are ' + median(verdict.topTier.candidateP99EveryTickEachMs) + ' ms against ' + median(verdict.topTier.referenceP99EveryTickEachMs) + ' ms')
   console.log('RESULT: PASS top tier median p99 ' + verdict.topTier.candidateP99Ms + ' ms against the reference ' + verdict.topTier.referenceP99Ms + ' ms (limit ' + verdict.topTier.p99LimitMs + '), ' + verdict.topTier.candidateOverBudget + ' ticks over budget in the median run against ' + verdict.topTier.referenceOverBudget + ' (limit ' + verdict.topTier.overLimit + ')')
 }

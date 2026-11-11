@@ -93,6 +93,35 @@ gate('a tick over budget is left out only when the run marks it as the host, and
   assert.equal(judge(BASELINE, results).ok, false, 'one tick more than the host marks cover still fails')
 })
 
+gate('the p99 is judged over quiet ticks when every row has them: the every-tick spread of identical builds in Kaggle run 27 passes, and a build slower in quiet ticks fails', () => {
+  const everyTick = { reference: [9.589, 6.68, 7.961, 9.148, 6.808], base: [8.645, 11.371, 6.539, 9.301, 9.672] }
+  const noisy = (quietReference, quietCandidate) => {
+    const results = run(0, 0)
+    for (const variant of ['reference', 'base']) {
+      results.configs.filter((c) => c.variant === variant).forEach((c, i) => {
+        c.p99Ms = everyTick[variant][i]
+        c.ticks = 900
+        c.quietTicks = 800
+        c.p99QuietMs = variant === 'reference' ? quietReference : quietCandidate
+      })
+    }
+    return results
+  }
+  const control = noisy(6.4, 6.5)
+  for (const c of control.configs) delete c.p99QuietMs
+  const raw = judge(BASELINE, control)
+  assert.equal(raw.ok, false, 'control: judged over every tick, run 27 fails two identical builds')
+  assert.equal(raw.topTier.p99Basis, 'every tick')
+  const quiet = judge(BASELINE, noisy(6.4, 6.5))
+  assert.equal(quiet.ok, true, quiet.failures.join('; '))
+  assert.equal(quiet.topTier.p99Basis, 'quiet ticks')
+  assert.equal(quiet.topTier.candidateP99Ms, 6.5)
+  assert.match(judge(BASELINE, noisy(6.4, 7.9)).failures.join(' '), /median p99 over quiet ticks/)
+  const fewQuiet = noisy(6.4, 6.5)
+  fewQuiet.configs.find((c) => c.variant === 'base').quietTicks = 100
+  assert.equal(judge(BASELINE, fewQuiet).topTier.p99Basis, 'every tick', 'a row with under half its ticks quiet puts the run back on every tick')
+})
+
 gate('missing reference rows, missing candidate rows, a missing marble tier and a run with no result each fail', () => {
   const noReference = run(12, 12)
   noReference.configs = noReference.configs.filter((c) => c.variant !== 'reference')
