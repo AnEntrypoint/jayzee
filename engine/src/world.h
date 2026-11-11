@@ -130,6 +130,7 @@ class World {
   Status setVelocity(std::uint32_t handle, const float* velocity);
   Status follow(double x, double y, double z);
   void step(std::uint32_t steps);
+  void optimize();
   void setTick(std::uint64_t tick);
   void applyRadialGravity(JPH::PhysicsSystem& system, float dt);
   void updateCharacters(float dt);

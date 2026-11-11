@@ -100,6 +100,7 @@ target_compile_definitions(engine_core PRIVATE JPH_CROSS_PLATFORM_DETERMINISTIC 
 set(ENGINE_EXPORTS
   _engine_init
   _engine_world_configure
+  _engine_world_optimize
   _engine_world_add_box
   _engine_world_add_trunk
   _engine_character_add

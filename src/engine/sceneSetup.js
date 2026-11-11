@@ -13,6 +13,7 @@ export const configureWorld = (module, solverIterations = solverIterationsFor(re
   if (status !== 0) throw new Error('world configure status ' + status)
   if (baseY === 0) module._engine_world_add_box(...GROUND)
   for (let i = 0; i < TIER_1024.bodies; i++) module._engine_spawn((i % 100) * BODY_SPACING_M - 30, baseY + 1 + (i % 5), Math.floor(i / 100) * BODY_SPACING_M - 30, 0, 0, 0)
+  module._engine_world_optimize()
   return solverIterations
 }
 

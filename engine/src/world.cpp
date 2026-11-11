@@ -755,6 +755,11 @@ void World::applyRadialGravity(JPH::PhysicsSystem& system, float dt) {
   }
 }
 
+void World::optimize() {
+  if (runtime_ == nullptr) return;
+  runtime_->physics.OptimizeBroadPhase();
+}
+
 void World::step(std::uint32_t steps) {
   const float dt = 1.0f / static_cast<float>(tickRate_);
   for (std::uint32_t s = 0; s < steps; ++s) {

@@ -219,6 +219,11 @@ EMSCRIPTEN_KEEPALIVE int engine_world_configure(std::uint32_t capacity, std::uin
   return status;
 }
 
+EMSCRIPTEN_KEEPALIVE int engine_world_optimize() {
+  engine::world().optimize();
+  return engine::kOk;
+}
+
 EMSCRIPTEN_KEEPALIVE int engine_world_add_box(double minX, double minY, double minZ, double maxX, double maxY, double maxZ) {
   const double box[6] = {minX, minY, minZ, maxX, maxY, maxZ};
   return engine::world().addBox(box);
