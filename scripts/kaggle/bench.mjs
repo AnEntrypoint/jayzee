@@ -148,6 +148,19 @@ const isEngineThread = (index) => index === 0 || index >= threads.length - ENGIN
 const threadWaitNs = new Float64Array(threads.length)
 const threadRunNs = new Float64Array(threads.length)
 const helperRunMs = new Float64Array(ticks)
+const engineRunMs = new Float64Array(ticks)
+const FUTEX_KINDS = ['mainSpin', 'spinTimeout', 'workerWait', 'timedSlice', 'yield']
+const futexCount = typeof module._engine_wait_count === 'function' ? module._engine_wait_count : null
+const futexAt = new Float64Array(FUTEX_KINDS.length)
+const futexIn = FUTEX_KINDS.map(() => new Int32Array(ticks))
+const readFutex = (tick) => {
+  if (!futexCount) return
+  for (let kind = 0; kind < FUTEX_KINDS.length; kind++) {
+    const now = futexCount(kind)
+    if (tick >= 0) futexIn[kind][tick] = now - futexAt[kind]
+    futexAt[kind] = now
+  }
+}
 const waitMaxMs = new Float64Array(ticks)
 const waitSumMs = new Float64Array(ticks)
 const waitThread = new Int32Array(ticks).fill(-1)
@@ -156,12 +169,14 @@ const readThreadWaits = (tick) => {
   let sum = 0
   let who = -1
   let helpers = 0
+  let engines = 0
   for (let t = 0; t < threads.length; t++) {
     const length = readSync(threads[t].fd, counterBytes, 0, 128, 0)
     const waited = fieldAt(counterBytes, length, 1)
     const ran = fieldAt(counterBytes, length, 0)
     const delta = waited - threadWaitNs[t]
-    if (!isEngineThread(t)) helpers += ran - threadRunNs[t]
+    if (isEngineThread(t)) engines += ran - threadRunNs[t]
+    else helpers += ran - threadRunNs[t]
     threadWaitNs[t] = waited
     threadRunNs[t] = ran
     if (tick < 0) continue
@@ -176,6 +191,7 @@ const readThreadWaits = (tick) => {
   waitSumMs[tick] = sum / NS_PER_MS
   waitThread[tick] = who
   helperRunMs[tick] = helpers / NS_PER_MS
+  engineRunMs[tick] = engines / NS_PER_MS
 }
 const activeOf = typeof module._engine_world_active_bodies === 'function' ? module._engine_world_active_bodies : null
 const active = new Int32Array(ticks)
@@ -186,6 +202,7 @@ const loopStarted = performance.now()
 const times = new Float64Array(ticks)
 readCounters(0)
 readThreadWaits(-1)
+readFutex(-1)
 for (let f = 0; f < ticks; f++) {
   region.setFrame(0, f)
   const at = performance.now()
@@ -194,6 +211,7 @@ for (let f = 0; f < ticks; f++) {
   if (activeOf) active[f] = activeOf()
   readCounters(f + 1)
   readThreadWaits(f)
+  readFutex(f)
 }
 for (const thread of threads) closeSync(thread.fd)
 if (cgroupFd >= 0) closeSync(cgroupFd)
@@ -211,7 +229,7 @@ collections.push(...gcObserver.takeRecords())
 gcObserver.disconnect()
 const overTicks = []
 times.forEach((ms, tick) => {
-  if (ms > BUDGET_MS) overTicks.push([tick, round(ms, 2), activeOf ? active[tick] : null, hostCounters ? throttledIn(tick) : null, hostCounters ? round(throttledUsecIn(tick) / 1000, 2) : null, hostCounters ? stealIn(tick) : null, threads.length ? round(waitMaxMs[tick], 2) : null, waitThread[tick] >= 0 ? (isEngineThread(waitThread[tick]) ? 'engine thread ' : 'helper thread ') + waitThread[tick] : null, threads.length ? round(waitSumMs[tick], 2) : null, threads.length ? round(helperRunMs[tick], 2) : null])
+  if (ms > BUDGET_MS) overTicks.push([tick, round(ms, 2), activeOf ? active[tick] : null, hostCounters ? throttledIn(tick) : null, hostCounters ? round(throttledUsecIn(tick) / 1000, 2) : null, hostCounters ? stealIn(tick) : null, threads.length ? round(waitMaxMs[tick], 2) : null, waitThread[tick] >= 0 ? (isEngineThread(waitThread[tick]) ? 'engine thread ' : 'helper thread ') + waitThread[tick] : null, threads.length ? round(waitSumMs[tick], 2) : null, threads.length ? round(helperRunMs[tick], 2) : null, threads.length ? round(engineRunMs[tick], 2) : null, futexCount ? FUTEX_KINDS.map((_, kind) => futexIn[kind][tick]) : null])
 })
 const sortedWaits = Float64Array.from(waitMaxMs).sort()
 const sortedHelperRuns = Float64Array.from(helperRunMs).sort()
@@ -273,6 +291,10 @@ emit({
   helperRunMedianMs: threads.length ? round(quantile(sortedHelperRuns, 0.5), 3) : null,
   helperRunP99Ms: threads.length ? round(quantile(sortedHelperRuns, 0.99), 3) : null,
   helperRunTotalMs: threads.length ? round(helperRunTotalMs, 1) : null,
+  engineRunShareMedian: threads.length ? round(quantile(Float64Array.from(times, (ms, tick) => (ms > 0 ? engineRunMs[tick] / ms : 0)).sort(), 0.5), 2) : null,
+  futexKinds: FUTEX_KINDS,
+  futexMedianPerTick: futexCount ? futexIn.map((counts) => quantile(Int32Array.from(counts).sort(), 0.5)) : null,
+  futexP99PerTick: futexCount ? futexIn.map((counts) => quantile(Int32Array.from(counts).sort(), 0.99)) : null,
   throttledPeriods: hostCounters ? throttledAt[ticks] - throttledAt[0] : null,
   throttledMs: hostCounters ? round((throttledUsecAt[ticks] - throttledUsecAt[0]) / 1000, 1) : null,
   stealJiffies: hostCounters ? stealAt[ticks] - stealAt[0] : null,

@@ -108,14 +108,12 @@ const ceiling = () => {
 }
 
 export const STALL_REPEATS = 8
-export const STALL_POOL_FLAG = '--v8-pool-size=1'
+export const STALL_ROWS_PER_REPEAT = 4
 
 const stall = () => {
   const runs = [calibrate()]
   for (let repeat = 0; repeat < STALL_REPEATS; repeat++) {
-    runs.push(tick(SIMD_GLUE, TOP_TIER_BODIES, 4))
-    runs.push(tick(SIMD_GLUE, TOP_TIER_BODIES, 4, { nodeFlags: [STALL_POOL_FLAG], probe: true }))
-    runs.push(tick(SIMD_GLUE, TOP_TIER_BODIES, 3, { probe: true }))
+    for (let again = 0; again < STALL_ROWS_PER_REPEAT; again++) runs.push(tick(SIMD_GLUE, TOP_TIER_BODIES, 4))
   }
   runs.push(calibrate())
   return runs
