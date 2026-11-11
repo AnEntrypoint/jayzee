@@ -4,11 +4,6 @@ here="$(cd "$(dirname "$0")" && pwd)"
 root="$(dirname "$here")"
 log_dir="$root/build/engine-build-logs"
 mkdir -p "$log_dir"
-if [ -z "${JOLT_SOURCE:-}" ]; then
-  for candidate in "$root"/build/engine-*/_deps/joltphysics-src; do
-    if [ -d "$candidate" ]; then export JOLT_SOURCE="$candidate"; break; fi
-  done
-fi
 failed=0
 for glue in "$here"/out/engine-core-*.mjs; do
   name="$(basename "$glue" .mjs)"
