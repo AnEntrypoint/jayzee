@@ -33,7 +33,7 @@ if [ -z "${JOLT_SOURCE:-}" ]; then
 fi
 jolt_arg=(-DFETCHCONTENT_SOURCE_DIR_JOLTPHYSICS="$JOLT_SOURCE")
 emcmake cmake -S "$here" -B "$build_dir" -DENGINE_TIER_MIB="$tier" -DENGINE_LEAK_ON_TICK="$leak" -DENGINE_PHASE_TIMERS="$timers" -DENGINE_THREADS="$threads" -DENGINE_WASM_SIMD="$simd" "${jolt_arg[@]}"
-cmake --build "$build_dir" --parallel
+cmake --build "$build_dir" --parallel "${ENGINE_BUILD_JOBS:-8}"
 out_suffix="$suffix"
 if [ "$simd" = "ON" ]; then out_suffix="$suffix-simd"; fi
 sha256sum "$here/out/engine-core-${tier}mib$out_suffix.wasm"
