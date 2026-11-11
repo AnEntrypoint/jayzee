@@ -155,6 +155,7 @@ export const createPlanetStreamer = (module, { sink = null, window = PATH_WINDOW
 
   return {
     surface,
+    viewTarget: Float64Array.of(0, baseY, 0),
     get pending() { return counts.stage + counts.release },
     step(frame) {
       const at = 3 * (frame % PATH_PERIOD_FRAMES)

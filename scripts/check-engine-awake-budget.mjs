@@ -188,6 +188,75 @@ gate('reconfiguring the planet leaves held bodies held and wakes the released on
   assert.equal(module._engine_world_active_bodies(), BODIES - held)
 })
 
+const TUNE_RELEASE_BY_SLOT = 16
+const eyeAt = (module, slot, lift) => {
+  const at = positions(module)
+  return [at[slot * POSITION_WORDS], at[slot * POSITION_WORDS + 1] + lift, at[slot * POSITION_WORDS + 2]]
+}
+const releasedAfter = (module, ticks) => {
+  const start = positions(module)
+  for (let i = 0; i < ticks; i++) module._engine_tick(1)
+  return movedSlots(start, positions(module))
+}
+const distanceTo = (start, slot, eye) => Math.sqrt((start[slot * 3] - eye[0]) ** 2 + (start[slot * 3 + 1] - eye[1]) ** 2 + (start[slot * 3 + 2] - eye[2]) ** 2)
+
+gate('with a release view at the last slot the held bodies nearest the eye are released first, and with no view the lowest slots are', async () => {
+  const module = await boot({ budget: BUDGET })
+  const start = positions(module)
+  const eye = eyeAt(module, BODIES - 1, 3)
+  assert.equal(module._engine_world_set_release_view(eye[0], eye[1], eye[2], 0, 0, 0, 1, 1000), 0)
+  let wave = []
+  for (let guard = 0; guard < SETTLE_TICKS && wave.length === 0; guard++) wave = releasedAfter(module, 1).filter((slot) => slot >= BUDGET)
+  assert.ok(wave.length > 0, 'no held body was released')
+  const held = range(BUDGET, BODIES)
+  const nearest = held.slice().sort((a, b) => distanceTo(start, a, eye) - distanceTo(start, b, eye) || a - b).slice(0, wave.length)
+  assert.deepEqual(wave.slice().sort((a, b) => a - b), nearest.slice().sort((a, b) => a - b))
+  assert.ok(wave.includes(BODIES - 1) && !wave.includes(BUDGET), 'the wave is ' + wave.slice(0, 8))
+  const control = await boot({ budget: BUDGET })
+  let plain = []
+  for (let guard = 0; guard < SETTLE_TICKS && plain.length === 0; guard++) plain = releasedAfter(control, 1).filter((slot) => slot >= BUDGET)
+  assert.deepEqual(plain, range(BUDGET, BUDGET + plain.length))
+})
+
+gate('a cone picks the bodies in front of the eye before nearer ones behind it, the slot-order tuning ignores the view, and both runs end at rest', async () => {
+  const module = await boot({ budget: BUDGET })
+  const start = positions(module)
+  const mid = BUDGET + Math.floor((BODIES - BUDGET) / 2)
+  const eye = eyeAt(module, mid, 3)
+  const ahead = [start[(BODIES - 1) * 3] - eye[0], 0, start[(BODIES - 1) * 3 + 2] - eye[2]]
+  assert.equal(module._engine_world_set_release_view(eye[0], eye[1], eye[2], ahead[0], ahead[1], ahead[2], 0.5, 1000), 0)
+  let wave = []
+  for (let guard = 0; guard < SETTLE_TICKS && wave.length === 0; guard++) wave = releasedAfter(module, 1).filter((slot) => slot >= BUDGET)
+  const length = Math.sqrt(ahead[0] ** 2 + ahead[2] ** 2)
+  const inFront = (slot) => {
+    const d = [start[slot * 3] - eye[0], start[slot * 3 + 1] - eye[1], start[slot * 3 + 2] - eye[2]]
+    const far = Math.sqrt(d[0] ** 2 + d[1] ** 2 + d[2] ** 2)
+    return (d[0] * ahead[0] + d[2] * ahead[2]) / length >= 0.5 * far
+  }
+  const visibleHeld = range(BUDGET, BODIES).filter(inFront)
+  assert.ok(visibleHeld.length > wave.length, 'the cone holds only ' + visibleHeld.length + ' held bodies, fewer than one wave')
+  assert.ok(wave.every(inFront), 'a body outside the cone was released while ' + visibleHeld.length + ' in it were held')
+  const before = module._engine_world_unsettled_in_view()
+  assert.ok(before > 0 && before <= BODIES)
+  settle(module)
+  assert.equal(module._engine_world_unsettled_in_view(), 0)
+  assertAtRest(module)
+  const bySlot = await boot({ budget: BUDGET })
+  assert.equal(bySlot._engine_world_set_tuning(TUNE_RELEASE_BY_SLOT), 0)
+  assert.equal(bySlot._engine_world_set_release_view(eye[0], eye[1], eye[2], ahead[0], ahead[1], ahead[2], 0.5, 1000), 0)
+  let plain = []
+  for (let guard = 0; guard < SETTLE_TICKS && plain.length === 0; guard++) plain = releasedAfter(bySlot, 1).filter((slot) => slot >= BUDGET)
+  assert.deepEqual(plain, range(BUDGET, BUDGET + plain.length))
+})
+
+gate('the release view refuses a value that is not finite, a cone outside -1 to 1 and a range that is not above zero', async () => {
+  const module = await boot({ budget: BUDGET })
+  for (const bad of [[NaN, 0, 0, 1, 0, 0, 0.5, 10], [0, 0, 0, Infinity, 0, 0, 0.5, 10], [0, 0, 0, 1, 0, 0, 1.5, 10], [0, 0, 0, 1, 0, 0, 0.5, 0], [0, 0, 0, 1, 0, 0, 0.5, NaN]]) {
+    assert.notEqual(module._engine_world_set_release_view(...bad), 0, 'accepted ' + bad.join(','))
+  }
+  assert.equal(module._engine_world_clear_release_view(), 0)
+})
+
 gate('a budget lifted to zero releases every held body on the next tick', async () => {
   const module = await boot({ budget: BUDGET })
   assert.equal(module._engine_world_set_awake_budget(0), 0)

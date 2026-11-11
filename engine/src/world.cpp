@@ -223,6 +223,9 @@ Status World::bind(const budget::Capacity& capacity) {
   transforms_ = carveArray<Transform>(n);
   air_ = carveArray<std::uint8_t>(n);
   ceiling_ = carveArray<float>(n);
+  releaseQueue_ = carveArray<std::uint32_t>(n);
+  releaseKeys_ = carveArray<float>(n);
+  if (releaseQueue_ == nullptr || releaseKeys_ == nullptr) return kFull;
   if (bodyIds_ == nullptr || batch_ == nullptr || freeSlots_ == nullptr || generations_ == nullptr || alive_ == nullptr ||
       positions_ == nullptr || velocities_ == nullptr || transforms_ == nullptr || air_ == nullptr || ceiling_ == nullptr) {
     return kFull;
@@ -266,6 +269,11 @@ Status World::configure(const Config& config) {
   std::fill(air_, air_ + limits_.bodies, static_cast<std::uint8_t>(0));
   std::fill(ceiling_, ceiling_ + limits_.bodies, std::numeric_limits<float>::quiet_NaN());
   radius_ = config.radius;
+  heldCount_ = 0;
+  queueCount_ = 0;
+  queueHead_ = 0;
+  queueStale_ = true;
+  viewSet_ = false;
 
   runtime_->physics.Init(joltBodyCapacity(limits_), 0, joltPairCapacity(limits_), joltContactCapacity(limits_), runtime_->broadPhase,
                          runtime_->objectVsBroadPhase, runtime_->objectPairs);
@@ -682,7 +690,8 @@ int World::spawnBatch(const double* rows, std::uint32_t count, std::uint32_t* ha
       if (body != nullptr) body->SetLinearVelocityClamped(launch);
       if (!spawnAsleep_) {
         alive_[slot] = kSlotHeld;
-        heldCursor_ = std::min(heldCursor_, slot);
+        heldCount_ += 1;
+        queueStale_ = true;
       }
     }
     sync(slot);
@@ -697,7 +706,11 @@ Status World::despawn(std::uint32_t handle) {
   if (slot < 0) return kBadId;
   JPH::BodyInterface& bodies = runtime_->physics.GetBodyInterface();
   const JPH::BodyID id(bodyIds_[slot]);
-  if (alive_[slot] != kSlotHeld) bodies.RemoveBody(id);
+  if (alive_[slot] == kSlotHeld) {
+    heldCount_ -= 1;
+  } else {
+    bodies.RemoveBody(id);
+  }
   alive_[slot] = kSlotFree;
   live_ -= 1;
   if (generations_[slot] == kBodyLastGeneration) {
@@ -722,6 +735,7 @@ Status World::setPosition(std::uint32_t handle, const double* position) {
     bodies.SetPosition(id, toBody(position), JPH::EActivation::DontActivate);
     bodies.AddBody(id, JPH::EActivation::Activate);
     alive_[slot] = kSlotAlive;
+    heldCount_ -= 1;
   } else {
     bodies.SetPosition(id, toBody(position), JPH::EActivation::Activate);
   }
@@ -742,6 +756,7 @@ Status World::setVelocity(std::uint32_t handle, const float* velocity) {
     if (body != nullptr) body->SetLinearVelocityClamped(next);
     bodies.AddBody(id, JPH::EActivation::Activate);
     alive_[slot] = kSlotAlive;
+    heldCount_ -= 1;
   } else {
     bodies.SetLinearVelocity(id, next);
   }
@@ -907,25 +922,111 @@ void World::applyRadialGravity(JPH::PhysicsSystem& system, float dt) {
 std::uint32_t World::wakeCount(std::uint32_t count) const {
   if (spawnAsleep_) return 0;
   if (awakeBudget_ == 0) return count;
-  if (heldCursor_ != kNoHeld) return 0;
+  if (heldCount_ != 0) return 0;
   const std::uint32_t active = runtime_->physics.GetNumActiveBodies(JPH::EBodyType::RigidBody);
   return active >= awakeBudget_ ? 0 : std::min(count, awakeBudget_ - active);
 }
 
+bool World::inView(std::uint32_t slot, double& distance) const {
+  const double* p = positions_ + slot * 3;
+  const double dx = p[0] - viewEye_[0];
+  const double dy = p[1] - viewEye_[1];
+  const double dz = p[2] - viewEye_[2];
+  distance = std::sqrt(dx * dx + dy * dy + dz * dz);
+  if (distance > viewRange_) return false;
+  return dx * viewDir_[0] + dy * viewDir_[1] + dz * viewDir_[2] >= viewCos_ * distance;
+}
+
+void World::refillReleaseQueue() {
+  constexpr float kOutOfViewMetres = 1.0e6f;
+  constexpr std::uint32_t kLeastChunk = 1024;
+  queueStale_ = false;
+  queueHead_ = 0;
+  queueCount_ = 0;
+  const bool ordered = viewSet_ && (tuning_ & kTuneReleaseBySlot) == 0;
+  for (std::uint32_t slot = 0; slot < fresh_; ++slot) {
+    if (alive_[slot] != kSlotHeld) continue;
+    releaseQueue_[queueCount_] = slot;
+    queueCount_ += 1;
+    if (!ordered) continue;
+    double distance = 0.0;
+    const bool visible = inView(slot, distance);
+    releaseKeys_[slot] = static_cast<float>(distance) + (visible ? 0.0f : kOutOfViewMetres);
+  }
+  if (!ordered) return;
+  const float* keys = releaseKeys_;
+  auto nearer = [keys](std::uint32_t a, std::uint32_t b) { return keys[a] < keys[b] || (keys[a] == keys[b] && a < b); };
+  const std::uint32_t chunk = std::min(queueCount_, std::max(awakeBudget_, kLeastChunk));
+  if (chunk < queueCount_) std::nth_element(releaseQueue_, releaseQueue_ + chunk, releaseQueue_ + queueCount_, nearer);
+  std::sort(releaseQueue_, releaseQueue_ + chunk, nearer);
+  queueCount_ = chunk;
+  queueEye_[0] = viewEye_[0];
+  queueEye_[1] = viewEye_[1];
+  queueEye_[2] = viewEye_[2];
+}
+
+Status World::setReleaseView(const double* eye, const double* direction, double cosHalfAngle, double range) {
+  constexpr double kMovedMetres = 4.0;
+  constexpr double kTurnedCos = 0.98;
+  if (runtime_ == nullptr) return kNotConfigured;
+  for (int axis = 0; axis < 3; ++axis) {
+    if (!std::isfinite(eye[axis]) || !std::isfinite(direction[axis])) return kRange;
+  }
+  if (!(cosHalfAngle >= -1.0 && cosHalfAngle <= 1.0) || !(range > 0.0)) return kRange;
+  const double length = std::sqrt(direction[0] * direction[0] + direction[1] * direction[1] + direction[2] * direction[2]);
+  const double unit[3] = {length > 0.0 ? direction[0] / length : 0.0, length > 0.0 ? direction[1] / length : 0.0, length > 0.0 ? direction[2] / length : 0.0};
+  const double cone = length > 0.0 ? cosHalfAngle : -1.0;
+  const double mx = eye[0] - queueEye_[0];
+  const double my = eye[1] - queueEye_[1];
+  const double mz = eye[2] - queueEye_[2];
+  const bool moved = mx * mx + my * my + mz * mz > kMovedMetres * kMovedMetres;
+  const bool turned = unit[0] * viewDir_[0] + unit[1] * viewDir_[1] + unit[2] * viewDir_[2] < kTurnedCos;
+  if (!viewSet_ || moved || turned || cone != viewCos_ || range != viewRange_) queueStale_ = true;
+  for (int axis = 0; axis < 3; ++axis) {
+    viewEye_[axis] = eye[axis];
+    viewDir_[axis] = unit[axis];
+  }
+  viewCos_ = cone;
+  viewRange_ = range;
+  viewSet_ = true;
+  return kOk;
+}
+
+Status World::clearReleaseView() {
+  if (runtime_ == nullptr) return kNotConfigured;
+  viewSet_ = false;
+  queueStale_ = true;
+  return kOk;
+}
+
+std::uint32_t World::unsettledInView() const {
+  std::uint32_t unsettled = 0;
+  for (std::uint32_t slot = 0; slot < fresh_; ++slot) {
+    const std::uint8_t state = alive_[slot];
+    if (state != kSlotHeld && state != kSlotAlive && state != kSlotAwakeSynced) continue;
+    double distance = 0.0;
+    if (!viewSet_ || inView(slot, distance)) unsettled += 1;
+  }
+  return unsettled;
+}
+
 void World::releaseHeld() {
-  if (heldCursor_ == kNoHeld) return;
+  if (heldCount_ == 0) return;
   const std::uint32_t active = runtime_->physics.GetNumActiveBodies(JPH::EBodyType::RigidBody);
   std::uint32_t room = awakeBudget_ == 0 ? fresh_ : (active >= awakeBudget_ ? 0 : awakeBudget_ - active);
   JPH::BodyInterface& bodies = runtime_->physics.GetBodyInterface();
   JPH::BodyID* batch = asBodyIds(batch_);
   std::uint32_t released = 0;
-  while (room > 0 && heldCursor_ < fresh_) {
-    const std::uint32_t slot = heldCursor_;
-    heldCursor_ += 1;
+  while (room > 0 && heldCount_ > 0) {
+    if (queueStale_ || queueHead_ == queueCount_) refillReleaseQueue();
+    if (queueHead_ == queueCount_) break;
+    const std::uint32_t slot = releaseQueue_[queueHead_];
+    queueHead_ += 1;
     if (alive_[slot] != kSlotHeld) continue;
     batch[released] = JPH::BodyID(bodyIds_[slot]);
     released += 1;
     alive_[slot] = kSlotAlive;
+    heldCount_ -= 1;
     room -= 1;
   }
   if (released > 0) {
@@ -937,7 +1038,6 @@ void World::releaseHeld() {
       if (body != nullptr) sync(static_cast<std::uint32_t>(body->GetUserData() - 1));
     }
   }
-  if (heldCursor_ >= fresh_) heldCursor_ = kNoHeld;
 }
 
 Status World::setAwakeBudget(std::uint32_t bodies) {
@@ -996,9 +1096,7 @@ std::uint32_t World::airborneBodies() const {
 }
 
 std::uint32_t World::heldBodies() const {
-  std::uint32_t held = 0;
-  for (std::uint32_t slot = 0; slot < fresh_; ++slot) held += alive_[slot] == kSlotHeld ? 1 : 0;
-  return held;
+  return heldCount_;
 }
 
 void World::optimize() {

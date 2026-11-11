@@ -28,7 +28,6 @@ constexpr std::uint8_t kSlotAlive = 1;
 constexpr std::uint8_t kSlotAsleepSynced = 2;
 constexpr std::uint8_t kSlotAwakeSynced = 3;
 constexpr std::uint8_t kSlotHeld = 4;
-constexpr std::uint32_t kNoHeld = 0xffffffffu;
 constexpr std::uint32_t kTuneGravityAfterStep = 1u;
 constexpr std::uint32_t kTuneWholeIslands = 2u;
 constexpr std::uint32_t kTuneAirborne = 4u;
@@ -158,6 +157,9 @@ class World {
   Status setTuning(std::uint32_t flags);
   Status setSleep(float seconds, float pointSpeed);
   std::uint32_t heldBodies() const;
+  std::uint32_t unsettledInView() const;
+  Status setReleaseView(const double* eye, const double* direction, double cosHalfAngle, double range);
+  Status clearReleaseView();
   std::uint32_t airborneBodies() const;
   std::uint32_t wakeCount(std::uint32_t count) const;
   void releaseHeld();
@@ -189,6 +191,8 @@ class World {
   void sync(std::uint32_t slot);
   void hide(std::uint32_t slot);
   void pull(JPH::Body& body, std::uint32_t slot, const PhysicsOrigin& o, float dt);
+  bool inView(std::uint32_t slot, double& distance) const;
+  void refillReleaseQueue();
   void applyAirLayers();
   Status applyTuning(std::uint32_t flags);
   void rebase(double x, double y, double z);
@@ -203,7 +207,16 @@ class World {
   std::uint32_t live_ = 0;
   std::uint32_t retired_ = 0;
   std::uint32_t awakeBudget_ = 0;
-  std::uint32_t heldCursor_ = kNoHeld;
+  std::uint32_t heldCount_ = 0;
+  std::uint32_t queueCount_ = 0;
+  std::uint32_t queueHead_ = 0;
+  bool queueStale_ = true;
+  bool viewSet_ = false;
+  double viewEye_[3] = {0.0, 0.0, 0.0};
+  double viewDir_[3] = {0.0, 0.0, 0.0};
+  double queueEye_[3] = {0.0, 0.0, 0.0};
+  double viewCos_ = -1.0;
+  double viewRange_ = 0.0;
   bool spawnAsleep_ = false;
   std::uint32_t tuning_ = 0;
   std::uint32_t fresh_ = 0;
@@ -230,6 +243,8 @@ class World {
   Transform* transforms_ = nullptr;
   std::uint8_t* air_ = nullptr;
   float* ceiling_ = nullptr;
+  std::uint32_t* releaseQueue_ = nullptr;
+  float* releaseKeys_ = nullptr;
   float radius_ = 0.0f;
 };
 

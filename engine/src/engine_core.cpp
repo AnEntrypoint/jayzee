@@ -235,6 +235,20 @@ EMSCRIPTEN_KEEPALIVE int engine_world_set_sleep(float seconds, float pointSpeed)
   return engine::world().setSleep(seconds, pointSpeed);
 }
 
+EMSCRIPTEN_KEEPALIVE int engine_world_set_release_view(double ex, double ey, double ez, double dx, double dy, double dz, double cosHalfAngle, double range) {
+  const double eye[3] = {ex, ey, ez};
+  const double direction[3] = {dx, dy, dz};
+  return engine::world().setReleaseView(eye, direction, cosHalfAngle, range);
+}
+
+EMSCRIPTEN_KEEPALIVE int engine_world_clear_release_view() {
+  return engine::world().clearReleaseView();
+}
+
+EMSCRIPTEN_KEEPALIVE int engine_world_unsettled_in_view() {
+  return static_cast<int>(engine::world().unsettledInView());
+}
+
 EMSCRIPTEN_KEEPALIVE int engine_world_airborne_bodies() {
   return static_cast<int>(engine::world().airborneBodies());
 }
