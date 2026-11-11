@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { finish, gate } from './lib/gate.mjs'
+import { releaseWorld } from './lib/releaseWorld.mjs'
 import { createTickTimer, writeTickTrace } from './lib/tickTrace.mjs'
 import { SCENARIO_TIERS } from './lib/scenarioTiers.mjs'
 import { BOSS_FIGHT, createBossFight } from './lib/bossFight.mjs'
@@ -29,6 +30,7 @@ const scenario = async (tier, options) => {
     bossHealth.push(fight.state.bossHealth)
     playerTrail.push(fight.playerBody[0], fight.playerBody[1], fight.playerBody[2])
   }
+  await releaseWorld(fight.world)
   return { ...fight.state, boss: { health: fight.state.bossHealth }, player: { health: fight.state.playerHealth }, radial, bossHealth, playerTrail, tickMs, final: [...fight.bossBody, ...fight.playerBody] }
 }
 

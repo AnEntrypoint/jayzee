@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { finish, gate } from './lib/gate.mjs'
+import { releaseWorld } from './lib/releaseWorld.mjs'
 import { createEngineWorld } from '../src/engine/EngineWorld.js'
 import { bodyPoolCapacity } from '../src/engine/poolPlan.js'
 import { createTickTimer, writeTickTrace } from './lib/tickTrace.mjs'
@@ -71,6 +72,7 @@ const duel = async (tier, obstacle) => {
     })
     world.step()
   }
+  await releaseWorld(world)
   return { health: duellists.map((bot) => bot.health), shots, blocked, blockers: [...blockers].sort(), gap: Math.hypot(...positions[0].map((v, a) => v - positions[1][a])), allocations: world.allocationsSinceWarmup() }
 }
 
@@ -166,6 +168,7 @@ const scenario = async (tier) => {
     world.characterBodyPosition(bot.index, body)
     finalPositions.push(...body)
   }
+  await releaseWorld(world)
   return { bots: bots.map((bot) => ({ health: bot.health, shotsFired: bot.shotsFired })), kills, radial, tickMs, finalPositions, ticks: tick, health, blockedShots }
 }
 

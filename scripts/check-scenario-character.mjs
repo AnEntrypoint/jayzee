@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { finish, gate } from './lib/gate.mjs'
+import { releaseWorld } from './lib/releaseWorld.mjs'
 import { createEngineWorld } from '../src/engine/EngineWorld.js'
 import { bodyPoolCapacity } from '../src/engine/poolPlan.js'
 import { createTickTimer, writeTickTrace } from './lib/tickTrace.mjs'
@@ -47,6 +48,7 @@ const scenario = async (tier) => {
   }
   const walked = Array.from(world.characterPosition(0, p))
   const supportedWalking = world.characterSupported(0)
+  await releaseWorld(world)
   return { standing, startWalk, walked, trail, restingDistance, supportedStanding, supportedWalking, tickMs }
 }
 

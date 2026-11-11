@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { finish, gate } from './lib/gate.mjs'
+import { releaseWorld } from './lib/releaseWorld.mjs'
 import { createTickTimer, writeTickTrace } from './lib/tickTrace.mjs'
 import { SCENARIO_TIERS } from './lib/scenarioTiers.mjs'
 import { DEATHRUN, DEATHRUN_COURSES, DEATHRUN_STATUS, createDeathrun } from './lib/deathrun.mjs'
@@ -33,6 +34,7 @@ const scenario = async (tier, courseName) => {
   for (let i = 0; i < Math.min(run.state.fallCount, run.fallTick.length); i++) {
     falls.push({ tick: run.fallTick[i], x: run.falls[i * 4], z: run.falls[i * 4 + 2], feetHeightM: run.falls[i * 4 + 3], spawn: run.respawnSpawn[i], respawnAt: Array.from(run.respawnAt.subarray(i * 4, i * 4 + 3)) })
   }
+  await releaseWorld(run.world)
   return {
     course: run.course,
     floorM: run.floorM,

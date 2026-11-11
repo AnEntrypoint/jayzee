@@ -3,12 +3,12 @@ import { readdirSync, readFileSync } from 'node:fs'
 
 const argv = process.argv.slice(2)
 const split = argv.indexOf('--')
-if (split < 0 || split === argv.length - 1) throw new TypeError('usage: measure-memory.mjs [--match <text>] [--interval <ms>] -- <command> [args]')
+if (split < 0 || split === argv.length - 1) throw new TypeError('usage: measure-memory.mjs [--match <text>] [--interval <ms>] [--settle <ms>] -- <command> [args]')
 const options = argv.slice(0, split)
 const optionValue = (name, fallback) => (options.includes(name) ? options[options.indexOf(name) + 1] : fallback)
 const match = optionValue('--match', null)
 const intervalMs = Number(optionValue('--interval', '500'))
-const SETTLE_MS = 1500
+const settleMs = Number(optionValue('--settle', '1500'))
 const TOP = 5
 const MB = 1024 * 1024
 const PAGE_BYTES = 4096
@@ -104,5 +104,5 @@ child.on('exit', (code, signal) => {
       matched: match === null ? null : { text: match, runningBefore: matchedBefore.size, peakMb: round(peak.matchedBytes), peakProcesses: peak.matchedProcesses, runningAfter: matchedAfter.length, afterMb: round(matchedAfter.reduce((sum, row) => sum + heldBytes(row.pid), 0)), startedByThisCommand: matchedAfter.filter((row) => !matchedBefore.has(row.pid)).length },
     }))
     process.exit(code ?? 1)
-  }, SETTLE_MS)
+  }, settleMs)
 })

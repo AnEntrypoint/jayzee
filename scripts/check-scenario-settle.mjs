@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { finish, gate } from './lib/gate.mjs'
+import { releaseWorld } from './lib/releaseWorld.mjs'
 import { createTickTimer, writeTickTrace } from './lib/tickTrace.mjs'
 import { SCENARIO_TIERS } from './lib/scenarioTiers.mjs'
 import { SETTLE, buildSettle } from './lib/scenarioWorlds.mjs'
@@ -31,6 +32,7 @@ const scenario = async (tier) => {
       trail.push(frame)
     }
   }
+  await releaseWorld(world)
   return { trail, finalPositions: Array.from(trail[trail.length - 1]), tickMs }
 }
 

@@ -2,6 +2,7 @@ import { checkVector, isFiniteNumber, resolveWorldOptions } from '../world/optio
 import { createBridge, readLayout } from './bridge.js'
 import { solverIterationsFor } from './solverIterations.js'
 import { PHYSICS_REBASE_M } from './physicsOrigin.js'
+import { closeMailbox, trackMailboxWaits } from './threadMailbox.js'
 
 const MAX_STEPS_PER_ADVANCE = 8
 const BOX_WORDS = 6
@@ -76,7 +77,17 @@ export const resolvePlan = (options = {}) => {
   return Object.freeze({ players, workers, budgetBytes })
 }
 
+export const releaseEngineModule = (module) => {
+  const threads = module.PThread
+  if (!threads) return Promise.resolve(0)
+  const workers = [...threads.runningWorkers, ...threads.unusedWorkers]
+  threads.terminateAllThreads()
+  closeMailbox(module.HEAPU8.buffer)
+  return Promise.all(workers.map((worker) => worker.terminate())).then(() => workers.length)
+}
+
 export const loadEngineModule = async (glue = DEFAULT_GLUE, plan = resolvePlan()) => {
+  trackMailboxWaits()
   const factory = (await import(glue)).default
   const module = await factory()
   const status = module._engine_init(plan.players, plan.workers, plan.budgetBytes)
@@ -125,6 +136,10 @@ export class EngineWorld {
 
   get retiredSlots() {
     return this.#module._engine_retired_slots()
+  }
+
+  release() {
+    return releaseEngineModule(this.#module)
   }
 
   get tick() {

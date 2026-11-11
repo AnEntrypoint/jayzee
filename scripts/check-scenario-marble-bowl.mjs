@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { finish, gate } from './lib/gate.mjs'
+import { releaseWorld } from './lib/releaseWorld.mjs'
 import { createTickTimer, writeTickTrace } from './lib/tickTrace.mjs'
 import { SCENARIO_TIERS } from './lib/scenarioTiers.mjs'
 import { MARBLE_BOWL, buildMarbleBowl } from './lib/scenarioWorlds.mjs'
@@ -29,6 +30,7 @@ const scenario = async (tier) => {
     positions.set(p, i * 3)
     speeds[i] = Math.hypot(v[0], v[1], v[2])
   })
+  await releaseWorld(world)
   return { positions, speeds, tickMs: timer.tickMs }
 }
 

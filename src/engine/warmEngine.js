@@ -1,4 +1,4 @@
-import { loadEngineModule, resolvePlan } from './EngineWorld.js'
+import { loadEngineModule, releaseEngineModule, resolvePlan } from './EngineWorld.js'
 import { isReservationFailure } from './glueTier.js'
 import { BODY_POOL_CAPACITY } from './poolPlan.js'
 import { BODY_SPACING_M, PLANET_RADIUS_M, TIER_1024 } from './sceneSetup.js'
@@ -49,7 +49,7 @@ export const warmEngine = async (glue, spec = {}) => {
   runScene(module, bodies, ticks)
   const release = () => {
     if (module === null) return
-    if (module.PThread) module.PThread.terminateAllThreads()
+    releaseEngineModule(module)
     module = null
   }
   return Object.freeze({ warmed: true, reason: null, bodies, ticks, ms: now() - started, release })

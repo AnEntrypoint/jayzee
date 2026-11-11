@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { finish, gate } from './lib/gate.mjs'
+import { releaseWorld } from './lib/releaseWorld.mjs'
 import { createEngineWorld } from '../src/engine/EngineWorld.js'
 import { bodyPoolCapacity } from '../src/engine/poolPlan.js'
 import { createTickTimer, writeTickTrace } from './lib/tickTrace.mjs'
@@ -122,6 +123,7 @@ const scenario = async (tier, tuning) => {
     world.characterBodyPosition(walker.index, body)
     finalBody.push(...body)
   }
+  await releaseWorld(world)
   return {
     walkers: Object.fromEntries(walkers.map((walker) => [walker.name, walker.samples])),
     settled, finalBody, tickMs, engineHeightOnRamp, residentPages, pageCount: terrain.pageCount,

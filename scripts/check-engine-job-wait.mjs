@@ -2,6 +2,7 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import assert from 'node:assert/strict'
 import { gate, finish } from './lib/gate.mjs'
+import { releaseWorld } from './lib/releaseWorld.mjs'
 import {
   CLOCK_CALLS_IN_WINDOW, CLOCK_CALLS_TOTAL, CLOCK_MAIN_CALLS_IN_WINDOW, CLOCK_MAIN_HOOKS, CLOCK_WINDOW_OPEN, CLOCK_WORKER_HOOKS, clockCounters,
 } from './lib/clockCount.mjs'
@@ -64,6 +65,7 @@ const run = async (glue, workers) => {
     world.position(handle, p)
     positions.push(p[0], p[1], p[2])
   }
+  await releaseWorld(world)
   return { workers, positions, clockCalls: inWindow() - callsBefore, workerHooks: Atomics.load(counters, CLOCK_WORKER_HOOKS) - hooksBefore, wallMs, hash: world.hash(), waits }
 }
 

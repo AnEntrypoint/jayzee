@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { resolve } from 'node:path'
 import { pathToFileURL, fileURLToPath } from 'node:url'
 import { finish, gate } from './lib/gate.mjs'
+import { releaseModule } from './lib/releaseWorld.mjs'
 import { loadEngineModule, resolvePlan } from '../src/engine/EngineWorld.js'
 import { readLayout } from '../src/engine/bridge.js'
 import { PLANET, configureWorld } from '../src/engine/sceneSetup.js'
@@ -13,7 +14,7 @@ import { createLeafBlock, createVegetationFollower } from '../src/engine/vegetat
 import { PATH_PERIOD_FRAMES } from '../src/engine/planetStream.js'
 
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)))
-const GLUE = pathToFileURL(resolve(root, 'engine/out/engine-core-1024mib-threads.mjs')).href
+const GLUE = pathToFileURL(resolve(root, 'engine/out/engine-core-512mib-threads.mjs')).href
 const MIB = 1024 * 1024
 const BROWSER_PAGE_WINDOW = 8
 const POLE_FACE = 2
@@ -28,7 +29,9 @@ const sceneOn = async (spec, generateAfterPages) => {
     createPlanetStreamer(module, { window: BROWSER_PAGE_WINDOW })
     scene.generate()
   }
-  return scene.report()
+  const report = scene.report()
+  await releaseModule(module)
+  return report
 }
 
 const orbit = async (spec) => {
@@ -48,7 +51,9 @@ const orbit = async (spec) => {
     const spot = streamer.step(frame)
     follow(spot[0], PLANET.radius + spot[1], spot[2], streamer.pending)
   }
-  return { atStart, atEnd: scene.report(), moves: block.moves, firstIds, lastIds: block.ids.slice() }
+  const atEnd = scene.report()
+  await releaseModule(module)
+  return { atStart, atEnd, moves: block.moves, firstIds, lastIds: block.ids.slice() }
 }
 
 const spec = witnessSceneSpec(PLANET.radius)

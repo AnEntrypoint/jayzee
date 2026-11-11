@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { finish, gate } from './lib/gate.mjs'
+import { releaseWorld } from './lib/releaseWorld.mjs'
 import { PLANET } from '../src/engine/sceneSetup.js'
 import { createTickTimer, writeTickTrace } from './lib/tickTrace.mjs'
 import { SCENARIO_TIERS } from './lib/scenarioTiers.mjs'
@@ -29,6 +30,7 @@ const scenario = async (tier) => {
     const ground = world.height(p[0], p[1], p[2])
     gaps[i] = distance - PLANET.radius - ground - RADIUS
   })
+  await releaseWorld(world)
   return { gaps, tickMs }
 }
 

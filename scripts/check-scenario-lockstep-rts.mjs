@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { finish, gate } from './lib/gate.mjs'
+import { releaseWorld } from './lib/releaseWorld.mjs'
 import { createTickTimer, writeTickTrace } from './lib/tickTrace.mjs'
 import { SCENARIO_TIERS } from './lib/scenarioTiers.mjs'
 import { LOCKSTEP, createLockstepMatch, lockstepSchedule } from './lib/lockstepMatch.mjs'
@@ -30,6 +31,9 @@ const play = async (tier, variant) => {
     match.record()
   }
   const finalEngine = match.engineHash()
+  const engineTick = match.world.tick
+  const bodyHash = match.world.hash()
+  await releaseWorld(match.world)
   return {
     schedule,
     applied: match.applied(),
@@ -41,8 +45,8 @@ const play = async (tier, variant) => {
     checkpoints: match.checkpoints,
     finalEngine,
     finalEngineByStateHash: stateHash(Array.from(match.engineState())),
-    engineTick: match.world.tick,
-    bodyHash: match.world.hash(),
+    engineTick,
+    bodyHash,
   }
 }
 
