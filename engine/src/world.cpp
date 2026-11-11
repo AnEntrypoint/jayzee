@@ -322,7 +322,7 @@ Status World::configurePlanet(double radius, double cellSize, double gravity, do
   planetBody_ = id.GetIndexAndSequenceNumber();
   planetGravity_ = static_cast<float>(gravity);
   for (std::uint32_t slot = 0; slot < fresh_; ++slot) {
-    if (alive_[slot] != 0) runtime_->physics.GetBodyInterface().ActivateBody(JPH::BodyID(bodyIds_[slot]));
+    if (alive_[slot] == kSlotAlive && !spawnAsleep_) runtime_->physics.GetBodyInterface().ActivateBody(JPH::BodyID(bodyIds_[slot]));
   }
   return kOk;
 }
@@ -626,14 +626,30 @@ int World::spawnBatch(const double* rows, std::uint32_t count, std::uint32_t* ha
     live_ += 1;
     handles[i] = (static_cast<std::uint32_t>(generations_[slot]) << 16) | static_cast<std::uint32_t>(slot);
   }
-  if (count > 0) {
-    const JPH::BodyInterface::AddState state = bodies.AddBodiesPrepare(batch, static_cast<int>(count));
-    bodies.AddBodiesFinalize(batch, static_cast<int>(count), state, JPH::EActivation::Activate);
+  const std::uint32_t woken = wakeCount(count);
+  if (woken > 0) {
+    const JPH::BodyInterface::AddState state = bodies.AddBodiesPrepare(batch, static_cast<int>(woken));
+    bodies.AddBodiesFinalize(batch, static_cast<int>(woken), state, JPH::EActivation::Activate);
   }
+  if (woken < count) {
+    const JPH::BodyInterface::AddState state = bodies.AddBodiesPrepare(batch + woken, static_cast<int>(count - woken));
+    bodies.AddBodiesFinalize(batch + woken, static_cast<int>(count - woken), state, JPH::EActivation::DontActivate);
+  }
+  const JPH::BodyLockInterfaceNoLock& locks = runtime_->physics.GetBodyLockInterfaceNoLock();
   for (std::uint32_t i = 0; i < count; ++i) {
     const double* row = rows + i * kBatchWords;
     const std::uint32_t slot = handles[i] & kSlotMask;
-    bodies.SetLinearVelocity(JPH::BodyID(bodyIds_[slot]), JPH::Vec3(static_cast<float>(row[3]), static_cast<float>(row[4]), static_cast<float>(row[5])));
+    const JPH::Vec3 launch(static_cast<float>(row[3]), static_cast<float>(row[4]), static_cast<float>(row[5]));
+    if (i < woken) {
+      bodies.SetLinearVelocity(JPH::BodyID(bodyIds_[slot]), launch);
+    } else {
+      JPH::Body* body = locks.TryGetBody(JPH::BodyID(bodyIds_[slot]));
+      if (body != nullptr) body->SetLinearVelocityClamped(launch);
+      if (!spawnAsleep_) {
+        alive_[slot] = kSlotHeld;
+        heldCursor_ = std::min(heldCursor_, slot);
+      }
+    }
     sync(slot);
   }
   return static_cast<int>(count);
@@ -665,6 +681,7 @@ Status World::setPosition(std::uint32_t handle, const double* position) {
   if (slot < 0) return kBadId;
   follow(position[0], position[1], position[2]);
   runtime_->physics.GetBodyInterface().SetPosition(JPH::BodyID(bodyIds_[slot]), toBody(position), JPH::EActivation::Activate);
+  if (alive_[slot] == kSlotHeld) alive_[slot] = kSlotAlive;
   sync(static_cast<std::uint32_t>(slot));
   return kOk;
 }
@@ -675,6 +692,10 @@ Status World::setVelocity(std::uint32_t handle, const float* velocity) {
   if (slot < 0) return kBadId;
   runtime_->physics.GetBodyInterface().SetLinearVelocity(JPH::BodyID(bodyIds_[slot]),
                                                          JPH::Vec3(velocity[0], velocity[1], velocity[2]));
+  if (alive_[slot] == kSlotHeld) {
+    runtime_->physics.GetBodyInterface().ActivateBody(JPH::BodyID(bodyIds_[slot]));
+    alive_[slot] = kSlotAlive;
+  }
   sync(static_cast<std::uint32_t>(slot));
   return kOk;
 }
@@ -796,6 +817,58 @@ void World::applyRadialGravity(JPH::PhysicsSystem& system, float dt) {
   forActiveRanges(system.GetNumActiveBodies(JPH::EBodyType::RigidBody), true);
 }
 
+std::uint32_t World::wakeCount(std::uint32_t count) const {
+  if (spawnAsleep_) return 0;
+  if (awakeBudget_ == 0) return count;
+  if (heldCursor_ != kNoHeld) return 0;
+  const std::uint32_t active = runtime_->physics.GetNumActiveBodies(JPH::EBodyType::RigidBody);
+  return active >= awakeBudget_ ? 0 : std::min(count, awakeBudget_ - active);
+}
+
+void World::releaseHeld() {
+  if (heldCursor_ == kNoHeld) return;
+  const std::uint32_t active = runtime_->physics.GetNumActiveBodies(JPH::EBodyType::RigidBody);
+  std::uint32_t room = awakeBudget_ == 0 ? fresh_ : (active >= awakeBudget_ ? 0 : awakeBudget_ - active);
+  JPH::BodyInterface& bodies = runtime_->physics.GetBodyInterface();
+  while (room > 0 && heldCursor_ < fresh_) {
+    const std::uint32_t slot = heldCursor_;
+    heldCursor_ += 1;
+    if (alive_[slot] != kSlotHeld) continue;
+    bodies.ActivateBody(JPH::BodyID(bodyIds_[slot]));
+    alive_[slot] = kSlotAlive;
+    room -= 1;
+  }
+  if (heldCursor_ >= fresh_) heldCursor_ = kNoHeld;
+}
+
+Status World::setAwakeBudget(std::uint32_t bodies) {
+  if (runtime_ == nullptr) return kNotConfigured;
+  awakeBudget_ = bodies;
+  return kOk;
+}
+
+Status World::setSpawnAsleep(bool asleep) {
+  if (runtime_ == nullptr) return kNotConfigured;
+  spawnAsleep_ = asleep;
+  return kOk;
+}
+
+Status World::setSleep(float seconds, float pointSpeed) {
+  if (runtime_ == nullptr) return kNotConfigured;
+  if (!(seconds > 0.0f) || !(pointSpeed > 0.0f)) return kRange;
+  JPH::PhysicsSettings settings = runtime_->physics.GetPhysicsSettings();
+  settings.mTimeBeforeSleep = seconds;
+  settings.mPointVelocitySleepThreshold = pointSpeed;
+  runtime_->physics.SetPhysicsSettings(settings);
+  return kOk;
+}
+
+std::uint32_t World::heldBodies() const {
+  std::uint32_t held = 0;
+  for (std::uint32_t slot = 0; slot < fresh_; ++slot) held += alive_[slot] == kSlotHeld ? 1 : 0;
+  return held;
+}
+
 void World::optimize() {
   if (runtime_ == nullptr) return;
   runtime_->physics.OptimizeBroadPhase();
@@ -808,6 +881,7 @@ void World::step(std::uint32_t steps) {
       updateCharacters(dt);
       {
         engine::phase::Scope scope(engine::phase::kPhysics);
+        releaseHeld();
         applyRadialGravity(runtime_->physics, dt);
         runtime_->physics.Update(dt, 1, &runtime_->temp, &runtime_->jobs);
       }
@@ -834,7 +908,7 @@ Status World::applyPoses(const Transform* rows, std::uint32_t count) {
   if (transforms_ == nullptr || count != limits_.bodies) return kRange;
   std::memcpy(transforms_, rows, static_cast<std::size_t>(count) * sizeof(Transform));
   for (std::uint32_t slot = 0; slot < fresh_; ++slot) {
-    if (alive_[slot] != kSlotFree) alive_[slot] = kSlotAlive;
+    if (alive_[slot] != kSlotFree && alive_[slot] != kSlotHeld) alive_[slot] = kSlotAlive;
   }
   return kOk;
 }

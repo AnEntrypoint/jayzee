@@ -28,7 +28,7 @@ export const VARIANT_WORKERS = 4
 export const VARIANT_REPEATS = 3
 export const variantGlue = (name) => 'build/variants/' + name + '/engine-core-1024mib-threads-simd.mjs'
 
-const tick = (glue, bodies, workers, extra = {}) => ({ script: 'scripts/kaggle/bench.mjs', nodeFlags: extra.nodeFlags ?? [], args: [glue, String(bodies), String(workers), String(TICKS), String(ARENA_BUDGET_BYTES), String(extra.iterations ?? 'default'), extra.scene ?? 'planet', extra.warm === false ? 'cold' : 'warm', extra.warmSpec ?? 'default'], glueArg: 0, probe: extra.probe === true })
+const tick = (glue, bodies, workers, extra = {}) => ({ script: 'scripts/kaggle/bench.mjs', nodeFlags: extra.nodeFlags ?? [], args: [glue, String(bodies), String(workers), String(TICKS), String(ARENA_BUDGET_BYTES), String(extra.iterations ?? 'default'), extra.scene ?? 'planet', extra.warm === false ? 'cold' : 'warm', extra.warmSpec ?? 'default', extra.knobs ?? 'none'], glueArg: 0, probe: extra.probe === true })
 const marble = (tier, runs = MARBLE_RUNS, warmRuns = 0) => ({ script: 'scripts/kaggle/marble.mjs', nodeFlags: [], args: [String(tier), String(runs), String(warmRuns)], glueArg: -1, probe: false })
 
 const matrix = () => {
@@ -56,7 +56,27 @@ const regressWith = (candidate) => () => {
   return runs
 }
 
-export const PLANS = Object.freeze({ matrix, variants, regress: regressWith(SIMD_GLUE), control: regressWith(SCALAR_GLUE) })
+const calibrate = () => ({ script: 'scripts/kaggle/calibrate.mjs', nodeFlags: [], args: [], glueArg: -1, probe: false })
+
+export const PROBE_CAP = 20480
+export const PROBE_BODIES = Object.freeze([16384, 12288])
+export const PROBE_KNOBS = Object.freeze(['none', 'sleep=0.25', 'sleep=0.15', 'awake=8192', 'awake=6144', 'awake=8192,sleep=0.25', 'asleep=1'])
+export const PROBE_REPEATS = 3
+
+const probe = () => {
+  const runs = [calibrate()]
+  const reference = referenceGlue(BASELINE.referenceCommit, PROBE_CAP)
+  for (let repeat = 0; repeat < PROBE_REPEATS; repeat++) {
+    for (const bodies of PROBE_BODIES) {
+      runs.push(tick(reference, bodies, 4))
+      for (const knobs of PROBE_KNOBS) runs.push(tick(HEADROOM_GLUE, bodies, 4, { knobs }))
+    }
+  }
+  runs.push(calibrate())
+  return runs
+}
+
+export const PLANS = Object.freeze({ probe, matrix, variants, regress: regressWith(SIMD_GLUE), control: regressWith(SCALAR_GLUE) })
 
 export const buildPlan = (mode = 'matrix') => {
   if (!Object.hasOwn(PLANS, mode)) throw new RangeError('unknown plan ' + mode)

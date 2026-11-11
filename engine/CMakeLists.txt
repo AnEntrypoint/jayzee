@@ -112,6 +112,11 @@ set(ENGINE_EXPORTS
   _engine_init
   _engine_world_configure
   _engine_world_optimize
+  _engine_world_set_awake_budget
+  _engine_world_set_spawn_asleep
+  _engine_world_set_sleep
+  _engine_world_held_bodies
+  _engine_world_active_bodies
   _engine_world_add_box
   _engine_world_add_trunk
   _engine_character_add

@@ -12,7 +12,7 @@ const stage = join(out, 'stage')
 const plan = buildPlan(process.argv[2] ?? 'matrix')
 const entries = [...new Set(plan.runs.map((run) => run.script))]
 const tickGlues = plan.runs.filter((run) => run.glueArg >= 0).map((run) => run.args[run.glueArg])
-const scenarioGlues = plan.runs.some((run) => run.glueArg < 0) ? SCENARIO_TIERS.map((tier) => tier.glue) : []
+const scenarioGlues = plan.runs.some((run) => run.script.endsWith('/marble.mjs')) ? SCENARIO_TIERS.map((tier) => tier.glue) : []
 const glues = [...new Set([...tickGlues, ...scenarioGlues])]
 
 rmSync(stage, { recursive: true, force: true })

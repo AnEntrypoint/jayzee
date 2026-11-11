@@ -219,6 +219,26 @@ EMSCRIPTEN_KEEPALIVE int engine_world_configure(std::uint32_t capacity, std::uin
   return status;
 }
 
+EMSCRIPTEN_KEEPALIVE int engine_world_set_awake_budget(std::uint32_t bodies) {
+  return engine::world().setAwakeBudget(bodies);
+}
+
+EMSCRIPTEN_KEEPALIVE int engine_world_set_spawn_asleep(std::uint32_t asleep) {
+  return engine::world().setSpawnAsleep(asleep != 0);
+}
+
+EMSCRIPTEN_KEEPALIVE int engine_world_set_sleep(float seconds, float pointSpeed) {
+  return engine::world().setSleep(seconds, pointSpeed);
+}
+
+EMSCRIPTEN_KEEPALIVE int engine_world_held_bodies() {
+  return static_cast<int>(engine::world().heldBodies());
+}
+
+EMSCRIPTEN_KEEPALIVE int engine_world_active_bodies() {
+  return static_cast<int>(engine::world().activeBodies());
+}
+
 EMSCRIPTEN_KEEPALIVE int engine_world_optimize() {
   engine::world().optimize();
   return engine::kOk;

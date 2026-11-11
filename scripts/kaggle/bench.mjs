@@ -1,4 +1,5 @@
 import { availableParallelism } from 'node:os'
+import { PerformanceObserver } from 'node:perf_hooks'
 import { loadEngineModule, resolvePlan } from '../../src/engine/EngineWorld.js'
 import { readLayout } from '../../src/engine/bridge.js'
 import { BODY_SPACING_M, GROUND, PLANET_RADIUS_M, TIER_1024 } from '../../src/engine/sceneSetup.js'
@@ -11,10 +12,12 @@ import { warmEngine } from '../../src/engine/warmEngine.js'
 const BUDGET_MS = 16.7
 const BOOT_TICKS = 2
 const SETTLE_END = 300
-const TRACE_TICKS = 320
+const TRACE_TICKS = 900
+const DEFAULT_POINT_SLEEP_SPEED = 0.03
 const PLAYERS = 1024
 
-const [glue, bodiesArg, workersArg, ticksArg, budgetArg, iterationsArg = 'default', scene = 'planet', warmArg = 'cold', warmSpecArg = 'default'] = process.argv.slice(2)
+const [glue, bodiesArg, workersArg, ticksArg, budgetArg, iterationsArg = 'default', scene = 'planet', warmArg = 'cold', warmSpecArg = 'default', knobsArg = 'none'] = process.argv.slice(2)
+const knobs = Object.fromEntries(knobsArg === 'none' ? [] : knobsArg.split(',').map((pair) => pair.split('=')))
 const bodies = Number(bodiesArg)
 const workers = Number(workersArg)
 const ticks = Number(ticksArg)
@@ -24,7 +27,7 @@ const onPlanet = scene === 'planet'
 const baseY = onPlanet ? PLANET_RADIUS_M : 0
 const FLAT_SPOT = Float64Array.of(0, 25, 60)
 const warm = warmArg === 'warm'
-const base = { kind: 'tick', scene, warm, warmSpec: warmSpecArg, variant: glue.includes('/variants/') ? glue.split('/').at(-2) : glue.includes('/reference/') ? 'reference' : 'base', glue: glue.split('/').pop(), bodies, workers, iterations, budgetMs: BUDGET_MS, budgetBytes, ticks, cpus: availableParallelism(), execArgv: process.execArgv }
+const base = { kind: 'tick', scene, warm, warmSpec: warmSpecArg, knobs: knobsArg, variant: glue.includes('/variants/') ? glue.split('/').at(-2) : glue.includes('/reference/') ? 'reference' : 'base', glue: glue.split('/').pop(), bodies, workers, iterations, budgetMs: BUDGET_MS, budgetBytes, ticks, cpus: availableParallelism(), execArgv: process.execArgv }
 
 const emit = (result) => {
   console.log('RESULT ' + JSON.stringify(result))
@@ -50,6 +53,11 @@ const setupStarted = performance.now()
 const status = module._engine_world_configure(bodies, TIER_1024.tickRate, TIER_1024.gravity, TIER_1024.drag, TIER_1024.radius, TIER_1024.restitution, iterations)
 if (status !== 0) emit({ ...base, refused: 'world-configure', status })
 if (!onPlanet) module._engine_world_add_box(...GROUND)
+const knobStatus = []
+if (knobs.sleep !== undefined) knobStatus.push(module._engine_world_set_sleep(Number(knobs.sleep), DEFAULT_POINT_SLEEP_SPEED))
+if (knobs.awake !== undefined) knobStatus.push(module._engine_world_set_awake_budget(Number(knobs.awake)))
+if (knobs.asleep !== undefined) knobStatus.push(module._engine_world_set_spawn_asleep(1))
+if (knobStatus.some((code) => code !== 0)) emit({ ...base, refused: 'knob', status: knobStatus })
 const perRow = Math.ceil(Math.sqrt(bodies))
 for (let i = 0; i < bodies; i++) {
   module._engine_spawn((i % perRow) * BODY_SPACING_M - 30, baseY + 1 + (i % 5), Math.floor(i / perRow) * BODY_SPACING_M - 30, 0, 0, 0)
@@ -62,13 +70,30 @@ const region = attachPoseRegion(poseRegionBuffers({ slots: 1, poseBytes }), { ow
 const stepper = createPoseStepper({ module, streamer, region, reserve })
 const setupMs = performance.now() - setupStarted
 
+const activeOf = typeof module._engine_world_active_bodies === 'function' ? module._engine_world_active_bodies : null
+const active = new Int32Array(ticks)
+const collections = []
+const gcObserver = new PerformanceObserver((list) => collections.push(...list.getEntries()))
+gcObserver.observe({ entryTypes: ['gc'] })
+const loopStarted = performance.now()
 const times = new Float64Array(ticks)
 for (let f = 0; f < ticks; f++) {
   region.setFrame(0, f)
   const at = performance.now()
   stepper(0)
   times[f] = performance.now() - at
+  if (activeOf) active[f] = activeOf()
 }
+collections.push(...gcObserver.takeRecords())
+gcObserver.disconnect()
+const overTicks = []
+times.forEach((ms, tick) => {
+  if (ms > BUDGET_MS) overTicks.push([tick, round(ms, 2), activeOf ? active[tick] : null])
+})
+let lastActiveTick = -1
+if (activeOf) active.forEach((count, tick) => {
+  if (count > 0) lastActiveTick = tick
+})
 
 const layout = readLayout(module)
 const sorted = Float64Array.from(times).sort()
@@ -101,5 +126,12 @@ emit({
   arenaUsedBytes: layout.usedBytes,
   wasmMemoryBytes: Number(module._engine_memory_bytes()),
   planBodies: layout.bodies,
+  overTicks: overTicks.slice(0, 40),
+  peakActive: activeOf ? Math.max(...active) : null,
+  lastActiveTick: activeOf ? lastActiveTick : null,
+  gcCount: collections.length,
+  gcMs: round(collections.reduce((sum, entry) => sum + entry.duration, 0), 2),
+  gcAtMs: collections.slice(0, 8).map((entry) => round(entry.startTime - loopStarted, 0)),
   traceMs: Array.from(times.subarray(0, Math.min(ticks, TRACE_TICKS)), (ms) => round(ms, 1)),
+  activeTrace: activeOf ? Array.from(active.subarray(0, Math.min(ticks, TRACE_TICKS))) : null,
 })
