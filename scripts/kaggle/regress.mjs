@@ -9,7 +9,6 @@ const median = (values) => {
   const sorted = [...values].sort((a, b) => a - b)
   return sorted[Math.floor(sorted.length / 2)]
 }
-const sum = (values) => values.reduce((total, value) => total + value, 0)
 
 export const judge = (baseline, results) => {
   const failures = []
@@ -19,14 +18,16 @@ export const judge = (baseline, results) => {
   const candidate = rows('base')
   if (reference.length < repeats) failures.push('reference rows: ' + reference.length + ' of ' + repeats)
   if (candidate.length < repeats) failures.push('candidate rows: ' + candidate.length + ' of ' + repeats)
-  const top = { bodies, workers, referenceP99Ms: null, candidateP99Ms: null, p99LimitMs: null, referenceOverBudget: sum(reference.map((c) => c.overBudget)), candidateOverBudget: sum(candidate.map((c) => c.overBudget)), overLimit: null, referenceP99EachMs: reference.map((c) => c.p99Ms), candidateP99EachMs: candidate.map((c) => c.p99Ms) }
+  const top = { bodies, workers, referenceP99Ms: null, candidateP99Ms: null, p99LimitMs: null, referenceOverBudget: null, candidateOverBudget: null, overLimit: null, referenceOverEach: reference.map((c) => c.overBudget), candidateOverEach: candidate.map((c) => c.overBudget), referenceP99EachMs: reference.map((c) => c.p99Ms), candidateP99EachMs: candidate.map((c) => c.p99Ms) }
   if (reference.length > 0 && candidate.length > 0) {
     top.referenceP99Ms = median(reference.map((c) => c.p99Ms))
     top.candidateP99Ms = median(candidate.map((c) => c.p99Ms))
     top.p99LimitMs = Number((top.referenceP99Ms * baseline.margin.p99Factor).toFixed(3))
+    top.referenceOverBudget = median(top.referenceOverEach)
+    top.candidateOverBudget = median(top.candidateOverEach)
     top.overLimit = Math.floor(top.referenceOverBudget * baseline.margin.overBudgetFactor) + baseline.margin.overBudgetTicks
     if (top.candidateP99Ms > top.p99LimitMs) failures.push('top tier median p99 ' + top.candidateP99Ms + ' ms is over ' + top.p99LimitMs + ' ms (the reference build ran ' + top.referenceP99Ms + ' ms in the same run, times ' + baseline.margin.p99Factor + ')')
-    if (top.candidateOverBudget > top.overLimit) failures.push('top tier ticks over ' + results.budgetMs + ' ms: ' + top.candidateOverBudget + ', limit ' + top.overLimit + ' (the reference build had ' + top.referenceOverBudget + ' in the same run)')
+    if (top.candidateOverBudget > top.overLimit) failures.push('top tier ticks over ' + results.budgetMs + ' ms in the median run: ' + top.candidateOverBudget + ', limit ' + top.overLimit + ' (the reference build had ' + top.referenceOverBudget + ' in the same kernel run)')
   }
   const marbles = results.configs.filter((c) => c.kind === 'marble-bowl')
   if (marbles.length < baseline.marble.tiers) failures.push('marble tiers: ' + marbles.length + ' of ' + baseline.marble.tiers)
@@ -57,5 +58,5 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     console.error('RESULT: FAIL ' + verdict.failures.join('; '))
     process.exit(1)
   }
-  console.log('RESULT: PASS top tier median p99 ' + verdict.topTier.candidateP99Ms + ' ms against the reference ' + verdict.topTier.referenceP99Ms + ' ms (limit ' + verdict.topTier.p99LimitMs + '), ' + verdict.topTier.candidateOverBudget + ' ticks over budget against ' + verdict.topTier.referenceOverBudget + ' (limit ' + verdict.topTier.overLimit + ')')
+  console.log('RESULT: PASS top tier median p99 ' + verdict.topTier.candidateP99Ms + ' ms against the reference ' + verdict.topTier.referenceP99Ms + ' ms (limit ' + verdict.topTier.p99LimitMs + '), ' + verdict.topTier.candidateOverBudget + ' ticks over budget in the median run against ' + verdict.topTier.referenceOverBudget + ' (limit ' + verdict.topTier.overLimit + ')')
 }

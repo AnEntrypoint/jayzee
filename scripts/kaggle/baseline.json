@@ -8,8 +8,8 @@
   "margin": {
     "p99Factor": 1.1,
     "overBudgetFactor": 1.25,
-    "overBudgetTicks": 5,
-    "basis": "Kaggle run 9: seven builds with the same cost within noise gave median p99 from 19.24 to 20.50 ms at 10240 bodies (6 percent) and 22.35 to 24.65 ms at 12288 (10 percent), and ticks over budget per three runs from 103 to 157 on a slow machine. Between machines the same build ran 11.7 ms (run 7), 13.6 ms (run 8) and 20.5 ms (run 9), so the gate compares with a reference build in the same run and not with a recorded absolute figure."
+    "overBudgetTicks": 2,
+    "basis": "Kaggle run 9: seven builds with the same cost within noise gave median p99 from 19.24 to 20.50 ms at 10240 bodies (6 percent) and 22.35 to 24.65 ms at 12288 (10 percent), and ticks over budget per three runs from 103 to 157 on a slow machine. Between machines the same build ran 11.7 ms (run 7), 13.6 ms (run 8) and 20.5 ms (run 9), so the gate compares with a reference build in the same run and not with a recorded absolute figure. Kaggle run 12, the same source as reference and candidate: p99 13.5 to 14.3 ms and 13.7 to 14.5 ms over five runs each, zero ticks over budget, except one candidate run at 19.5 ms with 17 ticks over. So both figures are judged on the median run, with 10 percent on the p99 and 25 percent plus 2 ticks on the count."
   },
   "marble": {
     "tiers": 4,

@@ -40,13 +40,24 @@ gate('the p99 is the median of the repeats, so one slow repeat does not fail the
   assert.equal(judge(BASELINE, results).ok, true)
 })
 
-gate('more ticks over budget than the reference allows fails', () => {
-  const allowedEach = Math.floor((Math.floor(9 * top.repeats * BASELINE.margin.overBudgetFactor) + BASELINE.margin.overBudgetTicks) / top.repeats)
-  assert.equal(judge(BASELINE, run(20, 20, 9, allowedEach)).ok, true)
-  const verdict = judge(BASELINE, run(20, 20, 9, allowedEach + 2))
+gate('more ticks over budget in the median run than the reference allows fails', () => {
+  const limit = Math.floor(9 * BASELINE.margin.overBudgetFactor) + BASELINE.margin.overBudgetTicks
+  assert.equal(judge(BASELINE, run(20, 20, 9, limit)).ok, true)
+  const verdict = judge(BASELINE, run(20, 20, 9, limit + 1))
   assert.equal(verdict.ok, false)
   assert.match(verdict.failures.join(' '), /ticks over/)
-  assert.equal(judge(BASELINE, run(12, 12, 0, Math.ceil((BASELINE.margin.overBudgetTicks + 1) / top.repeats) + 1)).ok, false)
+  assert.equal(judge(BASELINE, run(12, 12, 0, BASELINE.margin.overBudgetTicks)).ok, true)
+  assert.equal(judge(BASELINE, run(12, 12, 0, BASELINE.margin.overBudgetTicks + 1)).ok, false)
+})
+
+gate('one noisy repeat with many ticks over budget does not fail the run, as Kaggle run 12 had with identical builds', () => {
+  const results = run(13.9, 14.25)
+  const noisy = results.configs.find((c) => c.variant === 'base')
+  noisy.p99Ms = 19.469
+  noisy.overBudget = 17
+  const verdict = judge(BASELINE, results)
+  assert.equal(verdict.ok, true, verdict.failures.join('; '))
+  assert.equal(verdict.topTier.candidateOverBudget, 0)
 })
 
 gate('missing reference rows, missing candidate rows, a missing marble tier and a run with no result each fail', () => {
