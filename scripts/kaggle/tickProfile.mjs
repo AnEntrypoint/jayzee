@@ -1,6 +1,8 @@
 const SCOPE_FIELDS = 4
 const LANE_FIELDS = 5
 const SHOWN_SCOPES = 16
+const ENGINE_SCOPE_PREFIX = 'engine '
+const NOTABLE_QUIET_MAX_MS = 2
 const ENGINE_ENTRY_SCOPES = Object.freeze(['engine tick batch', 'engine follow', 'engine pose export'])
 const round = (value) => Number(value.toFixed(3))
 
@@ -87,7 +89,7 @@ export const createTickProfile = ({ module, budgetMs, keep = 12 }) => {
       return {
         quietTicks,
         slowTicks,
-        quiet: quiet.slice(0, SHOWN_SCOPES * 2),
+        quiet: quiet.filter((row, rank) => rank < SHOWN_SCOPES * 2 || row.scope.startsWith(ENGINE_SCOPE_PREFIX) || row.maxMs > NOTABLE_QUIET_MAX_MS),
         slow: slow.map(({ tick, ms, table }) => ({ tick, ms: round(ms), ...describeSlowTick({ ms, table, scopes, lanes, names, quietMeanMs, quietMaxMs, quietMeanCalls }) })),
       }
     },
