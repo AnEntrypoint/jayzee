@@ -39,9 +39,9 @@ const scenario = async (tier) => {
     const angle = arc / centreRadius
     return [centreRadius * Math.sin(angle), centreRadius * Math.cos(angle), 0]
   }
+  world.follow([0, centreRadius, 0])
   const boss = { index: world.addCharacter({ position: surfaceAt(BOSS_ARC_M), radius: CHARACTER_RADIUS, halfHeight: CHARACTER_HALF_HEIGHT }), health: BOSS_HEALTH, cooldown: 0 }
   const player = { index: world.addCharacter({ position: surfaceAt(0), radius: CHARACTER_RADIUS, halfHeight: CHARACTER_HALF_HEIGHT }), health: PLAYER_HEALTH, cooldown: 0 }
-  world.follow([0, centreRadius, 0])
   const planetCentre = [0, -centreRadius, 0]
   const bossBody = [0, 0, 0]
   const playerBody = [0, 0, 0]

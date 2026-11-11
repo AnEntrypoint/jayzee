@@ -55,9 +55,9 @@ std::unique_ptr<World> makeWorld(float gravity, float drag, float restitution, s
 }
 
 int spawnGrid(World& w, std::uint32_t* handles) {
-  float rows[kGridBodies * kBatchFloats];
+  double rows[kGridBodies * kBatchWords];
   for (std::uint32_t i = 0; i < kGridBodies; ++i) {
-    float* row = rows + i * kBatchFloats;
+    double* row = rows + i * kBatchWords;
     row[0] = static_cast<float>(i % kGridColumns) * 1.5f;
     row[1] = 2.0f + static_cast<float>(i / kGridColumns) * 1.5f;
     row[2] = 0.0f;
@@ -94,8 +94,8 @@ double groundRest() {
   Status status = kOk;
   std::unique_ptr<World> w = makeWorld(kGravity, kNoDrag, kNoRestitution, kCapacity, status);
   check(status == kOk, "phase 2: a 64-body world configures");
-  const float position[3] = {0.0f, kDropHeight, 0.0f};
-  const float velocity[3] = {0.0f, 0.0f, 0.0f};
+  const double position[3] = {0.0f, kDropHeight, 0.0f};
+  const double velocity[3] = {0.0f, 0.0f, 0.0f};
   const std::int64_t handle = w->spawn(position, velocity);
   check(handle == 0, "phase 2: the first spawn returns handle 0");
   w->step(kSettleTicks);
@@ -109,10 +109,10 @@ double groundRest() {
 void boxRest() {
   Status status = kOk;
   std::unique_ptr<World> w = makeWorld(kGravity, kNoDrag, kNoRestitution, kCapacity, status);
-  const float box[6] = {-1.0f, 0.5f, -1.0f, 1.0f, 1.0f, 1.0f};
+  const double box[6] = {-1.0f, 0.5f, -1.0f, 1.0f, 1.0f, 1.0f};
   check(w->addBox(box) == kOk, "phase 2: a static box is accepted");
-  const float position[3] = {0.0f, kBoxDropHeight, 0.0f};
-  const float velocity[3] = {0.0f, 0.0f, 0.0f};
+  const double position[3] = {0.0f, kBoxDropHeight, 0.0f};
+  const double velocity[3] = {0.0f, 0.0f, 0.0f};
   w->spawn(position, velocity);
   w->step(kSettleTicks);
   const double y = w->positions()[1];
@@ -156,7 +156,7 @@ void stateRoundTrip() {
   std::memcpy(velocities, a->velocities(), sizeof velocities);
 
   std::unique_ptr<World> b = makeWorld(kGravity, kNoDrag, kNoRestitution, kCapacity, status);
-  const float zero[3] = {0.0f, 0.0f, 0.0f};
+  const double zero[3] = {0.0f, 0.0f, 0.0f};
   std::uint32_t importHandles[kGridBodies];
   bool spawned = true;
   for (std::uint32_t i = 0; i < kGridBodies; ++i) {
@@ -166,10 +166,10 @@ void stateRoundTrip() {
   }
   check(spawned, "phase 2: the import world spawns every body");
   for (std::uint32_t i = 0; i < kGridBodies; ++i) {
-    const float position[3] = {static_cast<float>(positions[i * 3]), static_cast<float>(positions[i * 3 + 1]),
+    const double position[3] = {static_cast<float>(positions[i * 3]), static_cast<float>(positions[i * 3 + 1]),
                                static_cast<float>(positions[i * 3 + 2])};
     const float velocity[3] = {static_cast<float>(velocities[i * 3]), static_cast<float>(velocities[i * 3 + 1]),
-                               static_cast<float>(velocities[i * 3 + 2])};
+                              static_cast<float>(velocities[i * 3 + 2])};
     b->setPosition(importHandles[i], position);
     b->setVelocity(importHandles[i], velocity);
   }
@@ -184,8 +184,8 @@ void stateRoundTrip() {
 void sleepObservation() {
   Status status = kOk;
   std::unique_ptr<World> w = makeWorld(kGravity, kNoDrag, kNoRestitution, kCapacity, status);
-  const float position[3] = {0.0f, kDropHeight, 0.0f};
-  const float velocity[3] = {0.0f, 0.0f, 0.0f};
+  const double position[3] = {0.0f, kDropHeight, 0.0f};
+  const double velocity[3] = {0.0f, 0.0f, 0.0f};
   w->spawn(position, velocity);
   w->step(kSettleTicks);
   const double* v = w->velocities();
@@ -196,8 +196,8 @@ void sleepObservation() {
 double horizontalSpeedRatio(float drag) {
   Status status = kOk;
   std::unique_ptr<World> w = makeWorld(0.0f, drag, kNoRestitution, kCapacity, status);
-  const float position[3] = {0.0f, kProbeHeight, 0.0f};
-  const float velocity[3] = {kProbeSpeed, 0.0f, 0.0f};
+  const double position[3] = {0.0f, kProbeHeight, 0.0f};
+  const double velocity[3] = {kProbeSpeed, 0.0f, 0.0f};
   w->spawn(position, velocity);
   w->step(kProbeTicks);
   return w->velocities()[0] / static_cast<double>(kProbeSpeed);
@@ -214,8 +214,8 @@ void dragObservation() {
 void restitutionObservation() {
   Status status = kOk;
   std::unique_ptr<World> w = makeWorld(kGravity, kNoDrag, kBounceRestitution, kCapacity, status);
-  const float position[3] = {0.0f, kBounceDrop, 0.0f};
-  const float velocity[3] = {0.0f, 0.0f, 0.0f};
+  const double position[3] = {0.0f, kBounceDrop, 0.0f};
+  const double velocity[3] = {0.0f, 0.0f, 0.0f};
   w->spawn(position, velocity);
   double trace[kBounceTicks];
   for (std::uint32_t t = 0; t < kBounceTicks; ++t) {

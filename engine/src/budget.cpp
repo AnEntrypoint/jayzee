@@ -57,13 +57,6 @@ constexpr std::uint64_t kMaterialBytes = 64;
 constexpr std::uint64_t kTextureBytes = 32;
 constexpr std::uint64_t kLightBytes = 32;
 constexpr std::uint64_t kWorkerScratchBytes = 64ull * 1024ull;
-#if defined(ENGINE_THREADS)
-constexpr std::uint64_t kWorkerStackBytes = 512ull * 1024ull;
-constexpr std::uint64_t kThreadPoolBytes = 3ull * kWorkerStackBytes;
-#else
-constexpr std::uint64_t kWorkerStackBytes = 0;
-constexpr std::uint64_t kThreadPoolBytes = 0;
-#endif
 constexpr std::uint64_t kSlackBytes = 1024ull * 1024ull;
 #if defined(ENGINE_THREADS)
 constexpr std::uint64_t kJoltThreadHeapBytes = 526648;
@@ -71,7 +64,7 @@ constexpr std::uint64_t kHeapReserveBytes = 2633240;
 #endif
 
 constexpr std::uint64_t kBodyRowBytes = 2 * sizeof(std::uint32_t) + sizeof(std::uint16_t) + sizeof(std::uint8_t) + 6 * sizeof(double) +
-                                        sizeof(Transform) + sizeof(std::uint32_t) + kBatchFloats * sizeof(float) + sizeof(std::uint32_t);
+                                        sizeof(Transform) + sizeof(std::uint32_t) + kBatchWords * sizeof(double) + sizeof(std::uint32_t);
 
 constexpr std::uint32_t bodiesFor(std::uint32_t players) {
   for (const Tier& tier : kTiers) {
@@ -99,7 +92,6 @@ std::uint64_t totalBytes(const Capacity& c) {
   total += static_cast<std::uint64_t>(joltPairCapacity(c)) * kJoltPairBytes;
   total += c.tempBytes;
   total += kJoltFixedBytes;
-  total += kThreadPoolBytes;
   total += pool::primedBytes();
   total += static_cast<std::uint64_t>(joltQuadNodePages(c)) * pool::kLargestClassBytes;
   total += static_cast<std::uint64_t>(c.pageSlots) * (planet::kPageSamples * sizeof(float) + sizeof(std::int64_t) + sizeof(std::uint8_t));
@@ -116,7 +108,7 @@ std::uint64_t totalBytes(const Capacity& c) {
   total += players * visible * entityBytes;
   total += players * c.baselineDepth * visible * entityBytes;
   total += codec::kScratchBytes + codec::kScratchValues * sizeof(double) + 4 * sizeof(std::int32_t);
-  total += static_cast<std::uint64_t>(c.workers) * (kWorkerScratchBytes + kWorkerStackBytes);
+  total += static_cast<std::uint64_t>(c.workers) * kWorkerScratchBytes;
   total += kSlackBytes;
   return total;
 }

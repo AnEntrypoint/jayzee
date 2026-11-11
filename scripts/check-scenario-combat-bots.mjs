@@ -37,9 +37,9 @@ const scenario = async (tier) => {
   for (let k = 0; k < BOTS; k++) {
     const phi = (2 * Math.PI * k) / BOTS
     const at = [centreRadius * Math.sin(theta) * Math.cos(phi), centreRadius * Math.cos(theta), centreRadius * Math.sin(theta) * Math.sin(phi)]
+  world.follow([0, centreRadius, 0])
     bots.push({ index: world.addCharacter({ position: at, radius: CHARACTER_RADIUS, halfHeight: CHARACTER_HALF_HEIGHT }), health: MAX_HEALTH, cooldown: 0, shotsFired: 0 })
   }
-  world.follow([0, centreRadius, 0])
   const planetCentre = [0, -centreRadius, 0]
   const body = [0, 0, 0]
   const positions = bots.map(() => [0, 0, 0])

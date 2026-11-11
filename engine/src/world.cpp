@@ -208,6 +208,7 @@ Status World::configure(const Config& config) {
   if (bodyIds_ == nullptr) return kNotConfigured;
 
   releaseRuntime();
+  physicsOrigin() = PhysicsOrigin{};
   void* raw = pool::allocateAligned(sizeof(Runtime), alignof(Runtime));
   if (raw == nullptr) return kFull;
   runtime_ = new (raw) Runtime(*this, limits_.tempBytes, limits_.workers);
@@ -267,19 +268,23 @@ void World::removeBody(std::uint32_t index) {
   bodies.DestroyBody(id);
 }
 
-Status World::addBox(const float* box) {
+Status World::addBox(const double* box) {
   if (runtime_ == nullptr) return kNotConfigured;
   if (statics_ == limits_.statics) return kTooManyStatics;
-  const float halfX = (box[3] - box[0]) * 0.5f;
-  const float halfY = (box[4] - box[1]) * 0.5f;
-  const float halfZ = (box[5] - box[2]) * 0.5f;
-  if (!(halfX > 0.0f && halfY > 0.0f && halfZ > 0.0f)) return kZeroThickness;
+  const double extentX = (box[3] - box[0]) * 0.5;
+  const double extentY = (box[4] - box[1]) * 0.5;
+  const double extentZ = (box[5] - box[2]) * 0.5;
+  if (!(extentX > 0.0 && extentY > 0.0 && extentZ > 0.0)) return kZeroThickness;
+  const float halfX = static_cast<float>(extentX);
+  const float halfY = static_cast<float>(extentY);
+  const float halfZ = static_cast<float>(extentZ);
   const float radius = std::min(kConvexRadius, std::min(halfX, std::min(halfY, halfZ)));
   JPH::ShapeRefC shape = new JPH::BoxShape(JPH::Vec3(halfX, halfY, halfZ), radius);
+  follow((box[0] + box[3]) * 0.5, (box[1] + box[4]) * 0.5, (box[2] + box[5]) * 0.5);
   const PhysicsOrigin& o = physicsOrigin();
-  const JPH::RVec3 center(static_cast<float>((static_cast<double>(box[0]) + box[3]) * 0.5 - o.x),
-                          static_cast<float>((static_cast<double>(box[1]) + box[4]) * 0.5 - o.y),
-                          static_cast<float>((static_cast<double>(box[2]) + box[5]) * 0.5 - o.z));
+  const JPH::RVec3 center(static_cast<float>((box[0] + box[3]) * 0.5 - o.x),
+                          static_cast<float>((box[1] + box[4]) * 0.5 - o.y),
+                          static_cast<float>((box[2] + box[5]) * 0.5 - o.z));
   JPH::BodyCreationSettings settings(shape.GetPtr(), center, JPH::Quat::sIdentity(), JPH::EMotionType::Static, kLayerNonMoving);
   const JPH::BodyID id = runtime_->physics.GetBodyInterface().CreateAndAddBody(settings, JPH::EActivation::DontActivate);
   if (id.IsInvalid()) return kFull;
@@ -328,26 +333,29 @@ Status World::attachVegetation() {
 
 namespace {
 
-JPH::RVec3 toBody(const float* p) {
+JPH::RVec3 toBody(const double* p) {
   const PhysicsOrigin& o = physicsOrigin();
   return JPH::RVec3(static_cast<float>(p[0] - o.x), static_cast<float>(p[1] - o.y), static_cast<float>(p[2] - o.z));
 }
 
 }
 
-int World::addCharacter(const float* spec) {
+int World::addCharacter(const double* spec) {
   if (runtime_ == nullptr) return kNotConfigured;
-  if (!(spec[3] > 0.0f) || !(spec[4] >= 0.0f)) return kRange;
+  if (!(spec[3] > 0.0) || !(spec[4] >= 0.0)) return kRange;
   Runtime& r = *runtime_;
   if (r.characterCount >= kMaxCharacters) return kFull;
+  const float radius = static_cast<float>(spec[3]);
+  const float halfHeight = static_cast<float>(spec[4]);
   if (r.characterCount == 0) {
-    r.characterSettings.mShape = new JPH::CapsuleShape(spec[4], spec[3]);
-    r.characterRadius = spec[3];
-    r.characterHalfHeight = spec[4];
-  } else if (spec[3] != r.characterRadius || spec[4] != r.characterHalfHeight) {
+    r.characterSettings.mShape = new JPH::CapsuleShape(halfHeight, radius);
+    r.characterRadius = radius;
+    r.characterHalfHeight = halfHeight;
+  } else if (radius != r.characterRadius || halfHeight != r.characterHalfHeight) {
     return kRange;
   }
   const std::uint32_t index = r.characterCount;
+  follow(spec[0], spec[1], spec[2]);
   r.characters[index] = new JPH::CharacterVirtual(&r.characterSettings, toBody(spec), JPH::Quat::sIdentity(), &r.physics);
   r.characterCount += 1;
   return static_cast<int>(index);
@@ -409,13 +417,13 @@ void World::updateCharacters(float dt) {
   }
 }
 
-Status World::addTrunk(const float* trunk) {
+Status World::addTrunk(const double* trunk) {
   if (runtime_ == nullptr) return kNotConfigured;
   if (trunkBodies_ == limits_.trunks) return kFull;
-  if (!(trunk[3] > 0.0f) || !(trunk[4] >= 0.0f)) return kRange;
-  JPH::ShapeRefC shape = new JPH::CapsuleShape(trunk[4], trunk[3]);
-  const PhysicsOrigin& o = physicsOrigin();
-  const JPH::RVec3 at(static_cast<float>(trunk[0] - o.x), static_cast<float>(trunk[1] - o.y), static_cast<float>(trunk[2] - o.z));
+  if (!(trunk[3] > 0.0) || !(trunk[4] >= 0.0)) return kRange;
+  JPH::ShapeRefC shape = new JPH::CapsuleShape(static_cast<float>(trunk[4]), static_cast<float>(trunk[3]));
+  follow(trunk[0], trunk[1], trunk[2]);
+  const JPH::RVec3 at = toBody(trunk);
   JPH::BodyCreationSettings settings(shape.GetPtr(), at, JPH::Quat::sIdentity(), JPH::EMotionType::Static, kLayerNonMoving);
   const JPH::BodyID id = runtime_->physics.GetBodyInterface().CreateAndAddBody(settings, JPH::EActivation::DontActivate);
   if (id.IsInvalid()) return kFull;
@@ -423,21 +431,22 @@ Status World::addTrunk(const float* trunk) {
   return kOk;
 }
 
-std::int64_t World::spawn(const float* position, const float* velocity) {
-  const float row[kBatchFloats] = {position[0], position[1], position[2], velocity[0], velocity[1], velocity[2]};
+std::int64_t World::spawn(const double* position, const double* velocity) {
+  const double row[kBatchWords] = {position[0], position[1], position[2], velocity[0], velocity[1], velocity[2]};
   std::uint32_t handle = 0;
   const int status = spawnBatch(row, 1, &handle);
   if (status < 0) return status;
   return static_cast<std::int64_t>(handle);
 }
 
-int World::spawnBatch(const float* rows, std::uint32_t count, std::uint32_t* handles) {
+int World::spawnBatch(const double* rows, std::uint32_t count, std::uint32_t* handles) {
   if (runtime_ == nullptr) return kNotConfigured;
   if (count > capacity_ - live_ - retired_) return kFull;
+  if (count > 0) follow(rows[0], rows[1], rows[2]);
   JPH::BodyInterface& bodies = runtime_->physics.GetBodyInterface();
   JPH::BodyID* batch = asBodyIds(batch_);
   for (std::uint32_t i = 0; i < count; ++i) {
-    const float* row = rows + i * kBatchFloats;
+    const double* row = rows + i * kBatchWords;
     const int slot = allocateSlot();
     if (slot < 0) return kFull;
     const JPH::BodyID id(bodyIds_[slot]);
@@ -452,9 +461,9 @@ int World::spawnBatch(const float* rows, std::uint32_t count, std::uint32_t* han
     bodies.AddBodiesFinalize(batch, static_cast<int>(count), state, JPH::EActivation::Activate);
   }
   for (std::uint32_t i = 0; i < count; ++i) {
-    const float* row = rows + i * kBatchFloats;
+    const double* row = rows + i * kBatchWords;
     const std::uint32_t slot = handles[i] & kSlotMask;
-    bodies.SetLinearVelocity(JPH::BodyID(bodyIds_[slot]), JPH::Vec3(row[3], row[4], row[5]));
+    bodies.SetLinearVelocity(JPH::BodyID(bodyIds_[slot]), JPH::Vec3(static_cast<float>(row[3]), static_cast<float>(row[4]), static_cast<float>(row[5])));
     sync(slot);
   }
   return static_cast<int>(count);
@@ -480,10 +489,11 @@ Status World::despawn(std::uint32_t handle) {
   return kOk;
 }
 
-Status World::setPosition(std::uint32_t handle, const float* position) {
+Status World::setPosition(std::uint32_t handle, const double* position) {
   if (runtime_ == nullptr) return kNotConfigured;
   const int slot = resolve(handle);
   if (slot < 0) return kBadId;
+  follow(position[0], position[1], position[2]);
   runtime_->physics.GetBodyInterface().SetPosition(JPH::BodyID(bodyIds_[slot]), toBody(position), JPH::EActivation::Activate);
   sync(static_cast<std::uint32_t>(slot));
   return kOk;

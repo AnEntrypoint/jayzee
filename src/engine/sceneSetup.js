@@ -22,8 +22,17 @@ export const configurePlanet = (module) => {
 }
 
 export const planetSurface = (module) => {
-  const anchor = module._engine_planet_height(0, PLANET.radius, 0)
-  return (x, z) => module._engine_planet_height(x, PLANET.radius, z) - anchor
+  const at = module._engine_frame_scratch() >> 3
+  const heap = module.HEAPF64
+  const height = (x, z) => {
+    heap[at] = x
+    heap[at + 1] = PLANET.radius
+    heap[at + 2] = z
+    module._engine_planet_height_scratch()
+    return heap[at + 3]
+  }
+  const anchor = height(0, 0)
+  return (x, z) => height(x, z) - anchor
 }
 
 export const locateCell = (module, x, y, z, out) => {

@@ -90,7 +90,7 @@ export class EngineWorld {
     const buffer = module.HEAPF64.buffer
     this.#positions = new Float64Array(buffer, layout.regions.positions, layout.bodies * 3)
     this.#velocities = new Float64Array(buffer, layout.regions.velocities, layout.bodies * 3)
-    this.#stageRows = new Float32Array(buffer, layout.regions.stageRows, layout.bodies * BATCH_WORDS)
+    this.#stageRows = new Float64Array(buffer, layout.regions.stageRows, layout.bodies * BATCH_WORDS)
     this.#stageHandles = new Uint32Array(buffer, layout.regions.stageHandles, layout.bodies)
     this.#scratch = new Int32Array(buffer, layout.regions.planetScratch, 4)
   }

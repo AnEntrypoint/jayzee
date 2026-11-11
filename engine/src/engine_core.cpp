@@ -72,7 +72,7 @@ constexpr std::uint32_t kLayoutWords = kRegionWord0 + kRegionCount;
 std::uint32_t layoutWords[kLayoutWords];
 engine::budget::Capacity capacity{};
 std::uint64_t hostCarved = 0;
-float* stageRows = nullptr;
+double* stageRows = nullptr;
 std::uint32_t* stageHandles = nullptr;
 std::int32_t planetScratch[4];
 double planetScratchF[16];
@@ -139,7 +139,7 @@ int initialize(std::uint32_t players, std::uint32_t workers, double budgetBytes)
     return engine::kFull;
   }
   if (!engine::interest::bind(engine::arena::carve(engine::interest::bytesFor(capacity), 8), capacity)) return engine::kFull;
-  stageRows = carveArray<float>(static_cast<std::size_t>(capacity.bodies) * engine::kBatchFloats);
+  stageRows = carveArray<double>(static_cast<std::size_t>(capacity.bodies) * engine::kBatchWords);
   stageHandles = carveArray<std::uint32_t>(capacity.bodies);
   if (stageRows == nullptr || stageHandles == nullptr) return engine::kFull;
   fillLayout();
@@ -203,18 +203,18 @@ EMSCRIPTEN_KEEPALIVE int engine_world_configure(std::uint32_t capacity, std::uin
   return status;
 }
 
-EMSCRIPTEN_KEEPALIVE int engine_world_add_box(float minX, float minY, float minZ, float maxX, float maxY, float maxZ) {
-  const float box[6] = {minX, minY, minZ, maxX, maxY, maxZ};
+EMSCRIPTEN_KEEPALIVE int engine_world_add_box(double minX, double minY, double minZ, double maxX, double maxY, double maxZ) {
+  const double box[6] = {minX, minY, minZ, maxX, maxY, maxZ};
   return engine::world().addBox(box);
 }
 
-EMSCRIPTEN_KEEPALIVE int engine_world_add_trunk(float x, float y, float z, float radius, float halfHeight) {
-  const float trunk[5] = {x, y, z, radius, halfHeight};
+EMSCRIPTEN_KEEPALIVE int engine_world_add_trunk(double x, double y, double z, double radius, double halfHeight) {
+  const double trunk[5] = {x, y, z, radius, halfHeight};
   return engine::world().addTrunk(trunk);
 }
 
-EMSCRIPTEN_KEEPALIVE int engine_character_add(float x, float y, float z, float radius, float halfHeight) {
-  const float spec[5] = {x, y, z, radius, halfHeight};
+EMSCRIPTEN_KEEPALIVE int engine_character_add(double x, double y, double z, double radius, double halfHeight) {
+  const double spec[5] = {x, y, z, radius, halfHeight};
   return engine::world().addCharacter(spec);
 }
 
@@ -239,13 +239,13 @@ EMSCRIPTEN_KEEPALIVE float engine_character_body_axis(std::uint32_t index, std::
   return out[axis];
 }
 
-EMSCRIPTEN_KEEPALIVE double engine_spawn(float px, float py, float pz, float vx, float vy, float vz) {
-  const float position[3] = {px, py, pz};
-  const float velocity[3] = {vx, vy, vz};
+EMSCRIPTEN_KEEPALIVE double engine_spawn(double px, double py, double pz, double vx, double vy, double vz) {
+  const double position[3] = {px, py, pz};
+  const double velocity[3] = {vx, vy, vz};
   return static_cast<double>(engine::world().spawn(position, velocity));
 }
 
-EMSCRIPTEN_KEEPALIVE float* engine_stage() {
+EMSCRIPTEN_KEEPALIVE double* engine_stage() {
   return stageRows;
 }
 
@@ -261,8 +261,8 @@ EMSCRIPTEN_KEEPALIVE int engine_despawn(std::uint32_t handle) {
   return engine::world().despawn(handle);
 }
 
-EMSCRIPTEN_KEEPALIVE int engine_set_position(std::uint32_t handle, float x, float y, float z) {
-  const float position[3] = {x, y, z};
+EMSCRIPTEN_KEEPALIVE int engine_set_position(std::uint32_t handle, double x, double y, double z) {
+  const double position[3] = {x, y, z};
   return engine::world().setPosition(handle, position);
 }
 
@@ -275,8 +275,8 @@ EMSCRIPTEN_KEEPALIVE void engine_set_tick(std::uint64_t tick) {
   engine::world().setTick(tick);
 }
 
-EMSCRIPTEN_KEEPALIVE void engine_tick(int steps) {
-  if (steps <= 0) return;
+EMSCRIPTEN_KEEPALIVE int engine_tick(int steps) {
+  if (steps <= 0) return 0;
 #if defined(ENGINE_LEAK_ON_TICK)
   for (int i = 0; i < steps; ++i) {
     engine::bridge::tickBatch(1);
@@ -285,6 +285,7 @@ EMSCRIPTEN_KEEPALIVE void engine_tick(int steps) {
 #else
   engine::bridge::tickBatch(static_cast<std::uint32_t>(steps));
 #endif
+  return 0;
 }
 
 EMSCRIPTEN_KEEPALIVE void engine_mark_warmup() {
@@ -462,6 +463,21 @@ EMSCRIPTEN_KEEPALIVE int engine_page_commit(int slot) {
 }
 
 EMSCRIPTEN_KEEPALIVE int engine_page_release(std::int64_t key) {
+  return engine::planet::state().pages.releaseKey(key) ? engine::kOk : engine::kRange;
+}
+
+EMSCRIPTEN_KEEPALIVE int engine_page_stage_cell(int face, int cx, int cy) {
+  const engine::planet::Planet& terrain = engine::planet::state();
+  std::int64_t key = 0;
+  if (!terrain.configured || !engine::planet::packCellKey(face, cx, cy, terrain.cellsPerFace, key)) return engine::kRange;
+  engine::planet::state().pages.applyPending();
+  return engine::planet::state().pages.stage(key);
+}
+
+EMSCRIPTEN_KEEPALIVE int engine_page_release_cell(int face, int cx, int cy) {
+  const engine::planet::Planet& terrain = engine::planet::state();
+  std::int64_t key = 0;
+  if (!terrain.configured || !engine::planet::packCellKey(face, cx, cy, terrain.cellsPerFace, key)) return engine::kRange;
   return engine::planet::state().pages.releaseKey(key) ? engine::kOk : engine::kRange;
 }
 

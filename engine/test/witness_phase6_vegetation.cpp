@@ -98,7 +98,7 @@ std::uint32_t addLegacyTrunks(World& w) {
   std::uint32_t added = 0;
   for (int iz = 0; iz < fieldSide(); ++iz) {
     for (int ix = 0; ix < fieldSide(); ++ix) {
-      const float trunk[5] = {cellCentre(ix), kLegacyTrunkCentreHeight, cellCentre(iz), kLegacyTrunkRadius, kLegacyTrunkHalfCylinder};
+      const double trunk[5] = {cellCentre(ix), kLegacyTrunkCentreHeight, cellCentre(iz), kLegacyTrunkRadius, kLegacyTrunkHalfCylinder};
       if (w.addTrunk(trunk) == kOk) added += 1;
     }
   }
@@ -106,8 +106,8 @@ std::uint32_t addLegacyTrunks(World& w) {
 }
 
 std::int64_t fire(World& w, float x, float y, float z, float vx) {
-  const float position[3] = {x, y, z};
-  const float velocity[3] = {vx, 0.0f, 0.0f};
+  const double position[3] = {x, y, z};
+  const double velocity[3] = {vx, 0.0f, 0.0f};
   return w.spawn(position, velocity);
 }
 

@@ -38,9 +38,9 @@ std::unique_ptr<World> makeWorld(std::uint32_t capacity, Status& status) {
   return w;
 }
 
-void fillRows(float* rows, std::uint32_t count) {
+void fillRows(double* rows, std::uint32_t count) {
   for (std::uint32_t i = 0; i < count; ++i) {
-    float* row = rows + i * kBatchFloats;
+    double* row = rows + i * kBatchWords;
     row[0] = static_cast<float>(i) * kSpacing;
     row[1] = kDropHeight;
     row[2] = 0.0f;
@@ -62,8 +62,8 @@ void staleGenerationRefused() {
   Status status = kOk;
   std::unique_ptr<World> w = makeWorld(kRetireCapacity, status);
   check(status == kOk, "phase 4: a capacity-2 pool configures");
-  const float position[3] = {0.0f, kDropHeight, 0.0f};
-  const float velocity[3] = {0.0f, 0.0f, 0.0f};
+  const double position[3] = {0.0f, kDropHeight, 0.0f};
+  const double velocity[3] = {0.0f, 0.0f, 0.0f};
   const std::uint32_t handle = static_cast<std::uint32_t>(w->spawn(position, velocity));
   check(w->despawn(handle ^ (1u << 16)) == kBadId, "phase 4: a handle with the wrong generation is refused");
   check(w->despawn(handle) == kOk, "phase 4: the live handle still despawns");
@@ -72,8 +72,8 @@ void staleGenerationRefused() {
 void retirement() {
   Status status = kOk;
   std::unique_ptr<World> w = makeWorld(kRetireCapacity, status);
-  const float position[3] = {0.0f, kDropHeight, 0.0f};
-  const float velocity[3] = {0.0f, 0.0f, 0.0f};
+  const double position[3] = {0.0f, kDropHeight, 0.0f};
+  const double velocity[3] = {0.0f, 0.0f, 0.0f};
   bool everyCycleOk = true;
   bool immediateRefused = true;
   std::uint32_t retiredBeforeLast = 0xffffffffu;
@@ -105,7 +105,7 @@ void churn() {
   Status status = kOk;
   std::unique_ptr<World> w = makeWorld(kChurnCapacity, status);
   check(status == kOk, "phase 4: a 64-body pool configures");
-  float rows[kChurnBatchSize * kBatchFloats];
+  double rows[kChurnBatchSize * kBatchWords];
   fillRows(rows, kChurnBatchSize);
   std::uint32_t handles[kChurnBatchSize];
 

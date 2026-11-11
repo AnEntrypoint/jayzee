@@ -80,7 +80,7 @@ gate('the C++ body store, planet contact, gravity and vegetation field use the o
   assert.ok(world.includes('if (index == planetBody_ || index == vegetationBody_) continue;'))
   assert.ok(world.includes('const double x = position.GetX() + o.x;'))
   assert.ok(world.includes('position[0] = p.GetX() + o.x;'))
-  assert.ok(world.includes('JPH::RVec3 toBody(const float* p) {'))
+  assert.ok(world.includes('JPH::RVec3 toBody(const double* p) {'))
   assert.ok(read('engine/src/world.h').includes('Status follow(double x, double y, double z);'))
   const planet = read('engine/src/planet_shape.cpp')
   assert.ok(planet.includes('const double x = center.GetX() + o.x;'))

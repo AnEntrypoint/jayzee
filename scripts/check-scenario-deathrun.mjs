@@ -27,8 +27,8 @@ const scenario = async (tier) => {
   world.configurePlanet(PLANET)
   const anchor = world.height(0, PLANET.radius, 0)
   const centreRadius = PLANET.radius + anchor + CHARACTER_RADIUS + CHARACTER_HALF_HEIGHT
-  world.addCharacter({ position: [0, centreRadius + 0.5, 0], radius: CHARACTER_RADIUS, halfHeight: CHARACTER_HALF_HEIGHT })
   world.follow([0, centreRadius, 0])
+  world.addCharacter({ position: [0, centreRadius + 0.5, 0], radius: CHARACTER_RADIUS, halfHeight: CHARACTER_HALF_HEIGHT })
   const planetCentre = [0, -centreRadius, 0]
   const checkpoints = CHECKPOINT_ARC_M.map((arc) => {
     const angle = arc / centreRadius

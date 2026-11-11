@@ -69,8 +69,8 @@ void batchCallRule() {
 void inputAtBatchStart() {
   std::uint32_t* control = bridge::controlWords();
   check(world().configure(batchConfig()) == kOk, "phase 3: the input world configures");
-  const float position[3] = {0.0f, 2.0f, 0.0f};
-  const float velocity[3] = {0.0f, 0.0f, 0.0f};
+  const double position[3] = {0.0f, 2.0f, 0.0f};
+  const double velocity[3] = {0.0f, 0.0f, 0.0f};
   const std::int64_t handle = world().spawn(position, velocity);
   check(handle == 0, "phase 3: the input target is handle 0");
   drainEvents();
@@ -144,9 +144,9 @@ void regionLayout() {
 
 void noAllocationAfterWarmup() {
   check(world().configure(batchConfig()) == kOk, "phase 3: the allocation world configures");
-  const float velocity[3] = {0.0f, 0.0f, 0.0f};
+  const double velocity[3] = {0.0f, 0.0f, 0.0f};
   for (std::uint32_t i = 0; i < kWarmupBodies; ++i) {
-    const float position[3] = {static_cast<float>(i) * 1.5f, 2.0f, 0.0f};
+    const double position[3] = {static_cast<float>(i) * 1.5f, 2.0f, 0.0f};
     world().spawn(position, velocity);
   }
   for (std::uint32_t b = 0; b < kWarmupBatches; ++b) {

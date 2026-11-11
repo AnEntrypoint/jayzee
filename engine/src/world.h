@@ -14,7 +14,7 @@ namespace engine {
 
 constexpr std::uint32_t kMaxIterations = 32;
 constexpr std::uint32_t kSlotMask = 0xffffu;
-constexpr std::uint32_t kBatchFloats = 6;
+constexpr std::uint32_t kBatchWords = 6;
 constexpr std::uint32_t kNoBody = 0xffffffffu;
 constexpr std::uint16_t kLastGeneration = 0xfffeu;
 constexpr std::uint16_t kRetiredGeneration = 0xffffu;
@@ -90,19 +90,19 @@ class World {
 
   Status bind(const budget::Capacity& capacity);
   Status configure(const Config& config);
-  Status addBox(const float* box);
+  Status addBox(const double* box);
   Status configurePlanet(double radius, double cellSize, double gravity, double maxHeight);
   Status attachVegetation();
-  Status addTrunk(const float* trunk);
-  int addCharacter(const float* spec);
+  Status addTrunk(const double* trunk);
+  int addCharacter(const double* spec);
   void setCharacterVelocity(std::uint32_t index, const float* velocity);
   bool characterSupported(std::uint32_t index) const;
   void characterPosition(std::uint32_t index, float* out) const;
   void characterBodyPosition(std::uint32_t index, float* out) const;
-  std::int64_t spawn(const float* position, const float* velocity);
-  int spawnBatch(const float* rows, std::uint32_t count, std::uint32_t* handles);
+  std::int64_t spawn(const double* position, const double* velocity);
+  int spawnBatch(const double* rows, std::uint32_t count, std::uint32_t* handles);
   Status despawn(std::uint32_t handle);
-  Status setPosition(std::uint32_t handle, const float* position);
+  Status setPosition(std::uint32_t handle, const double* position);
   Status setVelocity(std::uint32_t handle, const float* velocity);
   Status follow(double x, double y, double z);
   void step(std::uint32_t steps);

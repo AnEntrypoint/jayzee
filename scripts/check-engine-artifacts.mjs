@@ -1,4 +1,5 @@
-import { readFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import assert from 'node:assert/strict'
@@ -32,6 +33,15 @@ gate('every pinned artifact has a 64-hex sha256 and a wasm path under engine/out
   for (const [name, entry] of Object.entries(manifest.artifacts)) {
     assert.match(entry.sha256, /^[0-9a-f]{64}$/, name)
     assert.equal(entry.wasm, 'engine/out/' + name + '.wasm', name)
+  }
+})
+
+gate('every pinned artifact is the file in engine/out whose sha256 the pin records', () => {
+  for (const [name, entry] of Object.entries(manifest.artifacts)) {
+    const file = join(root, entry.wasm)
+    assert.ok(existsSync(file), name + ': ' + entry.wasm + ' is missing')
+    const digest = createHash('sha256').update(readFileSync(file)).digest('hex')
+    assert.equal(digest, entry.sha256, name + ': pin does not match ' + entry.wasm)
   }
 })
 

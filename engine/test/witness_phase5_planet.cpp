@@ -59,8 +59,8 @@ void refusals() {
 
 void settle() {
   check(bootPlanet() == kOk, "phase 5: the settle world boots with a planet");
-  const float position[3] = {0.0f, static_cast<float>(kPlanetRadius + kSettleDrop), 0.0f};
-  const float velocity[3] = {0.0f, 0.0f, 0.0f};
+  const double position[3] = {0.0f, static_cast<float>(kPlanetRadius + kSettleDrop), 0.0f};
+  const double velocity[3] = {0.0f, 0.0f, 0.0f};
   check(world().spawn(position, velocity) == 0, "phase 5: the settling sphere takes slot 0");
   for (std::uint32_t t = 0; t < kSettleTicks; ++t) {
     bridge::tickBatch(1);
@@ -97,8 +97,8 @@ void flight() {
   check(bootPlanet() == kOk, "phase 5: the flight world boots with a planet");
   const double orbitRadius = kPlanetRadius + kFlightAltitude;
   const double orbitSpeed = std::sqrt(kPlanetGravity * kPlanetRadius * kPlanetRadius / orbitRadius);
-  const float position[3] = {static_cast<float>(orbitRadius), 0.0f, 0.0f};
-  const float velocity[3] = {0.0f, 0.0f, static_cast<float>(orbitSpeed)};
+  const double position[3] = {static_cast<float>(orbitRadius), 0.0f, 0.0f};
+  const double velocity[3] = {0.0f, 0.0f, static_cast<float>(orbitSpeed)};
   check(world().spawn(position, velocity) == 0, "phase 5: the flyer takes slot 0");
   for (std::uint32_t t = 0; t < kFlightWarmupTicks; ++t) {
     bridge::tickBatch(1);

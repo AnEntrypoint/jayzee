@@ -2,7 +2,7 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import assert from 'node:assert/strict'
 import { gate, finish } from './lib/gate.mjs'
-import { THREADS_BODIES, runThreadsScenario } from './lib/threadsScenario.mjs'
+import { THREADS_BODIES, THREADS_PLAYERS, runThreadsScenario } from './lib/threadsScenario.mjs'
 import { loadEngineModule, resolvePlan } from '../src/engine/EngineWorld.js'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -16,8 +16,8 @@ const threadedA = await runThreadsScenario(THREADED, WORKERS)
 const threadedB = await runThreadsScenario(THREADED, WORKERS)
 
 gate('the threaded build has a shared heap, and the single-threaded build does not', async () => {
-  const threaded = await loadEngineModule(THREADED, resolvePlan({ workers: WORKERS }))
-  const single = await loadEngineModule(FIXED, resolvePlan({ workers: 1 }))
+  const threaded = await loadEngineModule(THREADED, resolvePlan({ players: THREADS_PLAYERS, workers: WORKERS }))
+  const single = await loadEngineModule(FIXED, resolvePlan({ players: THREADS_PLAYERS, workers: 1 }))
   assert.ok(threaded.HEAPU8.buffer instanceof SharedArrayBuffer, 'the threaded heap is not a SharedArrayBuffer')
   assert.ok(!(single.HEAPU8.buffer instanceof SharedArrayBuffer), 'the single-threaded heap is shared')
 })

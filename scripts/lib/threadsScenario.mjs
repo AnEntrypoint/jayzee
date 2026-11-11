@@ -2,7 +2,8 @@ import { createEngineWorld } from '../../src/engine/EngineWorld.js'
 
 export const THREADS_BODIES = 256
 export const THREADS_TICKS = 600
-export const THREADS_WORLD = Object.freeze({ capacity: 512, tickRate: 60, gravity: -9.8, drag: 0.1, radius: 0.35, restitution: 0.2, iterations: 8, players: 64, budgetBytes: 67108864 })
+export const THREADS_PLAYERS = 64
+export const THREADS_WORLD = Object.freeze({ capacity: 512, tickRate: 60, gravity: -9.8, drag: 0.1, radius: 0.35, restitution: 0.2, iterations: 8, players: THREADS_PLAYERS, budgetBytes: 67108864 })
 
 export const runThreadsScenario = async (glue, workers) => {
   const world = await createEngineWorld({ ...THREADS_WORLD, workers }, glue)

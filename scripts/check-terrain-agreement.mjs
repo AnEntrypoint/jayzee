@@ -130,7 +130,6 @@ const runTier = async (tier) => {
   for (const pick of picks) {
     const dir = pick.p.map((c) => c / Math.hypot(...pick.p))
     const start = dir.map((c) => c * (PLANET.radius + pick.rendered + DROP_HEIGHT_M))
-    world.follow(start)
     const handle = world.spawn(start)
     for (let t = 0; t < SETTLE_TICKS; t++) world.step()
     const rest = world.position(handle)
