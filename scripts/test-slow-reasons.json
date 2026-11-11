@@ -3,7 +3,7 @@
   "check:engine-state-hash-1024": "Five isolated 1024-tier runs of 120 ticks (fixed, and 2, 4, 7, 8 workers). They now run at the same time; before, they ran one after another and the 4-worker run was done twice (29 s).",
   "check:gc-witness": "20000 measured ticks and 20000 control ticks under a GC observer. The count is the claim, so the ticks stay.",
   "check:elevation-ab": "Runs spoint A/B elevation script at the fixture N and compares its output line for line.",
-  "check:scenario-marble-bowl": "512 marbles for 600 ticks, twice, on four tiers. Containment, settling and bit-for-bit agreement are the claims here. The per-tick wall-time claim (no tick over 25 ms or 16.7 ms) moved to the Kaggle run (scripts/kaggle/marble.mjs, recorded at the end of docs/CHECK_TIMES.md), because under host load another session pushed 8 ticks over 25 ms here and the check failed, and it passed alone.",
+  "check:scenario-marble-bowl": "512 marbles for 600 ticks, twice, on four tiers. Containment, settling and bit-for-bit agreement are the claims, with a bound of 25 ms of main-thread CPU time per tick on the single-threaded tiers. The 16.7 ms budget and the threaded tier are judged in the Kaggle regression run (scripts/kaggle/marble.mjs): wall time failed here under host load, and on a threaded tier the main thread spins while starved workers catch up, so its CPU time rose to 29.5 ms in a loaded full run.",
   "check:height-cpu": "Evaluates every spoint height fixture sample to 1e-12.",
   "check:heightmap-cli": "Runs the heightmap CLI once per fixture case.",
   "check:app-watch": "Waits on real file-watch events.",

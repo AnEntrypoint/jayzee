@@ -15,5 +15,6 @@
   "check:engine-job-wait",
   "check:scenario-determinism",
   "check:scenario-allocations",
-  "check:scenario-character-terrain"
+  "check:scenario-character-terrain",
+  "check:scenario-marble-bowl"
 ]
