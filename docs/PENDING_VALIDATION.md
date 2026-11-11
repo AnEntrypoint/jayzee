@@ -3882,3 +3882,19 @@ Cause, from the built glue:
 Not done: a non-allocating clock. The alternatives are (a) a fake monotonic clock in the import, which changes the timeout behaviour of every timed wait in the runtime and needs a gate for that; (b) removing the futex waits from the per-tick path, which changes the job system.
 
 Witness needed to close it: `scripts/check-pose-allocations.mjs` against `engine/out/engine-core-1024mib-threads.mjs` reports `frameBytes.own` and `inheritedFromFramePath` at 0 over 600 frames, and `check:engine-threads` still passes.
+
+## Clock-free futex wait in the threaded runtime (Phase A, pending witness)
+
+Change: `engine/src/futex_clockfree.cpp` defines `emscripten_futex_wait`, which replaces the emscripten library version in threaded builds only (`engine/CMakeLists.txt`, `ENGINE_THREADS`). The library version reads the emscripten clock import in its main-thread busy-wait branch on every loop, and that import allocates per call.
+
+Behaviour:
+- A thread that supports `Atomics.wait` (the worker threads) calls `memory.atomic.wait32` directly, as the library does. That path reads no clock.
+- A thread without `Atomics.wait` (the main thread in the glue's run) spins on the address. A timed wait spins a budget of `maxWaitMilliseconds * 20000` iterations, a preallocated count in place of a time read. An infinite wait spins until the value changes. Neither reads the clock.
+- Both paths call `_emscripten_yield(0)` each iteration, so proxied main-thread calls still run.
+
+Timed waits now end after a spin count, not after wall time. Jolt's `sleep_for(100 µs)` therefore sleeps for an approximate number of spins. The job results do not depend on that, because the job system's ordering comes from its semaphores and queues, not from sleep length.
+
+Witness that closes it, all in Phase B on a rebuilt threaded glue:
+- `npm run check:pose-allocations` against `engine/out/engine-core-1024mib-threads.mjs`: `frameBytes.total` and `own` both 0 over 600 frames. The gate currently runs on the non-threaded glue, so the threaded run is a separate command (see Phase B).
+- `npm run check:engine-threads`: the threaded run agrees with the fixed run within 1 mm after 600 ticks, and two threaded runs agree bit for bit.
+- The pool job-wait tests: the repo has no dedicated job-wait test. `check:engine-threads` is the job-wait witness, because it runs the pool through 600 ticks with four workers.
