@@ -493,6 +493,8 @@ const run = async () => {
   result.frameTimesMs = timed.map(roundTo2)
   result.wallIntervalsMs = Array.from(column(5), roundTo2)
   result.wallIntervalMaxMs = Math.max(...result.wallIntervalsMs)
+  result.frameStartsMs = Array.from(column(1), roundTo2)
+  result.timeOriginMs = performance.timeOrigin
   result.players = readLayout(module).players
   if (TIER === 1024) result.scene = planetScene.report()
   result.path = PATH

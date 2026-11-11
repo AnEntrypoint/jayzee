@@ -3718,3 +3718,11 @@ Phase B (2026-11-11): the engine is unchanged in this stretch, so the glues are 
 - Cause, as far as the evidence goes: every run shares the host with the owner's exe process at about 94% CPU, and the load average was 3.1 to 3.7 on 16 CPUs. The rAF gaps are in the scheduler, not the frame work. The 29.42 ms frame is on the WebGL2 path, which the change does not touch (only `encodeVisibility` changed). The cause of that single frame is not identified.
 - Status: Phase B is not green. The rule is that a 1024 run over 16.7 ms is a defect, and the 1024 runs pass, but the 64-tier missed-frame and single-frame failures are not explained. The vegetation change is not pushed. Its commit stays local.
 - Limit: the 1024 WebGPU vegetation draw is in the front pass after the models, so its cost is included in the 1024 work numbers above.
+
+## Planet witness: per-frame cause record (Phase A, 2026-11-11)
+
+- Problem: the earlier witness recorded the in-callback work and the rAF interval per frame but not the host state at the frame. The 25 to 43 ms gaps could not be attributed to the browser or the host.
+- Change: `scripts/browser/engine-render-browser.js` adds `frameStartsMs` (the start of each timed frame on the page clock) and `timeOriginMs` (`performance.timeOrigin`), so a frame can be placed on the host's clock.
+- Change: `scripts/browser/planet-witness-run.mjs` samples `ps` (top five by CPU) and the load average every 250 ms for the whole of each run. For each timed frame whose interval is over 25 ms, it writes a `frameCases` entry: the frame index, interval, in-callback work, start epoch, the host samples in the window, the max load, and the top processes in the window. It classifies the frame as `code-defect` when the work is over 16.7 ms, and as `outside-callback` otherwise. The run JSON also carries `hostSamples`, and the summary prints each run's worst work, worst interval, and the frame cases.
+- Limit: the `outside-callback` class only says the time was not in the frame callback. It does not say whether the browser or the host spent it. The host samples show what else was running, but not whether the page's renderer thread was descheduled. Settling that needs the trace in the next step.
+- Witness: Phase B runs the witness three times on both backends at the 64 and 1024 tiers, and the frame cases are read from each run's JSON.
