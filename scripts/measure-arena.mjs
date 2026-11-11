@@ -54,6 +54,8 @@ console.log(JSON.stringify({
   tempPeakBytes: module._engine_world_temp_peak_bytes(),
   tempPeakPerBody: perBody(module._engine_world_temp_peak_bytes()),
   tempPlanBytes: terms[PLAN_TERMS.indexOf('temp')],
+  updateErrors: module._engine_world_update_errors(),
+  awakeLimit: module._engine_world_awake_limit(),
   wasmMemoryBytes: Number(module._engine_memory_bytes()),
 }, null, 1))
 await releaseEngineModule(module)

@@ -45,6 +45,8 @@ export const configurations = (results) => {
       arenaBytes: first.arenaBytes,
       arenaUsedBytes: Math.max(...ticks.map((row) => row.arenaUsedBytes ?? 0)),
       tempPeakBytes: Math.max(...ticks.map((row) => row.tempPeakBytes ?? 0)),
+      updateErrors: Math.max(...ticks.map((row) => row.updateErrors ?? 0)),
+      awakeLimit: first.awakeLimit ?? null,
       minorFaultsMax: Math.max(...ticks.map((row) => row.minorFaultsMax ?? 0)),
       arenaGrowthTicks: Math.max(...ticks.map((row) => row.arenaGrowthTicks ?? 0)),
     }

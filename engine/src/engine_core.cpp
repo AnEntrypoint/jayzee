@@ -249,6 +249,14 @@ EMSCRIPTEN_KEEPALIVE int engine_world_unsettled_in_view() {
   return static_cast<int>(engine::world().unsettledInView());
 }
 
+EMSCRIPTEN_KEEPALIVE int engine_world_update_errors() {
+  return static_cast<int>(engine::world().updateErrors());
+}
+
+EMSCRIPTEN_KEEPALIVE int engine_world_awake_limit() {
+  return static_cast<int>(engine::world().awakeLimit());
+}
+
 EMSCRIPTEN_KEEPALIVE double engine_world_temp_peak_bytes() {
   return static_cast<double>(engine::world().tempPeakBytes());
 }

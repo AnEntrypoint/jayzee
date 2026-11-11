@@ -49,10 +49,11 @@ constexpr std::uint32_t kEventSlots = 256;
 constexpr std::uint32_t kVisiblePerClient = 128;
 constexpr std::uint32_t kBaselineDepth = 8;
 constexpr std::uint32_t kInterestCellsPerSide = 32;
-constexpr std::uint64_t kTempBytes = 16ull * 1024ull * 1024ull;
-constexpr std::uint64_t kTempBytesPerBody = 2048;
+constexpr std::uint64_t kTempBytes = 8ull * 1024ull * 1024ull;
+constexpr std::uint64_t kTempBytesPerBody = 64;
+constexpr std::uint64_t kTempBytesPerContact = 896;
 
-constexpr std::uint64_t kJoltBodyBytes = 1024;
+constexpr std::uint64_t kJoltBodyBytes = 576;
 constexpr std::uint64_t kJoltStaticBytes = 512;
 constexpr std::uint64_t kJoltContactBytes = 384;
 constexpr std::uint64_t kJoltPairBytes = 128;
@@ -168,7 +169,7 @@ bool fitsTier(std::uint64_t budgetBytes, std::uint32_t players, std::uint32_t wo
     next.modelBytes = modelBytesOf(tier);
     for (std::uint32_t perPlayer = mostPerPlayer + 1; perPlayer-- > leastPerPlayer;) {
       next.bodies = bodiesFor(players, perPlayer);
-      next.tempBytes = kTempBytes + static_cast<std::uint64_t>(next.bodies) * kTempBytesPerBody;
+      next.tempBytes = kTempBytes + static_cast<std::uint64_t>(next.bodies) * kTempBytesPerBody + static_cast<std::uint64_t>(joltContactCapacity(next)) * kTempBytesPerContact;
       next.arenaBytes = totalBytes(next);
       if (next.arenaBytes <= budgetBytes && next.arenaBytes <= arena::kBytes) {
         fits = true;

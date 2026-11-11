@@ -165,6 +165,8 @@ emit({
   planBodies: layout.bodies,
   planTermBytes: termCount ? Array.from({ length: termCount() }, (_, term) => module._engine_plan_term_bytes(term)) : null,
   tempPeakBytes: exported('_engine_world_temp_peak_bytes') ? module._engine_world_temp_peak_bytes() : null,
+  updateErrors: exported('_engine_world_update_errors') ? module._engine_world_update_errors() : null,
+  awakeLimit: exported('_engine_world_awake_limit') ? module._engine_world_awake_limit() : null,
   overTicks: overTicks.slice(0, SHOWN_OVER_TICKS),
   peakActive: activeOf ? Math.max(...active) : null,
   lastActiveTick: activeOf ? lastActiveTick : null,

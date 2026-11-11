@@ -54,12 +54,18 @@ constexpr std::uint32_t joltQuadNodePages(const budget::Capacity& c) {
   return (nodes + kQuadNodesPerPage - 1) / kQuadNodesPerPage;
 }
 
+constexpr std::uint32_t kAwakeDesignBodies = 16384;
+
+constexpr std::uint32_t contactBodies(const budget::Capacity& c) {
+  return c.bodies < kAwakeDesignBodies ? c.bodies : kAwakeDesignBodies;
+}
+
 constexpr std::uint32_t joltPairCapacity(const budget::Capacity& c) {
-  return c.bodies * 4;
+  return contactBodies(c) * 4;
 }
 
 constexpr std::uint32_t joltContactCapacity(const budget::Capacity& c) {
-  return c.bodies * 5 / 2;
+  return contactBodies(c) * 5 / 2;
 }
 
 enum Status : int {
@@ -162,6 +168,8 @@ class World {
   Status clearReleaseView();
   std::uint32_t airborneBodies() const;
   std::uint64_t tempPeakBytes() const;
+  std::uint32_t updateErrors() const { return updateErrors_; }
+  std::uint32_t awakeLimit() const;
   std::uint32_t wakeCount(std::uint32_t count) const;
   void releaseHeld();
   void setTick(std::uint64_t tick);
@@ -209,6 +217,7 @@ class World {
   std::uint32_t retired_ = 0;
   std::uint32_t awakeBudget_ = 0;
   std::uint32_t heldCount_ = 0;
+  std::uint32_t updateErrors_ = 0;
   std::uint32_t queueCount_ = 0;
   std::uint32_t queueHead_ = 0;
   bool queueStale_ = true;

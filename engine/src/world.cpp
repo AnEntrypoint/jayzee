@@ -290,6 +290,7 @@ Status World::configure(const Config& config) {
   std::fill(ceiling_, ceiling_ + limits_.bodies, std::numeric_limits<float>::quiet_NaN());
   radius_ = config.radius;
   heldCount_ = 0;
+  updateErrors_ = 0;
   queueCount_ = 0;
   queueHead_ = 0;
   queueStale_ = true;
@@ -939,12 +940,19 @@ void World::applyRadialGravity(JPH::PhysicsSystem& system, float dt) {
   forActiveRanges(system.GetNumActiveBodies(JPH::EBodyType::RigidBody), true);
 }
 
+std::uint32_t World::awakeLimit() const {
+  const bool bounded = limits_.bodies > kAwakeDesignBodies;
+  if (awakeBudget_ == 0) return bounded ? kAwakeDesignBodies : 0;
+  return bounded ? std::min(awakeBudget_, kAwakeDesignBodies) : awakeBudget_;
+}
+
 std::uint32_t World::wakeCount(std::uint32_t count) const {
   if (spawnAsleep_) return 0;
-  if (awakeBudget_ == 0) return count;
+  const std::uint32_t limit = awakeLimit();
+  if (limit == 0) return count;
   if (heldCount_ != 0) return 0;
   const std::uint32_t active = runtime_->physics.GetNumActiveBodies(JPH::EBodyType::RigidBody);
-  return active >= awakeBudget_ ? 0 : std::min(count, awakeBudget_ - active);
+  return active >= limit ? 0 : std::min(count, limit - active);
 }
 
 bool World::inView(std::uint32_t slot, double& distance) const {
@@ -976,7 +984,7 @@ void World::refillReleaseQueue() {
   if (!ordered) return;
   const float* keys = releaseKeys_;
   auto nearer = [keys](std::uint32_t a, std::uint32_t b) { return keys[a] < keys[b] || (keys[a] == keys[b] && a < b); };
-  const std::uint32_t chunk = std::min(queueCount_, std::max(awakeBudget_, kLeastChunk));
+  const std::uint32_t chunk = std::min(queueCount_, std::max(awakeLimit(), kLeastChunk));
   if (chunk < queueCount_) std::nth_element(releaseQueue_, releaseQueue_ + chunk, releaseQueue_ + queueCount_, nearer);
   std::sort(releaseQueue_, releaseQueue_ + chunk, nearer);
   queueCount_ = chunk;
@@ -1033,7 +1041,8 @@ std::uint32_t World::unsettledInView() const {
 void World::releaseHeld() {
   if (heldCount_ == 0) return;
   const std::uint32_t active = runtime_->physics.GetNumActiveBodies(JPH::EBodyType::RigidBody);
-  std::uint32_t room = awakeBudget_ == 0 ? fresh_ : (active >= awakeBudget_ ? 0 : awakeBudget_ - active);
+  const std::uint32_t limit = awakeLimit();
+  std::uint32_t room = limit == 0 ? fresh_ : (active >= limit ? 0 : limit - active);
   JPH::BodyInterface& bodies = runtime_->physics.GetBodyInterface();
   JPH::BodyID* batch = asBodyIds(batch_);
   std::uint32_t released = 0;
@@ -1139,7 +1148,7 @@ void World::step(std::uint32_t steps) {
         runtime_->stepDt = dt;
         if ((tuning_ & kTuneGravityAfterStep) == 0) applyRadialGravity(runtime_->physics, dt);
         applyAirLayers();
-        runtime_->physics.Update(dt, 1, &runtime_->temp, &runtime_->jobs);
+        if (runtime_->physics.Update(dt, 1, &runtime_->temp, &runtime_->jobs) != JPH::EPhysicsUpdateError::None) updateErrors_ += 1;
       }
       {
         engine::phase::Scope scope(engine::phase::kReadback);

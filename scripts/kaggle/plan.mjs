@@ -126,12 +126,13 @@ const stall = () => {
   return runs
 }
 
-export const STRETCH_CAP = 98304
-export const STRETCH_GLUE = 'build/variants/cap98304/engine-core-1024mib-threads-simd.mjs'
+export const STRETCH_CAP = 131072
+export const STRETCH_GLUE = 'build/variants/cap131072/engine-core-1024mib-threads-simd.mjs'
+export const STRETCH_TIER_TICKS = 3000
 export const STRETCH_REPEATS = 3
 export const STRETCH_TUNINGS = Object.freeze([0, 4, 8, 12])
-export const STRETCH_BUDGETS = Object.freeze([6144, 8192, 12288])
-export const STRETCH_TIERS = Object.freeze([65536, 81920, 98304])
+export const STRETCH_BUDGETS = Object.freeze([6144, 8192, 12288, 16384])
+export const STRETCH_TIERS = Object.freeze([65536, 81920, 98304, 131072])
 export const TUNE_BOTH = 12
 export const TUNE_RELEASE_BY_SLOT = 16
 export const PREVIOUS_TIER_COMMIT = 'f4e63b04bc2c41e9c5cb1c08066154f99d9ed12d'
@@ -143,12 +144,13 @@ const stretch = () => {
   for (let repeat = 0; repeat < STRETCH_REPEATS; repeat++) {
     runs.push(tick(previous, PREVIOUS_TIER_BODIES, 4, { role: 'reference' }))
     for (const tune of STRETCH_TUNINGS) runs.push(tick(STRETCH_GLUE, COMPACT_BODIES, 4, { knobs: ALL_AWAKE + ',tune=' + tune, role: 'all awake' }))
+    for (const tune of STRETCH_TUNINGS) runs.push(tick(STRETCH_GLUE, PREVIOUS_TIER_BODIES, 4, { knobs: ALL_AWAKE + ',tune=' + tune, role: 'all awake' }))
     for (const tune of STRETCH_TUNINGS) runs.push(tick(STRETCH_GLUE, PREVIOUS_TIER_BODIES, 4, { knobs: 'tune=' + tune, role: 'tuning' }))
     runs.push(tick(STRETCH_GLUE, PREVIOUS_TIER_BODIES, 4, { knobs: 'tune=' + TUNE_RELEASE_BY_SLOT, role: 'slot order' }))
     for (const budget of STRETCH_BUDGETS) runs.push(tick(STRETCH_GLUE, PREVIOUS_TIER_BODIES, 4, { knobs: 'awake=' + budget + ',tune=' + TUNE_BOTH, role: 'budget' }))
     for (const bodies of STRETCH_TIERS) {
-      runs.push(tick(STRETCH_GLUE, bodies, 4, { knobs: 'tune=0', role: 'tier' }))
-      runs.push(tick(STRETCH_GLUE, bodies, 4, { knobs: 'tune=' + TUNE_BOTH, role: 'tier' }))
+      runs.push(tick(STRETCH_GLUE, bodies, 4, { knobs: 'tune=0', role: 'tier', ticks: STRETCH_TIER_TICKS }))
+      runs.push(tick(STRETCH_GLUE, bodies, 4, { knobs: 'tune=' + TUNE_BOTH, role: 'tier', ticks: STRETCH_TIER_TICKS }))
     }
   }
   runs.push(calibrate())

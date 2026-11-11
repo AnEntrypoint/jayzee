@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { execFileSync } from 'node:child_process'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { gate, finish } from './lib/gate.mjs'
@@ -29,15 +30,20 @@ gate('a 128 MiB build given 1024 players and a 128 MiB budget steps down to the 
   assert.ok(layout.usedBytes <= 128 * MIB, 'the plan allocates above its budget: ' + layout.usedBytes)
 })
 
-gate('a 512 MiB build given 1024 players and a 512 MiB budget runs the 1024 tier with 12288 bodies', async () => {
+const AWAKE_DESIGN_BODIES = 16384
+const COMPACT_BODIES = 12288
+const BODIES_AT_512_MIB = 27648
+
+gate('a 512 MiB build given 1024 players and a 512 MiB budget runs the 1024 tier with ' + BODIES_AT_512_MIB + ' bodies, more than the ' + COMPACT_BODIES + ' it carried', async () => {
   const plan = resolvePlan({ players: 1024, budgetBytes: 512 * MIB })
   const layout = readLayout(await loadEngineModule(glue512, plan))
   assert.equal(layout.players, 1024)
-  assert.equal(layout.bodies, 12288)
+  assert.equal(layout.bodies, BODIES_AT_512_MIB)
+  assert.ok(layout.bodies > COMPACT_BODIES)
   assert.ok(layout.usedBytes <= 512 * MIB, 'the plan allocates above its budget: ' + layout.usedBytes)
 })
 
-gate('a 1024 MiB build given 1024 players and a 1024 MiB budget plans the top tier of 40960 bodies, and the 512 MiB plan keeps its arena under the budget with 12288', async () => {
+gate('a 1024 MiB build given 1024 players and a 1024 MiB budget plans the top tier of 40960 bodies, and the 512 MiB plan keeps its model tier and its arena under the budget', async () => {
   const top = await loadEngineModule(glue1024, resolvePlan({ players: 1024, workers: 2, budgetBytes: 1024 * MIB }))
   const layout = readLayout(top)
   await releaseModule(top)
@@ -45,7 +51,7 @@ gate('a 1024 MiB build given 1024 players and a 1024 MiB budget plans the top ti
   assert.equal(layout.bodies, 40960)
   assert.ok(layout.arenaBytes <= 1024 * MIB, 'the plan is above its budget: ' + layout.arenaBytes)
   const compact = readLayout(await loadEngineModule(glue512, resolvePlan({ players: 1024, budgetBytes: 512 * MIB })))
-  assert.equal(compact.bodies, 12288)
+  assert.equal(compact.bodies, BODIES_AT_512_MIB)
   assert.ok(compact.arenaBytes <= 512 * MIB && compact.arenaBytes > 500 * 1000 * 1000, 'the 512 MiB plan lost its model tier: arena ' + compact.arenaBytes)
 })
 
@@ -77,8 +83,17 @@ gate('the 1024 tier carves nothing from the arena after warm-up, with 12288 bodi
   assert.equal(world.allocationsSinceWarmup(), 0)
 })
 
-gate('the 1024 tier refuses a world larger than its 12288 bodies', async () => {
-  await assert.rejects(() => createEngineWorld({ players: 1024, budgetBytes: 512 * MIB, capacity: 12289 }, glue512), RangeError)
+gate('the 1024 tier refuses a world larger than its ' + BODIES_AT_512_MIB + ' bodies', async () => {
+  await assert.rejects(() => createEngineWorld({ players: 1024, budgetBytes: 512 * MIB, capacity: BODIES_AT_512_MIB + 1 }, glue512), RangeError)
+})
+
+gate('the top tier with every body asked awake keeps its awake count at the design limit, its solver memory inside the plan, and no step reports a full buffer', () => {
+  const report = JSON.parse(execFileSync('node', [join(root, 'scripts/measure-arena.mjs'), 'engine/out/engine-core-1024mib-threads.mjs', '1024', '2', '240', '0'], { cwd: root, encoding: 'utf8', timeout: 120000 }))
+  assert.equal(report.bodies, 40960)
+  assert.equal(report.awakeLimit, AWAKE_DESIGN_BODIES)
+  assert.equal(report.updateErrors, 0)
+  assert.ok(report.tempPeakBytes > 0 && report.tempPeakBytes <= report.tempPlanBytes, 'the solver used ' + report.tempPeakBytes + ' bytes of a ' + report.tempPlanBytes + ' byte plan')
+  assert.ok(report.wasmMemoryBytes <= 1024 * MIB)
 })
 
 finish()

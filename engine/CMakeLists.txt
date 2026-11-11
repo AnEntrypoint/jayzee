@@ -119,6 +119,8 @@ set(ENGINE_EXPORTS
   _engine_world_held_bodies
   _engine_world_airborne_bodies
   _engine_world_temp_peak_bytes
+  _engine_world_update_errors
+  _engine_world_awake_limit
   _engine_plan_term_count
   _engine_plan_term_bytes
   _engine_world_set_release_view
