@@ -4460,3 +4460,13 @@ The PAUSED controlled run: it starts two busy loops to pause, which loads the sh
 6. Statics, trunks and characters have no float64 rebase anchor; rigid spheres use the radial planet contact; 7 and 8 workers need a smaller threaded arena (a decision).
 7. Residual allocations: 36 B per crowd-dot update in the browser; the held-result IK and spring rows; a second world in one process.
 8. Not reachable here: hosted CI and a second machine, Safari, owner decisions (cube-sphere keying, the solver lever, the spoint comparison operation, ENGINE.md wording, the witness vegetation density), a browser restart.
+
+## Phase C (2026-11-11): 1024 physics tick, planet sampler, WebGPU residual
+
+- The 1024 tick was over budget because the scene's spawn grid used 0.6 m spacing for 0.5 m radius spheres. The bodies overlapped at spawn, never slept (10,236 to 10,240 active after 900 ticks), and cost 42 to 49 ms per tick at 4 workers. `BODY_SPACING_M` is 1.2 m in `src/engine/sceneSetup.js`: 8,192 bodies sleep within about 300 ticks, and the steady tick is 1.5 ms median. Measured with `scripts/measure-tick-stages.mjs` on the timed threaded 1024 glue.
+- Worker count alone does not fit the old scene: 1 worker 158 ms, 2 workers 82 ms, 4 workers 42 ms, 6 workers 37 ms. Eight workers do not fit a 1 GiB plan. Solver iterations 8 to 1 saved about 16 ms, so the iteration count was not the lever.
+- Planet witness, with the spacing fix: `1024-webgl2` ok (worker tick median 3.0 ms, p99 8.0 ms, zero over budget), `64-webgl2` ok, `64-webgpu` ok at 500 ms sampling, `1024-webgpu` 3 to 4 missed frames per 900. The worker tick is 3.1 ms median and 9.2 ms p99 on that run.
+- The runner's `ps -eo` sampler at 50 ms caused the 64-webgpu misses in this session. Its own `ps` process was at 300% CPU in the gaps. `SAMPLE_MS` is now 500, and `scripts/browser/planet-control-run.mjs` runs one configuration with the runner's trace flags and no samplers (`TRACE=1`).
+- The 1024-webgpu residual is not cleared. With no samplers and tracing on, two runs gave 2 and 0 intervals over 25 ms. In the dump of the 2-interval run, the GPU process decoder blocked 150 ms on 312 bytes of commands while a thread ran `vulkan_swap_chain.cc PostSubBufferAsync` for the same 150 ms. The other two dumps had at most 10 ms in that call. The present path is one candidate, not a proven single cause. Still OPEN.
+- The boot transient is open: ticks 0 and 1 take about 220 ms each and the settling ticks 5 to 15 ms, which is over the 16.7 ms budget for those ticks.
+- Not done in this stretch: `check:pose-allocations` and `check:engine-tiers` were not split or shortened, and their wall times are unchanged in `docs/CHECK_TIMES.md`.

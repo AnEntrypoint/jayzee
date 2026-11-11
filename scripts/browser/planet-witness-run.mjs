@@ -8,7 +8,7 @@ import { runRenderWitness } from './render-witness.mjs'
 import { PLANET_FRAME_BUDGET_MS, PLANET_MISSED_FRAME_MS, PLANET_RUNS, planetQuery, planetVerdict } from '../../src/engine/planetWitness.js'
 
 const execFileAsync = promisify(execFile)
-const SAMPLE_MS = 50
+const SAMPLE_MS = 500
 const RUN_TIMEOUT_MS = 240000
 
 const root = resolve(fileURLToPath(new URL('../..', import.meta.url)))

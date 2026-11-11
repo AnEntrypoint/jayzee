@@ -6,12 +6,13 @@ export const PLANET_RADIUS_M = 6371000
 export const PLANET = Object.freeze({ radius: PLANET_RADIUS_M, cellSize: planetCellSize(PLANET_RADIUS_M), gravity: 9.8, maxHeight: 8000 })
 export const GROUND = Object.freeze([-200, -1, -200, 200, 0, 200])
 export const TIER_1024 = Object.freeze({ players: 1024, bodies: 10240, capacity: 10240, tickRate: 60, gravity: -9.8, drag: 0, radius: 0.5, restitution: 0 })
+export const BODY_SPACING_M = 1.2
 
 export const configureWorld = (module, solverIterations = solverIterationsFor(readLayout(module).players), baseY = 0) => {
   const status = module._engine_world_configure(TIER_1024.capacity, TIER_1024.tickRate, TIER_1024.gravity, TIER_1024.drag, TIER_1024.radius, TIER_1024.restitution, solverIterations)
   if (status !== 0) throw new Error('world configure status ' + status)
   if (baseY === 0) module._engine_world_add_box(...GROUND)
-  for (let i = 0; i < TIER_1024.bodies; i++) module._engine_spawn((i % 100) * 0.6 - 30, baseY + 1 + (i % 5), Math.floor(i / 100) * 0.6 - 30, 0, 0, 0)
+  for (let i = 0; i < TIER_1024.bodies; i++) module._engine_spawn((i % 100) * BODY_SPACING_M - 30, baseY + 1 + (i % 5), Math.floor(i / 100) * BODY_SPACING_M - 30, 0, 0, 0)
   return solverIterations
 }
 

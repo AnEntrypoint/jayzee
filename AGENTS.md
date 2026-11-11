@@ -253,6 +253,10 @@ Non-obvious facts for automated edits. Architecture and measured costs live in d
 - `check:ci-engine-glue` derives the glues CI must build from the chain files and their imports. A gate that loads a new glue fails that check until `.github/workflows/ci.yml` builds it.
 - The engine gates outside `scripts/test-chain.json` rot: two were failing unnoticed. A gate that needs only `engine/out` belongs in the chain.
 
+- `scripts/measure-tick-stages.mjs` times `engine_tick` at 1024 players through the timed threaded glue (`engine/out/engine-core-1024mib-timed-threads.mjs`, built with `ENGINE_VARIANT=threadstimed ENGINE_TIER_MIB=1024` and `JOLT_SOURCE` set, since configure otherwise fetches Jolt over the network). Its physics phase is the whole tick: at 4 workers the spawn grid of the old 0.6 m spacing cost 42 to 49 ms per tick and never slept, while `BODY_SPACING_M` (1.2 m, above the 1.0 m diameter) sleeps within about 300 ticks and costs 1.5 ms. The first two ticks take about 220 ms each and the settling ticks 5 to 15 ms, so the boot transient is not steady state.
+- The planet runner's host sampler ran `ps -eo` every 50 ms, and its own `ps` showed 300% CPU in the gaps it reported. At 500 ms the 64-webgpu run has no missed frame. A WebGPU miss needs a run with no sampler to count, and 1024-webgpu still misses 0 to 3 frames per 900 with tracing on and no sampler.
+- A WebGPU gap that a trace places on the GPU process is `WebGPUDecoderImpl::HandleDawnCommands` with 312 bytes of commands, which blocks for 150 ms on the decoder thread while a thread in `vulkan_swap_chain.cc PostSubBufferAsync` runs for the same time. That is one dump, and the other two dumps had at most 10 ms in that present call, so the present path is not proven to be the only cause.
+
 ## Dependencies and licences
 
 - `meshoptimizer` 1.2.0, MIT (`node_modules/meshoptimizer/LICENSE.md`). Pinned exactly to the version spoint locks. `src/packages/streaming-gltf/meshlet-codec.js` loads it with a dynamic import, and `scripts/fixtures/spoint/cluster-lod.json` records the version it was generated with.
