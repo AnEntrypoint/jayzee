@@ -63,7 +63,15 @@ export const createTickProfile = ({ module, budgetMs, keep = 12 }) => {
       const heap = module.HEAPF64
       if (ms > budgetMs) {
         slowTicks += 1
-        if (slow.length < keep) slow.push({ tick, ms, table: heap.slice(at, at + words) })
+        if (slow.length < keep) {
+          slow.push({ tick, ms, table: heap.slice(at, at + words) })
+        } else {
+          let least = 0
+          for (let i = 1; i < slow.length; i++) {
+            if (slow[i].ms < slow[least].ms) least = i
+          }
+          if (ms > slow[least].ms) slow[least] = { tick, ms, table: heap.slice(at, at + words) }
+        }
         return
       }
       for (let scope = 0; scope < scopes; scope++) {
@@ -86,11 +94,13 @@ export const createTickProfile = ({ module, budgetMs, keep = 12 }) => {
         if (quietSumMs[scope] > 0) quiet.push({ scope: names[scope], meanMs: round(quietMeanMs[scope]), maxMs: round(quietMaxMs[scope]), meanCalls: round(quietMeanCalls[scope]) })
       }
       quiet.sort((a, b) => b.meanMs - a.meanMs)
+      const mutedScopes = names.filter((name, scope) => name !== '' && module._engine_profile_scope_muted(scope) === 1)
       return {
         quietTicks,
         slowTicks,
+        mutedScopes,
         quiet: quiet.filter((row, rank) => rank < SHOWN_SCOPES * 2 || row.scope.startsWith(ENGINE_SCOPE_PREFIX) || row.maxMs > NOTABLE_QUIET_MAX_MS),
-        slow: slow.map(({ tick, ms, table }) => ({ tick, ms: round(ms), ...describeSlowTick({ ms, table, scopes, lanes, names, quietMeanMs, quietMaxMs, quietMeanCalls }) })),
+        slow: slow.slice().sort((a, b) => a.tick - b.tick).map(({ tick, ms, table }) => ({ tick, ms: round(ms), ...describeSlowTick({ ms, table, scopes, lanes, names, quietMeanMs, quietMaxMs, quietMeanCalls }) })),
       }
     },
   }

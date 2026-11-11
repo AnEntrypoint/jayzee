@@ -14,6 +14,8 @@ constexpr std::uint32_t kScopeFields = 4;
 constexpr std::uint32_t kLaneFields = 5;
 constexpr std::uint32_t kOverflowScope = kScopes - 1;
 constexpr std::uint32_t kNoLane = 0xffffffffu;
+constexpr std::uint32_t kMutedScope = 0xffffffffu;
+constexpr double kMuteCalls = 64.0;
 
 struct Row {
   double ms;
@@ -41,6 +43,7 @@ struct Mark {
 static_assert(sizeof(Mark) <= 64);
 
 std::atomic<const char*> scopeNames[kScopes];
+std::atomic<bool> muted[kScopes];
 Lane lanes[kLanes];
 std::atomic<std::uint32_t> laneCount{0};
 thread_local std::uint32_t laneIndex = kNoLane;
@@ -91,6 +94,13 @@ ExternalProfileMeasurement::ExternalProfileMeasurement(const char* inName, uint3
   (void)inColor;
   Mark mark;
   mark.scope = scopeOf(inName);
+  mark.lane = 0;
+  mark.startMs = 0.0;
+  if (muted[mark.scope].load(std::memory_order_relaxed)) {
+    mark.scope = kMutedScope;
+    std::memcpy(mUserData, &mark, sizeof(Mark));
+    return;
+  }
   mark.lane = laneOf();
   mark.startMs = emscripten_get_now();
   touch(lanes[mark.lane], mark.startMs, mark.scope, 0.0);
@@ -100,12 +110,14 @@ ExternalProfileMeasurement::ExternalProfileMeasurement(const char* inName, uint3
 ExternalProfileMeasurement::~ExternalProfileMeasurement() {
   Mark mark;
   std::memcpy(&mark, mUserData, sizeof(Mark));
+  if (mark.scope == kMutedScope) return;
   const double endMs = emscripten_get_now();
   Lane& lane = lanes[mark.lane];
   Row& row = lane.rows[mark.scope];
   const double elapsed = endMs - mark.startMs;
   row.ms += elapsed;
   row.calls += 1.0;
+  if (row.calls > kMuteCalls) muted[mark.scope].store(true, std::memory_order_relaxed);
   if (elapsed > row.longestMs) {
     row.longestMs = elapsed;
     row.longestAtMs = mark.startMs - tickStartMs;
@@ -123,6 +135,11 @@ EMSCRIPTEN_KEEPALIVE int engine_profile_scope_count() {
 
 EMSCRIPTEN_KEEPALIVE int engine_profile_lane_count() {
   return static_cast<int>(kLanes);
+}
+
+EMSCRIPTEN_KEEPALIVE int engine_profile_scope_muted(int scope) {
+  if (scope < 0 || scope >= static_cast<int>(kScopes)) return 0;
+  return muted[scope].load(std::memory_order_relaxed) ? 1 : 0;
 }
 
 EMSCRIPTEN_KEEPALIVE const char* engine_profile_scope_name(int scope) {

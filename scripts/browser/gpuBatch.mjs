@@ -33,6 +33,28 @@ const piecesOf = (parent, sameThread) => {
   return pieces
 }
 
+export const DRIVER_LOCK = /^os_acquire_/
+export const DRIVER_LOCK_LEAST_MS = 5
+export const DRIVER_LOCK_SHARE = 0.5
+export const FRAME_PERIOD_MS = 16.7
+
+export const driverLockMs = (samples, fromUs, toUs) => {
+  if (!samples || samples.samples < 2) return null
+  const { atUs } = samples
+  if (atUs[0] > fromUs || atUs[atUs.length - 1] < toUs) return null
+  let lockedUs = 0
+  for (let i = 0; i < atUs.length - 1; i++) {
+    if (atUs[i + 1] <= fromUs) continue
+    if (atUs[i] >= toUs) break
+    if (samples.state[i] !== 'D' || !DRIVER_LOCK.test(samples.waitNames[samples.waitsOn[i]])) continue
+    lockedUs += Math.min(atUs[i + 1], toUs) - Math.max(atUs[i], fromUs)
+  }
+  return round(lockedUs / 1000)
+}
+
+export const isDriverLockGap = ({ lockMs, intervalMs, pageIdle, workWithinBudget }) =>
+  typeof lockMs === 'number' && lockMs >= DRIVER_LOCK_LEAST_MS && lockMs >= DRIVER_LOCK_SHARE * (intervalMs - FRAME_PERIOD_MS) && pageIdle === true && workWithinBudget === true
+
 export const tsAfterFrames = (events, frames) => {
   const starts = events.filter((event) => event.ph === 'X' && event.name === 'FireAnimationFrame').map((event) => event.ts).sort((a, b) => a - b)
   return starts.length > frames ? starts[frames] : 0

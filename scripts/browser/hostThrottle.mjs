@@ -17,7 +17,9 @@ export const isHostThrottledGap = ({ throttled, pageIdle, workWithinBudget }) =>
 
 export const excuseHostThrottled = (verdict, cases) => {
   const throttled = cases.filter((c) => c.hostThrottledGap === true)
+  const driverLocked = cases.filter((c) => c.hostThrottledGap !== true && c.gpuDriverLockGap === true)
+  const counts = { hostThrottledIntervals: throttled.length, gpuDriverLockIntervals: driverLocked.length }
   const onlyMissedFrames = verdict.failures.length === 1 && verdict.failures[0].startsWith('missed frames')
-  if (verdict.ok || !onlyMissedFrames || cases.length === 0 || throttled.length !== cases.length) return { ...verdict, hostThrottledIntervals: throttled.length }
-  return { ...verdict, ok: true, failures: [], hostThrottledIntervals: throttled.length, notCountedAgainstThePage: verdict.failures }
+  if (verdict.ok || !onlyMissedFrames || cases.length === 0 || throttled.length + driverLocked.length !== cases.length) return { ...verdict, ...counts }
+  return { ...verdict, ok: true, failures: [], ...counts, notCountedAgainstThePage: verdict.failures }
 }

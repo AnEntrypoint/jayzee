@@ -309,7 +309,7 @@ if(ENGINE_PHASE_TIMERS)
   list(APPEND ENGINE_EXPORTS _engine_phase_total_ms _engine_phase_count _engine_sim_active_bodies)
 endif()
 if(ENGINE_TICK_PROFILE)
-  list(APPEND ENGINE_EXPORTS _engine_profile_scope_count _engine_profile_lane_count _engine_profile_scope_name _engine_profile_capture)
+  list(APPEND ENGINE_EXPORTS _engine_profile_scope_count _engine_profile_lane_count _engine_profile_scope_name _engine_profile_scope_muted _engine_profile_capture)
 endif()
 string(JOIN "," ENGINE_EXPORT_LIST ${ENGINE_EXPORTS})
 

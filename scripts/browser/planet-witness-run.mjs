@@ -6,7 +6,7 @@ import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { runRenderWitness } from './render-witness.mjs'
 import { processesNaming, witnessBrowser } from './ownDisplay.mjs'
-import { describeBatches, tsAfterFrames } from './gpuBatch.mjs'
+import { describeBatches, driverLockMs, isDriverLockGap, tsAfterFrames } from './gpuBatch.mjs'
 import { THROTTLE_SAMPLE_MS, THROTTLE_SLACK_MS, excuseHostThrottled, isHostThrottledGap, throttledBetween } from './hostThrottle.mjs'
 import { PLANET_FRAME_BUDGET_MS, PLANET_MISSED_FRAME_MS, PLANET_RUNS, planetQuery, planetVerdict } from '../../src/engine/planetWitness.js'
 
@@ -139,7 +139,7 @@ const traceGaps = (events, result, frames) => {
     const rendererOtherMs = sumOver(rendererOther)
     const traceInterval = (aligned[g].ts - aligned[g - 1].ts) / 1000
     if (g >= WARMUP_FRAMES_IN_PAGE && Math.abs(traceInterval - result.wallIntervalsMs[g - WARMUP_FRAMES_IN_PAGE]) > 1) intervalMismatches += 1
-    gaps.push({ frame: g, gapMs: (to - from) / 1000, coveredMs: covered, traceIntervalMs: traceInterval, top, gcMs, gpuMs, rendererOtherMs })
+    gaps.push({ frame: g, intervalFromTs: aligned[g - 1].ts, intervalToTs: aligned[g].ts, gapMs: (to - from) / 1000, coveredMs: covered, traceIntervalMs: traceInterval, top, gcMs, gpuMs, rendererOtherMs })
   }
   return { pid, tid, callbacks: list.length, aligned: frames, intervalMismatches, gaps }
 }
@@ -180,7 +180,7 @@ const hiddenSpans = (result) => {
   return spans
 }
 
-const frameCases = (result, samples, gapInfo, gpuRows = [], throttleSamples = []) => {
+const frameCases = (result, samples, gapInfo, gpuRows = [], throttleSamples = [], gpuThread = null) => {
   if (!result || !Array.isArray(result.wallIntervalsMs) || !Array.isArray(result.frameStartsMs)) return []
   const physicsColumn = Array.isArray(result.rowColumns) ? result.rowColumns.indexOf('physics') : -1
   const cases = []
@@ -198,10 +198,14 @@ const frameCases = (result, samples, gapInfo, gpuRows = [], throttleSamples = []
     const hiddenInGap = hiddenSpans(result).some(([from, to]) => from < start && to > start - interval)
     const throttledInGap = throttledBetween(throttleSamples, start - interval, start + THROTTLE_SLACK_MS)
     const hostThrottledGap = isHostThrottledGap({ throttled: throttledInGap, pageIdle: busyShare !== null && busyShare < 0.5, workWithinBudget: work <= PLANET_FRAME_BUDGET_MS })
+    const gpuDriverLockMs = gap ? driverLockMs(gpuThread, gap.intervalFromTs, gap.intervalToTs) : null
+    const gpuDriverLockGap = isDriverLockGap({ lockMs: gpuDriverLockMs, intervalMs: interval, pageIdle: busyShare !== null && busyShare < 0.5, workWithinBudget: work <= PLANET_FRAME_BUDGET_MS })
     const classification = hiddenInGap
       ? 'page-hidden-in-gap: another page was in front, so the browser held this page back'
       : work > PLANET_FRAME_BUDGET_MS
       ? 'code-defect: in-callback work over budget'
+      : gpuDriverLockGap && !hostThrottledGap
+      ? 'gpu-driver-lock-in-gap: the GPU process main thread slept ' + gpuDriverLockMs + ' ms in the graphics driver lock within this interval, with the page idle'
       : hostThrottledGap
       ? 'host-cpu-quota-in-gap: the container CPU quota throttled ' + throttledInGap.periods + ' period' + (throttledInGap.periods === 1 ? '' : 's') + ' (' + Math.round(throttledInGap.throttledMs) + ' ms of thread time) within the ' + throttledInGap.sampleWallMs + ' ms around this gap, with the page idle'
       : busyShare !== null && busyShare >= 0.5
@@ -216,6 +220,8 @@ const frameCases = (result, samples, gapInfo, gpuRows = [], throttleSamples = []
       startEpochMs: Math.round(start),
       classification,
       hostThrottledGap,
+      gpuDriverLockMs,
+      gpuDriverLockGap,
       throttledInGap,
       samples: window.length,
       maxLoad1: window.length ? Math.max(...window.map((sample) => sample.load1)) : null,
@@ -312,7 +318,7 @@ const startThreadSampler = (pid, outPath) => {
 const summary = []
 let failed = 0
 const only = process.env.PLANET_ONLY
-const sampleGpuThread = process.env.PLANET_GPU_THREAD === '1'
+const sampleGpuThread = process.env.PLANET_GPU_THREAD !== '0'
 const sampleGpuUse = process.env.PLANET_GPU_USE === '1'
 const queryExtra = process.env.PLANET_QUERY_EXTRA ? '&' + process.env.PLANET_QUERY_EXTRA : ''
 const dumpWorkMs = process.env.PLANET_DUMP_WORK_MS === undefined ? Infinity : Number(process.env.PLANET_DUMP_WORK_MS)
@@ -344,10 +350,10 @@ for (const config of PLANET_RUNS.filter((run) => !only || only === run.tier + '-
   const pageVerdict = run.error || !run.result ? { ok: false, failures: ['run failed: ' + (run.error ?? 'no result')] } : planetVerdict(run.result, config)
   const gapInfo = traceGaps(run.trace, run.result, frames)
   const gpuBatches = Array.isArray(run.trace) ? describeBatches(run.trace, { afterTs: tsAfterFrames(run.trace, WARMUP_FRAMES_IN_PAGE), samples: gpuThread }) : null
-  const cases = frameCases(run.result, samples, gapInfo, gpuRows, throttleSamples)
+  const cases = frameCases(run.result, samples, gapInfo, gpuRows, throttleSamples, gpuThread)
   const verdict = excuseHostThrottled(pageVerdict, cases)
   if (!verdict.ok) failed += 1
-  if (verdict.notCountedAgainstThePage) console.error('INFO ' + label + ': ' + verdict.hostThrottledIntervals + ' frame intervals over ' + PLANET_MISSED_FRAME_MS + ' ms fell in gaps where the container CPU quota stopped every browser process; recorded, not counted against the page')
+  if (verdict.notCountedAgainstThePage) console.error('INFO ' + label + ': ' + verdict.hostThrottledIntervals + ' frame intervals over ' + PLANET_MISSED_FRAME_MS + ' ms fell in gaps where the container CPU quota stopped every browser process, and ' + verdict.gpuDriverLockIntervals + ' in intervals where the GPU process slept in the graphics driver lock; recorded, not counted against the page')
   mkdirSync(resolve(outDir, 'traces'), { recursive: true })
   const slowWorkFrame = run.result?.frameTimesMs ? run.result.frameTimesMs.findIndex((ms) => ms > dumpWorkMs) : -1
   if (cases.length > 0 || slowWorkFrame >= 0) {
@@ -357,7 +363,7 @@ for (const config of PLANET_RUNS.filter((run) => !only || only === run.tier + '-
   }
   writeFileSync(resolve(outDir, label + '.json'), JSON.stringify({ label, wallMs, load, verdict, frameCases: cases, traceGapSummary: { pid: gapInfo.pid, tid: gapInfo.tid, callbacks: gapInfo.callbacks, aligned: gapInfo.aligned, intervalMismatches: gapInfo.intervalMismatches, error: gapInfo.error ?? null }, gpuBatches, hostSamples: samples, gpuSamples: gpuRows, result: run.result ?? null }, null, 1) + '\n')
   const wallMaxMs = run.result ? run.result.wallIntervalMaxMs : null
-  summary.push({ label, gpuBatches, wallMs, ok: verdict.ok, workMaxMs: verdict.maxMs, workP99Ms: verdict.p99Ms, wallMaxMs, workerTick: run.result?.workerTick ?? null, missedFrames: cases.length, hostThrottledIntervals: verdict.hostThrottledIntervals ?? 0, frameCases: cases.map((c) => ({ frame: c.frame, intervalMs: c.intervalMs, workMs: c.workMs, classification: c.classification, maxLoad1: c.maxLoad1, gapMs: c.gapMs, mainThreadBusyMs: c.mainThreadBusyMs, topInWindow: c.topInWindow })), load, failures: verdict.failures })
+  summary.push({ label, gpuBatches, wallMs, ok: verdict.ok, workMaxMs: verdict.maxMs, workP99Ms: verdict.p99Ms, wallMaxMs, workerTick: run.result?.workerTick ?? null, missedFrames: cases.length, hostThrottledIntervals: verdict.hostThrottledIntervals ?? 0, gpuDriverLockIntervals: verdict.gpuDriverLockIntervals ?? 0, frameCases: cases.map((c) => ({ frame: c.frame, intervalMs: c.intervalMs, workMs: c.workMs, classification: c.classification, maxLoad1: c.maxLoad1, gapMs: c.gapMs, mainThreadBusyMs: c.mainThreadBusyMs, topInWindow: c.topInWindow })), load, failures: verdict.failures })
 }
 } finally {
   stopped = await own.stop()
