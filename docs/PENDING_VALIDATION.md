@@ -3994,3 +3994,26 @@ Witness: `build/diag/spike-hunt2.log`, `build/diag/spike2-22.log`, `build/diag/s
 ### Browser GPU, viz and compositor trace for long frames (Phase A, gap cause)
 
 The planet witness runner now records its trace with the `gpu`, `viz`, `cc` and `disabled-by-default-gpu.service` categories added to the existing devtools categories, in the same devtools session (`scripts/browser/page-witness.mjs`, `GPU_TRACE_CATEGORIES`, the `gpuTrace` flag passed through `render-witness.mjs` and set by `planet-witness-run.mjs`). The trace file is still written only when a run has a long frame or gap event, as `dumps/<label>-frame<N>.trace.json`. Clean runs write no trace.
+
+### 64-webgpu gap cause from the browser trace (Phase B outcome, hunt 3 run 12)
+
+`build/diag/spike-hunt3.sh` ran `PLANET_ONLY=64-webgpu` with the gpu, viz and compositor categories. Runs 1 to 11 were clean, and run 12 captured (`build/diag/spike-hunt3.log`, `RUN 12 CAPTURED`, `HUNT-EXIT 0`). The trace is inside the dump `build/diag/spike3-12/dumps/64-webgpu-frame505.trace.json` (515,687 events); `build/diag/spike3-12/traces` is empty, because the runner writes the trace only into the dump.
+
+The long frame is frame 505: interval 25.39 ms, work 2.84 ms, `joltStepMs` 2.37, main thread busy 0.54 ms in a 22.90 ms gap (trace ts 486897152016 to 486897174914), `gcMs` 0.
+
+What holds the gap: one WebGPU command-buffer flush on the GPU process's main thread (`GPU Process / CrGpuMain`, pid 1736031). It overlaps 20.3 ms of the 22.9 ms gap. The events, outermost to innermost, all on that thread:
+
+| event | ts (µs) | dur (µs) | tdur (µs) |
+|---|---|---|---|
+| `GPUTask` (`renderer_pid` 2978785) | 486897151101 | 21260 | 4086 |
+| `CommandBuffer::Flush` | 486897151110 | 21246 | 4074 |
+| `CommandBufferStub::OnAsyncFlush` (`put_offset` 6854) | 486897151112 | 21242 | 4072 |
+| `CommandBufferService:PutChanged` (`handler` `WebGPUDecoderImpl`) | 486897151114 | 21236 | 4067 |
+
+The flush took 21.2 ms of wall time and 4.07 ms of thread CPU time, so the GPU main thread was off the CPU for about 17.2 ms inside the WebGPU decoder. The run's 1,840 WebGPU flushes have a median of 1.95 ms and a 99th percentile of 5.25 ms.
+
+Not the compositor: the longest `VizCompositorThread` event inside the flush is 95 µs (`DelayBasedBeginFrameSource::OnTimerTick`, ts 486897158197, 74 µs). The renderer's `ProxyMain::BeginMainFrame` events overlap the gap by 0.2 ms.
+
+Host in the window: 3.6 cores of 12 used, `throttledPeriods` 0. The top processes were `exe` PID 901344 (80 ms), `fx` (50 ms) and the page's `chromium.real` (20 ms).
+
+Cause, as far as the trace names it: the GPU process held the gap, in one WebGPU flush that waited off-CPU. Still open: what the thread waited on. The trace has no event inside the decoder for those 17 ms, and it has no scheduler events, so it does not separate a block inside the GPU driver from the OS descheduling the thread. The host reading (3.6 of 12 cores, no throttling) makes CPU starvation unlikely, but does not rule out a deschedule. Closing it needs scheduler events for the GPU main thread (for example `sched_switch` through perf or ftrace) or Dawn's own trace category in the same window. Also not examined: the run's longest WebGPU flush is 144.7 ms, outside this gap.
