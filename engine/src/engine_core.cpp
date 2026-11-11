@@ -113,6 +113,7 @@ int initialize(std::uint32_t players, std::uint32_t workers, double budgetBytes)
   if (!(budgetBytes >= 0.0) || budgetBytes > kMaxBudgetBytes) return engine::kRange;
   if (engine::arena::sealed() || engine::arena::used() != 0) return engine::kAlreadyInitialized;
   if (!engine::budget::plan(static_cast<std::uint64_t>(budgetBytes), players, workers, capacity)) return engine::kRange;
+  if (capacity.players < players && engine::budget::workersBlock(static_cast<std::uint64_t>(budgetBytes), players, workers)) return engine::kWorkersDoNotFit;
   std::uint32_t primeCounts[engine::pool::kClasses];
   engine::budget::poolCounts(capacity, primeCounts);
   if (!engine::pool::prime(primeCounts)) return engine::kFull;
@@ -146,6 +147,12 @@ int initialize(std::uint32_t players, std::uint32_t workers, double budgetBytes)
 }
 
 extern "C" {
+
+EMSCRIPTEN_KEEPALIVE int engine_plan_fits(std::uint32_t players, std::uint32_t workers, double budgetBytes) {
+  engine::budget::Capacity probe{};
+  if (!(budgetBytes >= 0.0) || budgetBytes > kMaxBudgetBytes) return 0;
+  return engine::budget::plan(static_cast<std::uint64_t>(budgetBytes), players, workers, probe) && probe.players == players ? 1 : 0;
+}
 
 EMSCRIPTEN_KEEPALIVE int engine_init(std::uint32_t players, std::uint32_t workers, double budgetBytes) {
   return initialize(players, workers, budgetBytes);

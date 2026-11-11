@@ -31,6 +31,18 @@ const fnvWords = (hash, words) => {
 
 const engineError = (status, message) => new RangeError(message + ' (engine status ' + status + ')')
 
+export class WorkersDoNotFitError extends RangeError {
+  constructor(workers, players, budgetBytes) {
+    super('the ' + workers + ' worker count does not fit ' + players + ' players in ' + budgetBytes + ' bytes')
+    this.name = 'WorkersDoNotFitError'
+    this.code = 'workers-do-not-fit'
+    this.status = -8
+    this.workers = workers
+    this.players = players
+    this.budgetBytes = budgetBytes
+  }
+}
+
 const bySlot = (a, b) => (a & SLOT_MASK) - (b & SLOT_MASK)
 
 export const resolvePlan = (options = {}) => {
@@ -47,6 +59,7 @@ export const loadEngineModule = async (glue = DEFAULT_GLUE, plan = resolvePlan()
   const factory = (await import(glue)).default
   const module = await factory()
   const status = module._engine_init(plan.players, plan.workers, plan.budgetBytes)
+  if (status === -8) throw new WorkersDoNotFitError(plan.workers, plan.players, plan.budgetBytes)
   if (status !== ENGINE_OK) throw engineError(status, 'engine_init refused the memory plan')
   return module
 }

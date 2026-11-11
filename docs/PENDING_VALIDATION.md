@@ -3589,3 +3589,12 @@ Open after this pass:
 
 - Cause: the gate built four 512 MiB instances in one process; the fourth aborted with OOM in createEngineWorld.
 - Fix: each scenario runs in scripts/lib/stateHashChild.mjs in its own process.
+
+## 8-worker OOM: planner refusal, typed error and measured budget (Phase A, 2026-11-11)
+
+- Cause: the planner counted 512 KiB per worker stack but not the threaded build's three pool threads (PTHREAD_POOL_SIZE=3, 512 KiB stacks each), and it fills the budget to the byte, so 8 workers ran past the wasm heap at configure.
+- Change: `kThreadPoolBytes` counts the three pool stacks in threaded builds (engine/src/budget.cpp). Witness: `engine_plan_fits` probe via scripts/measure-workers-budget.mjs.
+- Change: `initialize` returns `kWorkersDoNotFit` (-8) when the requested players fit with one worker but not with the requested count (`budget::workersBlock`). Witness: state-hash gate line "8 workers at 512 MiB is refused with the typed workers-do-not-fit error, not an abort".
+- Change: `WorkersDoNotFitError` (code `workers-do-not-fit`, status -8) in src/engine/EngineWorld.js.
+- Change: `engine_plan_fits` export (planner probe, no initialisation) and `scripts/measure-workers-budget.mjs`, which bisects the smallest budget that fits 1024 players at a worker count. Witness: its JSON output, quoted in the Phase B result below.
+- Gate: scripts/check-engine-state-hash-1024.mjs runs 2, 4 and 8 workers in child processes; 2 and 4 must match hash 8e96da08 and count 30720; 8 must be refused.

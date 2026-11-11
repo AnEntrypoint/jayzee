@@ -49,6 +49,7 @@ enum Status : int {
   kTooManyStatics = -5,
   kZeroThickness = -6,
   kAlreadyInitialized = -7,
+  kWorkersDoNotFit = -8,
 };
 
 struct Config {

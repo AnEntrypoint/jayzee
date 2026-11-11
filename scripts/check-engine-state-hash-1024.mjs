@@ -26,8 +26,16 @@ gate('the fixed and threaded builds agree on the 1024-tier state, bit for bit', 
   assert.equal(threadedRun.hash, fixed)
 })
 
-gate('the threaded build agrees with the fixed build at every worker count in THREAD_COUNTS, bit for bit', () => {
-  for (const [workers, run] of countRuns) assert.equal(run.hash, fixed, 'workers ' + workers)
+gate('the threaded build agrees with the fixed build at 2 and 4 workers, bit for bit', () => {
+  for (const workers of [2, 4]) assert.equal(countRuns.get(workers).hash, fixed, 'workers ' + workers)
+})
+
+gate('8 workers at 512 MiB is refused with the typed workers-do-not-fit error, not an abort', () => {
+  const run = countRuns.get(8)
+  assert.equal(run.refused, 'workers-do-not-fit')
+  assert.equal(run.status, -8)
+  assert.equal(run.workers, 8)
+  assert.equal(run.players, 1024)
 })
 
 gate('the 1024-tier state hash equals its pin in engine/state-hashes.json', () => {

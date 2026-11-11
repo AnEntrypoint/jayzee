@@ -59,8 +59,10 @@ constexpr std::uint64_t kLightBytes = 32;
 constexpr std::uint64_t kWorkerScratchBytes = 64ull * 1024ull;
 #if defined(ENGINE_THREADS)
 constexpr std::uint64_t kWorkerStackBytes = 512ull * 1024ull;
+constexpr std::uint64_t kThreadPoolBytes = 3ull * kWorkerStackBytes;
 #else
 constexpr std::uint64_t kWorkerStackBytes = 0;
+constexpr std::uint64_t kThreadPoolBytes = 0;
 #endif
 constexpr std::uint64_t kSlackBytes = 1024ull * 1024ull;
 
@@ -93,6 +95,7 @@ std::uint64_t totalBytes(const Capacity& c) {
   total += static_cast<std::uint64_t>(joltPairCapacity(c)) * kJoltPairBytes;
   total += c.tempBytes;
   total += kJoltFixedBytes;
+  total += kThreadPoolBytes;
   total += pool::primedBytes();
   total += static_cast<std::uint64_t>(joltQuadNodePages(c)) * pool::kLargestClassBytes;
   total += static_cast<std::uint64_t>(c.pageSlots) * (planet::kPageSamples * sizeof(float) + sizeof(std::int64_t) + sizeof(std::uint8_t));
@@ -185,6 +188,11 @@ bool plan(std::uint64_t budgetBytes, std::uint32_t players, std::uint32_t worker
     }
   }
   return false;
+}
+
+bool workersBlock(std::uint64_t budgetBytes, std::uint32_t players, std::uint32_t workers) {
+  Capacity probe{};
+  return fitsTier(budgetBytes, players, 1, probe) && !fitsTier(budgetBytes, players, workers, probe);
 }
 
 const Capacity& chosen() {

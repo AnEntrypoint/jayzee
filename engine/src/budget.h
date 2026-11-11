@@ -37,6 +37,7 @@ constexpr std::uint64_t kRenderBytes = 2ull * 1024ull * 1024ull;
 constexpr std::uint64_t kHostReserveBytes = 16ull * 1024ull * 1024ull;
 
 bool plan(std::uint64_t budgetBytes, std::uint32_t players, std::uint32_t workers, Capacity& out);
+bool workersBlock(std::uint64_t budgetBytes, std::uint32_t players, std::uint32_t workers);
 const Capacity& chosen();
 void poolCounts(const Capacity& c, std::uint32_t (&out)[pool::kClasses]);
 

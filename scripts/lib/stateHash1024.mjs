@@ -6,7 +6,7 @@ export const STATE_KEY = 'tier1024-solver' + solverIterationsFor(STATE_TIER.play
 export const FIXED_GLUE = 'engine/out/engine-core-512mib.mjs'
 export const THREADED_GLUE = 'engine/out/engine-core-512mib-threads.mjs'
 export const THREADED_WORKERS = 4
-export const THREAD_COUNTS = Object.freeze([2, 8])
+export const THREAD_COUNTS = Object.freeze([2, 4, 8])
 
 const FNV_OFFSET = 0x811c9dc5
 const FNV_PRIME = 0x01000193

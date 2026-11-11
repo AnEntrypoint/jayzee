@@ -165,6 +165,7 @@ set(ENGINE_EXPORTS
   _engine_page_release
   _engine_page_lookup
   _engine_page_apply
+  _engine_plan_fits
   _engine_veg_configure
   _engine_world_rebase_count
   _engine_veg_place
