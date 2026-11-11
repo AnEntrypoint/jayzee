@@ -5,7 +5,7 @@ import { solverIterationsFor } from './solverIterations.js'
 export const PLANET_RADIUS_M = 6371000
 export const PLANET = Object.freeze({ radius: PLANET_RADIUS_M, cellSize: planetCellSize(PLANET_RADIUS_M), gravity: 9.8, maxHeight: 8000 })
 export const GROUND = Object.freeze([-200, -1, -200, 200, 0, 200])
-export const TIER_1024 = Object.freeze({ players: 1024, bodies: 10240, capacity: 10240, tickRate: 60, gravity: -9.8, drag: 0, radius: 0.5, restitution: 0 })
+export const TIER_1024 = Object.freeze({ players: 1024, bodies: 12288, capacity: 12288, tickRate: 60, gravity: -9.8, drag: 0, radius: 0.5, restitution: 0 })
 export const BODY_SPACING_M = 1.2
 
 export const configureWorld = (module, solverIterations = solverIterationsFor(readLayout(module).players), baseY = 0) => {

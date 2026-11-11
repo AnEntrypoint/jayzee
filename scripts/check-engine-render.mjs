@@ -49,7 +49,7 @@ const EXPECT_LAYOUT = {
 const EXPECT_PAGE_SIDE = 16
 const EXPECT_PAGE_LAYERS = 256
 const EXPECT_PROP_CLASSES = 4
-const EXPECT_BODY_SLOTS = 10240
+const EXPECT_BODY_SLOTS = 12288
 const EXPECT_ALLOCATIONS_SINCE_WARMUP = '0'
 const EXPECT_FRAMES = 600
 const PHASE10_MAX_API_CALLS_PER_FRAME = 64
@@ -104,7 +104,7 @@ gate('the prop classes and body slots match the expected instance buffer shape',
   assert.ok(renderFrameHeader.includes('kPropClasses = 4'))
   assert.ok(renderFrameHeader.includes('kBodySlots = budget::kTopTierBodies'))
   assert.equal(EXPECT_PROP_CLASSES, 4)
-  assert.equal(EXPECT_BODY_SLOTS, 10240)
+  assert.equal(EXPECT_BODY_SLOTS, 12288)
 })
 
 gate('the render sources never map a buffer, wait on a future or allocate on the heap', () => {

@@ -12,8 +12,8 @@ namespace {
 
 namespace rnd = engine::render;
 
-constexpr std::uint64_t kExpectedChecksum = 0x3fb5a6de438de68eull;
-constexpr std::uint32_t kExpectedVisible[rnd::kPropClasses] = {2489, 2489, 2487, 2483};
+constexpr std::uint64_t kExpectedChecksum = 0xa867dd42811cab96ull;
+constexpr std::uint32_t kExpectedVisible[rnd::kPropClasses] = {2767, 2776, 2767, 2761};
 
 rnd::FramePlan plan;
 rnd::Camera camera;

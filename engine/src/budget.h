@@ -33,7 +33,7 @@ struct Capacity {
 
 constexpr std::uint32_t kMaxPlayers = 1024;
 #if !defined(ENGINE_TOP_TIER_BODIES)
-#define ENGINE_TOP_TIER_BODIES 10240
+#define ENGINE_TOP_TIER_BODIES 12288
 #endif
 
 constexpr std::uint32_t kTopTierBodies = ENGINE_TOP_TIER_BODIES;

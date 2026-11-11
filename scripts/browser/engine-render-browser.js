@@ -26,7 +26,7 @@ const TIER_BUDGET = LARGE_MEMORY ? 512 * 1024 * 1024 : 64 * 1024 * 1024
 const WARMUP_FRAMES = 60
 const FRAMES = QUERY.has('frames') ? Number(QUERY.get('frames')) : 600
 if (!Number.isInteger(FRAMES) || FRAMES <= WARMUP_FRAMES) throw new RangeError('frames must be a whole number above the warm-up frames')
-const BODIES = TIER === 1024 ? 10240 : 512
+const BODIES = TIER === 1024 ? 12288 : 512
 const LIGHTS = 8
 const ALBEDO_SIDE = 16
 const TICK_STEPS = 1
@@ -38,7 +38,7 @@ const FAR = 500
 const GROUND = [-200, -1, -200, 200, 0, 200]
 const SOLVER_ITERATIONS_QUERY = QUERY.get('iterations')
 const runConfig = { solverIterations: null }
-const WORLD = { capacity: TIER === 1024 ? 10240 : 2048, tickRate: 60, gravity: -9.8, drag: 0, radius: 0.5, restitution: 0 }
+const WORLD = { capacity: TIER === 1024 ? 12288 : 2048, tickRate: 60, gravity: -9.8, drag: 0, radius: 0.5, restitution: 0 }
 const PLANET = { radius: 6371000, cellSize: planetCellSize(6371000), gravity: 9.8, maxHeight: 8000 }
 const CLASS_MATERIALS = [0, 1, 2, 3]
 

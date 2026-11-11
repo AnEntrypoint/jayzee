@@ -44,6 +44,7 @@ jobs:
           ENGINE_VARIANT=threads ENGINE_TIER_MIB=128 bash engine/build.sh
           ENGINE_VARIANT=threads ENGINE_TIER_MIB=512 bash engine/build.sh
           ENGINE_VARIANT=threads ENGINE_TIER_MIB=1024 bash engine/build.sh
+          ENGINE_VARIANT=threads ENGINE_TIER_MIB=1024 ENGINE_WASM_SIMD=ON bash engine/build.sh
       - name: Fetch JoltPhysics at the pinned commit
         run: |
           set -euo pipefail
