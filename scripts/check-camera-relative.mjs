@@ -167,4 +167,10 @@ gate('the browser pages build their view with the relative look-at, not the abso
   assert.ok(visibility.includes('relativeLookAt(EYE, TARGET, UP, new Float64Array(16))'))
 })
 
+gate('relativeLookAt writes the same view as the reference frame, with the eye at (1, 2, 3) looking at the origin', () => {
+  const view = relativeLookAt([1, 2, 3], [0, 0, 0], [0, 1, 0], new Float64Array(16))
+  const expected = [0.9486832980505138, -0.16903085094570333, 0.2672612419124244, 0, 0, 0.8451542547285166, 0.5345224838248488, 0, -0.31622776601683794, -0.5070925528371099, 0.8017837257372732, 0, 0, 0, 0, 1]
+  for (let k = 0; k < 16; k++) assert.ok(Math.abs(view[k] - expected[k]) < 1e-12, 'word ' + k + ' is ' + view[k])
+})
+
 finish()

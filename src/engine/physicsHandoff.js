@@ -1,16 +1,20 @@
 export const HANDOFF_POOL = 3
+const QUEUE_CAPACITY = 4096
 
 export const createPhysicsHandoff = ({ module, glue, players, budgetBytes, workers = 1, solverIterations, path, pool = HANDOFF_POOL }) => {
   const worker = new Worker(new URL('./physicsWorker.js', import.meta.url), { type: 'module' })
   const poseBytes = module._engine_pose_bytes()
   const reserve = module._engine_pose_reserve()
   const free = Array.from({ length: pool }, () => new ArrayBuffer(poseBytes))
-  const queued = []
-  const handoff = { imported: -1, tickMs: [], failure: null, poseBytes, pending: 0 }
+  const queued = new Int32Array(QUEUE_CAPACITY)
+  const queue = { head: 0, count: 0 }
+  const handoff = { imported: -1, failure: null, poseBytes, pending: 0 }
 
   const pump = () => {
-    while (free.length > 0 && queued.length > 0) {
-      const frame = queued.shift()
+    while (free.length > 0 && queue.count > 0) {
+      const frame = queued[queue.head]
+      queue.head = (queue.head + 1) % QUEUE_CAPACITY
+      queue.count -= 1
       const buffer = free.pop()
       worker.postMessage({ type: 'tick', frame, buffer }, [buffer])
       handoff.pending += 1
@@ -42,7 +46,6 @@ export const createPhysicsHandoff = ({ module, glue, players, budgetBytes, worke
     const status = module._engine_pose_import(reserve, poseBytes)
     if (status !== 0) return fail('engine_pose_import status ' + status)
     handoff.imported = message.frame
-    handoff.tickMs.push(message.tickMs)
     free.push(message.buffer)
     pump()
   }
@@ -52,7 +55,9 @@ export const createPhysicsHandoff = ({ module, glue, players, budgetBytes, worke
   handoff.ready = ready
   handoff.requestFrame = (frame) => {
     if (handoff.failure) throw new Error('physics handoff failed: ' + handoff.failure)
-    queued.push(frame)
+    if (queue.count === QUEUE_CAPACITY) throw new RangeError('physics handoff queue full')
+    queued[(queue.head + queue.count) % QUEUE_CAPACITY] = frame
+    queue.count += 1
     pump()
   }
   handoff.close = () => worker.terminate()

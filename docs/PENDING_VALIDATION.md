@@ -3788,3 +3788,33 @@ Eight sequential runs, `PLANET_ONLY=64-webgl2 node scripts/browser/planet-witnes
 Max work over the eight runs: 5.06 ms (run 6). Missed frames: 0 in every run. First-call ms across runs: `_engine_tick` 1.00 to 1.45, `renderer.frame` 2.41 to 3.52.
 
 Result: no spike appeared in 8 runs after the earlier 1-run and 4-config passes (9 runs, 0 over 25 ms). The 26 ms and 29 ms spikes recorded earlier (trace-run8 frame 254, planet-run2 frame 148) remain unreproduced and their cause is OPEN. Their traces were not saved, so no trace of them exists to read. The spike stays recorded as a defect until a trace of it exists.
+
+## Stretch 1: reuse buffers and variables (Phase A audit, Phase B witness)
+
+Audit of the per-frame path (the render page's frame loop, the planet camera and page-stream helpers, the physics handoff, the camera math and the renderer calls it makes). Allocation found in the path, with the change made:
+
+| site | per-frame or per-event allocation | change |
+|---|---|---|
+| `relativeLookAt` (`src/engine/cameraRelative.js`) | six small arrays per frame (`normalise`, `cross`) | scalar locals, same operation order; bit-identical to the old code on 100,000 random inputs |
+| page `frameTimes` (`scripts/browser/engine-render-browser.js`) | array growth per frame | `Float64Array(FRAMES)`, indexed; `result.frameTimesMs` is `Array.from(timed, roundTo2)` |
+| `planWindow` | Map, arrays and spreads on each cell change | `wantedPages` Map cleared and reused; release and stage lists reused with length reset |
+| `streamPages` | tuple destructuring, `cellOrigin` array, placement object per staged page | packed integer offsets, `PAGE_ORIGIN` scratch, `pagePlacement` stores the slot number |
+| `pathStats` timing arrays | pushed per staged page and per restage | fixed `Float64Array` buffers with counters (cap 65,536 per part, a RangeError when full) |
+| `physicsHandoff` request queue (`src/engine/physicsHandoff.js`) | `Array.shift` and `push` per frame | fixed `Int32Array` ring of 4096, throws when full |
+| `physicsHandoff` `tickMs` | one number pushed per pose, never read | removed |
+
+Measured, not claimed as a zero: the heap probe (`result.heapAtWarm`, `result.heapAtEnd`, `usedJSHeapSize`, added in this stretch) moved from +206 KB (baseline, 64 WebGL2) to +203 KB and then +642 KB across two runs of the same config. The probe reads without a collection, so it is dominated by GC timing over 600 frames and cannot settle a per-frame allocation claim. The wasm memory stays at 67,108,864 bytes in every run. The per-frame claim rests on the audit above.
+
+Residuals, open:
+- 1024 tier, `physicsHandoff`: each pose allocates one `new Uint8Array(message.buffer)` view and each tick one `postMessage` message object. Both come from the transfer of pool buffers, so removing them needs a shared pose region, not a code tweak.
+- C++ `World::addBox`, `addCharacter`, the trunk path and the planet shape constructors allocate Jolt shapes when called. They run at setup in the witness. A call during play would break the invariant, and this stretch does not change them.
+- Scenario tick loops (`scripts/check-scenario-*.mjs`) and `EngineWorld` helpers (`gather`, the sorted-handles cache) were not changed. The planet witness does not run them per frame.
+
+Phase B witness, final tree:
+- Planet witness, `node scripts/browser/planet-witness-run.mjs build/diag/stretch1-final 8847 900`, wall 2m17s total:
+  - 1024-webgpu: wall 18768 ms, workMax 1.77 ms, missed 0, errors none.
+  - 1024-webgl2: wall 18459 ms, workMax 1.15 ms, missed 0.
+  - 64-webgpu: wall 18593 ms, workMax 3.91 ms, missed 0.
+  - 64-webgl2: wall 18175 ms, workMax 3.12 ms, missed 0.
+- `npm test`, first run: 253 PASS, 1 FAIL. The failing gate pinned the old `result.frameTimesMs = timed.map(roundTo2)` text in `scripts/check-planet-witness.mjs`. The pin was updated to the `Array.from` form; the gate passes alone.
+- `npm test`, second run on the same tree: exit 0, 263 PASS, 0 FAIL, wall 2m17s, log build/diag/stretch1-npmtest2.log.

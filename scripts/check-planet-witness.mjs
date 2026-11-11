@@ -165,7 +165,7 @@ gate('each open item from the earlier reports has a cause, a hook and a gate fil
 
 gate('the render page exports the per-frame times, the player count and the planet scene report', () => {
   const page = readFileSync(join(root, 'scripts/browser/engine-render-browser.js'), 'utf8')
-  assert.ok(page.includes('result.frameTimesMs = timed.map(roundTo2)'))
+  assert.ok(page.includes('result.frameTimesMs = Array.from(timed, roundTo2)'))
   assert.ok(page.includes('result.wallIntervalsMs = Array.from(column(5), roundTo2)'))
   assert.ok(page.includes('result.players = readLayout(module).players'))
   assert.ok(page.includes('result.scene = planetScene.report()'))

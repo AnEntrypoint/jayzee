@@ -1,5 +1,5 @@
 import { loadRenderer, RENDER_LAYOUT } from '../../src/engine/renderer.js'
-import { cellOrigin, PAGE_SIDE, PAGE_U_EDGE, PAGE_V_EDGE, planetCellSize } from '../../src/engine/pageLayout.js'
+import { cellOrigin, PAGE_SIDE, PAGE_SPAN, PAGE_U_EDGE, PAGE_V_EDGE, planetCellSize } from '../../src/engine/pageLayout.js'
 import { solverIterationsFor } from '../../src/engine/solverIterations.js'
 import { createPhysicsHandoff } from '../../src/engine/physicsHandoff.js'
 import { readLayout } from '../../src/engine/bridge.js'
@@ -179,43 +179,66 @@ const PATH_STEP_M = PATH_SPEED_M_PER_S / 60
 const PATH_HEIGHT_M = FLYOVER ? 250 : CAMERA_HEIGHT
 const pagePlacement = new Map()
 const PART_NAMES = ["stage", "fill", "commit", "place"]
-const pathStats = { restages: 0, restageMs: [], cellChanges: 0, parts: { stage: [], fill: [], commit: [], place: [] } }
+const PART_CAP = 1 << 16
+const pathStats = { restages: 0, restageCount: 0, restageMs: new Float64Array(FRAMES), cellChanges: 0, stageCount: 0, parts: { stage: new Float64Array(PART_CAP), fill: new Float64Array(PART_CAP), commit: new Float64Array(PART_CAP), place: new Float64Array(PART_CAP) } }
 let pathRef = null
 let pathCell = null
 const PATH_CELL_NOW = { face: 0, cx: 0, cy: 0 }
+const PAGE_ORIGIN = new Float64Array(3)
+const OFFSET_BIAS = 64
+const OFFSET_RADIX = 256
+const packOffset = (dx, dy) => (dx + OFFSET_BIAS) * OFFSET_RADIX + (dy + OFFSET_BIAS)
+const offsetDx = (packed) => Math.floor(packed / OFFSET_RADIX) - OFFSET_BIAS
+const offsetDy = (packed) => (packed % OFFSET_RADIX) - OFFSET_BIAS
 
 const PATH_WINDOW = Math.max(1, Math.min(8, Number(QUERY.get('window') ?? 2)))
 const PAGES_PER_FRAME = Math.max(1, Number(QUERY.get('streamPerFrame') ?? 8))
-const pageQueue = { stage: [], release: [] }
+const wantedPages = new Map()
+const pageQueue = { releaseKey: [], stageKey: [], stageOffset: [] }
 
 const planWindow = (module, cell) => {
-  const wanted = new Map()
+  wantedPages.clear()
   for (let dy = -PATH_WINDOW; dy < PATH_WINDOW; dy++) {
     for (let dx = -PATH_WINDOW; dx < PATH_WINDOW; dx++) {
-      wanted.set(module._engine_planet_key(cell.face, cell.cx + dx, cell.cy + dy), [cell.cx + dx - pathRef.cx, cell.cy + dy - pathRef.cy])
+      wantedPages.set(module._engine_planet_key(cell.face, cell.cx + dx, cell.cy + dy), packOffset(cell.cx + dx - pathRef.cx, cell.cy + dy - pathRef.cy))
     }
   }
-  pageQueue.release = [...pagePlacement.keys()].filter((key) => !wanted.has(key))
-  pageQueue.stage = [...wanted].filter(([key]) => !pagePlacement.has(key))
+  pageQueue.releaseKey.length = 0
+  for (const key of pagePlacement.keys()) if (!wantedPages.has(key)) pageQueue.releaseKey.push(key)
+  pageQueue.stageKey.length = 0
+  pageQueue.stageOffset.length = 0
+  for (const [key, packed] of wantedPages) {
+    if (pagePlacement.has(key)) continue
+    pageQueue.stageKey.push(key)
+    pageQueue.stageOffset.push(packed)
+  }
   pathStats.restages += 1
 }
 
+const recordPart = (name, value) => {
+  if (pathStats.stageCount >= PART_CAP) throw new RangeError('page timing buffer full')
+  pathStats.parts[name][pathStats.stageCount] = value
+}
+
 const streamPages = (module, renderer, limit) => {
-  if (pageQueue.release.length === 0 && pageQueue.stage.length === 0) return
+  if (pageQueue.releaseKey.length === 0 && pageQueue.stageKey.length === 0) return
   const started = performance.now()
   let budget = limit
-  while (budget > 0 && pageQueue.release.length > 0) {
-    const key = pageQueue.release.pop()
-    const held = pagePlacement.get(key)
-    if (held === undefined) continue
-    renderer.unplacePage(held.slot)
+  while (budget > 0 && pageQueue.releaseKey.length > 0) {
+    const key = pageQueue.releaseKey.pop()
+    const slot = pagePlacement.get(key)
+    if (slot === undefined) continue
+    renderer.unplacePage(slot)
     module._engine_page_release(key)
     pagePlacement.delete(key)
     budget -= 1
   }
-  while (budget > 0 && pageQueue.stage.length > 0) {
-    const [key, [dx, dy]] = pageQueue.stage.pop()
+  while (budget > 0 && pageQueue.stageKey.length > 0) {
+    const key = pageQueue.stageKey.pop()
+    const packed = pageQueue.stageOffset.pop()
     if (pagePlacement.has(key)) continue
+    const dx = offsetDx(packed)
+    const dy = offsetDy(packed)
     const t0 = performance.now()
     const slot = module._engine_page_stage(key)
     if (slot < 0) throw new Error('page stage refused at window cell ' + dx + ',' + dy)
@@ -228,16 +251,22 @@ const streamPages = (module, renderer, limit) => {
     const t2 = performance.now()
     module._engine_page_commit(slot)
     const t3 = performance.now()
-    renderer.placePage(slot, cellOrigin(dx, dy), PAGE_U_EDGE, PAGE_V_EDGE)
+    PAGE_ORIGIN[0] = dx * PAGE_SPAN
+    PAGE_ORIGIN[1] = 0
+    PAGE_ORIGIN[2] = (0 - dy) * PAGE_SPAN
+    renderer.placePage(slot, PAGE_ORIGIN, PAGE_U_EDGE, PAGE_V_EDGE)
     const t4 = performance.now()
-    pathStats.parts.stage.push(t1 - t0)
-    pathStats.parts.fill.push(t2 - t1)
-    pathStats.parts.commit.push(t3 - t2)
-    pathStats.parts.place.push(t4 - t3)
-    pagePlacement.set(key, { slot })
+    recordPart('stage', t1 - t0)
+    recordPart('fill', t2 - t1)
+    recordPart('commit', t3 - t2)
+    recordPart('place', t4 - t3)
+    pathStats.stageCount += 1
+    pagePlacement.set(key, slot)
     budget -= 1
   }
-  pathStats.restageMs.push(performance.now() - started)
+  if (pathStats.restageCount >= pathStats.restageMs.length) throw new RangeError('restage timing buffer full')
+  pathStats.restageMs[pathStats.restageCount] = performance.now() - started
+  pathStats.restageCount += 1
 }
 
 const setupPlanetPath = (module, renderer) => {
@@ -247,8 +276,8 @@ const setupPlanetPath = (module, renderer) => {
   planWindow(module, pathRef)
   streamPages(module, renderer, Infinity)
   pathStats.restages = 0
-  pathStats.restageMs = []
-  for (const name of PART_NAMES) pathStats.parts[name] = []
+  pathStats.restageCount = 0
+  pathStats.stageCount = 0
   return surface
 }
 
@@ -396,6 +425,8 @@ const modelsReport = (module, frameTimes) => {
   }
 }
 
+const heapSnapshot = (module) => ({ usedJSHeapSize: performance.memory ? performance.memory.usedJSHeapSize : null, wasmBytes: module.HEAPU8.buffer.byteLength })
+
 const run = async () => {
   const canvas = document.getElementById('engine-canvas')
   const navigatorLike = PHASE === 11 ? {} : navigator
@@ -412,7 +443,7 @@ const run = async () => {
   if (handoff) await handoff.ready
 
   const aspect = canvas.width / canvas.height
-  const frameTimes = []
+  const frameTimes = new Float64Array(FRAMES)
   const PHASE_NAMES = ['pages', 'inputs', 'physics', 'readback', 'plan', 'backend', 'acquire', 'upload', 'submit', 'encode']
   const phaseCount = TIMED && module._engine_phase_count ? module._engine_phase_count() : 0
   const ROW_FIELDS = 7
@@ -457,7 +488,7 @@ const run = async () => {
         }
         readPhases(phasesAfter)
         const totalMs = performance.now() - started
-        frameTimes.push(totalMs)
+        frameTimes[frame] = totalMs
         const at = frame * ROW_WIDTH
         rows[at] = frame
         rows[at + 1] = started
@@ -468,8 +499,8 @@ const run = async () => {
         rows[at + 6] = TIMED && module._engine_sim_active_bodies ? module._engine_sim_active_bodies() : NaN
         for (let i = 0; i < phaseCount; i++) rows[at + ROW_FIELDS + i] = phasesAfter[i] - phasesBefore[i]
         lastStarted = started
-        if (frame === WARMUP_FRAMES) { renderer.markWarmup(); result.warmAt = frame }
-        if (frame === FRAMES - 1) lastStats = renderer.stats()
+        if (frame === WARMUP_FRAMES) { renderer.markWarmup(); result.warmAt = frame; result.heapAtWarm = heapSnapshot(module) }
+        if (frame === FRAMES - 1) { lastStats = renderer.stats(); result.heapAtEnd = heapSnapshot(module) }
         result.lastFrame = frame
         frame += 1
         if (frame < FRAMES) requestAnimationFrame(step)
@@ -504,7 +535,7 @@ const run = async () => {
   result.frameTimeP99Ms = p99(timed)
   result.frameTimeMedianMs = median(timed)
   result.frameTimeMaxMs = Math.max(...timed)
-  result.frameTimesMs = timed.map(roundTo2)
+  result.frameTimesMs = Array.from(timed, roundTo2)
   result.wallIntervalsMs = Array.from(column(5), roundTo2)
   result.wallIntervalMaxMs = Math.max(...result.wallIntervalsMs)
   result.frameStartsMs = Array.from(column(1), roundTo2)
@@ -520,10 +551,11 @@ const run = async () => {
     result.pagesPlaced = pagePlacement.size
     result.cellChanges = pathStats.cellChanges
     result.restages = pathStats.restages
-    if (pathStats.restageMs.length > 0) {
-      result.restageMsMax = Math.max(...pathStats.restageMs)
-      result.restageMsP99 = p99(pathStats.restageMs)
-      result.restagePartsMaxMs = Object.fromEntries(PART_NAMES.map((name) => [name, Math.max(0, ...pathStats.parts[name])]))
+    if (pathStats.restageCount > 0) {
+      const restageMs = pathStats.restageMs.subarray(0, pathStats.restageCount)
+      result.restageMsMax = Math.max(...restageMs)
+      result.restageMsP99 = p99(restageMs)
+      result.restagePartsMaxMs = Object.fromEntries(PART_NAMES.map((name) => [name, Math.max(0, ...pathStats.parts[name].subarray(0, pathStats.stageCount))]))
     }
   }
   const round2 = (v) => Math.round(v * 100) / 100
