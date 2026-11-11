@@ -1,4 +1,5 @@
 #include "phase_timer.h"
+#include "tick_profile.h"
 #include "bridge.h"
 
 #include "arena.h"
@@ -70,6 +71,7 @@ std::uint32_t eventSlotCount() {
 }
 
 void tickBatch(std::uint32_t steps) {
+  ENGINE_PROFILE_SCOPE("engine tick batch");
   if (inputs == nullptr) return;
   control[kEpoch] += 1;
   {

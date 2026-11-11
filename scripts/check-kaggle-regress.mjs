@@ -6,7 +6,8 @@ import { finish, gate } from './lib/gate.mjs'
 import { classRecord, judge } from './kaggle/regress.mjs'
 import { decide } from './kaggle/push-gate.mjs'
 import { repeatedSpikes } from './kaggle/spikes.mjs'
-import { BASELINE, buildPlan } from './kaggle/plan.mjs'
+import { BASELINE, PROFILE_REPEATS, PROFILE_VARIANT, buildPlan } from './kaggle/plan.mjs'
+import { describeSlowTick } from './kaggle/tickProfile.mjs'
 import { referenceGlue } from './kaggle/reference.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -316,6 +317,30 @@ gate('the regress plan runs the reference and the candidate alternately at the t
   assert.equal(marbleRuns.length, BASELINE.marble.tiers)
   marbleRuns.forEach((r) => assert.deepEqual(r.args.slice(1), [String(BASELINE.marble.runs), String(BASELINE.marble.warmRuns)]))
   assert.ok(BASELINE.marble.warmRuns >= 1)
+})
+
+gate('a slow tick is described by the scopes that took more than in a quiet tick, the time outside the engine, and each thread widest gap', () => {
+  const scopes = 4
+  const lanes = 2
+  const names = ['engine tick batch', 'FindCollisions', 'Island', 'engine pose export']
+  const table = Float64Array.from([18, 1, 18, 0, 3, 4, 2, 1, 14, 900, 11, 5, 1, 1, 1, 18.5, 40, 11, 5, 2, 1, 0, 0, 0, 0, 0])
+  const described = describeSlowTick({ ms: 20, table, scopes, lanes, names, quietMeanMs: Float64Array.of(6, 2.5, 3, 1), quietMaxMs: Float64Array.of(9, 4, 5, 1.5), quietMeanCalls: Float64Array.of(1, 4, 880, 1) })
+  assert.equal(described.outsideEngineMs, 1)
+  assert.deepEqual(described.scopes.map((row) => row.scope), ['engine tick batch', 'Island', 'FindCollisions', 'engine pose export'])
+  assert.equal(described.scopes[1].overQuietMs, 11)
+  assert.equal(described.scopes[1].longestMs, 11)
+  assert.equal(described.scopes[1].longestAtMs, 5)
+  assert.deepEqual(described.threads, [{ lane: 0, events: 40, widestGapMs: 11, gapAtMs: 5, gapEndsAt: 'end of Island' }])
+})
+
+gate('the regress plan carries the profile build at the top tier as rows the gate does not judge', () => {
+  const rows = buildPlan('regress').runs.filter((run) => run.role === 'profile')
+  assert.equal(rows.length, PROFILE_REPEATS)
+  for (const row of rows) {
+    assert.ok(row.args[0].includes('/variants/' + PROFILE_VARIANT + '/'))
+    assert.equal(Number(row.args[1]), top.bodies)
+  }
+  assert.ok(PROFILE_REPEATS >= 10, 'the unexplained tick shows in about one repeat of ten')
 })
 
 gate('the baseline names a full commit, margins above one and the hook runs the push gate', () => {

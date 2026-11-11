@@ -58,13 +58,28 @@ export const configurations = (results) => {
 
 export const unmarkedOverTicks = (results) => results.configs.flatMap((row) => (row.overTicks ?? []).filter((tick) => tick.host === false).map((tick) => ({ bodies: row.bodies, knobs: row.knobs, source: sourceOf(row), ...tick })))
 
+export const profiledSlowTicks = (results) => results.configs.flatMap((row, run) => (row.profile?.slow ?? []).map((slow) => {
+  const counters = (row.overTicks ?? []).find((tick) => tick.tick === slow.tick) ?? null
+  return { run, bodies: row.bodies, host: counters ? counters.host : null, waitMaxMs: counters ? counters.waitMaxMs : null, involuntarySwitches: counters ? counters.involuntarySwitches : null, engineRunMs: counters ? counters.engineRunMs : null, awake: counters ? counters.awake : null, ...slow }
+}))
+
+export const profiledQuiet = (results) => {
+  const row = results.configs.find((config) => config.profile)
+  return row ? { quietTicks: row.profile.quietTicks, scopes: row.profile.quiet } : null
+}
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const paths = process.argv.slice(2).filter((arg) => !arg.startsWith('--'))
-  if (paths.length === 0) throw new TypeError('usage: summarise.mjs <results.json> [--unmarked]')
+  if (paths.length === 0) throw new TypeError('usage: summarise.mjs <results.json> [--unmarked] [--profile]')
   for (const path of paths) {
     const results = JSON.parse(readFileSync(resolve(path), 'utf8'))
     console.log('MACHINE ' + JSON.stringify({ class: results.machine?.class ?? null, model: results.machine?.modelName ?? results.cpuModel, runS: results.totalS, configs: results.configs.length }))
     for (const line of configurations(results)) console.log('CONFIG ' + JSON.stringify(line))
     if (process.argv.includes('--unmarked')) for (const tick of unmarkedOverTicks(results)) console.log('UNMARKED ' + JSON.stringify(tick))
+    if (process.argv.includes('--profile')) {
+      const quiet = profiledQuiet(results)
+      if (quiet) console.log('QUIET ' + JSON.stringify(quiet))
+      for (const tick of profiledSlowTicks(results)) console.log('PROFILE ' + JSON.stringify(tick))
+    }
   }
 }

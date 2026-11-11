@@ -51,6 +51,8 @@ const variants = () => {
 }
 
 export const RECORD_WORKERS = Object.freeze([1, 2, 3, 6])
+export const PROFILE_VARIANT = 'profile'
+export const PROFILE_REPEATS = 20
 export const SETTLE_TICKS = 3000
 export const VIEW_BODIES = 40960
 export const TUNE_DEFAULT_BY_SLOT = 28
@@ -68,6 +70,7 @@ const regressWith = (candidate) => () => {
   runs.push(tick(candidate, COMPACT_BODIES, workers, { role: 'record' }))
   runs.push(tick(candidate, bodies, workers, { role: 'record', ticks: SETTLE_TICKS }))
   for (const knobs of VIEW_KNOBS) runs.push(tick(candidate, VIEW_BODIES, workers, { role: 'record', knobs }))
+  for (let repeat = 0; repeat < PROFILE_REPEATS; repeat++) runs.push(tick(variantGlue(PROFILE_VARIANT), bodies, workers, { role: 'profile' }))
   runs.push(calibrate())
   return runs
 }

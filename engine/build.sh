@@ -7,12 +7,14 @@ variant="${ENGINE_VARIANT:-fixed}"
 tier="${ENGINE_TIER_MIB:-64}"
 timers=OFF
 threads=OFF
+profile=OFF
 case "$variant" in
   fixed) leak=OFF; suffix="" ;;
   leak) leak=ON; suffix="-leak" ;;
   timed) leak=OFF; timers=ON; suffix="-timed" ;;
   threads) leak=OFF; threads=ON; suffix="-threads" ;;
   threadstimed) leak=OFF; timers=ON; threads=ON; suffix="-timed-threads" ;;
+  threadsprofile) leak=OFF; threads=ON; profile=ON; suffix="-threads" ;;
   *) echo "unknown ENGINE_VARIANT: $variant" >&2; exit 2 ;;
 esac
 simd="${ENGINE_WASM_SIMD:-OFF}"
@@ -38,8 +40,10 @@ if [ -z "${JOLT_SOURCE:-}" ]; then
   fi
 fi
 jolt_arg=(-DFETCHCONTENT_SOURCE_DIR_JOLTPHYSICS="$JOLT_SOURCE")
-emcmake cmake -S "$here" -B "$build_dir" -DENGINE_TIER_MIB="$tier" -DENGINE_LEAK_ON_TICK="$leak" -DENGINE_PHASE_TIMERS="$timers" -DENGINE_THREADS="$threads" -DENGINE_WASM_SIMD="$simd" "${jolt_arg[@]}"
+emcmake cmake -S "$here" -B "$build_dir" -DENGINE_TIER_MIB="$tier" -DENGINE_LEAK_ON_TICK="$leak" -DENGINE_PHASE_TIMERS="$timers" -DENGINE_THREADS="$threads" -DENGINE_WASM_SIMD="$simd" -DENGINE_TICK_PROFILE="$profile" "${jolt_arg[@]}"
 cmake --build "$build_dir" --parallel "${ENGINE_BUILD_JOBS:-8}"
 out_suffix="$suffix"
 if [ "$simd" = "ON" ]; then out_suffix="$suffix-simd"; fi
-sha256sum "$here/out/engine-core-${tier}mib$out_suffix.wasm"
+out_dir="$here/out"
+if [ "$profile" = "ON" ]; then out_dir="$root/build/variants/profile"; fi
+sha256sum "$out_dir/engine-core-${tier}mib$out_suffix.wasm"

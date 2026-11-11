@@ -9,6 +9,7 @@ import { attachPoseRegion, poseRegionBuffers } from '../../src/engine/poseRegion
 import { createPoseStepper } from '../../src/engine/poseHandoffCore.js'
 import { warmEngine } from '../../src/engine/warmEngine.js'
 import { createTickProbe } from './tickProbe.mjs'
+import { canProfile, createTickProfile } from './tickProfile.mjs'
 
 const BUDGET_MS = 16.7
 const BOOT_TICKS = 2
@@ -89,18 +90,21 @@ const held = new Int32Array(ticks + 1)
 const unsettled = new Int32Array(ticks)
 const airborne = new Int32Array(ticks)
 const probe = createTickProbe({ module, ticks, budgetMs: BUDGET_MS, layoutUsedWord: BRIDGE.LAYOUT.WORDS.USED_BYTES })
+const profile = canProfile(module) ? createTickProfile({ module, budgetMs: BUDGET_MS }) : null
 const collections = []
 const gcObserver = new PerformanceObserver((list) => collections.push(...list.getEntries()))
 gcObserver.observe({ entryTypes: ['gc'] })
 const loopStarted = performance.now()
 const times = new Float64Array(ticks)
 held[0] = heldOf ? heldOf() : 0
+if (profile) profile.start()
 probe.start()
 for (let f = 0; f < ticks; f++) {
   region.setFrame(0, f)
   const at = performance.now()
   stepper(0)
   times[f] = performance.now() - at
+  if (profile) profile.record(f, times[f])
   if (activeOf) active[f] = activeOf()
   if (heldOf) held[f + 1] = heldOf()
   if (unsettledOf) unsettled[f] = unsettledOf()
@@ -176,6 +180,7 @@ emit({
   viewer: knobs.still !== undefined ? 'still' : 'path',
   heldAtEnd: heldOf ? held[ticks] : null,
   peakAirborne: airborneOf ? Math.max(...airborne) : null,
+  profile: profile ? profile.summarise() : null,
   gcCount: collections.length,
   gcMs: round(collections.reduce((sum, entry) => sum + entry.duration, 0), 2),
   gcAtMs: collections.slice(0, 8).map((entry) => round(entry.startTime - loopStarted, 0)),

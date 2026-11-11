@@ -1,4 +1,5 @@
 #include "phase_timer.h"
+#include "tick_profile.h"
 #include <Jolt/Jolt.h>
 
 #include <Jolt/Core/Factory.h>
@@ -966,6 +967,7 @@ bool World::inView(std::uint32_t slot, double cosine, double& distance) const {
 }
 
 void World::refillReleaseQueue() {
+  ENGINE_PROFILE_SCOPE("engine release refill");
   constexpr float kOutOfViewMetres = 1.0e6f;
   constexpr std::uint32_t kLeastChunk = 1024;
   queueStale_ = false;
@@ -1141,19 +1143,36 @@ void World::step(std::uint32_t steps) {
   const float dt = 1.0f / static_cast<float>(tickRate_);
   for (std::uint32_t s = 0; s < steps; ++s) {
     if (runtime_ != nullptr) {
-      updateCharacters(dt);
+      {
+        ENGINE_PROFILE_SCOPE("engine characters");
+        updateCharacters(dt);
+      }
       {
         engine::phase::Scope scope(engine::phase::kPhysics);
-        releaseHeld();
+        {
+          ENGINE_PROFILE_SCOPE("engine release held");
+          releaseHeld();
+        }
         runtime_->stepDt = dt;
-        if ((tuning_ & kTuneGravityAfterStep) == 0) applyRadialGravity(runtime_->physics, dt);
-        applyAirLayers();
+        {
+          ENGINE_PROFILE_SCOPE("engine gravity");
+          if ((tuning_ & kTuneGravityAfterStep) == 0) applyRadialGravity(runtime_->physics, dt);
+        }
+        {
+          ENGINE_PROFILE_SCOPE("engine air layers");
+          applyAirLayers();
+        }
+        ENGINE_PROFILE_SCOPE("engine jolt update");
         if (runtime_->physics.Update(dt, 1, &runtime_->temp, &runtime_->jobs) != JPH::EPhysicsUpdateError::None) updateErrors_ += 1;
       }
       {
         engine::phase::Scope scope(engine::phase::kReadback);
         runtime_->activeIds = runtime_->physics.GetActiveBodiesUnsafe(JPH::EBodyType::RigidBody);
-        forActiveRanges(runtime_->physics.GetNumActiveBodies(JPH::EBodyType::RigidBody), false);
+        {
+          ENGINE_PROFILE_SCOPE("engine readback rows");
+          forActiveRanges(runtime_->physics.GetNumActiveBodies(JPH::EBodyType::RigidBody), false);
+        }
+        ENGINE_PROFILE_SCOPE("engine readback slots");
         for (std::uint32_t slot = 0; slot < fresh_; ++slot) {
           const std::uint8_t state = alive_[slot];
           if (state == kSlotAwakeSynced) {

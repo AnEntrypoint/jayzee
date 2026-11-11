@@ -10,6 +10,7 @@ option(ENGINE_LEAK_ON_TICK "Retain one block per tick, the witness that the memo
 option(ENGINE_PHASE_TIMERS "Per-phase timers inside engine_tick, for the diagnostic build only" OFF)
 option(ENGINE_THREADS "Multithreaded Jolt job system on pthreads, a separate artifact from the single-threaded build" OFF)
 option(ENGINE_WASM_SIMD "Jolt SSE4.2 intrinsics compiled to wasm SIMD, a separate artifact from the scalar build" OFF)
+option(ENGINE_TICK_PROFILE "Per-scope timers inside the physics step through Jolt's external profile hooks, for the measurement build only" OFF)
 
 math(EXPR ENGINE_TIER_BYTES "${ENGINE_TIER_MIB} * 1024 * 1024")
 set(ENGINE_NAME "engine-core-${ENGINE_TIER_MIB}mib")
@@ -57,6 +58,10 @@ set(TARGET_HELLO_WORLD OFF CACHE BOOL "" FORCE)
 set(TARGET_PERFORMANCE_TEST OFF CACHE BOOL "" FORCE)
 set(TARGET_SAMPLES OFF CACHE BOOL "" FORCE)
 set(TARGET_VIEWER OFF CACHE BOOL "" FORCE)
+if(ENGINE_TICK_PROFILE)
+  set(PROFILER_IN_DEBUG_AND_RELEASE OFF CACHE BOOL "" FORCE)
+  set(PROFILER_IN_DISTRIBUTION OFF CACHE BOOL "" FORCE)
+endif()
 
 include(FetchContent)
 FetchContent_Declare(
@@ -67,6 +72,9 @@ FetchContent_Declare(
   SOURCE_SUBDIR Build
 )
 FetchContent_MakeAvailable(JoltPhysics)
+if(ENGINE_TICK_PROFILE)
+  target_compile_definitions(Jolt PUBLIC JPH_EXTERNAL_PROFILE)
+endif()
 
 add_executable(engine_core
   src/engine_core.cpp
@@ -300,6 +308,9 @@ set(ENGINE_EXPORTS
 if(ENGINE_PHASE_TIMERS)
   list(APPEND ENGINE_EXPORTS _engine_phase_total_ms _engine_phase_count _engine_sim_active_bodies)
 endif()
+if(ENGINE_TICK_PROFILE)
+  list(APPEND ENGINE_EXPORTS _engine_profile_scope_count _engine_profile_lane_count _engine_profile_scope_name _engine_profile_capture)
+endif()
 string(JOIN "," ENGINE_EXPORT_LIST ${ENGINE_EXPORTS})
 
 target_link_options(engine_core PRIVATE
@@ -321,6 +332,10 @@ target_link_options(engine_core PRIVATE
 if(ENGINE_PHASE_TIMERS)
   target_compile_definitions(engine_core PRIVATE ENGINE_PHASE_TIMERS)
 endif()
+if(ENGINE_TICK_PROFILE)
+  target_compile_definitions(engine_core PRIVATE ENGINE_TICK_PROFILE)
+  target_sources(engine_core PRIVATE src/tick_profile.cpp)
+endif()
 if(ENGINE_THREADS)
   target_sources(engine_core PRIVATE src/futex_clockfree.cpp)
   target_compile_definitions(engine_core PRIVATE ENGINE_THREADS)
@@ -333,7 +348,11 @@ else()
   target_link_options(engine_core PRIVATE -sALLOW_MEMORY_GROWTH=0 -sMAXIMUM_MEMORY=${ENGINE_TIER_BYTES})
 endif()
 
+set(ENGINE_OUTPUT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/out")
+if(ENGINE_TICK_PROFILE)
+  set(ENGINE_OUTPUT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../build/variants/profile")
+endif()
 set_target_properties(engine_core PROPERTIES
   OUTPUT_NAME ${ENGINE_NAME}
   SUFFIX ".mjs"
-  RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/out")
+  RUNTIME_OUTPUT_DIRECTORY "${ENGINE_OUTPUT_DIR}")

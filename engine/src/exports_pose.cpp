@@ -4,6 +4,7 @@
 
 #include "planet_frame.h"
 #include "pose_handoff.h"
+#include "tick_profile.h"
 #include "world.h"
 
 namespace {
@@ -30,6 +31,7 @@ EMSCRIPTEN_KEEPALIVE std::uint8_t* engine_pose_reserve() {
 }
 
 EMSCRIPTEN_KEEPALIVE std::int32_t engine_pose_export(std::uint8_t* dst, std::uint32_t capacity) {
+  ENGINE_PROFILE_SCOPE("engine pose export");
   return engine::pose::exportPoses(dst, capacity);
 }
 
@@ -46,6 +48,7 @@ EMSCRIPTEN_KEEPALIVE double* engine_frame_scratch() {
 }
 
 EMSCRIPTEN_KEEPALIVE int engine_follow_scratch() {
+  ENGINE_PROFILE_SCOPE("engine follow");
   engine::planet::state().pages.applyPending();
   return engine::world().follow(frameScratch[0], frameScratch[1], frameScratch[2]);
 }
