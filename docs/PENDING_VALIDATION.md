@@ -3578,3 +3578,9 @@ Open after this pass:
 - Two Jolt job threads (instead of four) made the physics median rise to 15 ms on both backends. Reverted. The step is compute-bound on the four threads.
 - The WebGL2 path runs through ANGLE on the same NVIDIA GPU, and its GL driver threads compete for CPU with the four Jolt workers on this 12-core host. Other processes were also busy (an exe at 94% CPU). The WebGL2 spike is the physics barrier stalling under that contention.
 - Status: open. A frame over 16.7 ms on WebGL2 is not removed by any change that keeps the content (10240 bodies) and the tick rate. Items that would move it are a physics cost reduction (solver iterations or collision steps) or a non-contended host, and each changes the simulation, so they need a decision.
+
+## Thread-count determinism, Phase A (2026-11-11)
+
+- Change: `scripts/check-engine-state-hash-1024.mjs` now runs the threaded 1024-tier scenario at 2 and 8 workers as well as the existing 4, and gates each one against the fixed build's state hash. The worker counts are `THREAD_COUNTS` in `scripts/lib/stateHash1024.mjs`.
+- Witness: `npm run check:engine-state-hash-1024`, gate "the threaded build agrees with the fixed build at every worker count in THREAD_COUNTS, bit for bit". Not yet run; Phase B runs it on the threaded glue.
+- Open: this covers one scenario at 120 ticks on this host. The cross-machine hash witness in docs/ENGINE.md remains open.
