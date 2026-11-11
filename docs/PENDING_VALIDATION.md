@@ -3698,3 +3698,5 @@ Phase B (2026-11-11): no engine source changed in this stretch, so the glues are
 - Change: `scripts/check-scenario-boss-fight.mjs`, run as `check:scenario-boss-fight` and appended to `npm test`. The engine is unchanged, so the glues are those from stretch 4. Gates per tier: the boss dies within 1800 ticks and the player survives, the boss closes inside 8 m before it dies, the boss stays on the surface and supported after the settle window, two runs agree bit for bit on the health trail and positions, worst tick work within 16.7 ms.
 - Limit: the player is scripted, not controlled, and it is not a second moving target. Spoint's level gate is not ported.
 - Witness: Phase B runs the boss scenario on both tiers.
+
+Phase B (2026-11-11): the engine is unchanged in this stretch, so the glues are the stretch 4 builds. The boss fight scenario prints RESULT: PASS on both tiers (all five gates). `npm test` exit 0 with no FAIL lines.
