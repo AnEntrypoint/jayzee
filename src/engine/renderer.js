@@ -11,7 +11,7 @@ export const RENDER_MODEL_PATH = Object.freeze({ FORWARD: 0, VISIBILITY: 1 })
 export const RENDER_MODEL_PATH_NAMES = Object.freeze(['forward', 'visibility'])
 
 export const RENDER_LAYOUT = Object.freeze({
-  CAMERA_BYTES: 224,
+  CAMERA_BYTES: 240,
   CAMERA_PLANES_WORD: 0,
   CAMERA_VIEW_PROJ_WORD: 24,
   CAMERA_EYE_WORD: 40,

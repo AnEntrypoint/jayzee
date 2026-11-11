@@ -194,6 +194,10 @@ void planFrame(const SceneView& scene, Camera& camera, FramePlan& plan) {
   camera.counts[1] = scene.bodyCount;
   camera.counts[2] = 0;
   camera.counts[3] = 0;
+  camera.bodyOffset[0] = static_cast<float>(scene.bodyOrigin.x - scene.origin.x);
+  camera.bodyOffset[1] = static_cast<float>(scene.bodyOrigin.y - scene.origin.y);
+  camera.bodyOffset[2] = static_cast<float>(scene.bodyOrigin.z - scene.origin.z);
+  camera.bodyOffset[3] = 0.0f;
 
   for (std::uint32_t c = 0; c < kPropClasses; ++c) plan.propCount[c] = 0;
   std::uint64_t hash = kFnvOffset;

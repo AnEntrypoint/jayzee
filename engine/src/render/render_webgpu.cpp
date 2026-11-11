@@ -7,6 +7,7 @@
 
 #include <webgpu/webgpu_cpp.h>
 
+#include "../arena.h"
 #include "../model_pool.h"
 #include "../page_cache.h"
 #include "../phase_timer.h"
@@ -23,6 +24,7 @@ struct Camera {
   counts: vec4u,
   classRadius: vec4f,
   classMaterial: vec4u,
+  bodyOffset: vec4f,
 };
 
 @group(0) @binding(0) var<uniform> cam: Camera;
@@ -79,14 +81,16 @@ fn cubeNormal(vid: u32) -> vec3f {
 @vertex
 fn vsProps(@builtin(vertex_index) vid: u32, @builtin(instance_index) iid: u32) -> PropOut {
   let base = iid * 8u;
-  let centre = vec3f(instF(base), instF(base + 1u), instF(base + 2u));
+  let centre = vec3f(instF(base), instF(base + 1u), instF(base + 2u)) + cam.bodyOffset.xyz;
   let q = vec4f(instF(base + 3u), instF(base + 4u), instF(base + 5u), instF(base + 6u));
   let world = centre + rotate(q, cubeCorner(vid));
+  let cls = inst[base + 7u];
+  let shown = dot(q, q) > 0.0 && cls < 4u;
   var out: PropOut;
-  out.clip = clipOf(cam.viewProj * vec4f(world, 1.0));
+  out.clip = select(vec4f(0.0, 0.0, 2.0, 1.0), clipOf(cam.viewProj * vec4f(world, 1.0)), shown);
   out.world = world;
   out.normal = rotate(q, cubeNormal(vid));
-  out.cls = inst[base + 7u];
+  out.cls = cls;
   return out;
 }
 
@@ -683,7 +687,8 @@ wgpu::Buffer argsBuf;
 wgpu::Buffer lightBuf;
 wgpu::Buffer materialBuf;
 wgpu::Buffer pageBuf;
-wgpu::Buffer instanceBuf[kPropClasses];
+wgpu::Buffer instanceBuf;
+std::uint32_t* instanceShadow = nullptr;
 wgpu::Texture heightTex;
 wgpu::Texture albedoTex;
 wgpu::Texture depthTex;
@@ -698,7 +703,7 @@ wgpu::BindGroup modelGroup;
 wgpu::Buffer modelVertexBuf;
 wgpu::Buffer modelIndexBuf;
 engine::models::Range modelRuns[engine::models::kMaxClustersPerSlot];
-wgpu::BindGroup propGroup[kPropClasses];
+wgpu::BindGroup propGroup;
 wgpu::RenderPipeline vegPipe;
 wgpu::BindGroupLayout vegLayout;
 wgpu::Buffer vegBuf[engine::render::vegetation::kMaxSpecies];
@@ -1045,15 +1050,13 @@ int buildPipelines() {
 
   if (!propPipe || !terrainPipe) return engine::kNotConfigured;
 
-  for (std::uint32_t c = 0; c < kPropClasses; ++c) {
-    wgpu::BindGroupEntry propBindings[kPropBindings];
-    propBindings[0] = bufferBinding(0, cameraBuf, kCameraBytes);
-    propBindings[1] = bufferBinding(1, instanceBuf[c], bodyBytes);
-    propBindings[2] = bufferBinding(2, materialBuf, kMaterialBytes);
-    propBindings[3] = bufferBinding(3, lightBuf, kLightBytes);
-    propBindings[4] = viewBinding(4, albedoView);
-    propGroup[c] = makeGroup(propLayout, propBindings, kPropBindings);
-  }
+  wgpu::BindGroupEntry propBindings[kPropBindings];
+  propBindings[0] = bufferBinding(0, cameraBuf, kCameraBytes);
+  propBindings[1] = bufferBinding(1, instanceBuf, bodyBytes);
+  propBindings[2] = bufferBinding(2, materialBuf, kMaterialBytes);
+  propBindings[3] = bufferBinding(3, lightBuf, kLightBytes);
+  propBindings[4] = viewBinding(4, albedoView);
+  propGroup = makeGroup(propLayout, propBindings, kPropBindings);
 
   wgpu::BindGroupEntry terrainBindings[kTerrainBindings];
   terrainBindings[0] = bufferBinding(0, cameraBuf, kCameraBytes);
@@ -1061,7 +1064,7 @@ int buildPipelines() {
   terrainBindings[2] = viewBinding(2, heightView);
   terrainGroup = makeGroup(terrainLayout, terrainBindings, kTerrainBindings);
 
-  return (propGroup[0] && terrainGroup) ? engine::kOk : engine::kNotConfigured;
+  return (propGroup && terrainGroup) ? engine::kOk : engine::kNotConfigured;
 }
 
 bool buildVisibility(std::uint32_t width, std::uint32_t height) {
@@ -1267,9 +1270,32 @@ bool buildVisibility(std::uint32_t width, std::uint32_t height) {
 
 void drawProps(wgpu::RenderPassEncoder& pass) {
   ENGINE_RENDER_CALL(pass.SetPipeline(propPipe));
-  for (std::uint32_t c = 0; c < kPropClasses; ++c) {
-    ENGINE_RENDER_CALL(pass.SetBindGroup(0, propGroup[c]));
-    ENGINE_RENDER_CALL(pass.DrawIndirect(argsBuf, (kArgsPropWord + c * 4) * 4));
+  ENGINE_RENDER_CALL(pass.SetBindGroup(0, propGroup));
+  ENGINE_RENDER_CALL(pass.DrawIndirect(argsBuf, kArgsPropWord * 4));
+}
+
+void uploadBodyRecords(const SceneView& scene) {
+  constexpr std::uint32_t kMergeGapRecords = 64;
+  constexpr std::uint32_t kNoRun = 0xffffffffu;
+  std::uint32_t runStart = kNoRun;
+  std::uint32_t runEnd = 0;
+  for (std::uint32_t i = 0; i < scene.bodyCount; ++i) {
+    const Transform& t = scene.transforms[i];
+    std::uint32_t record[kRecordWords];
+    std::memcpy(record, &t, sizeof(Transform));
+    record[kRecordWords - 1] = scene.bodyClass[i];
+    std::uint32_t* kept = instanceShadow + static_cast<std::size_t>(i) * kRecordWords;
+    if (std::memcmp(kept, record, kRecordBytes) == 0) continue;
+    std::memcpy(kept, record, kRecordBytes);
+    if (runStart != kNoRun && i - runEnd > kMergeGapRecords) {
+      writeBuffer(instanceBuf, static_cast<std::uint64_t>(runStart) * kRecordBytes, instanceShadow + static_cast<std::size_t>(runStart) * kRecordWords, static_cast<std::uint64_t>(runEnd - runStart) * kRecordBytes);
+      runStart = kNoRun;
+    }
+    if (runStart == kNoRun) runStart = i;
+    runEnd = i + 1;
+  }
+  if (runStart != kNoRun) {
+    writeBuffer(instanceBuf, static_cast<std::uint64_t>(runStart) * kRecordBytes, instanceShadow + static_cast<std::size_t>(runStart) * kRecordWords, static_cast<std::uint64_t>(runEnd - runStart) * kRecordBytes);
   }
 }
 
@@ -1549,9 +1575,12 @@ int init(const char* selector, std::uint32_t width, std::uint32_t height) {
   materialBuf = makeBuffer(kMaterialBytes, wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst);
   pageBuf = makeBuffer(kPageBytes, wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst);
   bodyBytes = static_cast<std::uint64_t>(engine::world().bodyCapacity()) * kRecordBytes;
-  for (std::uint32_t c = 0; c < kPropClasses; ++c) {
-    instanceBuf[c] = makeBuffer(bodyBytes, wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst);
+  instanceBuf = makeBuffer(bodyBytes, wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst);
+  if (instanceShadow == nullptr) {
+    instanceShadow = static_cast<std::uint32_t*>(engine::arena::carve(static_cast<std::size_t>(bodyBytes), alignof(std::uint32_t)));
+    if (instanceShadow == nullptr) return engine::kRange;
   }
+  std::memset(instanceShadow, 0, static_cast<std::size_t>(bodyBytes));
 
   if (engine::models::bound()) {
     modelVertexBuf = makeBuffer(engine::models::vertexPoolBytes(), wgpu::BufferUsage::Vertex | wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst);
@@ -1593,13 +1622,10 @@ int frame(const SceneView& scene, const FramePlan& plan, const Camera& camera) {
     std::uint32_t propArgs[kPropClasses * 4];
     {
       engine::phase::Scope part(engine::phase::kUploadProps);
+      uploadBodyRecords(scene);
       for (std::uint32_t c = 0; c < kPropClasses; ++c) {
-        const std::uint32_t count = plan.propCount[c];
-        if (count != 0) {
-          writeBuffer(instanceBuf[c], 0, plan.propRecords + c * plan.bodySlots * kRecordWords, static_cast<std::uint64_t>(count) * kRecordBytes);
-        }
         propArgs[c * 4 + 0] = kPropVertices;
-        propArgs[c * 4 + 1] = count;
+        propArgs[c * 4 + 1] = c == 0 ? scene.bodyCount : 0;
         propArgs[c * 4 + 2] = 0;
         propArgs[c * 4 + 3] = 0;
       }

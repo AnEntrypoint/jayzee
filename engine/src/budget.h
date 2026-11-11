@@ -34,12 +34,12 @@ struct Capacity {
 
 constexpr std::uint32_t kMaxPlayers = 1024;
 #if !defined(ENGINE_TOP_TIER_BODIES)
-#define ENGINE_TOP_TIER_BODIES 40960
+#define ENGINE_TOP_TIER_BODIES 131072
 #endif
 
 constexpr std::uint32_t kTopTierBodies = ENGINE_TOP_TIER_BODIES;
 constexpr std::uint32_t kCompactTopTierBodies = 12288;
-constexpr std::uint64_t kRenderBytesPerBody = 136;
+constexpr std::uint64_t kRenderBytesPerBody = 168;
 constexpr std::uint64_t kRenderFixedBytes = 1024ull * 1024ull;
 
 static_assert(kTopTierBodies >= kCompactTopTierBodies && (kTopTierBodies - 2048) % kMaxPlayers == 0);

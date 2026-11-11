@@ -10,7 +10,7 @@ export const DATASET_REF = 'heclgang/jayzee-physics-bench'
 export const BUDGET_MS = 16.7
 export const TICKS = 900
 export const ARENA_BUDGET_BYTES = 1024 * MIB
-export const TOP_TIER_BODIES = 40960
+export const TOP_TIER_BODIES = 131072
 export const COMPACT_BODIES = 12288
 export const HEADROOM_BODIES = Object.freeze([49152, 65536])
 export const HEADROOM_WORKERS = Object.freeze([3, 4, 6])
@@ -51,6 +51,10 @@ const variants = () => {
 }
 
 export const RECORD_WORKERS = Object.freeze([1, 2, 3, 6])
+export const SETTLE_TICKS = 3000
+export const VIEW_BODIES = 40960
+export const TUNE_DEFAULT_BY_SLOT = 28
+export const VIEW_KNOBS = Object.freeze(['still=1', 'still=1,tune=' + TUNE_DEFAULT_BY_SLOT, 'tune=' + TUNE_DEFAULT_BY_SLOT])
 
 const regressWith = (candidate) => () => {
   const runs = []
@@ -62,6 +66,8 @@ const regressWith = (candidate) => () => {
   for (const glue of TICK_GLUES.filter((path) => path !== candidate)) runs.push(tick(glue, bodies, workers, { role: 'record' }))
   runs.push(tick(candidate, bodies, workers, { warm: false, role: 'record' }))
   runs.push(tick(candidate, COMPACT_BODIES, workers, { role: 'record' }))
+  runs.push(tick(candidate, bodies, workers, { role: 'record', ticks: SETTLE_TICKS }))
+  for (const knobs of VIEW_KNOBS) runs.push(tick(candidate, VIEW_BODIES, workers, { role: 'record', knobs }))
   runs.push(calibrate())
   return runs
 }

@@ -30,9 +30,10 @@ gate('a 128 MiB build given 1024 players and a 128 MiB budget steps down to the 
   assert.ok(layout.usedBytes <= 128 * MIB, 'the plan allocates above its budget: ' + layout.usedBytes)
 })
 
+const TOP_TIER_BODIES = 131072
 const AWAKE_DESIGN_BODIES = 16384
 const COMPACT_BODIES = 12288
-const BODIES_AT_512_MIB = 27648
+const BODIES_AT_512_MIB = 26624
 
 gate('a 512 MiB build given 1024 players and a 512 MiB budget runs the 1024 tier with ' + BODIES_AT_512_MIB + ' bodies, more than the ' + COMPACT_BODIES + ' it carried', async () => {
   const plan = resolvePlan({ players: 1024, budgetBytes: 512 * MIB })
@@ -43,12 +44,12 @@ gate('a 512 MiB build given 1024 players and a 512 MiB budget runs the 1024 tier
   assert.ok(layout.usedBytes <= 512 * MIB, 'the plan allocates above its budget: ' + layout.usedBytes)
 })
 
-gate('a 1024 MiB build given 1024 players and a 1024 MiB budget plans the top tier of 40960 bodies, and the 512 MiB plan keeps its model tier and its arena under the budget', async () => {
+gate('a 1024 MiB build given 1024 players and a 1024 MiB budget plans the top tier of ' + TOP_TIER_BODIES + ' bodies, and the 512 MiB plan keeps its model tier and its arena under the budget', async () => {
   const top = await loadEngineModule(glue1024, resolvePlan({ players: 1024, workers: 2, budgetBytes: 1024 * MIB }))
   const layout = readLayout(top)
   await releaseModule(top)
   assert.equal(layout.players, 1024)
-  assert.equal(layout.bodies, 40960)
+  assert.equal(layout.bodies, TOP_TIER_BODIES)
   assert.ok(layout.arenaBytes <= 1024 * MIB, 'the plan is above its budget: ' + layout.arenaBytes)
   const compact = readLayout(await loadEngineModule(glue512, resolvePlan({ players: 1024, budgetBytes: 512 * MIB })))
   assert.equal(compact.bodies, BODIES_AT_512_MIB)
@@ -89,7 +90,7 @@ gate('the 1024 tier refuses a world larger than its ' + BODIES_AT_512_MIB + ' bo
 
 gate('the top tier with every body asked awake keeps its awake count at the design limit, its solver memory inside the plan, and no step reports a full buffer', () => {
   const report = JSON.parse(execFileSync('node', [join(root, 'scripts/measure-arena.mjs'), 'engine/out/engine-core-1024mib-threads.mjs', '1024', '2', '240', '0'], { cwd: root, encoding: 'utf8', timeout: 120000 }))
-  assert.equal(report.bodies, 40960)
+  assert.equal(report.bodies, TOP_TIER_BODIES)
   assert.equal(report.awakeLimit, AWAKE_DESIGN_BODIES)
   assert.equal(report.updateErrors, 0)
   assert.ok(report.tempPeakBytes > 0 && report.tempPeakBytes <= report.tempPlanBytes, 'the solver used ' + report.tempPeakBytes + ' bytes of a ' + report.tempPlanBytes + ' byte plan')

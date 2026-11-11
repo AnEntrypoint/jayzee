@@ -34,7 +34,11 @@ constexpr std::uint32_t kTuneAirborne = 4u;
 constexpr std::uint32_t kTuneBroadphaseInterval = 8u;
 constexpr std::uint32_t kTuneReleaseBySlot = 16u;
 constexpr std::uint32_t kTuneAll = kTuneGravityAfterStep | kTuneWholeIslands | kTuneAirborne | kTuneBroadphaseInterval | kTuneReleaseBySlot;
-constexpr std::uint32_t kDefaultTuning = 0u;
+#if defined(ENGINE_BROADPHASE_INTERVAL)
+constexpr std::uint32_t kDefaultTuning = kTuneAirborne | kTuneBroadphaseInterval;
+#else
+constexpr std::uint32_t kDefaultTuning = kTuneAirborne;
+#endif
 constexpr std::uint16_t kLastGeneration = 0xfffeu;
 constexpr std::uint16_t kRetiredGeneration = 0xffffu;
 constexpr std::uint16_t kBodyLastGeneration = static_cast<std::uint16_t>((1u << (32 - kSlotBits)) - 2u);

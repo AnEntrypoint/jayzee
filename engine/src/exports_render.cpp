@@ -104,7 +104,7 @@ int frameBackend(const SceneView& scene, const FramePlan& plan, const Camera& ca
 namespace rnd = engine::render;
 
 static_assert(sizeof(rnd::RenderState) <= engine::budget::kRenderFixedBytes);
-static_assert(rnd::kPropClasses * rnd::kRecordBytes + 1 <= engine::budget::kRenderBytesPerBody);
+static_assert((rnd::kPropClasses + 1) * rnd::kRecordBytes + 1 <= engine::budget::kRenderBytesPerBody);
 
 extern "C" {
 

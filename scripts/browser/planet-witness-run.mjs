@@ -238,6 +238,8 @@ const frameCases = (result, samples, gapInfo, gpuRows = [], throttleSamples = []
 const summary = []
 let failed = 0
 const only = process.env.PLANET_ONLY
+const dumpWorkMs = process.env.PLANET_DUMP_WORK_MS === undefined ? Infinity : Number(process.env.PLANET_DUMP_WORK_MS)
+if (Number.isNaN(dumpWorkMs) || dumpWorkMs <= 0) throw new RangeError('PLANET_DUMP_WORK_MS must be a number of milliseconds above zero')
 const own = await witnessBrowser(root)
 let stopped = null
 try {
@@ -266,10 +268,11 @@ for (const config of PLANET_RUNS.filter((run) => !only || only === run.tier + '-
   if (!verdict.ok) failed += 1
   if (verdict.notCountedAgainstThePage) console.error('INFO ' + label + ': ' + verdict.hostThrottledIntervals + ' frame intervals over ' + PLANET_MISSED_FRAME_MS + ' ms fell in gaps where the container CPU quota stopped every browser process; recorded, not counted against the page')
   mkdirSync(resolve(outDir, 'traces'), { recursive: true })
-  if (cases.length > 0) {
+  const slowWorkFrame = run.result?.frameTimesMs ? run.result.frameTimesMs.findIndex((ms) => ms > dumpWorkMs) : -1
+  if (cases.length > 0 || slowWorkFrame >= 0) {
     mkdirSync(resolve(outDir, 'dumps'), { recursive: true })
-    const dumpName = label + '-frame' + cases[0].frameIndex + '.trace.json'
-    writeFileSync(resolve(outDir, 'dumps', dumpName), JSON.stringify({ label, trigger: 'long-frame', frameCases: cases, firstCallMs: run.result?.firstCallMs ?? null, traceEvents: run.trace ?? [] }) + '\n')
+    const dumpName = label + '-frame' + (cases.length > 0 ? cases[0].frameIndex : slowWorkFrame) + '.trace.json'
+    writeFileSync(resolve(outDir, 'dumps', dumpName), JSON.stringify({ label, trigger: cases.length > 0 ? 'long-frame' : 'work-over-' + dumpWorkMs + '-ms', frameCases: cases, firstCallMs: run.result?.firstCallMs ?? null, traceEvents: run.trace ?? [] }) + '\n')
   }
   writeFileSync(resolve(outDir, label + '.json'), JSON.stringify({ label, wallMs, load, verdict, frameCases: cases, traceGapSummary: { pid: gapInfo.pid, tid: gapInfo.tid, callbacks: gapInfo.callbacks, aligned: gapInfo.aligned, intervalMismatches: gapInfo.intervalMismatches, error: gapInfo.error ?? null }, hostSamples: samples, gpuSamples: gpuRows, result: run.result ?? null }, null, 1) + '\n')
   const wallMaxMs = run.result ? run.result.wallIntervalMaxMs : null

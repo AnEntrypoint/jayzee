@@ -136,6 +136,8 @@ def summarise(configs):
                 "overBudgetEach": [row["overBudget"] for row in good], "overBudgetHostEach": [row.get("overBudgetHost") for row in good],
                 "lastActiveTick": max((row.get("lastActiveTick") or -1) for row in good),
                 "visualSettleTick": max((row.get("visualSettleTick") or -1) for row in good),
+                "unsettledViewBodyTicks": max((row.get("unsettledViewBodyTicks") or 0) for row in good),
+                "updateErrors": max((row.get("updateErrors") or 0) for row in good),
             })
         else:
             line["results"] = [{name: row.get(name) for name in ("kind", "refused", "error", "status", "singleMs", "memoryMs", "cpuP99Ms", "cpuMaxMs", "cpuOver25", "tier") if row.get(name) is not None} for row in rows]

@@ -76,7 +76,8 @@ const streamer = onPlanet ? createPlanetStreamer(module, { baseY }) : { step: ()
 const poseBytes = module._engine_pose_bytes()
 const reserve = module._engine_pose_reserve()
 const region = attachPoseRegion(poseRegionBuffers({ slots: 1, poseBytes }), { owner: true })
-const stepper = createPoseStepper({ module, streamer, region, reserve })
+const viewer = knobs.still !== undefined ? { viewTarget: streamer.viewTarget, step: () => streamer.step(0) } : streamer
+const stepper = createPoseStepper({ module, streamer: viewer, region, reserve })
 const setupMs = performance.now() - setupStarted
 
 const activeOf = exported('_engine_world_active_bodies')
@@ -171,6 +172,8 @@ emit({
   peakActive: activeOf ? Math.max(...active) : null,
   lastActiveTick: activeOf ? lastActiveTick : null,
   visualSettleTick: unsettledOf ? lastTickWith(unsettled) + 1 : null,
+  unsettledViewBodyTicks: unsettledOf ? unsettled.reduce((sum, count) => sum + count, 0) : null,
+  viewer: knobs.still !== undefined ? 'still' : 'path',
   heldAtEnd: heldOf ? held[ticks] : null,
   peakAirborne: airborneOf ? Math.max(...airborne) : null,
   gcCount: collections.length,

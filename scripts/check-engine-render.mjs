@@ -44,7 +44,7 @@ const EXPECT_LAYOUT = {
   MaterialSlot: 40,
   LightSlot: 32,
   PagePlacement: 56,
-  Camera: 224,
+  Camera: 240,
   Transform: 28,
 }
 const EXPECT_PAGE_SIDE = 16
@@ -107,8 +107,18 @@ gate('the prop classes and body slots match the expected instance buffer shape',
   assert.ok(renderFrameHeader.includes('std::uint32_t bodySlots;'))
   assert.ok(exportsSource.includes('engine::world().bodyCapacity()'), 'the render slots do not follow the planned bodies')
   assert.ok(budgetSource.includes('kRenderFixedBytes + bodies * kRenderBytesPerBody'), 'the plan does not charge the render slots per planned body')
-  assert.ok(budgetHeader.includes('kRenderBytesPerBody = 136'))
+  assert.ok(budgetHeader.includes('kRenderBytesPerBody = 168'))
   assert.equal(EXPECT_PROP_CLASSES, 4)
+})
+
+gate('the WebGPU backend keeps body records in slot order, sends only the runs that changed, and hides a held body in the shader', () => {
+  const webgpu = read('engine/src/render/render_webgpu.cpp')
+  assert.ok(webgpu.includes('void uploadBodyRecords(const SceneView& scene)'))
+  assert.ok(webgpu.includes('if (std::memcmp(kept, record, kRecordBytes) == 0) continue;'), 'an unchanged record is sent again')
+  assert.ok(!webgpu.includes('plan.propRecords'), 'the culled records, which change with the camera, are still uploaded')
+  assert.ok(webgpu.includes('+ cam.bodyOffset.xyz'), 'the records are not relative to the body origin')
+  assert.ok(webgpu.includes('let shown = dot(q, q) > 0.0 && cls < 4u;'), 'a held body or an unknown class is drawn')
+  assert.ok(read('engine/src/render/render_frame.cpp').includes('camera.bodyOffset[0] = static_cast<float>(scene.bodyOrigin.x - scene.origin.x);'))
 })
 
 gate('the render sources never map a buffer, wait on a future or allocate on the heap', () => {

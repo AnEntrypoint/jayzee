@@ -65,12 +65,14 @@ struct Camera {
   std::uint32_t counts[4];
   float classRadius[4];
   std::uint32_t classMaterial[4];
+  float bodyOffset[4];
 };
 
 static_assert(sizeof(MaterialSlot) == 40);
 static_assert(sizeof(LightSlot) == 32);
 static_assert(sizeof(PagePlacement) == 56);
-static_assert(sizeof(Camera) == 224);
+static_assert(sizeof(Camera) == 240);
+static_assert(sizeof(Transform) + sizeof(std::uint32_t) == kRecordBytes);
 static_assert(sizeof(Transform) == 28);
 
 struct FramePlan {

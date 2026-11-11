@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { readFileSync, readdirSync } from 'node:fs'
 import { finish, gate } from './lib/gate.mjs'
-import { FIRST_DISPLAY, chromiumFlags, freeDisplay, freePort, processesNaming, stopTree } from './browser/ownDisplay.mjs'
+import { FIRST_DISPLAY, chromiumFlags, freeDisplay, freePort, processesNaming, stopTree, xvfbArgs } from './browser/ownDisplay.mjs'
 
 const MARK = 'own-display-gate-' + process.pid
 const alive = (pid) => {
@@ -39,6 +39,17 @@ gate('the witness browser is started with the WebGPU and Vulkan switches, its ow
   const flags = chromiumFlags({ debugPort: 4567, profileDir: '/tmp/profile-x', width: 1280, height: 800 })
   for (const needed of ['--enable-unsafe-webgpu', '--enable-features=Vulkan,WebGPUService', '--use-vulkan', '--ignore-gpu-blocklist', '--user-data-dir=/tmp/profile-x', '--remote-debugging-port=4567']) assert.ok(flags.includes(needed), 'missing ' + needed)
   assert.ok(!flags.some((flag) => /headless|swiftshader/i.test(flag)), 'a headless or SwiftShader switch is present, which gives the CPU adapter')
+})
+
+gate('the display presents through the render node when there is one, and is a plain framebuffer without it', () => {
+  const accelerated = xvfbArgs({ display: 93, width: 1280, height: 800, renderNode: '/dev/dri/renderD128' })
+  assert.equal(accelerated[0], ':93')
+  assert.ok(accelerated.includes('-glamor'))
+  assert.equal(accelerated[accelerated.indexOf('-dri') + 1], '/dev/dri/renderD128')
+  assert.ok(accelerated.includes('1280x800x24') && accelerated.includes('-nolisten'))
+  assert.ok(!accelerated.includes('-ac'), 'access control is off')
+  const plain = xvfbArgs({ display: 93, width: 1280, height: 800, renderNode: null })
+  assert.ok(!plain.includes('-glamor') && !plain.includes('-dri'))
 })
 
 gate('a free port is a whole number a server can bind', async () => {

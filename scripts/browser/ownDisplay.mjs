@@ -10,6 +10,17 @@ export const STOP_GRACE_MS = 4000
 const READY_TRIES = 150
 const READY_GAP_MS = 100
 const DEFAULT_CHROMIUM = '/usr/bin/chromium'
+export const RENDER_NODE = '/dev/dri/renderD128'
+const X_EXTENSIONS = ['COMPOSITE', 'DAMAGE', 'GLX', 'RANDR', 'RENDER', 'MIT-SHM', 'XFIXES']
+
+export const xvfbArgs = ({ display, width, height, renderNode = existsSync(RENDER_NODE) ? RENDER_NODE : null }) => [
+  ':' + display,
+  '-screen', '0', width + 'x' + height + 'x24',
+  '-nolisten', 'tcp',
+  ...X_EXTENSIONS.flatMap((name) => ['+extension', name]),
+  '+iglx', '+render', '-shmem',
+  ...(renderNode ? ['-glamor', '-dri', renderNode] : []),
+]
 
 const pause = (ms) => new Promise((done) => setTimeout(done, ms))
 
@@ -107,7 +118,7 @@ const stopByPid = async (pids, graceMs = STOP_GRACE_MS) => {
 
 export const startOwnBrowser = async ({ root, width = 1280, height = 800, chromium = process.env.WEBGPU_CHROMIUM ?? DEFAULT_CHROMIUM }) => {
   const display = freeDisplay()
-  const xvfb = spawn('Xvfb', [':' + display, '-screen', '0', width + 'x' + height + 'x24', '-nolisten', 'tcp'], { detached: true, stdio: 'ignore' })
+  const xvfb = spawn('Xvfb', xvfbArgs({ display, width, height }), { detached: true, stdio: 'ignore' })
   let browser = null
   let profileDir = null
   const stop = async () => {
