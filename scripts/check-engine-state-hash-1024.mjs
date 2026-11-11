@@ -30,6 +30,14 @@ gate('the threaded build agrees with the fixed build at 2 and 4 workers, bit for
   for (const workers of [2, 4]) assert.equal(countRuns.get(workers).hash, fixed, 'workers ' + workers)
 })
 
+gate('7 workers at 512 MiB is refused with the typed workers-do-not-fit error, not an abort', () => {
+  const run = countRuns.get(7)
+  assert.equal(run.refused, 'workers-do-not-fit')
+  assert.equal(run.status, -8)
+  assert.equal(run.workers, 7)
+  assert.equal(run.players, 1024)
+})
+
 gate('8 workers at 512 MiB is refused with the typed workers-do-not-fit error, not an abort', () => {
   const run = countRuns.get(8)
   assert.equal(run.refused, 'workers-do-not-fit')

@@ -3763,3 +3763,28 @@ Witness, Phase B (build not needed: JS only):
   All four: verdict ok, 900 callbacks aligned, 0 interval mismatches. Traces saved under build/diag/planet-p1/traces/.
 
 Result: the 26 ms and 29 ms in-callback spikes did not recur in this pass. The first-call times are 0 to 5 ms, so the lazy compile was small in this run. The compile hypothesis is not confirmed or rejected by these runs. The pre-warm is kept as the owner direction. OPEN: the earlier spike traces (trace-run8, planet-run2) were not saved, so their cause remains unconfirmed.
+
+## 7-worker refusal: Phase A (gate for the threaded worker bound)
+
+- Change: scripts/lib/stateHash1024.mjs THREAD_COUNTS is [2, 4, 7, 8] (was [2, 4, 8]). scripts/check-engine-state-hash-1024.mjs adds the gate "7 workers at 512 MiB is refused with the typed workers-do-not-fit error, not an abort", which asserts refused, status -8, workers 7, players 1024.
+- Reason: the bound is already in the engine (engine/src/budget.cpp, workersFit: (workers - 1) * 526648 <= 2633240, so 7 workers, 3159888 bytes, is refused). No gate checked 7, so the refusal was inferred, not witnessed.
+- Witness: pending Phase B.
+
+## 64 WebGL2 spike: eight-run recurrence check (no code change)
+
+Eight sequential runs, `PLANET_ONLY=64-webgl2 node scripts/browser/planet-witness-run.mjs build/diag/spike8-<i> 8847 900`, traces saved to build/diag/spike8-<i>/traces/64-webgl2.trace.json. Background job, each run exit 0. All eight verdicts ok.
+
+| run | wall ms | workMax ms | missed | intervalMax ms | intervals over 25 ms |
+|---|---|---|---|---|---|
+| 1 | 18150 | 3.25 | 0 | 17.71 | 0 |
+| 2 | 18238 | 3.08 | 0 | 17.75 | 0 |
+| 3 | 18240 | 3.49 | 0 | 17.70 | 0 |
+| 4 | 18215 | 3.12 | 0 | 17.70 | 0 |
+| 5 | 18243 | 3.31 | 0 | 17.71 | 0 |
+| 6 | 18227 | 5.06 | 0 | 18.90 | 0 |
+| 7 | 18207 | 3.37 | 0 | 17.72 | 0 |
+| 8 | 18213 | 3.12 | 0 | 17.74 | 0 |
+
+Max work over the eight runs: 5.06 ms (run 6). Missed frames: 0 in every run. First-call ms across runs: `_engine_tick` 1.00 to 1.45, `renderer.frame` 2.41 to 3.52.
+
+Result: no spike appeared in 8 runs after the earlier 1-run and 4-config passes (9 runs, 0 over 25 ms). The 26 ms and 29 ms spikes recorded earlier (trace-run8 frame 254, planet-run2 frame 148) remain unreproduced and their cause is OPEN. Their traces were not saved, so no trace of them exists to read. The spike stays recorded as a defect until a trace of it exists.
