@@ -3691,3 +3691,10 @@ Phase B (2026-11-11): both glues rebuilt (64 MiB sha256 16dba745…, 512 MiB thr
 - Limit: the checksum is a JS-side hash, not the engine's state hash. Orders are scripted, not player input. The engine itself is unchanged in this stretch, so the glues from stretch 4 are the ones under test.
 
 Phase B (2026-11-11): no engine source changed in this stretch, so the glues are the stretch 4 builds (64 MiB sha256 16dba745…, 512 MiB threaded sha256 2521a27f…). The lockstep RTS scenario prints RESULT: PASS on both tiers (all six gates; the divergent peer is caught at tick 120). `npm test` exit 0 with no FAIL lines.
+
+## Boss fight scenario: chaser and shooter on the planet (Phase A, 2026-11-11)
+
+- Source: spoint apps/final-boss (a chaser at 5 m/s inside 50 m, stopping at 8 m, attacking every 2 s, 200 health). The jayzee core is the boss and one player character. The boss deals 25 per 2 s inside 8 m; the player fires 15 every 0.5 s within 30 m, and holds still. spoint's XP, level gate, timers and mesh are not ported.
+- Change: `scripts/check-scenario-boss-fight.mjs`, run as `check:scenario-boss-fight` and appended to `npm test`. The engine is unchanged, so the glues are those from stretch 4. Gates per tier: the boss dies within 1800 ticks and the player survives, the boss closes inside 8 m before it dies, the boss stays on the surface and supported after the settle window, two runs agree bit for bit on the health trail and positions, worst tick work within 16.7 ms.
+- Limit: the player is scripted, not controlled, and it is not a second moving target. Spoint's level gate is not ported.
+- Witness: Phase B runs the boss scenario on both tiers.
