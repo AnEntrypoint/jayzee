@@ -3968,3 +3968,25 @@ Each entry in a run's `frameCases` (and so each dump) now carries three fields t
 - `hostCpuInFrame`: the cgroup CPU delta and throttle delta over the frame's window, read from `/sys/fs/cgroup/cpu.stat` at each 50 ms host sample, with the top five processes by CPU delta from `/proc/<pid>/stat` for the processes in the `ps` list. `sampleWallMs` gives the span of the samples used. The resolution is one 50 ms sample, so a window shorter than that is bounded by its neighbouring samples, not measured inside.
 
 The frame's row is matched by the engine frame number, which is `frameIndex` (the warm-up of 60 frames is included). The dump name uses the same number.
+
+### 64-webgpu spike hunt with the physics split (Phase B outcome, run 22)
+
+`build/diag/spike-hunt2.sh` ran `PLANET_ONLY=64-webgpu` up to 25 times. Runs 1 to 21 were clean. Run 22 captured (`build/diag/spike-hunt2.log`, `RUN 22 CAPTURED`, `CAPTURED-RUN 22`), and the hunt stopped there.
+
+Dump: `build/diag/spike2-22/dumps/64-webgpu-frame106.trace.json` (`trigger: long-frame`, 3 cases, 241,887 events). Its three frame cases are all gap events, not in-tick excursions:
+
+| frame | intervalMs | workMs | joltStepMs | tickOutsideJoltMs | gpuTaskMs (in gap) | cgroup cores in window |
+|---|---|---|---|---|---|---|
+| 106 | 73.28 | 3.04 | 2.65 | 0.07 | 4.31 | 8.08 |
+| 405 | 26.34 | 3.06 | 2.70 | 0.05 | 3.07 | 8.02 |
+| 843 | 146.10 | 2.87 | 2.47 | 0.06 | 140.28 | 7.26 |
+
+Each has `gcMs` 0, `throttledPeriods` 0, and the classification `renderer-main-thread-idle-in-gap`.
+
+The host CPU in each window (`hostCpuInFrame`, over 80 to 85 ms of samples) is the planet's `chromium.real` (100 to 220 ms CPU), together with `exe` PID 901344 (70 to 80 ms each window, not touched), and `MainThread` (70 to 110 ms in two windows). The cgroup used 7.3 to 8.1 cores of 12, with no throttled periods in any window.
+
+Across the whole run (`build/diag/spike2-22/64-webgpu.json`), the only timed row with tick over 5 ms is frame 835 (tick 6.39 ms, physics 6.26 ms). The physics phase median is 2.48 ms. No physics excursion near the 16 ms of the earlier `spike-5` record appears in this run.
+
+Cause: not established. The dump separates the Jolt step from the rest of the tick, and it shows that the Jolt step is not the cause of this capture: the step is 2.5 to 2.7 ms in every captured frame, and the tick outside it is under 0.1 ms. Those frames are missed intervals with 3 ms of work, so the time sits in the gap. The one thing overlapping a gap is a GPU-process task of 140.28 ms in frame 843's gap, which may explain that frame, but the dump does not show that the GPU task caused the gap. Host CPU was 7 to 8 cores with no throttling, so it does not explain the gap alone. The earlier 16 ms physics excursion (`spike-5`, frame 868) did not recur in 25 runs. It is recorded as open, not as expected. Closing it needs a capture of the physics phase in a run that also shows a tick over budget, and the per-window throttle counter, read per frame in the page.
+
+Witness: `build/diag/spike-hunt2.log`, `build/diag/spike2-22.log`, `build/diag/spike2-22/dumps/64-webgpu-frame106.trace.json`, `build/diag/spike2-22/64-webgpu.json`.
