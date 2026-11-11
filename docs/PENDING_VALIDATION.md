@@ -4634,3 +4634,25 @@ One Kaggle run for the stretch, run 39 (private, class GenuineIntel-6-79-0, 625 
 - The session is a real Linux 6.18 kernel with a quota of 4 CPUs, not a user-space kernel.
 
 Open: what in the Kaggle session wakes every 10 s; the one tick per run that is off the phase with no wait (18.5 ms at tick 155 of one gate row in run 39).
+
+## Phase L (2026-11-12): can the planet tick get faster, and should its layout change
+
+One Kaggle run, run 40 (private, class GenuineIntel-6-79-0, 612 s, 58 of 58 rows, dry run of 27 rows in 49 s first). Mean tick while bodies are awake at 131072 bodies, 4096 awake, 4 workers, unless said:
+
+| option | before ms | after ms | state |
+|---|---|---|---|
+| engine's own serial passes eight slots at a time, pose rows copied once | 7.77 | 6.37 | adopted, poses identical |
+| the same with all 12288 awake | 8.23 | 7.45 | adopted |
+| two solver iterations, not four | 6.37 | 5.89 | measured, changes the simulation, not adopted |
+| airborne skip off, 4-step broadphase rebuild kept | 6.37 | 6.07 | measured on three repeats, not adopted |
+| 4-step broadphase rebuild (already on) | 6.82 | 6.07 | on since Phase I |
+| 3 workers and not 4 | 6.37 | 7.07 | worse |
+| 6 workers and not 4 | 6.37 | 6.54 | worse |
+| page frame: skip the two per-body loops when no body moved | 1.44 | about 0.46 | bound from the phase timers, not built |
+| warm instance path | 0.5 s at boot | | kept: first tick 5 ms against 23.6 ms cold, no cost per tick |
+
+Gate: mean 6.367 ms against the reference 7.771 ms (limit 8.548), quiet-tick p99 8.244 against 9.517 ms, 0 ticks over budget in the median run against 0. Full test and the push follow.
+
+The layout does not need to change: four workers beside the main thread is the fastest count measured, and the time that is left is in finding collisions (about 30 percent) and the position solve (about 19 percent), not in the hand-off. The awake budget stays 4096: all 12288 awake is 7.45 ms at the mean with a p99 of 14.86 ms.
+
+Next, in order of measured or bounded gain: the page's two per-body loops; the airborne skip settled on more repeats; collision finding against the planet.
