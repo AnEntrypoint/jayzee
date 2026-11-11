@@ -892,7 +892,6 @@ Status World::setTuning(std::uint32_t flags) {
   JPH::PhysicsSettings settings = runtime_->physics.GetPhysicsSettings();
   settings.mUseLargeIslandSplitter = (flags & kTuneWholeIslands) == 0;
   runtime_->physics.SetPhysicsSettings(settings);
-  planet::state().pages.cacheLookups((flags & kTunePageLookupCache) != 0);
   return kOk;
 }
 

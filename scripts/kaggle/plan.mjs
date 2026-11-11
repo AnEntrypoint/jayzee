@@ -10,10 +10,10 @@ export const DATASET_REF = 'heclgang/jayzee-physics-bench'
 export const BUDGET_MS = 16.7
 export const TICKS = 900
 export const ARENA_BUDGET_BYTES = 1024 * MIB
-export const TOP_TIER_BODIES = 12288
-export const HEADROOM_BODIES = Object.freeze([16384, 20480])
+export const TOP_TIER_BODIES = 40960
+export const HEADROOM_BODIES = Object.freeze([49152, 65536])
 export const HEADROOM_WORKERS = Object.freeze([3, 4, 6])
-export const HEADROOM_GLUE = 'build/variants/cap20480/engine-core-1024mib-threads-simd.mjs'
+export const HEADROOM_GLUE = 'build/variants/cap65536/engine-core-1024mib-threads-simd.mjs'
 export const WARM_SPECS = Object.freeze(['1024x150', '512x90'])
 export const WARM_SPEC_REPEATS = 2
 export const WORKER_COUNTS = Object.freeze([1, 2, 3, 4, 6, 8])
@@ -79,29 +79,29 @@ const claim = () => {
     }
     runs.push(tick(HEADROOM_GLUE, CLAIM_NEXT_BODIES, 4))
   }
-  for (const workers of CLAIM_SCALING_WORKERS) runs.push(tick(HEADROOM_GLUE, TOP_TIER_BODIES, workers, { knobs: ALL_AWAKE, probe: true }))
+  for (const workers of CLAIM_SCALING_WORKERS) runs.push(tick(HEADROOM_GLUE, CLAIM_BODIES[0], workers, { knobs: ALL_AWAKE, probe: true }))
   runs.push(tick(HEADROOM_GLUE, CLAIM_BODIES[1], 4, { knobs: ALL_AWAKE, probe: true }))
   runs.push(calibrate())
   return runs
 }
 
 export const CEILING_CAP = 40960
-export const CEILING_GLUE = 'build/variants/cap40960/engine-core-1024mib-threads-simd.mjs'
-export const CEILING_BODIES = Object.freeze([12288, 16384, 20480, 24576, 32768, 40960])
-export const CEILING_HELD_IN_WORLD_BODIES = Object.freeze([20480, 24576, 32768, 40960])
+export const NEXT_CAP = 65536
+export const NEXT_GLUE = 'build/variants/cap65536/engine-core-1024mib-threads-simd.mjs'
+export const NEXT_BODIES = Object.freeze([49152, 65536])
+export const CEILING_BODIES = Object.freeze([12288, 16384, 40960])
+export const CEILING_BUDGETS = Object.freeze([6144, 8192])
 export const CEILING_REPEATS = 3
 export const HELD_IN_WORLD_COMMIT = '675210968a34dcddaa949615b39e55c594bd68d0'
-export const TUNINGS = Object.freeze([0, 1, 2, 4, 7])
 
 const ceiling = () => {
   const runs = [calibrate()]
-  const unbudgeted = referenceGlue(UNBUDGETED_COMMIT, CEILING_CAP)
   const heldInWorld = referenceGlue(HELD_IN_WORLD_COMMIT, CEILING_CAP)
   for (let repeat = 0; repeat < CEILING_REPEATS; repeat++) {
-    runs.push(tick(unbudgeted, TOP_TIER_BODIES, 4))
-    for (const bodies of CEILING_BODIES) runs.push(tick(CEILING_GLUE, bodies, 4))
-    for (const bodies of CEILING_HELD_IN_WORLD_BODIES) runs.push(tick(heldInWorld, bodies, 4))
-    for (const tune of TUNINGS) runs.push(tick(CEILING_GLUE, TOP_TIER_BODIES, 4, { knobs: ALL_AWAKE + ',tune=' + tune, probe: true }))
+    for (const bodies of CEILING_BODIES) runs.push(tick(SIMD_GLUE, bodies, 4))
+    runs.push(tick(heldInWorld, TOP_TIER_BODIES, 4))
+    for (const budget of CEILING_BUDGETS) runs.push(tick(SIMD_GLUE, TOP_TIER_BODIES, 4, { knobs: 'awake=' + budget, probe: true }))
+    for (const bodies of NEXT_BODIES) runs.push(tick(NEXT_GLUE, bodies, 4, { probe: true }))
   }
   runs.push(calibrate())
   return runs

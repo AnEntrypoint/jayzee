@@ -66,14 +66,19 @@ constexpr std::uint64_t kHeapReserveBytes = 2633240;
 constexpr std::uint64_t kBodyRowBytes = 2 * sizeof(std::uint32_t) + sizeof(std::uint16_t) + sizeof(std::uint8_t) + 6 * sizeof(double) +
                                         sizeof(Transform) + sizeof(std::uint32_t) + kBatchWords * sizeof(double) + sizeof(std::uint32_t);
 
-constexpr std::uint32_t bodiesFor(std::uint32_t players) {
+constexpr std::uint32_t kCompactBodiesPerPlayer = (kCompactTopTierBodies - 2048) / kMaxPlayers;
+
+constexpr std::uint32_t bodiesFor(std::uint32_t players, bool compact) {
   for (const Tier& tier : kTiers) {
-    if (players <= tier.maxPlayers) return tier.baseBodies + tier.bodiesPerPlayer * players;
+    if (players > tier.maxPlayers) continue;
+    const std::uint32_t perPlayer = compact && tier.maxPlayers == kMaxPlayers ? kCompactBodiesPerPlayer : tier.bodiesPerPlayer;
+    return tier.baseBodies + perPlayer * players;
   }
   return 0;
 }
 
-static_assert(bodiesFor(kMaxPlayers) == kTopTierBodies);
+static_assert(bodiesFor(kMaxPlayers, false) == kTopTierBodies);
+static_assert(bodiesFor(kMaxPlayers, true) == kCompactTopTierBodies);
 
 std::uint64_t totalBytes(const Capacity& c) {
   const std::uint64_t bodies = c.bodies;
@@ -130,7 +135,6 @@ std::uint64_t modelBytesOf(std::uint32_t tier) {
 bool fitsTier(std::uint64_t budgetBytes, std::uint32_t players, std::uint32_t workers, Capacity& out) {
   Capacity next{};
   next.players = players;
-  next.bodies = bodiesFor(players);
   next.statics = kStatics;
   next.trunks = kTrunks;
   next.pageSlots = pageSlotsFor(budgetBytes);
@@ -145,16 +149,20 @@ bool fitsTier(std::uint64_t budgetBytes, std::uint32_t players, std::uint32_t wo
   next.baselineDepth = kBaselineDepth;
   next.interestCellsPerSide = kInterestCellsPerSide;
   next.workers = workers;
-  next.tempBytes = kTempBytes + static_cast<std::uint64_t>(next.bodies) * kTempBytesPerBody;
   next.hostBytes = players == kMaxPlayers ? kHostReserveBytes : 0;
+  const std::uint32_t bodyChoices[2] = {bodiesFor(players, false), bodiesFor(players, true)};
   bool fits = false;
-  for (std::uint32_t tier = device::kTierCount; tier-- > 0;) {
+  for (std::uint32_t tier = device::kTierCount; tier-- > 0 && !fits;) {
     next.modelTier = tier;
     next.modelBytes = modelBytesOf(tier);
-    next.arenaBytes = totalBytes(next);
-    if (next.arenaBytes <= budgetBytes && next.arenaBytes <= arena::kBytes) {
-      fits = true;
-      break;
+    for (const std::uint32_t bodies : bodyChoices) {
+      next.bodies = bodies;
+      next.tempBytes = kTempBytes + static_cast<std::uint64_t>(bodies) * kTempBytesPerBody;
+      next.arenaBytes = totalBytes(next);
+      if (next.arenaBytes <= budgetBytes && next.arenaBytes <= arena::kBytes) {
+        fits = true;
+        break;
+      }
     }
   }
   out = next;

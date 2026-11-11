@@ -62,6 +62,7 @@ const exportsSource = sources['engine/src/exports_render.cpp']
 const renderFrameHeader = sources['engine/src/render/render_frame.h']
 const renderFrameWrite = read('engine/src/render/render_frame.cpp')
 const budgetSource = read('engine/src/budget.cpp')
+const budgetHeader = read('engine/src/budget.h')
 const gluePath = join(root, 'engine/out/engine-core-64mib.mjs')
 const wasmPath = join(root, 'engine/out/engine-core-64mib.wasm')
 
@@ -102,7 +103,9 @@ gate('the page is 16 by 16 float samples, the layer array is sized to the larges
 
 gate('the prop classes and body slots match the expected instance buffer shape', () => {
   assert.ok(renderFrameHeader.includes('kPropClasses = 4'))
-  assert.ok(renderFrameHeader.includes('kBodySlots = budget::kTopTierBodies'))
+  assert.ok(renderFrameHeader.includes('kBodySlots = budget::kRenderBodySlots'))
+  assert.ok(budgetHeader.includes('kRenderBodySlots = arena::kBytes >= kTopTierArenaBytes ? kTopTierBodies : kCompactTopTierBodies'))
+  assert.ok(budgetHeader.includes('kCompactTopTierBodies = 12288'))
   assert.equal(EXPECT_PROP_CLASSES, 4)
   assert.equal(EXPECT_BODY_SLOTS, 12288)
 })

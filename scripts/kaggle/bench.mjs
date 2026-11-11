@@ -1,5 +1,5 @@
 import { availableParallelism } from 'node:os'
-import { closeSync, openSync, readSync } from 'node:fs'
+import { closeSync, openSync, readdirSync, readFileSync, readSync } from 'node:fs'
 import { PerformanceObserver } from 'node:perf_hooks'
 import { loadEngineModule, resolvePlan } from '../../src/engine/EngineWorld.js'
 import { readLayout } from '../../src/engine/bridge.js'
@@ -121,6 +121,53 @@ const readCounters = (at) => {
     stealAt[at] = numberAfter(counterBytes, length, STAT_LABEL, STEAL_FIELD)
   }
 }
+const NS_PER_MS = 1e6
+const fieldAt = (bytes, length, index) => {
+  let i = 0
+  for (let skipped = 0; skipped < index; skipped++) {
+    while (i < length && bytes[i] !== SPACE) i += 1
+    i += 1
+  }
+  let value = 0
+  while (i < length && bytes[i] >= 48 && bytes[i] <= 57) {
+    value = value * 10 + bytes[i] - 48
+    i += 1
+  }
+  return value
+}
+const listThreads = () => {
+  try {
+    return readdirSync('/proc/self/task').map((tid) => ({ tid: Number(tid), fd: openCounter('/proc/self/task/' + tid + '/schedstat'), name: readFileSync('/proc/self/task/' + tid + '/comm', 'utf8').trim() })).filter((thread) => thread.fd >= 0)
+  } catch {
+    return []
+  }
+}
+const threads = listThreads()
+const threadWaitNs = new Float64Array(threads.length)
+const waitMaxMs = new Float64Array(ticks)
+const waitSumMs = new Float64Array(ticks)
+const waitThread = new Int32Array(ticks).fill(-1)
+const readThreadWaits = (tick) => {
+  let worst = 0
+  let sum = 0
+  let who = -1
+  for (let t = 0; t < threads.length; t++) {
+    const length = readSync(threads[t].fd, counterBytes, 0, 128, 0)
+    const waited = fieldAt(counterBytes, length, 1)
+    const delta = waited - threadWaitNs[t]
+    threadWaitNs[t] = waited
+    if (tick < 0) continue
+    sum += delta
+    if (delta > worst) {
+      worst = delta
+      who = t
+    }
+  }
+  if (tick < 0) return
+  waitMaxMs[tick] = worst / NS_PER_MS
+  waitSumMs[tick] = sum / NS_PER_MS
+  waitThread[tick] = who
+}
 const activeOf = typeof module._engine_world_active_bodies === 'function' ? module._engine_world_active_bodies : null
 const active = new Int32Array(ticks)
 const collections = []
@@ -129,6 +176,7 @@ gcObserver.observe({ entryTypes: ['gc'] })
 const loopStarted = performance.now()
 const times = new Float64Array(ticks)
 readCounters(0)
+readThreadWaits(-1)
 for (let f = 0; f < ticks; f++) {
   region.setFrame(0, f)
   const at = performance.now()
@@ -136,7 +184,9 @@ for (let f = 0; f < ticks; f++) {
   times[f] = performance.now() - at
   if (activeOf) active[f] = activeOf()
   readCounters(f + 1)
+  readThreadWaits(f)
 }
+for (const thread of threads) closeSync(thread.fd)
 if (cgroupFd >= 0) closeSync(cgroupFd)
 if (statFd >= 0) closeSync(statFd)
 const hostCounters = throttledAt[0] >= 0 && stealAt[0] >= 0
@@ -148,8 +198,14 @@ collections.push(...gcObserver.takeRecords())
 gcObserver.disconnect()
 const overTicks = []
 times.forEach((ms, tick) => {
-  if (ms > BUDGET_MS) overTicks.push([tick, round(ms, 2), activeOf ? active[tick] : null, hostCounters ? throttledIn(tick) : null, hostCounters ? round(throttledUsecIn(tick) / 1000, 2) : null, hostCounters ? stealIn(tick) : null])
+  if (ms > BUDGET_MS) overTicks.push([tick, round(ms, 2), activeOf ? active[tick] : null, hostCounters ? throttledIn(tick) : null, hostCounters ? round(throttledUsecIn(tick) / 1000, 2) : null, hostCounters ? stealIn(tick) : null, threads.length ? round(waitMaxMs[tick], 2) : null, waitThread[tick] >= 0 ? threads[waitThread[tick]].name : null, threads.length ? round(waitSumMs[tick], 2) : null])
 })
+const RUNQUEUE_WAIT_MS = 2
+let overBudgetRunqueueWait = 0
+times.forEach((ms, tick) => {
+  if (ms > BUDGET_MS && waitMaxMs[tick] >= RUNQUEUE_WAIT_MS) overBudgetRunqueueWait += 1
+})
+const sortedWaits = Float64Array.from(waitMaxMs).sort()
 let overBudgetHostThrottled = 0
 times.forEach((ms, tick) => {
   if (ms > BUDGET_MS && hostMoved(tick)) overBudgetHostThrottled += 1
@@ -177,6 +233,10 @@ emit({
   overBudget: over(times),
   overBudgetHostThrottled,
   hostCounters,
+  overBudgetRunqueueWait,
+  threadsWatched: threads.map((thread) => thread.name),
+  waitMaxMedianMs: threads.length ? round(quantile(sortedWaits, 0.5), 3) : null,
+  waitMaxP99Ms: threads.length ? round(quantile(sortedWaits, 0.99), 3) : null,
   throttledPeriods: hostCounters ? throttledAt[ticks] - throttledAt[0] : null,
   throttledMs: hostCounters ? round((throttledUsecAt[ticks] - throttledUsecAt[0]) / 1000, 1) : null,
   stealJiffies: hostCounters ? stealAt[ticks] - stealAt[0] : null,

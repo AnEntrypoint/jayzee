@@ -5,11 +5,13 @@ import { gate, finish } from './lib/gate.mjs'
 import { createEngineWorld, loadEngineModule, resolvePlan } from '../src/engine/EngineWorld.js'
 import { readLayout } from '../src/engine/bridge.js'
 import { BODY_SPACING_M } from '../src/engine/sceneSetup.js'
+import { releaseModule } from './lib/releaseWorld.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const glue64 = pathToFileURL(join(root, 'engine/out/engine-core-64mib.mjs')).href
 const glue128 = pathToFileURL(join(root, 'engine/out/engine-core-128mib.mjs')).href
 const glue512 = pathToFileURL(join(root, 'engine/out/engine-core-512mib.mjs')).href
+const glue1024 = pathToFileURL(join(root, 'engine/out/engine-core-1024mib-threads.mjs')).href
 const MIB = 1024 * 1024
 
 gate('a 64 MiB build given 1024 players and a 64 MiB budget runs the 64 tier and reports it', async () => {
@@ -33,6 +35,18 @@ gate('a 512 MiB build given 1024 players and a 512 MiB budget runs the 1024 tier
   assert.equal(layout.players, 1024)
   assert.equal(layout.bodies, 12288)
   assert.ok(layout.usedBytes <= 512 * MIB, 'the plan allocates above its budget: ' + layout.usedBytes)
+})
+
+gate('a 1024 MiB build given 1024 players and a 1024 MiB budget plans the top tier of 40960 bodies, and the 512 MiB plan keeps its arena under the budget with 12288', async () => {
+  const top = await loadEngineModule(glue1024, resolvePlan({ players: 1024, workers: 2, budgetBytes: 1024 * MIB }))
+  const layout = readLayout(top)
+  await releaseModule(top)
+  assert.equal(layout.players, 1024)
+  assert.equal(layout.bodies, 40960)
+  assert.ok(layout.arenaBytes <= 1024 * MIB, 'the plan is above its budget: ' + layout.arenaBytes)
+  const compact = readLayout(await loadEngineModule(glue512, resolvePlan({ players: 1024, budgetBytes: 512 * MIB })))
+  assert.equal(compact.bodies, 12288)
+  assert.ok(compact.arenaBytes <= 512 * MIB && compact.arenaBytes > 500 * 1000 * 1000, 'the 512 MiB plan lost its model tier: arena ' + compact.arenaBytes)
 })
 
 gate('a 128 MiB build given 1024 players and only a 64 MiB budget falls back to the 64 tier', async () => {

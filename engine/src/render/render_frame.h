@@ -12,7 +12,7 @@
 namespace engine::render {
 
 constexpr std::uint32_t kPropClasses = 4;
-constexpr std::uint32_t kBodySlots = budget::kTopTierBodies;
+constexpr std::uint32_t kBodySlots = budget::kRenderBodySlots;
 constexpr std::uint32_t kRecordWords = 8;
 constexpr std::uint32_t kRecordBytes = kRecordWords * 4;
 constexpr std::uint32_t kPropVertices = 36;
