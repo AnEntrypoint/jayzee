@@ -113,8 +113,8 @@ void fillLayout() {
 int initialize(std::uint32_t players, std::uint32_t workers, double budgetBytes) {
   if (!(budgetBytes >= 0.0) || budgetBytes > kMaxBudgetBytes) return engine::kRange;
   if (engine::arena::sealed() || engine::arena::used() != 0) return engine::kAlreadyInitialized;
+  if (!engine::budget::workersFit(workers)) return engine::kWorkersDoNotFit;
   if (!engine::budget::plan(static_cast<std::uint64_t>(budgetBytes), players, workers, capacity)) return engine::kRange;
-  if (capacity.players < players && engine::budget::workersBlock(static_cast<std::uint64_t>(budgetBytes), players, workers)) return engine::kWorkersDoNotFit;
   std::uint32_t primeCounts[engine::pool::kClasses];
   engine::budget::poolCounts(capacity, primeCounts);
   if (!engine::pool::prime(primeCounts)) return engine::kFull;

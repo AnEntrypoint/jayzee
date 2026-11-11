@@ -65,6 +65,10 @@ constexpr std::uint64_t kWorkerStackBytes = 0;
 constexpr std::uint64_t kThreadPoolBytes = 0;
 #endif
 constexpr std::uint64_t kSlackBytes = 1024ull * 1024ull;
+#if defined(ENGINE_THREADS)
+constexpr std::uint64_t kJoltThreadHeapBytes = 526648;
+constexpr std::uint64_t kHeapReserveBytes = 2633240;
+#endif
 
 constexpr std::uint64_t kBodyRowBytes = 2 * sizeof(std::uint32_t) + sizeof(std::uint16_t) + sizeof(std::uint8_t) + 6 * sizeof(double) +
                                         sizeof(Transform) + sizeof(std::uint32_t) + kBatchFloats * sizeof(float) + sizeof(std::uint32_t);
@@ -177,6 +181,7 @@ Capacity chosenCapacity{};
 bool plan(std::uint64_t budgetBytes, std::uint32_t players, std::uint32_t workers, Capacity& out) {
   if (players < kMinPlayers || players > kMaxPlayers) return false;
   if (workers < kMinWorkers || workers > kMaxWorkers) return false;
+  if (!workersFit(workers)) return false;
   if (fitsTier(budgetBytes, players, workers, out)) {
     chosenCapacity = out;
     return true;
@@ -190,9 +195,12 @@ bool plan(std::uint64_t budgetBytes, std::uint32_t players, std::uint32_t worker
   return false;
 }
 
-bool workersBlock(std::uint64_t budgetBytes, std::uint32_t players, std::uint32_t workers) {
-  Capacity probe{};
-  return fitsTier(budgetBytes, players, 1, probe) && !fitsTier(budgetBytes, players, workers, probe);
+bool workersFit(std::uint32_t workers) {
+#if defined(ENGINE_THREADS)
+  return workers <= 1 || static_cast<std::uint64_t>(workers - 1) * kJoltThreadHeapBytes <= kHeapReserveBytes;
+#else
+  return true;
+#endif
 }
 
 const Capacity& chosen() {

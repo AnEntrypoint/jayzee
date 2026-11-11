@@ -3611,3 +3611,11 @@ Open after this pass:
 - Change: `scripts/measure-threaded-footprint.mjs` reads those exports at each stage (factory, engine_init, world configure, spawns, planet configure) and prints the in-use growth per stage and the high-water. The `HEAPU8.byteLength` readout is removed, since the threaded build pre-grows its heap to its maximum, so that number never changes.
 - Witness: Phase B runs the script at 2, 4 and 8 workers on a threaded build whose wasm maximum can hold the 8-worker configure. The per-stage growth is the per-site measurement, and the planner constant is set from it.
 - Limit: `mallinfo` reports in-use bytes at stage boundaries, not the peak inside one stage call.
+
+## 8-worker item: measured per-site heap and planner constants (Phase B, 2026-11-11)
+
+- Cause (measured): the threaded build sets ENGINE_ARENA_BYTES to the tier minus 4 MiB minus the pool stacks, so the arena takes nearly the whole wasm memory. The shadow stack and static data share the rest, and `malloc` gets about 2.5 MiB. Each Jolt thread (workers minus one) takes 526,648 bytes from malloc.
+- Measured configure growth (1024 MiB threaded glue, budget 512 MiB, `scripts/measure-threaded-footprint.mjs`): 2 workers 526,648 bytes; 4 workers 1,579,944; 5 workers 2,106,592; 6 workers 2,633,240 (configures); 7 workers and 8 workers abort with OOM at configure. Engine_init and spawns add no malloc growth (the arena is static, bodies live in it).
+- Constants set from the data: `kJoltThreadHeapBytes` = 526,648 and `kHeapReserveBytes` = 2,633,240 (the largest measured need that configures), in engine/src/budget.cpp under ENGINE_THREADS. `workersFit` refuses a worker count whose threads need more than the reserve, and `initialize` returns kWorkersDoNotFit before planning. The reserve is set by the fixed arena layout, so it does not depend on the budget.
+- Witness: `npm test` exit 0, 5086 PASS, 0 FAIL. The state-hash gate passes the 2- and 4-worker hash 8e96da08 and count 30720, and the refused-8 case ("8 workers at 512 MiB is refused with the typed workers-do-not-fit error, not an abort").
+- Limit: the 7-worker and 8-worker configures were measured only as aborts, so the reserve is bounded between the measured success at 6 workers and the abort at 7. Using the success bound refuses 7 and 8.
