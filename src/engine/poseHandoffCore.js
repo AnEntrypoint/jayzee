@@ -54,6 +54,11 @@ export const createPoseStepper = ({ module, streamer, region, reserve }) => {
   const { poseBytes } = region
   const at = module._engine_frame_scratch() >> 3
   const heap = module.HEAPF64
+  const direct = typeof module._engine_pose_header === 'function' && typeof module._engine_pose_rows === 'function'
+  const headerBytes = direct ? module._engine_pose_header(reserve, poseBytes) : 0
+  if (direct && !(headerBytes > 0 && headerBytes < poseBytes)) throw new Error('engine_pose_header refused')
+  const heapHeader = direct ? new Uint8Array(module.HEAPU8.buffer, reserve, headerBytes) : null
+  const heapRows = direct ? new Uint8Array(module.HEAPU8.buffer, module._engine_pose_rows(), poseBytes - headerBytes) : null
   const viewed = typeof module._engine_release_view_scratch === 'function' && Boolean(streamer.viewTarget)
   if (viewed) {
     heap[at + SCRATCH_VIEW_TARGET] = streamer.viewTarget[0]
@@ -71,6 +76,13 @@ export const createPoseStepper = ({ module, streamer, region, reserve }) => {
     if (module._engine_follow_scratch() !== 0) throw new Error('engine_follow refused at frame ' + frame)
     if (viewed && module._engine_release_view_scratch() !== 0) throw new Error('engine_release_view_scratch refused at frame ' + frame)
     module._engine_tick(1)
+    if (direct) {
+      if (module._engine_pose_header(reserve, poseBytes) !== headerBytes) throw new Error('engine_pose_header refused at frame ' + frame)
+      const view = region.view(slot)
+      view.set(heapHeader)
+      view.set(heapRows, headerBytes)
+      return slot
+    }
     if (module._engine_pose_export(reserve, poseBytes) !== poseBytes) throw new Error('engine_pose_export refused at frame ' + frame)
     region.view(slot).set(heapPose)
     return slot

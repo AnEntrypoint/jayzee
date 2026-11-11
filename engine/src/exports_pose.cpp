@@ -35,6 +35,15 @@ EMSCRIPTEN_KEEPALIVE std::int32_t engine_pose_export(std::uint8_t* dst, std::uin
   return engine::pose::exportPoses(dst, capacity);
 }
 
+EMSCRIPTEN_KEEPALIVE std::int32_t engine_pose_header(std::uint8_t* dst, std::uint32_t capacity) {
+  ENGINE_PROFILE_SCOPE("engine pose export");
+  return engine::pose::exportHeader(dst, capacity);
+}
+
+EMSCRIPTEN_KEEPALIVE const std::uint8_t* engine_pose_rows() {
+  return engine::pose::rowBytes();
+}
+
 EMSCRIPTEN_KEEPALIVE int engine_pose_import(const std::uint8_t* src, std::uint32_t bytes) {
   return engine::pose::importPoses(src, bytes);
 }

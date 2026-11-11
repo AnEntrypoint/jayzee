@@ -66,11 +66,22 @@ for (let f = 0; f < FRAMES; f++) {
   assert.equal(written, poseBytes, 'pose export at frame ' + f)
   frames.push(module.HEAPU8.slice(buffer, buffer + poseBytes))
 }
+const lastExport = frames.at(-1)
+const directHeaderBytes = module._engine_pose_header(buffer, poseBytes)
+const directHeader = module.HEAPU8.slice(buffer, buffer + HEADER_BYTES)
+const directRows = module.HEAPU8.slice(module._engine_pose_rows(), module._engine_pose_rows() + poseBytes - HEADER_BYTES)
 const decoded = frames.map(decode)
 
 gate('the pose buffer is the header plus one 28-byte row per body, allocated once', () => {
   assert.equal(poseBytes, HEADER_BYTES + decoded[0].bodies * ROW_BYTES)
   assert.equal(module._engine_pose_reserve(), buffer)
+})
+
+gate('the header and the engine rows read in place are byte for byte the exported pose buffer, so the worker copies the rows once', () => {
+  assert.equal(directHeaderBytes, HEADER_BYTES)
+  assert.deepEqual(directHeader, lastExport.subarray(0, HEADER_BYTES))
+  assert.equal(Buffer.compare(directRows, lastExport.subarray(HEADER_BYTES)), 0)
+  assert.equal(module._engine_pose_header(buffer, HEADER_BYTES - 1), -1)
 })
 
 gate('the origin walk crosses rebases, and the origin in the buffer changes with them', () => {

@@ -73,6 +73,9 @@ export const PROFILE_VARIANT = 'profile'
 export const PROFILE_REPEATS = 10
 export const PROFILE_UNRECLAIMED_REPEATS = 0
 export const CANARY_THREADS = Object.freeze([1, 4])
+export const OPTION_REPEATS = 3
+export const OPTION_TUNINGS = Object.freeze([0, 4, 8])
+export const OPTION_ITERATIONS = 2
 export const RECLAIM_OFF = 'reclaim=off'
 export const SETTLE_TICKS = 3000
 export const VIEW_BODIES = 40960
@@ -85,7 +88,11 @@ const regressWith = (candidate) => () => {
   runs.push(calibrate())
   for (let repeat = 0; repeat < repeats; repeat++) for (const glue of [referenceGlue(BASELINE.referenceCommit), candidate]) runs.push(tick(glue, bodies, workers, { role: 'gate' }))
   for (let tier = 0; tier < MARBLE_TIERS; tier++) runs.push(marble(tier, BASELINE.marble.runs, BASELINE.marble.warmRuns))
-  for (const threads of CANARY_THREADS) runs.push(canary(threads))
+  for (let repeat = 0; repeat < OPTION_REPEATS; repeat++) {
+    for (const glue of [referenceGlue(BASELINE.referenceCommit), candidate]) runs.push(tick(glue, COMPACT_BODIES, workers, { role: 'option', knobs: ALL_AWAKE }))
+    for (const tune of OPTION_TUNINGS) runs.push(tick(candidate, bodies, workers, { role: 'option', knobs: 'tune=' + tune }))
+    runs.push(tick(candidate, bodies, workers, { role: 'option', iterations: OPTION_ITERATIONS }))
+  }
   for (const count of RECORD_WORKERS) runs.push(tick(candidate, bodies, count, { role: 'record' }))
   for (const glue of TICK_GLUES.filter((path) => path !== candidate)) runs.push(tick(glue, bodies, workers, { role: 'record' }))
   runs.push(tick(candidate, bodies, workers, { warm: false, role: 'record' }))

@@ -40,6 +40,19 @@ std::int32_t exportPoses(std::uint8_t* dst, std::uint32_t capacity) {
   return static_cast<std::int32_t>(needed);
 }
 
+std::int32_t exportHeader(std::uint8_t* dst, std::uint32_t capacity) {
+  World& world = engine::world();
+  if (world.transforms() == nullptr || dst == nullptr || capacity < kHeaderBytes) return -1;
+  const PhysicsOrigin& origin = physicsOrigin();
+  Header header{origin.x, origin.y, origin.z, world.tick(), world.bodyCapacity(), 0};
+  std::memcpy(dst, &header, kHeaderBytes);
+  return static_cast<std::int32_t>(kHeaderBytes);
+}
+
+const std::uint8_t* rowBytes() {
+  return reinterpret_cast<const std::uint8_t*>(engine::world().transforms());
+}
+
 int importPoses(const std::uint8_t* src, std::uint32_t bytes) {
   if (src == nullptr || bytes < kHeaderBytes) return kRange;
   Header header{};

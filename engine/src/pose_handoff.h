@@ -23,6 +23,8 @@ constexpr std::uint32_t kHeaderBytes = sizeof(Header);
 std::uint32_t bytesFor(std::uint32_t bodies);
 std::uint8_t* reserve();
 std::int32_t exportPoses(std::uint8_t* dst, std::uint32_t capacity);
+std::int32_t exportHeader(std::uint8_t* dst, std::uint32_t capacity);
+const std::uint8_t* rowBytes();
 int importPoses(const std::uint8_t* src, std::uint32_t bytes);
 
 }

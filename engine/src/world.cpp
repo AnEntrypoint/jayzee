@@ -862,10 +862,32 @@ void World::pull(JPH::Body& body, std::uint32_t slot, const PhysicsOrigin& o, fl
   air_[slot] = static_cast<std::uint8_t>((air_[slot] & kAirNow) | (airborne ? kAirWanted : 0));
 }
 
+namespace {
+
+constexpr std::uint64_t kLowBitOfEachByte = 0x0101010101010101ull;
+constexpr std::uint32_t kWordBytes = 8;
+static_assert(kAirNow == 1 && kAirWanted == 2);
+static_assert((kSlotAlive & 1) == 1 && (kSlotAwakeSynced & 1) == 1 && (kSlotFree & 1) == 0 && (kSlotAsleepSynced & 1) == 0 && (kSlotHeld & 1) == 0);
+
+std::uint64_t wordAt(const std::uint8_t* bytes) {
+  std::uint64_t word;
+  std::memcpy(&word, bytes, kWordBytes);
+  return word;
+}
+
+}
+
 void World::applyAirLayers() {
   if ((tuning_ & kTuneAirborne) == 0 || planetBody_ == kNoBody) return;
   JPH::BodyInterface& bodies = runtime_->physics.GetBodyInterfaceNoLock();
   for (std::uint32_t slot = 0; slot < fresh_; ++slot) {
+    if (slot % kWordBytes == 0 && slot + kWordBytes <= fresh_) {
+      const std::uint64_t word = wordAt(air_ + slot);
+      if (((word ^ (word >> 1)) & kLowBitOfEachByte) == 0) {
+        slot += kWordBytes - 1;
+        continue;
+      }
+    }
     const std::uint8_t flags = air_[slot];
     const bool now = (flags & kAirNow) != 0;
     const bool wanted = (flags & kAirWanted) != 0;
@@ -1174,6 +1196,10 @@ void World::step(std::uint32_t steps) {
         }
         ENGINE_PROFILE_SCOPE("engine readback slots");
         for (std::uint32_t slot = 0; slot < fresh_; ++slot) {
+          if (slot % kWordBytes == 0 && slot + kWordBytes <= fresh_ && (wordAt(alive_ + slot) & kLowBitOfEachByte) == 0) {
+            slot += kWordBytes - 1;
+            continue;
+          }
           const std::uint8_t state = alive_[slot];
           if (state == kSlotAwakeSynced) {
             alive_[slot] = kSlotAlive;

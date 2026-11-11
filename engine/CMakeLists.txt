@@ -159,6 +159,8 @@ set(ENGINE_EXPORTS
   _engine_pose_bytes
   _engine_pose_reserve
   _engine_pose_export
+  _engine_pose_header
+  _engine_pose_rows
   _engine_pose_import
   _engine_follow
   _engine_retired_slots
