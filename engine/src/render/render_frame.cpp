@@ -213,7 +213,7 @@ void planFrame(const SceneView& scene, Camera& camera, FramePlan& plan) {
     if (!inFrustum(camera.planes, rel, kPropRadius)) continue;
     const std::uint32_t index = plan.propCount[cls];
     plan.propCount[cls] = index + 1;
-    std::memcpy(plan.propRecords + (cls * kBodySlots + index) * kRecordWords, out, kRecordBytes);
+    std::memcpy(plan.propRecords + (cls * plan.bodySlots + index) * kRecordWords, out, kRecordBytes);
   }
   plan.checksum = hash;
 

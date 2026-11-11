@@ -666,7 +666,7 @@ constexpr double kClearRed = 0.05;
 constexpr double kClearGreen = 0.07;
 constexpr double kClearBlue = 0.10;
 constexpr std::uint64_t kCameraBytes = sizeof(Camera);
-constexpr std::uint64_t kBodyBytes = static_cast<std::uint64_t>(kBodySlots) * kRecordBytes;
+std::uint64_t bodyBytes = 0;
 constexpr std::uint64_t kLightBytes = static_cast<std::uint64_t>(kLightSlots) * engine::render::kLightBytes;
 constexpr std::uint64_t kMaterialBytes = static_cast<std::uint64_t>(kMaterialSlots) * engine::render::kMaterialBytes;
 constexpr std::uint64_t kPageBytes = static_cast<std::uint64_t>(kMaxPageLayers) * kPageRecordBytes;
@@ -1048,7 +1048,7 @@ int buildPipelines() {
   for (std::uint32_t c = 0; c < kPropClasses; ++c) {
     wgpu::BindGroupEntry propBindings[kPropBindings];
     propBindings[0] = bufferBinding(0, cameraBuf, kCameraBytes);
-    propBindings[1] = bufferBinding(1, instanceBuf[c], kBodyBytes);
+    propBindings[1] = bufferBinding(1, instanceBuf[c], bodyBytes);
     propBindings[2] = bufferBinding(2, materialBuf, kMaterialBytes);
     propBindings[3] = bufferBinding(3, lightBuf, kLightBytes);
     propBindings[4] = viewBinding(4, albedoView);
@@ -1548,8 +1548,9 @@ int init(const char* selector, std::uint32_t width, std::uint32_t height) {
   lightBuf = makeBuffer(kLightBytes, wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst);
   materialBuf = makeBuffer(kMaterialBytes, wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst);
   pageBuf = makeBuffer(kPageBytes, wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst);
+  bodyBytes = static_cast<std::uint64_t>(engine::world().bodyCapacity()) * kRecordBytes;
   for (std::uint32_t c = 0; c < kPropClasses; ++c) {
-    instanceBuf[c] = makeBuffer(kBodyBytes, wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst);
+    instanceBuf[c] = makeBuffer(bodyBytes, wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst);
   }
 
   if (engine::models::bound()) {
@@ -1590,7 +1591,7 @@ int frame(const SceneView& scene, const FramePlan& plan, const Camera& camera) {
     for (std::uint32_t c = 0; c < kPropClasses; ++c) {
       const std::uint32_t count = plan.propCount[c];
       if (count != 0) {
-        writeBuffer(instanceBuf[c], 0, plan.propRecords + c * kBodySlots * kRecordWords, static_cast<std::uint64_t>(count) * kRecordBytes);
+        writeBuffer(instanceBuf[c], 0, plan.propRecords + c * plan.bodySlots * kRecordWords, static_cast<std::uint64_t>(count) * kRecordBytes);
       }
       propArgs[c * 4 + 0] = kPropVertices;
       propArgs[c * 4 + 1] = count;

@@ -118,6 +118,9 @@ set(ENGINE_EXPORTS
   _engine_world_set_sleep
   _engine_world_held_bodies
   _engine_world_airborne_bodies
+  _engine_world_temp_peak_bytes
+  _engine_plan_term_count
+  _engine_plan_term_bytes
   _engine_world_set_release_view
   _engine_world_clear_release_view
   _engine_world_unsettled_in_view
@@ -248,6 +251,7 @@ set(ENGINE_EXPORTS
   _engine_render_backend
   _engine_render_bind_materials
   _engine_render_body_classes
+  _engine_render_body_slots
   _engine_render_camera
   _engine_render_checksum
   _engine_render_commit_albedo

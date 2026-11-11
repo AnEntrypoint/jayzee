@@ -26,10 +26,14 @@ struct Tier {
   std::uint32_t bodiesPerPlayer;
 };
 
+constexpr std::uint32_t kTopBase = 2048;
+constexpr std::uint32_t kTopBodiesPerPlayer = (kTopTierBodies - kTopBase) / kMaxPlayers;
+constexpr std::uint32_t kCompactBodiesPerPlayer = (kCompactTopTierBodies - kTopBase) / kMaxPlayers;
+
 constexpr Tier kTiers[] = {
     {16, 512, 32},
     {256, 1024, 16},
-    {kMaxPlayers, 2048, (kTopTierBodies - 2048) / kMaxPlayers},
+    {kMaxPlayers, kTopBase, kTopBodiesPerPlayer},
 };
 
 constexpr std::uint32_t kStatics = 64;
@@ -66,21 +70,24 @@ constexpr std::uint64_t kHeapReserveBytes = 2633240;
 constexpr std::uint64_t kBodyRowBytes = 2 * sizeof(std::uint32_t) + sizeof(std::uint16_t) + sizeof(std::uint8_t) + 6 * sizeof(double) +
                                         sizeof(Transform) + sizeof(std::uint32_t) + kBatchWords * sizeof(double) + sizeof(std::uint32_t) + sizeof(std::uint8_t) + sizeof(float) + sizeof(std::uint32_t) + sizeof(float);
 
-constexpr std::uint32_t kCompactBodiesPerPlayer = (kCompactTopTierBodies - 2048) / kMaxPlayers;
+constexpr bool scalesBodies(std::uint32_t players) {
+  return players > kTiers[1].maxPlayers;
+}
 
-constexpr std::uint32_t bodiesFor(std::uint32_t players, bool compact) {
+constexpr std::uint32_t bodiesFor(std::uint32_t players, std::uint32_t perPlayer) {
+  if (scalesBodies(players)) return kTopBase + perPlayer * players;
   for (const Tier& tier : kTiers) {
-    if (players > tier.maxPlayers) continue;
-    const std::uint32_t perPlayer = compact && tier.maxPlayers == kMaxPlayers ? kCompactBodiesPerPlayer : tier.bodiesPerPlayer;
-    return tier.baseBodies + perPlayer * players;
+    if (players <= tier.maxPlayers) return tier.baseBodies + tier.bodiesPerPlayer * players;
   }
   return 0;
 }
 
-static_assert(bodiesFor(kMaxPlayers, false) == kTopTierBodies);
-static_assert(bodiesFor(kMaxPlayers, true) == kCompactTopTierBodies);
+static_assert(bodiesFor(kMaxPlayers, kTopBodiesPerPlayer) == kTopTierBodies);
+static_assert(bodiesFor(kMaxPlayers, kCompactBodiesPerPlayer) == kCompactTopTierBodies);
 
-std::uint64_t totalBytes(const Capacity& c) {
+}
+
+std::uint64_t termBytes(const Capacity& c, std::uint32_t term) {
   const std::uint64_t bodies = c.bodies;
   const std::uint64_t players = c.players;
   const std::uint64_t visible = c.visiblePerClient;
@@ -88,33 +95,36 @@ std::uint64_t totalBytes(const Capacity& c) {
   const std::uint64_t fixedBodies = static_cast<std::uint64_t>(c.statics) + c.trunks + kFixedJoltBodies;
   const std::uint64_t vegetationCells = static_cast<std::uint64_t>(c.cellsPerSide) * c.cellsPerSide;
   const std::uint64_t interestCells = static_cast<std::uint64_t>(c.interestCellsPerSide) * c.interestCellsPerSide;
+  switch (term) {
+    case kTermBodyRows: return bodies * kBodyRowBytes;
+    case kTermJoltBodies: return bodies * kJoltBodyBytes;
+    case kTermJoltStatics: return fixedBodies * kJoltStaticBytes;
+    case kTermContacts: return static_cast<std::uint64_t>(joltContactCapacity(c)) * kJoltContactBytes;
+    case kTermBodyPairs: return static_cast<std::uint64_t>(joltPairCapacity(c)) * kJoltPairBytes;
+    case kTermTemp: return c.tempBytes;
+    case kTermJoltFixed: return kJoltFixedBytes;
+    case kTermPoolPrimed: return pool::primedBytes();
+    case kTermQuadNodes: return static_cast<std::uint64_t>(joltQuadNodePages(c)) * pool::kLargestClassBytes;
+    case kTermPages: return static_cast<std::uint64_t>(c.pageSlots) * (planet::kPageSamples * sizeof(float) + sizeof(std::int64_t) + sizeof(std::uint8_t));
+    case kTermVegetation: return vegetationCells * (sizeof(std::uint32_t) + static_cast<std::uint64_t>(c.instancesPerCell) * sizeof(vegetation::Instance));
+    case kTermMaterials: return static_cast<std::uint64_t>(c.materials) * kMaterialBytes + static_cast<std::uint64_t>(c.textures) * kTextureBytes + static_cast<std::uint64_t>(c.lights) * kLightBytes;
+    case kTermRender: return kRenderFixedBytes + bodies * kRenderBytesPerBody;
+    case kTermModels: return c.modelBytes;
+    case kTermHost: return c.hostBytes;
+    case kTermBridge: return players * c.inputDepth * sizeof(bridge::InputSlot) + static_cast<std::uint64_t>(c.eventSlots) * sizeof(bridge::EventSlot);
+    case kTermInterest: return interestCells * (sizeof(std::uint32_t) + visible * sizeof(std::uint32_t)) + players * visible * entityBytes + players * c.baselineDepth * visible * entityBytes;
+    case kTermCodec: return codec::kScratchBytes + codec::kScratchValues * sizeof(double) + 4 * sizeof(std::int32_t);
+    case kTermWorkers: return static_cast<std::uint64_t>(c.workers) * kWorkerScratchBytes;
+    case kTermSlack: return kSlackBytes;
+    default: return 0;
+  }
+}
 
+namespace {
+
+std::uint64_t totalBytes(const Capacity& c) {
   std::uint64_t total = 0;
-  total += bodies * kBodyRowBytes;
-  total += bodies * kJoltBodyBytes;
-  total += fixedBodies * kJoltStaticBytes;
-  total += static_cast<std::uint64_t>(joltContactCapacity(c)) * kJoltContactBytes;
-  total += static_cast<std::uint64_t>(joltPairCapacity(c)) * kJoltPairBytes;
-  total += c.tempBytes;
-  total += kJoltFixedBytes;
-  total += pool::primedBytes();
-  total += static_cast<std::uint64_t>(joltQuadNodePages(c)) * pool::kLargestClassBytes;
-  total += static_cast<std::uint64_t>(c.pageSlots) * (planet::kPageSamples * sizeof(float) + sizeof(std::int64_t) + sizeof(std::uint8_t));
-  total += vegetationCells * (sizeof(std::uint32_t) + static_cast<std::uint64_t>(c.instancesPerCell) * sizeof(vegetation::Instance));
-  total += static_cast<std::uint64_t>(c.materials) * kMaterialBytes;
-  total += static_cast<std::uint64_t>(c.textures) * kTextureBytes;
-  total += static_cast<std::uint64_t>(c.lights) * kLightBytes;
-  total += kRenderBytes;
-  total += c.modelBytes;
-  total += c.hostBytes;
-  total += players * c.inputDepth * sizeof(bridge::InputSlot);
-  total += static_cast<std::uint64_t>(c.eventSlots) * sizeof(bridge::EventSlot);
-  total += interestCells * (sizeof(std::uint32_t) + visible * sizeof(std::uint32_t));
-  total += players * visible * entityBytes;
-  total += players * c.baselineDepth * visible * entityBytes;
-  total += codec::kScratchBytes + codec::kScratchValues * sizeof(double) + 4 * sizeof(std::int32_t);
-  total += static_cast<std::uint64_t>(c.workers) * kWorkerScratchBytes;
-  total += kSlackBytes;
+  for (std::uint32_t term = 0; term < kTermCount; ++term) total += termBytes(c, term);
   return total;
 }
 
@@ -150,14 +160,15 @@ bool fitsTier(std::uint64_t budgetBytes, std::uint32_t players, std::uint32_t wo
   next.interestCellsPerSide = kInterestCellsPerSide;
   next.workers = workers;
   next.hostBytes = players == kMaxPlayers ? kHostReserveBytes : 0;
-  const std::uint32_t bodyChoices[2] = {bodiesFor(players, false), bodiesFor(players, true)};
+  const std::uint32_t mostPerPlayer = scalesBodies(players) ? kTopBodiesPerPlayer : 0;
+  const std::uint32_t leastPerPlayer = scalesBodies(players) ? kCompactBodiesPerPlayer : 0;
   bool fits = false;
   for (std::uint32_t tier = device::kTierCount; tier-- > 0 && !fits;) {
     next.modelTier = tier;
     next.modelBytes = modelBytesOf(tier);
-    for (const std::uint32_t bodies : bodyChoices) {
-      next.bodies = bodies;
-      next.tempBytes = kTempBytes + static_cast<std::uint64_t>(bodies) * kTempBytesPerBody;
+    for (std::uint32_t perPlayer = mostPerPlayer + 1; perPlayer-- > leastPerPlayer;) {
+      next.bodies = bodiesFor(players, perPlayer);
+      next.tempBytes = kTempBytes + static_cast<std::uint64_t>(next.bodies) * kTempBytesPerBody;
       next.arenaBytes = totalBytes(next);
       if (next.arenaBytes <= budgetBytes && next.arenaBytes <= arena::kBytes) {
         fits = true;

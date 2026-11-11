@@ -249,6 +249,18 @@ EMSCRIPTEN_KEEPALIVE int engine_world_unsettled_in_view() {
   return static_cast<int>(engine::world().unsettledInView());
 }
 
+EMSCRIPTEN_KEEPALIVE double engine_world_temp_peak_bytes() {
+  return static_cast<double>(engine::world().tempPeakBytes());
+}
+
+EMSCRIPTEN_KEEPALIVE std::uint32_t engine_plan_term_count() {
+  return engine::budget::kTermCount;
+}
+
+EMSCRIPTEN_KEEPALIVE double engine_plan_term_bytes(std::uint32_t term) {
+  return static_cast<double>(engine::budget::termBytes(capacity, term));
+}
+
 EMSCRIPTEN_KEEPALIVE int engine_world_airborne_bodies() {
   return static_cast<int>(engine::world().airborneBodies());
 }

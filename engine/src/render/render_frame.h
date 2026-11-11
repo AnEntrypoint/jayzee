@@ -12,7 +12,6 @@
 namespace engine::render {
 
 constexpr std::uint32_t kPropClasses = 4;
-constexpr std::uint32_t kBodySlots = budget::kRenderBodySlots;
 constexpr std::uint32_t kRecordWords = 8;
 constexpr std::uint32_t kRecordBytes = kRecordWords * 4;
 constexpr std::uint32_t kPropVertices = 36;
@@ -84,7 +83,8 @@ struct FramePlan {
   std::uint32_t uploadCount;
   std::uint32_t pageRecords[kMaxPageLayers * kPageRecordWords];
   std::uint32_t pageCount;
-  std::uint32_t propRecords[kPropClasses * kBodySlots * kRecordWords];
+  std::uint32_t* propRecords;
+  std::uint32_t bodySlots;
   std::uint32_t propCount[kPropClasses];
   std::uint32_t materialWords[kMaterialSlots * kMaterialWords];
   std::uint64_t checksum;

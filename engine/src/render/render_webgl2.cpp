@@ -256,7 +256,7 @@ constexpr float kClearGreen = 0.07f;
 constexpr float kClearBlue = 0.10f;
 constexpr std::uint32_t kMaterialBlockBytes = kMaterialSlots * kMaterialBytes;
 constexpr std::uint32_t kLightBlockBytes = kLightSlots * kLightBytes;
-constexpr std::uint32_t kPropClassBytes = kBodySlots * kRecordBytes;
+std::uint32_t propClassBytes = 0;
 constexpr std::uint32_t kFrameBinding = 0;
 constexpr std::uint32_t kMaterialBinding = 1;
 constexpr std::uint32_t kLightBinding = 2;
@@ -472,7 +472,8 @@ int init(const char* selector, std::uint32_t width, std::uint32_t height) {
 
   glGenBuffers(1, &propVbo);
   glBindBuffer(GL_ARRAY_BUFFER, propVbo);
-  glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(kPropClasses) * kPropClassBytes, nullptr, GL_DYNAMIC_DRAW);
+  propClassBytes = engine::world().bodyCapacity() * kRecordBytes;
+  glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(kPropClasses) * propClassBytes, nullptr, GL_DYNAMIC_DRAW);
   glGenVertexArrays(1, &propVao);
   glBindVertexArray(propVao);
   glEnableVertexAttribArray(0);
@@ -602,8 +603,8 @@ int frame(const SceneView& scene, const FramePlan& plan, const Camera& camera) {
   for (std::uint32_t c = 0; c < kPropClasses; ++c) {
     const std::uint32_t count = plan.propCount[c];
     if (count == 0) continue;
-    const std::uint32_t base = c * kPropClassBytes;
-    ENGINE_RENDER_CALL(glBufferSubData(GL_ARRAY_BUFFER, base, static_cast<GLsizeiptr>(count) * kRecordBytes, plan.propRecords + c * kBodySlots * kRecordWords));
+    const std::uint32_t base = c * propClassBytes;
+    ENGINE_RENDER_CALL(glBufferSubData(GL_ARRAY_BUFFER, base, static_cast<GLsizeiptr>(count) * kRecordBytes, plan.propRecords + c * plan.bodySlots * kRecordWords));
     ENGINE_RENDER_CALL(glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, kRecordBytes, offsetPointer(base)));
     ENGINE_RENDER_CALL(glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, kRecordBytes, offsetPointer(base + 12)));
     ENGINE_RENDER_CALL(glVertexAttribIPointer(2, 1, GL_UNSIGNED_INT, kRecordBytes, offsetPointer(base + 28)));

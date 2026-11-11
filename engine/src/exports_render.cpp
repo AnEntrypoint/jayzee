@@ -35,7 +35,8 @@ struct RenderState {
   MaterialSlot materials[kMaterialSlots];
   std::uint8_t albedoReady[kAlbedoLayers];
   std::uint8_t albedoPixels[kAlbedoLayers * kAlbedoBytes];
-  std::uint8_t bodyClass[kBodySlots];
+  std::uint8_t* bodyClass;
+  std::uint32_t bodySlots;
   const MaterialSlot* boundMaterials;
   std::uint32_t boundCount;
   std::uint32_t lightCount;
@@ -57,8 +58,13 @@ MaterialSlot ownDefaultMaterial() {
   return material;
 }
 
-void initState(RenderState& state) {
+void initState(RenderState& state, std::uint32_t* propRecords, std::uint8_t* bodyClass, std::uint32_t bodySlots) {
   std::memset(&state.plan, 0, sizeof state.plan);
+  state.plan.propRecords = propRecords;
+  state.plan.bodySlots = bodySlots;
+  state.bodyClass = bodyClass;
+  state.bodySlots = bodySlots;
+  std::memset(propRecords, 0, static_cast<std::size_t>(kPropClasses) * bodySlots * kRecordBytes);
   resetPlan(state.plan);
   std::memset(&state.camera, 0, sizeof state.camera);
   for (std::uint32_t c = 0; c < kPropClasses; ++c) state.camera.classMaterial[c] = c;
@@ -71,7 +77,7 @@ void initState(RenderState& state) {
   std::memset(state.albedoPixels, 0xff, kAlbedoBytes);
   state.albedoReady[0] = 1;
   state.plan.albedoPending[0] = 1;
-  std::memset(state.bodyClass, kNoClass, sizeof state.bodyClass);
+  std::memset(state.bodyClass, kNoClass, bodySlots);
   state.boundMaterials = state.materials;
   state.boundCount = kMaterialSlots;
   state.lightCount = 0;
@@ -97,18 +103,23 @@ int frameBackend(const SceneView& scene, const FramePlan& plan, const Camera& ca
 
 namespace rnd = engine::render;
 
-static_assert(sizeof(rnd::RenderState) <= engine::budget::kRenderBytes);
+static_assert(sizeof(rnd::RenderState) <= engine::budget::kRenderFixedBytes);
+static_assert(rnd::kPropClasses * rnd::kRecordBytes + 1 <= engine::budget::kRenderBytesPerBody);
 
 extern "C" {
 
 EMSCRIPTEN_KEEPALIVE int engine_render_init(std::uint32_t backend) {
   if (!rnd::isBackendValue(backend)) return engine::kRange;
-  if (engine::world().bodyCapacity() > rnd::kBodySlots) return engine::kRange;
+  const std::uint32_t bodySlots = engine::world().bodyCapacity();
+  if (bodySlots == 0) return engine::kNotConfigured;
   if (rnd::renderState == nullptr) {
     if (!rnd::acceptCreate()) return engine::kRange;
-    rnd::renderState = static_cast<rnd::RenderState*>(engine::arena::carve(sizeof(rnd::RenderState), alignof(rnd::RenderState)));
-    if (rnd::renderState == nullptr) return engine::kRange;
-    rnd::initState(*rnd::renderState);
+    rnd::RenderState* state = static_cast<rnd::RenderState*>(engine::arena::carve(sizeof(rnd::RenderState), alignof(rnd::RenderState)));
+    std::uint32_t* propRecords = static_cast<std::uint32_t*>(engine::arena::carve(static_cast<std::size_t>(rnd::kPropClasses) * bodySlots * rnd::kRecordBytes, alignof(std::uint32_t)));
+    std::uint8_t* bodyClass = static_cast<std::uint8_t*>(engine::arena::carve(bodySlots, alignof(std::uint8_t)));
+    if (state == nullptr || propRecords == nullptr || bodyClass == nullptr) return engine::kRange;
+    rnd::initState(*state, propRecords, bodyClass, bodySlots);
+    rnd::renderState = state;
   }
   int width = 0;
   int height = 0;
@@ -180,6 +191,10 @@ EMSCRIPTEN_KEEPALIVE float* engine_render_camera() {
 
 EMSCRIPTEN_KEEPALIVE std::uint8_t* engine_render_body_classes() {
   return rnd::renderState == nullptr ? nullptr : rnd::renderState->bodyClass;
+}
+
+EMSCRIPTEN_KEEPALIVE std::uint32_t engine_render_body_slots() {
+  return rnd::renderState == nullptr ? 0 : rnd::renderState->bodySlots;
 }
 
 EMSCRIPTEN_KEEPALIVE std::uint32_t* engine_render_placements() {

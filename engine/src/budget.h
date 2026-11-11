@@ -39,17 +39,38 @@ constexpr std::uint32_t kMaxPlayers = 1024;
 
 constexpr std::uint32_t kTopTierBodies = ENGINE_TOP_TIER_BODIES;
 constexpr std::uint32_t kCompactTopTierBodies = 12288;
-constexpr std::uint32_t kBaseTopTierBodies = 10240;
 constexpr std::uint64_t kRenderBytesPerBody = 136;
-constexpr std::uint64_t kRenderFixedBytes = 2ull * 1024ull * 1024ull - kBaseTopTierBodies * kRenderBytesPerBody;
-constexpr std::uint64_t kTopTierArenaBytes = 768ull * 1024ull * 1024ull;
-constexpr std::uint32_t kRenderBodySlots = arena::kBytes >= kTopTierArenaBytes ? kTopTierBodies : kCompactTopTierBodies;
-constexpr std::uint64_t kRenderBytes = kRenderFixedBytes + kRenderBodySlots * kRenderBytesPerBody;
+constexpr std::uint64_t kRenderFixedBytes = 1024ull * 1024ull;
 
 static_assert(kTopTierBodies >= kCompactTopTierBodies && (kTopTierBodies - 2048) % kMaxPlayers == 0);
 static_assert(kTopTierBodies <= 131072);
 constexpr std::uint64_t kHostReserveBytes = 16ull * 1024ull * 1024ull;
 
+enum Term : std::uint32_t {
+  kTermBodyRows,
+  kTermJoltBodies,
+  kTermJoltStatics,
+  kTermContacts,
+  kTermBodyPairs,
+  kTermTemp,
+  kTermJoltFixed,
+  kTermPoolPrimed,
+  kTermQuadNodes,
+  kTermPages,
+  kTermVegetation,
+  kTermMaterials,
+  kTermRender,
+  kTermModels,
+  kTermHost,
+  kTermBridge,
+  kTermInterest,
+  kTermCodec,
+  kTermWorkers,
+  kTermSlack,
+  kTermCount,
+};
+
+std::uint64_t termBytes(const Capacity& c, std::uint32_t term);
 bool plan(std::uint64_t budgetBytes, std::uint32_t players, std::uint32_t workers, Capacity& out);
 bool workersFit(std::uint32_t workers);
 const Capacity& chosen();

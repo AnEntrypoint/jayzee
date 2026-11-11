@@ -331,7 +331,7 @@ const planetCamera = (module, renderer, frame, aspect, surface) => {
 const setupScene = (module, renderer, placed, worldReady = false) => {
   if (!worldReady) setupWorld(module)
   const surface = PATH === 'planet' ? setupPlanetPath(module, renderer) : setupPlanet(module, renderer, placed)
-  const classes = new Uint8Array(RENDER_LAYOUT.BODY_SLOTS).fill(255)
+  const classes = new Uint8Array(renderer.bodySlots).fill(255)
   for (let i = 0; i < BODIES; i++) classes[i] = i % RENDER_LAYOUT.PROP_CLASSES
   renderer.setBodyClasses(classes)
   CLASS_MATERIALS.forEach((material, cls) => renderer.setClassMaterial(cls, material))

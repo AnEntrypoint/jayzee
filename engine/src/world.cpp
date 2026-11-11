@@ -99,6 +99,26 @@ T* carveArray(std::size_t count) {
   return static_cast<T*>(arena::carve(sizeof(T) * count, alignof(T)));
 }
 
+class PeakTempAllocator final : public JPH::TempAllocator {
+ public:
+  explicit PeakTempAllocator(std::size_t bytes) : inner_(static_cast<JPH::uint>(bytes)) {}
+
+  void* Allocate(JPH::uint size) override {
+    void* block = inner_.Allocate(size);
+    const std::size_t used = inner_.GetUsage();
+    if (used > peak_) peak_ = used;
+    return block;
+  }
+
+  void Free(void* address, JPH::uint size) override { inner_.Free(address, size); }
+
+  std::size_t peak() const { return peak_; }
+
+ private:
+  JPH::TempAllocatorImpl inner_;
+  std::size_t peak_ = 0;
+};
+
 class BroadPhaseLayers final : public JPH::BroadPhaseLayerInterface {
  public:
   JPH::uint GetNumBroadPhaseLayers() const override { return kBroadLayerCount; }
@@ -152,7 +172,7 @@ struct World::Runtime {
   BroadPhaseLayers broadPhase;
   ObjectVsBroadPhase objectVsBroadPhase;
   ObjectPairs objectPairs;
-  JPH::TempAllocatorImpl temp;
+  PeakTempAllocator temp;
 #if defined(ENGINE_THREADS)
   JPH::JobSystemThreadPool jobs;
 #else
@@ -1087,6 +1107,10 @@ Status World::setSleep(float seconds, float pointSpeed) {
   settings.mPointVelocitySleepThreshold = pointSpeed;
   runtime_->physics.SetPhysicsSettings(settings);
   return kOk;
+}
+
+std::uint64_t World::tempPeakBytes() const {
+  return runtime_ == nullptr ? 0 : runtime_->temp.peak();
 }
 
 std::uint32_t World::airborneBodies() const {

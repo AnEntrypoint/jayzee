@@ -161,6 +161,7 @@ class World {
   Status setReleaseView(const double* eye, const double* direction, double cosHalfAngle, double range);
   Status clearReleaseView();
   std::uint32_t airborneBodies() const;
+  std::uint64_t tempPeakBytes() const;
   std::uint32_t wakeCount(std::uint32_t count) const;
   void releaseHeld();
   void setTick(std::uint64_t tick);

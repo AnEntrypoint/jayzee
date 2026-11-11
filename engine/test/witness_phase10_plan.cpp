@@ -17,8 +17,10 @@ constexpr std::uint32_t kExpectedVisible[rnd::kPropClasses] = {2767, 2776, 2767,
 
 rnd::FramePlan plan;
 rnd::Camera camera;
-Transform transforms[rnd::kBodySlots];
-std::uint8_t classes[rnd::kBodySlots];
+constexpr std::uint32_t kWitnessBodySlots = 12288;
+Transform transforms[kWitnessBodySlots];
+std::uint8_t classes[kWitnessBodySlots];
+std::uint32_t propStorage[rnd::kPropClasses * kWitnessBodySlots * rnd::kRecordWords];
 rnd::MaterialSlot materials[1];
 std::uint8_t albedoReady[rnd::kAlbedoLayers];
 std::uint8_t albedoPixels[rnd::kAlbedoLayers * rnd::kAlbedoBytes];
@@ -67,7 +69,7 @@ void multiply(const float* p, const float* v, float* out) {
 }
 
 void buildScene(std::uint32_t frame) {
-  for (std::uint32_t i = 0; i < rnd::kBodySlots; ++i) {
+  for (std::uint32_t i = 0; i < kWitnessBodySlots; ++i) {
     transforms[i] = Transform{static_cast<float>(i % 100) * 0.6f - 30.0f, 1.0f + static_cast<float>(i % 5), static_cast<float>(i / 100) * 0.6f - 30.0f, 0.0f, 0.0f, 0.0f, 1.0f};
     classes[i] = static_cast<std::uint8_t>(i % rnd::kPropClasses);
   }
@@ -98,7 +100,7 @@ void phase10Plan() {
 
   rnd::SceneView scene{};
   scene.transforms = transforms;
-  scene.bodyCount = rnd::kBodySlots;
+  scene.bodyCount = kWitnessBodySlots;
   scene.bodyClass = classes;
   scene.pages = &pages;
   scene.materials = materials;
@@ -107,6 +109,8 @@ void phase10Plan() {
   scene.albedoPixels = albedoPixels;
   scene.albedoLayerOf = noAlbedoLayer;
 
+  plan.propRecords = propStorage;
+  plan.bodySlots = kWitnessBodySlots;
   rnd::resetPlan(plan);
   rnd::planFrame(scene, camera, plan);
 

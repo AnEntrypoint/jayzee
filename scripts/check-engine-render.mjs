@@ -14,6 +14,7 @@ const EXPECT_EXPORTS = [
   'engine_render_frame',
   'engine_render_camera',
   'engine_render_body_classes',
+  'engine_render_body_slots',
   'engine_render_placements',
   'engine_render_lights',
   'engine_render_set_light_count',
@@ -49,7 +50,6 @@ const EXPECT_LAYOUT = {
 const EXPECT_PAGE_SIDE = 16
 const EXPECT_PAGE_LAYERS = 256
 const EXPECT_PROP_CLASSES = 4
-const EXPECT_BODY_SLOTS = 12288
 const EXPECT_ALLOCATIONS_SINCE_WARMUP = '0'
 const EXPECT_FRAMES = 600
 const PHASE10_MAX_API_CALLS_PER_FRAME = 64
@@ -103,11 +103,12 @@ gate('the page is 16 by 16 float samples, the layer array is sized to the larges
 
 gate('the prop classes and body slots match the expected instance buffer shape', () => {
   assert.ok(renderFrameHeader.includes('kPropClasses = 4'))
-  assert.ok(renderFrameHeader.includes('kBodySlots = budget::kRenderBodySlots'))
-  assert.ok(budgetHeader.includes('kRenderBodySlots = arena::kBytes >= kTopTierArenaBytes ? kTopTierBodies : kCompactTopTierBodies'))
-  assert.ok(budgetHeader.includes('kCompactTopTierBodies = 12288'))
+  assert.ok(renderFrameHeader.includes('std::uint32_t* propRecords;'), 'the instance records are not sized by the plan')
+  assert.ok(renderFrameHeader.includes('std::uint32_t bodySlots;'))
+  assert.ok(exportsSource.includes('engine::world().bodyCapacity()'), 'the render slots do not follow the planned bodies')
+  assert.ok(budgetSource.includes('kRenderFixedBytes + bodies * kRenderBytesPerBody'), 'the plan does not charge the render slots per planned body')
+  assert.ok(budgetHeader.includes('kRenderBytesPerBody = 136'))
   assert.equal(EXPECT_PROP_CLASSES, 4)
-  assert.equal(EXPECT_BODY_SLOTS, 12288)
 })
 
 gate('the render sources never map a buffer, wait on a future or allocate on the heap', () => {

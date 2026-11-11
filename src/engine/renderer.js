@@ -22,7 +22,6 @@ export const RENDER_LAYOUT = Object.freeze({
   MATERIAL_WORDS: 10,
   MATERIAL_ALBEDO_WORD: 9,
   PROP_CLASSES: 4,
-  BODY_SLOTS: 12288,
   PAGE_LAYERS: 256,
   ALBEDO_LAYERS: 64,
   ALBEDO_SIDE: 16,
@@ -96,12 +95,14 @@ export const createRenderer = (module, backend, { modelTier = -1, device = null,
   const f64 = module.HEAPF64
   const materials = module._engine_render_material_table() >> 2
   const classes = module._engine_render_body_classes()
+  const bodySlots = module._engine_render_body_slots()
   const albedo = module._engine_render_albedo_staging()
   const L = RENDER_LAYOUT
 
   return Object.freeze({
     module,
     backend,
+    bodySlots,
     backendName: RENDER_BACKEND_NAMES[backend],
     modelTier,
     device,
@@ -121,7 +122,7 @@ export const createRenderer = (module, backend, { modelTier = -1, device = null,
     },
 
     setBodyClasses(classList) {
-      if (!(classList instanceof Uint8Array) || classList.length > L.BODY_SLOTS) throw new TypeError('body classes take a Uint8Array of at most ' + L.BODY_SLOTS)
+      if (!(classList instanceof Uint8Array) || classList.length > bodySlots) throw new TypeError('body classes take a Uint8Array of at most ' + bodySlots)
       u8.set(classList, classes)
     },
 
