@@ -299,6 +299,7 @@
     "check:engine-tiers": "node scripts/check-engine-tiers.mjs",
     "check:engine-warm": "node scripts/check-engine-warm.mjs",
     "check:kaggle-regress": "node scripts/check-kaggle-regress.mjs",
+    "check:planet-gap-class": "node scripts/check-planet-gap-class.mjs",
     "check:engine-leak": "node scripts/check-engine-leak.mjs engine/out/engine-core-64mib-leak.mjs",
     "gen:engine-codec-fixtures": "node scripts/gen-engine-codec-fixtures.mjs",
     "check:client-resource-pools": "node scripts/check-client-resource-pools.mjs",

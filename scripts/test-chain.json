@@ -299,6 +299,7 @@
   "check:engine-tiers",
   "check:engine-warm",
   "check:kaggle-regress",
+  "check:planet-gap-class",
   "check:engine-leak",
   "check:client-resource-pools"
 ]

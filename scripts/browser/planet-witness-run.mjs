@@ -5,6 +5,7 @@ import { cpus, loadavg } from 'node:os'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { runRenderWitness } from './render-witness.mjs'
+import { THROTTLE_SAMPLE_MS, THROTTLE_SLACK_MS, excuseHostThrottled, isHostThrottledGap, throttledBetween } from './hostThrottle.mjs'
 import { PLANET_FRAME_BUDGET_MS, PLANET_MISSED_FRAME_MS, PLANET_RUNS, planetQuery, planetVerdict } from '../../src/engine/planetWitness.js'
 
 const execFileAsync = promisify(execFile)
@@ -177,7 +178,7 @@ const hiddenSpans = (result) => {
   return spans
 }
 
-const frameCases = (result, samples, gapInfo, gpuRows = []) => {
+const frameCases = (result, samples, gapInfo, gpuRows = [], throttleSamples = []) => {
   if (!result || !Array.isArray(result.wallIntervalsMs) || !Array.isArray(result.frameStartsMs)) return []
   const physicsColumn = Array.isArray(result.rowColumns) ? result.rowColumns.indexOf('physics') : -1
   const cases = []
@@ -193,10 +194,14 @@ const frameCases = (result, samples, gapInfo, gpuRows = []) => {
     const gap = gapInfo && gapInfo.gaps ? gapInfo.gaps.find((x) => x.frame === frame + WARMUP_FRAMES_IN_PAGE) : null
     const busyShare = gap && gap.gapMs > 0 ? gap.coveredMs / gap.gapMs : null
     const hiddenInGap = hiddenSpans(result).some(([from, to]) => from < start && to > start - interval)
+    const throttledInGap = throttledBetween(throttleSamples, start - interval, start + THROTTLE_SLACK_MS)
+    const hostThrottledGap = isHostThrottledGap({ throttled: throttledInGap, pageIdle: busyShare !== null && busyShare < 0.5, workWithinBudget: work <= PLANET_FRAME_BUDGET_MS })
     const classification = hiddenInGap
       ? 'page-hidden-in-gap: another page was in front, so the browser held this page back'
       : work > PLANET_FRAME_BUDGET_MS
       ? 'code-defect: in-callback work over budget'
+      : hostThrottledGap
+      ? 'host-cpu-quota-in-gap: the container CPU quota throttled ' + throttledInGap.periods + ' period' + (throttledInGap.periods === 1 ? '' : 's') + ' (' + Math.round(throttledInGap.throttledMs) + ' ms of thread time) within the ' + throttledInGap.sampleWallMs + ' ms around this gap, with the page idle'
       : busyShare !== null && busyShare >= 0.5
         ? 'page-main-thread-busy-in-gap: ' + gap.top.map((t) => t.name).join(', ')
         : 'renderer-main-thread-idle-in-gap: the wait is outside the page main thread (browser, GPU or host)'
@@ -208,6 +213,8 @@ const frameCases = (result, samples, gapInfo, gpuRows = []) => {
       workMs: work,
       startEpochMs: Math.round(start),
       classification,
+      hostThrottledGap,
+      throttledInGap,
       samples: window.length,
       maxLoad1: window.length ? Math.max(...window.map((sample) => sample.load1)) : null,
       topInWindow: window.length ? window.flatMap((sample) => sample.top).sort((a, b) => b.pcpu - a.pcpu).slice(0, 3) : [],
@@ -239,16 +246,21 @@ for (const config of PLANET_RUNS.filter((run) => !only || only === run.tier + '-
   const sampling = sampleHost(samples, stop)
   const gpuRows = []
   const stopGpu = sampleGpu(gpuRows)
+  const throttleSamples = []
+  const throttleTimer = setInterval(() => throttleSamples.push({ epochMs: Date.now(), ...readCgroupCpu() }), THROTTLE_SAMPLE_MS)
   const run = await runRenderWitness({ root, port, query: planetQuery(config, frames), trace: true, gpuTrace: true, timeoutMs: RUN_TIMEOUT_MS })
   stop.done = true
+  clearInterval(throttleTimer)
   await sampling
   stopGpu()
   const wallMs = Date.now() - started
   const load = { cpus: cpus().length, load1Before, load1After: loadavg()[0], topProcesses: topProcesses() }
-  const verdict = run.error || !run.result ? { ok: false, failures: ['run failed: ' + (run.error ?? 'no result')] } : planetVerdict(run.result, config)
-  if (!verdict.ok) failed += 1
+  const pageVerdict = run.error || !run.result ? { ok: false, failures: ['run failed: ' + (run.error ?? 'no result')] } : planetVerdict(run.result, config)
   const gapInfo = traceGaps(run.trace, run.result, frames)
-  const cases = frameCases(run.result, samples, gapInfo, gpuRows)
+  const cases = frameCases(run.result, samples, gapInfo, gpuRows, throttleSamples)
+  const verdict = excuseHostThrottled(pageVerdict, cases)
+  if (!verdict.ok) failed += 1
+  if (verdict.notCountedAgainstThePage) console.error('INFO ' + label + ': ' + verdict.hostThrottledIntervals + ' frame intervals over ' + PLANET_MISSED_FRAME_MS + ' ms fell in gaps where the container CPU quota stopped every browser process; recorded, not counted against the page')
   mkdirSync(resolve(outDir, 'traces'), { recursive: true })
   if (cases.length > 0) {
     mkdirSync(resolve(outDir, 'dumps'), { recursive: true })
@@ -257,7 +269,7 @@ for (const config of PLANET_RUNS.filter((run) => !only || only === run.tier + '-
   }
   writeFileSync(resolve(outDir, label + '.json'), JSON.stringify({ label, wallMs, load, verdict, frameCases: cases, traceGapSummary: { pid: gapInfo.pid, tid: gapInfo.tid, callbacks: gapInfo.callbacks, aligned: gapInfo.aligned, intervalMismatches: gapInfo.intervalMismatches, error: gapInfo.error ?? null }, hostSamples: samples, gpuSamples: gpuRows, result: run.result ?? null }, null, 1) + '\n')
   const wallMaxMs = run.result ? run.result.wallIntervalMaxMs : null
-  summary.push({ label, wallMs, ok: verdict.ok, workMaxMs: verdict.maxMs, workP99Ms: verdict.p99Ms, wallMaxMs, workerTick: run.result?.workerTick ?? null, missedFrames: cases.length, frameCases: cases.map((c) => ({ frame: c.frame, intervalMs: c.intervalMs, workMs: c.workMs, classification: c.classification, maxLoad1: c.maxLoad1, gapMs: c.gapMs, mainThreadBusyMs: c.mainThreadBusyMs, topInWindow: c.topInWindow })), load, failures: verdict.failures })
+  summary.push({ label, wallMs, ok: verdict.ok, workMaxMs: verdict.maxMs, workP99Ms: verdict.p99Ms, wallMaxMs, workerTick: run.result?.workerTick ?? null, missedFrames: cases.length, hostThrottledIntervals: verdict.hostThrottledIntervals ?? 0, frameCases: cases.map((c) => ({ frame: c.frame, intervalMs: c.intervalMs, workMs: c.workMs, classification: c.classification, maxLoad1: c.maxLoad1, gapMs: c.gapMs, mainThreadBusyMs: c.mainThreadBusyMs, topInWindow: c.topInWindow })), load, failures: verdict.failures })
 }
 
 console.log(JSON.stringify({ outDir, budgetMs: 16.7, runs: summary }, null, 1))
