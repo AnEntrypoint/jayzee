@@ -8,7 +8,7 @@ import { runRenderWitness } from './render-witness.mjs'
 import { PLANET_FRAME_BUDGET_MS, PLANET_MISSED_FRAME_MS, PLANET_RUNS, planetQuery, planetVerdict } from '../../src/engine/planetWitness.js'
 
 const execFileAsync = promisify(execFile)
-const SAMPLE_MS = 250
+const SAMPLE_MS = 50
 
 const root = resolve(fileURLToPath(new URL('../..', import.meta.url)))
 const outDir = resolve(root, process.argv[2] ?? 'build/diag/planet')
@@ -72,9 +72,15 @@ const traceGaps = (events, result, frames) => {
       byName.set(e.name, (byName.get(e.name) ?? 0) + overlap / 1000)
     }
     const top = [...byName].sort((a, b) => b[1] - a[1]).slice(0, 4).map(([name, ms]) => ({ name, ms: Math.round(ms * 100) / 100 }))
+    const overlapMs = (e) => Math.min(e.ts + e.dur, to) - Math.max(e.ts, from)
+    const sumOver = (list) => list.reduce((acc, e) => acc + Math.max(0, overlapMs(e)), 0) / 1000
+    const gcMs = sumOver(events.filter((e) => e.ph === 'X' && (e.name === 'MinorGC' || e.name === 'MajorGC') && e.ts < to && e.ts + e.dur > from))
+    const gpuMs = sumOver(events.filter((e) => e.ph === 'X' && e.name === 'GPUTask' && e.ts < to && e.ts + e.dur > from))
+    const rendererOther = events.filter((e) => e.ph === 'X' && e.pid === pid && e.tid !== tid && e.ts < to && e.ts + e.dur > from)
+    const rendererOtherMs = sumOver(rendererOther)
     const traceInterval = (aligned[g].ts - aligned[g - 1].ts) / 1000
     if (g >= WARMUP_FRAMES_IN_PAGE && Math.abs(traceInterval - result.wallIntervalsMs[g - WARMUP_FRAMES_IN_PAGE]) > 1) intervalMismatches += 1
-    gaps.push({ frame: g, gapMs: (to - from) / 1000, coveredMs: covered, traceIntervalMs: traceInterval, top })
+    gaps.push({ frame: g, gapMs: (to - from) / 1000, coveredMs: covered, traceIntervalMs: traceInterval, top, gcMs, gpuMs, rendererOtherMs })
   }
   return { pid, tid, callbacks: list.length, aligned: frames, intervalMismatches, gaps }
 }
@@ -87,6 +93,7 @@ const frameCases = (result, samples, gapInfo) => {
     const start = result.timeOriginMs + result.frameStartsMs[frame]
     const work = result.frameTimesMs[frame]
     const window = samples.filter((sample) => sample.epochMs >= start - interval && sample.epochMs <= start + work)
+    const nearest = samples.length ? samples.reduce((best, sample) => (Math.abs(sample.epochMs - start) < Math.abs(best.epochMs - start) ? sample : best)) : null
     const gap = gapInfo && gapInfo.gaps ? gapInfo.gaps.find((x) => x.frame === frame + WARMUP_FRAMES_IN_PAGE) : null
     const busyShare = gap && gap.gapMs > 0 ? gap.coveredMs / gap.gapMs : null
     const classification = work > PLANET_FRAME_BUDGET_MS
@@ -105,6 +112,12 @@ const frameCases = (result, samples, gapInfo) => {
       samples: window.length,
       maxLoad1: window.length ? Math.max(...window.map((sample) => sample.load1)) : null,
       topInWindow: window.length ? window.flatMap((sample) => sample.top).sort((a, b) => b.pcpu - a.pcpu).slice(0, 3) : [],
+      loadAtFrameStart: nearest ? nearest.load1 : null,
+      topAtFrameStart: nearest ? nearest.top.slice(0, 3) : [],
+      gcMs: gap ? Math.round(gap.gcMs * 100) / 100 : null,
+      gpuTaskMs: gap ? Math.round(gap.gpuMs * 100) / 100 : null,
+      rendererOtherThreadMs: gap ? Math.round(gap.rendererOtherMs * 100) / 100 : null,
+      frameIndex: frame + WARMUP_FRAMES_IN_PAGE,
     })
   })
   return cases

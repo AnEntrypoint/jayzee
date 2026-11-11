@@ -3931,3 +3931,15 @@ Witness, final state, all `rc=0` or PASS:
 - Planet configs: all four `ok true`, 0 missed frames (`build/diag/planet-phaseB-final5/*.json`, `PLANET-EXIT 0`).
 
 64-webgpu spike: earlier runs missed one frame at 25.27 ms (frame 665), 26.19 ms (frame 250), and passed on a rerun. Host load in this run: 4.60 before, 4.62 at most during the run, PID 901344 at 95% CPU throughout (`build/diag/host-before-phaseB.log`). The spike did not recur here. Its cause is not established, so it is recorded as intermittent, not fixed.
+
+### 64-webgpu long-frame capture (Phase A)
+
+`scripts/browser/planet-witness-run.mjs` now records, for each long frame of a planet run, in `<label>.json` under `frameCases`:
+- `frameIndex`, `intervalMs`, `workMs`, `startEpochMs`
+- `mainThreadBusyMs` and `mainThreadTop`: busy time on the page's main thread inside the gap before the frame
+- `gcMs`: `MinorGC` and `MajorGC` time overlapping the gap
+- `gpuTaskMs`: `GPUTask` time overlapping the gap, which is the GPU process's work, including submits
+- `rendererOtherThreadMs`: busy time on the renderer's other threads in the gap (worker-side proxy). The 64 tier runs with `threads: false`, so the engine has no pthread pool there
+- `loadAtFrameStart` and `topAtFrameStart`: the nearest host sample to the frame's start, taken every 50 ms (it was 250 ms)
+
+Witness: `build/diag/planet-64webgpu-capture/` after the Phase B job, five consecutive runs of `PLANET_ONLY=64-webgpu`.
