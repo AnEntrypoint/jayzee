@@ -232,6 +232,21 @@ gate('a class recorded as holding fails when the candidate has a tick over budge
   assert.equal(judge(withClass({ holds: false }), run(12, 12, 0, 1)).ok, true)
 })
 
+gate('a class record with a mean awake tick is judged on that mean: the reference of Kaggle run 28 passes the record of run 32 though its p99 is 1.8 times the recorded one, and a mean past the limit fails', () => {
+  const record = withClass({ holds: false, referenceP99Ms: 5.048, referenceActiveMeanMs: 4.165, singleMs: 523.5 })
+  const results = (referenceMean) => {
+    const r = run(9.079, 8.046, 0, 0, marbles(), 574.1)
+    for (const c of r.configs.filter((c) => c.kind === 'tick')) c.activeMeanMs = c.variant === 'reference' ? referenceMean : referenceMean * 0.98
+    return r
+  }
+  const run28 = judge(record, results(5.97))
+  assert.equal(run28.ok, true, run28.failures.join('; '))
+  assert.equal(run28.machineClass.driftBasis, 'mean tick while bodies are awake')
+  const slow = judge(record, results(4.165 * BASELINE.drift.p99Factor * 1.2))
+  assert.equal(slow.ok, false)
+  assert.match(slow.failures.join(' '), /the reference build itself ran a median mean tick/)
+})
+
 gate('a class record made for another reference commit is not judged and is reported as stale', () => {
   const stale = withClass({ referenceCommit: 'f'.repeat(40), referenceP99Ms: 1 })
   const verdict = judge(stale, run(12, 12))

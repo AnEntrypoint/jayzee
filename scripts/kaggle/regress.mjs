@@ -22,11 +22,16 @@ export const judgeClass = (baseline, results, top) => {
   if (name === null) failures.push('the results carry no machine class')
   if (singleMs === null) failures.push('the results carry no calibration row')
   if (!current || top.referenceP99Ms === null || singleMs === null) return { failures, summary }
+  const onMean = Number.isFinite(entry.referenceActiveMeanMs) && Number.isFinite(top.referenceActiveMeanMs)
+  const recorded = onMean ? entry.referenceActiveMeanMs : entry.referenceP99Ms
+  const ran = onMean ? top.referenceActiveMeanMs : top.referenceP99Ms
+  summary.driftBasis = onMean ? 'mean tick while bodies are awake' : 'p99'
   summary.recordedReferenceP99Ms = entry.referenceP99Ms
+  summary.recordedReferenceMs = recorded
   summary.calibrationScale = Number(Math.max(1, singleMs / entry.singleMs).toFixed(3))
-  summary.referenceLimitMs = Number((entry.referenceP99Ms * baseline.drift.p99Factor * summary.calibrationScale).toFixed(3))
+  summary.referenceLimitMs = Number((recorded * baseline.drift.p99Factor * summary.calibrationScale).toFixed(3))
   summary.holds = entry.holds === true
-  if (top.referenceP99Ms > summary.referenceLimitMs) failures.push('the reference build itself ran a median p99 of ' + top.referenceP99Ms + ' ms on machine class ' + name + ', over ' + summary.referenceLimitMs + ' ms (recorded ' + entry.referenceP99Ms + ' ms times ' + baseline.drift.p99Factor + ', calibration scale ' + summary.calibrationScale + ')')
+  if (ran > summary.referenceLimitMs) failures.push('the reference build itself ran a median ' + summary.driftBasis + ' of ' + ran + ' ms on machine class ' + name + ', over ' + summary.referenceLimitMs + ' ms (recorded ' + recorded + ' ms times ' + baseline.drift.p99Factor + ', calibration scale ' + summary.calibrationScale + ')')
   if (summary.holds && (top.candidateP99Ms > results.budgetMs || top.candidateOverBudget > 0)) failures.push('machine class ' + name + ' is recorded as holding ' + top.bodies + ' bodies, and the candidate ran a median p99 of ' + top.candidateP99Ms + ' ms with ' + top.candidateOverBudget + ' ticks over ' + results.budgetMs + ' ms in the median run')
   return { failures, summary }
 }
@@ -36,7 +41,7 @@ export const classRecord = (verdict) => {
   const c = verdict.machineClass
   if (!c || c.class === null || c.singleMs === null) throw new Error('the verdict has no machine class or calibration')
   const t = verdict.topTier
-  return { name: c.class, entry: { modelName: c.modelName, cores: c.cores, siblings: c.siblings, cache: c.cache, kaggleRun: verdict.version, referenceCommit: verdict.referenceCommit, bodies: t.bodies, workers: t.workers, singleMs: c.singleMs, referenceP99Ms: t.referenceP99Ms, candidateP99Ms: t.candidateP99Ms, candidateOverBudget: t.candidateOverBudget, holds: t.candidateP99Ms <= verdict.budgetMs && t.candidateOverBudget === 0 && t.candidateOverEach.every((n) => n === 0) } }
+  return { name: c.class, entry: { modelName: c.modelName, cores: c.cores, siblings: c.siblings, cache: c.cache, kaggleRun: verdict.version, referenceCommit: verdict.referenceCommit, bodies: t.bodies, workers: t.workers, singleMs: c.singleMs, referenceActiveMeanMs: t.referenceActiveMeanMs ?? null, referenceP99Ms: t.referenceP99Ms, candidateP99Ms: t.candidateP99Ms, candidateOverBudget: t.candidateOverBudget, holds: t.candidateP99Ms <= verdict.budgetMs && t.candidateOverBudget === 0 && t.candidateOverEach.every((n) => n === 0) } }
 }
 
 const median = (values) => {
@@ -129,7 +134,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     process.exit(1)
   }
   const seen = verdict.machineClass
-  console.log(seen.recorded ? 'machine class ' + seen.class + ': reference ' + verdict.topTier.referenceP99Ms + ' ms against its recorded ' + seen.recordedReferenceP99Ms + ' ms (limit ' + seen.referenceLimitMs + ')' : 'machine class ' + seen.class + ' (' + seen.modelName + ') has no record for this reference; node scripts/kaggle/regress.mjs record adds it')
+  console.log(seen.recorded ? 'machine class ' + seen.class + ': reference ' + seen.driftBasis + ' ' + (seen.driftBasis === 'p99' ? verdict.topTier.referenceP99Ms : verdict.topTier.referenceActiveMeanMs) + ' ms against its recorded ' + seen.recordedReferenceMs + ' ms (limit ' + seen.referenceLimitMs + ')' : 'machine class ' + seen.class + ' (' + seen.modelName + ') has no record for this reference; node scripts/kaggle/regress.mjs record adds it')
   const excluded = [...verdict.topTier.referenceHostExcludedEach, ...verdict.topTier.candidateHostExcludedEach].reduce((sum, n) => sum + n, 0)
   console.log(excluded > 0 ? excluded + ' ticks over budget were not counted (reference ' + verdict.topTier.referenceHostExcludedEach.join(', ') + '; candidate ' + verdict.topTier.candidateHostExcludedEach.join(', ') + '): ' + verdict.topTier.hostRule : 'no tick over budget was excluded as the host')
   console.log('p99 judged over ' + verdict.topTier.p99Basis + '; over every tick the medians are ' + median(verdict.topTier.candidateP99EveryTickEachMs) + ' ms against ' + median(verdict.topTier.referenceP99EveryTickEachMs) + ' ms')
