@@ -3626,3 +3626,10 @@ Open after this pass:
 - Change: `check:scenario-settle` script, appended to the `npm test` chain in package.json.
 - Not gated: tick time. A wall-clock gate would be flaky on this host, so tick timings are left for a separate measurement.
 - Open: the other scenarios (character controller, deathrun, combat bots, lockstep RTS, boss fights) are not started.
+
+## Settle scenario: tick work-time gate on two tiers (Phase A, 2026-11-11)
+
+- Change: `scripts/check-scenario-settle.mjs` now runs the settle scenario on the 64 MiB fixed build and on the 512 MiB threaded build with 2 workers.
+- Change: each tier gates the worst tick work time at 16.7 ms. The time is taken around the `world.step()` call only, the same way the planet witness times the tick, not by wall clock between ticks.
+- Witness: the four gates per tier (settle, no drift, bit-for-bit agreement, worst tick work within 16.7 ms). Not yet run; Phase B runs them.
+- Open: items 2 to 5 of the stretch (the other four scenarios, the vegetation identification pass, the parity rows and the platform items) are not started in this pass.
