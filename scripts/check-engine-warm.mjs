@@ -9,6 +9,7 @@ import { createPlanetStreamer } from '../src/engine/planetStream.js'
 import { attachPoseRegion, poseRegionBuffers } from '../src/engine/poseRegion.js'
 import { createPoseStepper } from '../src/engine/poseHandoffCore.js'
 import { WARM_DEFAULTS, warmEngine } from '../src/engine/warmEngine.js'
+import { RECLAIM_DEFAULTS, watchCollected } from '../src/engine/memoryReclaim.js'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const GLUE = pathToFileURL(join(root, 'engine/out/engine-core-64mib-threads.mjs')).href
@@ -41,7 +42,7 @@ const poseDigest = async () => {
 const cold = await poseDigest()
 const warmed = await warmEngine(GLUE, SMALL_WARM)
 const afterWarm = await poseDigest()
-warmed.release()
+const reclaimed = await warmed.release()
 
 gate('a warm run on the threaded glue reports its bodies, its ticks and a positive time', () => {
   assert.equal(warmed.warmed, true)
@@ -55,8 +56,33 @@ gate('a world stepped after a warm run has the same pose bytes on every one of '
   assert.equal(afterWarm, cold)
 })
 
-gate('release ends the warm instance threads and may be called again', () => {
-  warmed.release()
+gate('release ends the warm instance threads, waits until its memory has been collected, and may be called again', async () => {
+  assert.equal(reclaimed.collected, true, 'the warm instance was not collected after ' + reclaimed.nudges + ' nudges')
+  assert.equal(reclaimed.watched, 2)
+  assert.ok(reclaimed.nudges >= 1 && reclaimed.nudges <= RECLAIM_DEFAULTS.mostNudges)
+  assert.deepEqual(await warmed.release(), { collected: false, watched: 0, nudges: 0, ms: 0 })
+})
+
+gate('control: with no nudge allowed the release does not wait and reports the memory as not collected', async () => {
+  const quick = await warmEngine(GLUE, { ...SMALL_WARM, reclaim: { mostNudges: 0 } })
+  const result = await quick.release()
+  assert.equal(result.collected, false)
+  assert.equal(result.nudges, 0)
+  assert.equal(result.watched, 2)
+})
+
+gate('the watch nudges with dropped buffers, one loop turn apart, until every target is collected, then lets the loop turn to finish the sweep', async () => {
+  const made = []
+  let turns = 0
+  const wait = watchCollected([{}, null, 7, {}], { nudgeBytes: 4096, mostNudges: 400, settleTurns: 3, makeBuffer: (bytes) => made.push(bytes) && new ArrayBuffer(32 * MIB), yieldToLoop: () => new Promise((done) => { turns += 1; setTimeout(done, 1) }) })
+  const result = await wait()
+  assert.equal(result.watched, 2)
+  assert.equal(result.collected, true, 'not collected after ' + result.nudges + ' nudges')
+  assert.equal(made.length, result.nudges)
+  assert.ok(made.every((bytes) => bytes === 4096))
+  assert.equal(turns, result.nudges + 3)
+  assert.throws(() => watchCollected([], { mostNudges: -1 }), RangeError)
+  assert.throws(() => watchCollected([], { nudgeBytes: 0 }), RangeError)
 })
 
 gate('the defaults are the 64-player plan with its whole body pool for 300 ticks', () => {
@@ -89,6 +115,13 @@ gate('the physics worker warms before it loads its world and reports the warm ru
   const loadAt = worker.indexOf('await loadEngineModule(glue')
   const releaseAt = worker.indexOf('warmed.release()')
   assert.ok(warmAt > 0 && loadAt > warmAt && releaseAt > loadAt, 'order: warm ' + warmAt + ', load ' + loadAt + ', release ' + releaseAt)
+  assert.match(worker, /const reclaim = warmed \? await warmed\.release\(\) : null/, 'the worker reports ready before the warm memory is collected')
+  assert.ok(worker.includes("new Worker(new URL('./warmWorker.js', import.meta.url), { type: 'module' })"), 'the warm instance is not in a worker of its own')
+  assert.ok(worker.includes('const apart = warm !== false && spec.inline !== true'), 'the warm run is not apart by default')
+  const settleAt = worker.indexOf('const settle = (act, value) => {')
+  assert.ok(settleAt > 0 && worker.indexOf('worker.terminate()', settleAt) < worker.indexOf('act(value)', settleAt), 'the warm worker is not ended before its result is used')
+  const warmWorker = await readFile(join(root, 'src/engine/warmWorker.js'), 'utf8')
+  assert.ok(warmWorker.includes('await warmEngine(glue, spec)') && warmWorker.includes("type: 'warmed'"))
   assert.match(worker, /type: 'ready', poseBytes, warm:/)
 })
 

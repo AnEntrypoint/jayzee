@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { execFile, execFileSync, spawn } from 'node:child_process'
 import { promisify } from 'node:util'
 import { cpus, loadavg } from 'node:os'
@@ -254,8 +254,47 @@ const gpuProcessOf = (browserPid) => {
   return found.length > 0 ? found[0] : null
 }
 
+const GPU_USER = /gpu-process|Xvfb|Xorg|nvidia/
+const GPU_KERNEL_THREAD = /^(nv|nvidia|irq\/\d+-nvidia|UVM)/
+const SAMPLE_GAP_US = 500
+const MOST_SAMPLES = 600000
+
+const commOf = (path) => {
+  try {
+    return readFileSync(path, 'utf8').trim()
+  } catch {
+    return ''
+  }
+}
+
+const gpuUsers = (mainPid) => {
+  const threads = []
+  for (const name of readdirSync('/proc')) {
+    if (!/^\d+$/.test(name)) continue
+    const pid = Number(name)
+    const cmdline = commOf('/proc/' + pid + '/cmdline').replaceAll('\0', ' ')
+    const comm = commOf('/proc/' + pid + '/comm')
+    const user = cmdline === '' ? GPU_KERNEL_THREAD.test(comm) : GPU_USER.test(cmdline)
+    if (!user) continue
+    let tids = []
+    try {
+      tids = readdirSync('/proc/' + pid + '/task').map(Number)
+    } catch {
+      continue
+    }
+    const owner = pid === mainPid ? 'own gpu process' : cmdline === '' ? 'kernel' : (comm + ' ' + pid)
+    for (const tid of tids) {
+      if (pid === mainPid && tid === mainPid) continue
+      threads.push({ pid, tid, label: owner + ': ' + commOf('/proc/' + pid + '/task/' + tid + '/comm') })
+    }
+  }
+  return threads
+}
+
 const startThreadSampler = (pid, outPath) => {
-  const child = spawn(process.execPath, [resolve(root, 'scripts/browser/threadSampler.mjs'), String(pid), String(pid), outPath], { stdio: ['pipe', 'ignore', 'inherit'] })
+  const othersPath = outPath.replace(/\.json$/, '-others.json')
+  writeFileSync(othersPath, JSON.stringify(gpuUsers(pid)))
+  const child = spawn(process.execPath, [resolve(root, 'scripts/browser/threadSampler.mjs'), String(pid), String(pid), outPath, String(SAMPLE_GAP_US), String(MOST_SAMPLES), othersPath], { stdio: ['pipe', 'ignore', 'inherit'] })
   const exited = new Promise((done) => child.once('exit', done))
   return async () => {
     child.kill('SIGTERM')
@@ -274,6 +313,8 @@ const summary = []
 let failed = 0
 const only = process.env.PLANET_ONLY
 const sampleGpuThread = process.env.PLANET_GPU_THREAD === '1'
+const sampleGpuUse = process.env.PLANET_GPU_USE === '1'
+const queryExtra = process.env.PLANET_QUERY_EXTRA ? '&' + process.env.PLANET_QUERY_EXTRA : ''
 const dumpWorkMs = process.env.PLANET_DUMP_WORK_MS === undefined ? Infinity : Number(process.env.PLANET_DUMP_WORK_MS)
 if (Number.isNaN(dumpWorkMs) || dumpWorkMs <= 0) throw new RangeError('PLANET_DUMP_WORK_MS must be a number of milliseconds above zero')
 const own = await witnessBrowser(root)
@@ -287,12 +328,12 @@ for (const config of PLANET_RUNS.filter((run) => !only || only === run.tier + '-
   const stop = { done: false }
   const sampling = sampleHost(samples, stop)
   const gpuRows = []
-  const stopGpu = sampleGpu(gpuRows)
+  const stopGpu = sampleGpuUse ? sampleGpu(gpuRows) : () => {}
   const throttleSamples = []
   const throttleTimer = setInterval(() => throttleSamples.push({ epochMs: Date.now(), ...readCgroupCpu() }), THROTTLE_SAMPLE_MS)
   const gpuPid = sampleGpuThread ? gpuProcessOf(own.browserPid) : null
   const stopSampler = gpuPid === null ? null : startThreadSampler(gpuPid, resolve(outDir, label + '-gpu-thread.json'))
-  const run = await runRenderWitness({ root, port, query: planetQuery(config, frames), trace: true, gpuTrace: true, timeoutMs: RUN_TIMEOUT_MS, debugPort: own.debugPort })
+  const run = await runRenderWitness({ root, port, query: planetQuery(config, frames) + queryExtra, trace: true, gpuTrace: true, timeoutMs: RUN_TIMEOUT_MS, debugPort: own.debugPort })
   const gpuThread = stopSampler ? await stopSampler() : null
   stop.done = true
   clearInterval(throttleTimer)

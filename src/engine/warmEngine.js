@@ -6,10 +6,13 @@ import { solverIterationsFor } from './solverIterations.js'
 import { createPlanetStreamer } from './planetStream.js'
 import { attachPoseRegion, poseRegionBuffers } from './poseRegion.js'
 import { createPoseStepper } from './poseHandoffCore.js'
+import { watchCollected } from './memoryReclaim.js'
 
 const MIB = 1024 * 1024
 
 export const WARM_DEFAULTS = Object.freeze({ players: 64, budgetBytes: 64 * MIB, bodies: BODY_POOL_CAPACITY.standard, ticks: 300 })
+
+const NOT_RECLAIMED = Object.freeze({ collected: false, watched: 0, nudges: 0, ms: 0 })
 
 const checkCount = (value, name, least) => {
   if (!Number.isInteger(value) || value < least) throw new RangeError(name + ' must be a whole number at least ' + least)
@@ -44,17 +47,20 @@ export const warmEngine = async (glue, spec = {}) => {
     module = await loadEngineModule(glue, resolvePlan({ players, workers: 1, budgetBytes }))
   } catch (error) {
     if (!isReservationFailure(error)) throw error
-    return Object.freeze({ warmed: false, reason: 'the warm instance could not reserve its memory: ' + error.message, bodies: 0, ticks: 0, ms: now() - started, release: () => {} })
+    return Object.freeze({ warmed: false, reason: 'the warm instance could not reserve its memory: ' + error.message, bodies: 0, ticks: 0, ms: now() - started, release: () => Promise.resolve(NOT_RECLAIMED) })
   }
   runScene(module, bodies, ticks)
   const release = () => {
-    if (module === null) return
+    if (module === null) return Promise.resolve(NOT_RECLAIMED)
     if (spec.terminateOnly === true) {
       if (module.PThread) module.PThread.terminateAllThreads()
-    } else {
-      releaseEngineModule(module)
+      module = null
+      return Promise.resolve(NOT_RECLAIMED)
     }
+    const ended = Promise.resolve(releaseEngineModule(module))
+    const reclaimed = watchCollected([module, module.HEAPU8.buffer], spec.reclaim)
     module = null
+    return ended.then(reclaimed)
   }
   return Object.freeze({ warmed: true, reason: null, bodies, ticks, ms: now() - started, release })
 }

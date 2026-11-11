@@ -6,7 +6,7 @@ import { finish, gate } from './lib/gate.mjs'
 import { classRecord, judge } from './kaggle/regress.mjs'
 import { decide } from './kaggle/push-gate.mjs'
 import { repeatedSpikes } from './kaggle/spikes.mjs'
-import { BASELINE, PROFILE_REPEATS, PROFILE_VARIANT, buildPlan } from './kaggle/plan.mjs'
+import { BASELINE, PROFILE_REPEATS, PROFILE_UNRECLAIMED_REPEATS, PROFILE_VARIANT, RECLAIM_OFF, buildPlan } from './kaggle/plan.mjs'
 import { describeSlowTick } from './kaggle/tickProfile.mjs'
 import { referenceGlue } from './kaggle/reference.mjs'
 
@@ -335,7 +335,8 @@ gate('a slow tick is described by the scopes that took more than in a quiet tick
 
 gate('the regress plan carries the profile build at the top tier as rows the gate does not judge', () => {
   const rows = buildPlan('regress').runs.filter((run) => run.role === 'profile')
-  assert.equal(rows.length, PROFILE_REPEATS)
+  assert.equal(rows.length, PROFILE_REPEATS + PROFILE_UNRECLAIMED_REPEATS)
+  assert.equal(rows.filter((row) => row.args[9] === RECLAIM_OFF).length, PROFILE_UNRECLAIMED_REPEATS)
   for (const row of rows) {
     assert.ok(row.args[0].includes('/variants/' + PROFILE_VARIANT + '/'))
     assert.equal(Number(row.args[1]), top.bodies)

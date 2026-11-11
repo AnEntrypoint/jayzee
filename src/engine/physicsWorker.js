@@ -17,10 +17,28 @@ const timedTick = (slot) => {
   return out
 }
 
+const warmApart = (glue, spec) => new Promise((resolve, reject) => {
+  const started = performance.now()
+  const worker = new Worker(new URL('./warmWorker.js', import.meta.url), { type: 'module' })
+  const settle = (act, value) => {
+    worker.terminate()
+    act(value)
+  }
+  worker.onerror = (event) => settle(reject, new Error('warm worker: ' + event.message))
+  worker.onmessage = (event) => {
+    const message = event.data
+    if (message.type !== 'warmed') return settle(reject, new Error(message.message))
+    settle(resolve, { warmed: message.warmed, reason: message.reason, bodies: message.bodies, ticks: message.ticks, ms: message.ms, apartMs: performance.now() - started, release: () => Promise.resolve(null) })
+  }
+  worker.postMessage({ glue, spec })
+})
+
 const boot = async ({ glue, players, budgetBytes, workers, solverIterations, path, pose, timeTicks, warm }) => {
-  const warmed = warm === false ? null : await warmEngine(glue, warm === true ? {} : warm)
+  const spec = warm === true ? {} : warm
+  const apart = warm !== false && spec.inline !== true
+  const warmed = warm === false ? null : apart ? await warmApart(glue, spec) : await warmEngine(glue, spec)
   const module = await loadEngineModule(glue, resolvePlan({ players, budgetBytes, workers }))
-  if (warmed) warmed.release()
+  const reclaim = warmed ? await warmed.release() : null
   configureWorld(module, solverIterations, path && path.baseY ? path.baseY : 0)
   const streamer = createPlanetStreamer(module, path)
   const poseBytes = module._engine_pose_bytes()
@@ -28,7 +46,7 @@ const boot = async ({ glue, players, budgetBytes, workers, solverIterations, pat
   const region = attachPoseRegion(pose)
   tickSlot = createPoseStepper({ module, streamer, region, reserve })
   if (timeTicks > 0) tickMs = new Float64Array(timeTicks)
-  self.postMessage({ type: 'ready', poseBytes, warm: warmed ? { warmed: warmed.warmed, reason: warmed.reason, bodies: warmed.bodies, ticks: warmed.ticks, ms: warmed.ms } : null })
+  self.postMessage({ type: 'ready', poseBytes, warm: warmed ? { warmed: warmed.warmed, reason: warmed.reason, bodies: warmed.bodies, ticks: warmed.ticks, ms: warmed.ms, apart, apartMs: warmed.apartMs ?? null, reclaim } : null })
 }
 
 self.onmessage = (event) => {

@@ -42,6 +42,8 @@ const WORLD = { capacity: TIER === 1024 ? 12288 : 2048, tickRate: 60, gravity: -
 const PLANET = { radius: 6371000, cellSize: planetCellSize(6371000), gravity: 9.8, maxHeight: 8000 }
 const CLASS_MATERIALS = [0, 1, 2, 3]
 
+const WARM_CHOICES = Object.freeze({ apart: true, inline: Object.freeze({ inline: true }), terminate: Object.freeze({ inline: true, terminateOnly: true }), none: false })
+if (!Object.hasOwn(WARM_CHOICES, QUERY.get('warmRelease') ?? 'apart')) throw new RangeError('warmRelease is apart, inline, terminate or none')
 const result = { phase: PHASE, errors: [], done: false, warmAt: null, lastFrame: -1, heldAtEnd: false }
 window.engineRenderResult = result
 const VISIBILITY_LIMIT = 64
@@ -478,7 +480,7 @@ const run = async () => {
   const vegetationBlock = planetScene && VEGETATION && PATH === 'planet' ? createLeafBlock({ level: planetScene.spec.patchLevel, block: WITNESS_PATCH_BLOCK }) : null
   if (vegetationBlock) vegetationBlock.update(0, PLANET.radius, 0)
   const followVegetation = vegetationBlock ? createVegetationFollower({ scene: planetScene, block: vegetationBlock }) : null
-  const handoff = TIER === 1024 ? createPhysicsHandoff({ module, glue: new URL(TIER_GLUE, import.meta.url).href, players: TIER, budgetBytes: TIER_BUDGET, solverIterations: runConfig.solverIterations, workers: WORKERS, timeTicks: TIMED ? FRAMES : 0, path: { window: PATH_WINDOW, perFrame: PAGES_PER_FRAME, stepM: PATH_STEP_M, heightM: PATH_HEIGHT_M, baseY: BASE_Y }, warm: QUERY.get('warmRelease') === 'terminate' ? { terminateOnly: true } : true }) : null
+  const handoff = TIER === 1024 ? createPhysicsHandoff({ module, glue: new URL(TIER_GLUE, import.meta.url).href, players: TIER, budgetBytes: TIER_BUDGET, solverIterations: runConfig.solverIterations, workers: WORKERS, timeTicks: TIMED ? FRAMES : 0, path: { window: PATH_WINDOW, perFrame: PAGES_PER_FRAME, stepM: PATH_STEP_M, heightM: PATH_HEIGHT_M, baseY: BASE_Y }, warm: WARM_CHOICES[QUERY.get('warmRelease') ?? 'apart'] }) : null
   if (handoff) await handoff.ready
 
   const aspect = canvas.width / canvas.height
@@ -612,8 +614,9 @@ const run = async () => {
   result.solverIterations = runConfig.solverIterations
   result.tickMedianMs = round2(median(column(2)))
   if (handoff && TIMED) {
-    const workerTicks = (await handoff.tickTimes()).subarray(WARMUP_FRAMES)
-    result.workerTick = { ticks: workerTicks.length, medianMs: round2(median(workerTicks)), p99Ms: round2(p99(workerTicks)), maxMs: round2(Math.max(...workerTicks)), overBudget: workerTicks.filter((ms) => ms > 16.7).length, over25: workerTicks.filter((ms) => ms > 25).length }
+    const everyTick = await handoff.tickTimes()
+    const workerTicks = everyTick.subarray(WARMUP_FRAMES)
+    result.workerTick = { firstTicksMs: Array.from(everyTick.subarray(0, 4), round2), ticks: workerTicks.length, medianMs: round2(median(workerTicks)), p99Ms: round2(p99(workerTicks)), maxMs: round2(Math.max(...workerTicks)), overBudget: workerTicks.filter((ms) => ms > 16.7).length, over25: workerTicks.filter((ms) => ms > 25).length }
   }
   result.outlierThresholdMs = round2(2 * result.frameTimeMedianMs)
   result.outliers = []

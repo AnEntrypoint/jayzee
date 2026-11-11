@@ -113,14 +113,14 @@ gate('a slow GPU batch is split into its traced steps and the untraced time betw
     x('DawnServiceSerializer::Flush', 18900, 50),
     { ph: 'X', pid: 7, tid: 9, name: 'Other thread', ts: 10000, dur: 9000, args: {} },
   ]
-  const samples = { samples: 5, atUs: [9000, 10000, 13000, 16200, 20000], runNs: [0, 1e6, 2e6, 2.5e6, 3e6], waitNs: [0, 0, 0, 4e6, 4e6], state: 'SRSSR', waitsOn: [0, 0, 1, 1, 0], waitNames: ['', 'futex_wait'] }
+  const samples = { samples: 5, atUs: [9000, 10000, 13000, 16200, 20000], runNs: [0, 1e6, 2e6, 2.5e6, 3e6], waitNs: [0, 0, 0, 4e6, 4e6], state: 'SRSSR', waitsOn: [0, 0, 1, 1, 0], waitNames: ['', 'futex_wait'], minorFaults: [5, 10, 30, 50, 50], majorFaults: [0, 0, 1, 1, 1], systemTicks: [0, 0, 1, 1, 2], userTicks: [3, 3, 3, 3, 3], others: [{ pid: 7, tid: 12, label: 'own gpu process: VizCompositor' }, { pid: 8, tid: 8, label: 'Xvfb 8: Xvfb' }], otherSample: [0, 2, 3, 4], otherIndex: [1, 0, 0, 1], otherRunNs: [9e6, 1.5e6, 2e6, 9e6] }
   const described = describeBatches(events, { samples })
   assert.equal(described.batches, 2)
   assert.equal(described.slow, 1)
   assert.deepEqual(described.steps.map((step) => [step.step, step.ms]), [['Queue::Submit', 6], ['untraced after Queue::Submit', 2.8], ['DawnServiceSerializer::Flush', 0.05]])
   assert.equal(described.untracedMs, 2.8)
   assert.equal(described.worst[0].longestStep, 'Queue::Submit')
-  assert.deepEqual(described.worst[0].thread, { spanMs: 6.2, onCpuMs: 1.5, runQueueMs: 4, asleepMs: 0.7, samples: 3, states: { R: 1, S: 2 }, waits: { futex_wait: 2 } })
+  assert.deepEqual(described.worst[0].thread, { spanMs: 6.2, onCpuMs: 1.5, runQueueMs: 4, asleepMs: 0.7, samples: 3, states: { R: 1, S: 2 }, waits: { futex_wait: 2 }, minorFaults: 40, majorFaults: 1, systemTicks: 1, userTicks: 0, othersRanMs: { 'own gpu process: VizCompositor': 3.5 } })
   assert.equal(threadTime(samples, 100, 200), null)
   assert.equal(describeBatches([x('Other', 0, 10)]).batches, 0)
 })

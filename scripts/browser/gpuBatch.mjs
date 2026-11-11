@@ -63,7 +63,27 @@ export const threadTime = (samples, fromUs, toUs) => {
   const spanMs = (atUs[last] - atUs[first]) / 1000
   const onCpuMs = (runNs[last] - runNs[first]) / 1e6
   const runQueueMs = (waitNs[last] - waitNs[first]) / 1e6
-  return { spanMs: round(spanMs), onCpuMs: round(onCpuMs), runQueueMs: round(runQueueMs), asleepMs: round(Math.max(0, spanMs - onCpuMs - runQueueMs)), samples: last - first + 1, states, waits }
+  const time = { spanMs: round(spanMs), onCpuMs: round(onCpuMs), runQueueMs: round(runQueueMs), asleepMs: round(Math.max(0, spanMs - onCpuMs - runQueueMs)), samples: last - first + 1, states, waits }
+  if (samples.minorFaults) {
+    time.minorFaults = samples.minorFaults[last] - samples.minorFaults[first]
+    time.majorFaults = samples.majorFaults[last] - samples.majorFaults[first]
+    time.systemTicks = samples.systemTicks[last] - samples.systemTicks[first]
+    time.userTicks = samples.userTicks[last] - samples.userTicks[first]
+  }
+  if (!samples.otherSample || samples.otherSample.length === 0) return time
+  const ran = {}
+  let low2 = 0
+  let high2 = samples.otherSample.length
+  while (low2 < high2) {
+    const mid = (low2 + high2) >> 1
+    if (samples.otherSample[mid] <= first) low2 = mid + 1
+    else high2 = mid
+  }
+  for (let i = low2; i < samples.otherSample.length && samples.otherSample[i] <= last; i++) {
+    const label = samples.others[samples.otherIndex[i]].label
+    ran[label] = (ran[label] ?? 0) + samples.otherRunNs[i] / 1e6
+  }
+  return { ...time, othersRanMs: Object.fromEntries(Object.entries(ran).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([label, ms]) => [label, round(ms)])) }
 }
 
 export const describeBatches = (events, { afterTs = 0, slowMs = SLOW_BATCH_MS, samples = null } = {}) => {
@@ -77,7 +97,7 @@ export const describeBatches = (events, { afterTs = 0, slowMs = SLOW_BATCH_MS, s
   const steps = new Map()
   let slowMsSum = 0
   let untracedMs = 0
-  const totals = { spanMs: 0, onCpuMs: 0, runQueueMs: 0, asleepMs: 0, measured: 0, states: {}, waits: {} }
+  const totals = { spanMs: 0, onCpuMs: 0, runQueueMs: 0, asleepMs: 0, measured: 0, states: {}, waits: {}, othersRanMs: {} }
   const worst = []
   for (const batch of slow) {
     const children = piecesOf(batch, sameThread)
@@ -95,12 +115,15 @@ export const describeBatches = (events, { afterTs = 0, slowMs = SLOW_BATCH_MS, s
     if (thread) {
       totals.measured += 1
       for (const key of ['spanMs', 'onCpuMs', 'runQueueMs', 'asleepMs']) totals[key] += thread[key]
+      for (const key of ['minorFaults', 'majorFaults', 'systemTicks', 'userTicks']) totals[key] = (totals[key] ?? 0) + (thread[key] ?? 0)
       for (const [letter, count] of Object.entries(thread.states)) totals.states[letter] = (totals.states[letter] ?? 0) + count
       for (const [name, count] of Object.entries(thread.waits)) totals.waits[name] = (totals.waits[name] ?? 0) + count
+      for (const [label, ms] of Object.entries(thread.othersRanMs ?? {})) totals.othersRanMs[label] = round((totals.othersRanMs[label] ?? 0) + ms)
     }
     if (worst.length < SHOWN) worst.push({ ms: round(batch.dur / 1000), bytes: batch.args?.bytes ?? null, longestStep: longest ? longest.name : null, longestStepMs: longest ? round(longest.dur / 1000) : null, thread })
   }
   for (const key of ['spanMs', 'onCpuMs', 'runQueueMs', 'asleepMs']) totals[key] = round(totals[key])
+  totals.othersRanMs = Object.fromEntries(Object.entries(totals.othersRanMs).sort((a, b) => b[1] - a[1]).slice(0, SHOWN))
   return {
     pid,
     tid,

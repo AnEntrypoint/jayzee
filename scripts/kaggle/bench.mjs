@@ -43,7 +43,8 @@ const over = (values) => values.reduce((n, ms) => n + (ms > BUDGET_MS ? 1 : 0), 
 const exported = (name) => (typeof module[name] === 'function' ? module[name] : null)
 
 const warmSpec = warmSpecArg === 'default' ? {} : { bodies: Number(warmSpecArg.split('x')[0]), ticks: Number(warmSpecArg.split('x')[1]) }
-const warmed = warm ? await warmEngine(glue, warmSpec) : null
+const reclaimSpec = knobs.reclaim === 'off' ? { mostNudges: 0 } : undefined
+const warmed = warm ? await warmEngine(glue, { ...warmSpec, reclaim: reclaimSpec }) : null
 const loadStarted = performance.now()
 let module
 try {
@@ -51,7 +52,7 @@ try {
 } catch (error) {
   emit({ ...base, refused: error.code ?? error.name, message: String(error.message).slice(0, 200) })
 }
-if (warmed) warmed.release()
+const warmReclaim = warmed ? await warmed.release() : null
 const loadMs = performance.now() - loadStarted
 
 const setupStarted = performance.now()
@@ -96,6 +97,7 @@ const gcObserver = new PerformanceObserver((list) => collections.push(...list.ge
 gcObserver.observe({ entryTypes: ['gc'] })
 const loopStarted = performance.now()
 const times = new Float64Array(ticks)
+const tickAt = new Float64Array(ticks)
 held[0] = heldOf ? heldOf() : 0
 if (profile) profile.start()
 probe.start()
@@ -104,6 +106,7 @@ for (let f = 0; f < ticks; f++) {
   const at = performance.now()
   stepper(0)
   times[f] = performance.now() - at
+  tickAt[f] = at
   if (profile) profile.record(f, times[f])
   if (activeOf) active[f] = activeOf()
   if (heldOf) held[f + 1] = heldOf()
@@ -118,7 +121,8 @@ gcObserver.disconnect()
 const overTicks = []
 times.forEach((ms, tick) => {
   if (ms <= BUDGET_MS) return
-  overTicks.push({ ...probe.describe(tick, ms), awake: activeOf ? active[tick] : null, released: heldOf ? held[tick] - held[tick + 1] : null, airborne: airborneOf ? airborne[tick] : null })
+  const gcInTickMs = collections.reduce((sum, entry) => sum + (entry.startTime < tickAt[tick] + ms && entry.startTime + entry.duration > tickAt[tick] ? entry.duration : 0), 0)
+  overTicks.push({ ...probe.describe(tick, ms), gcInTickMs: round(gcInTickMs, 2), awake: activeOf ? active[tick] : null, released: heldOf ? held[tick] - held[tick + 1] : null, airborne: airborneOf ? airborne[tick] : null })
 })
 const lastTickWith = (counts) => {
   let last = -1
@@ -144,6 +148,7 @@ emit({
   tuning: knobs.tune !== undefined ? Number(knobs.tune) : null,
   warmMs: warmed ? round(warmed.ms, 1) : null,
   warmed: warmed ? warmed.warmed : null,
+  warmReclaim: warmReclaim ? { collected: warmReclaim.collected, nudges: warmReclaim.nudges, ms: round(warmReclaim.ms, 1) } : null,
   loadMs: round(loadMs, 1),
   setupMs: round(setupMs, 1),
   medianMs: round(quantile(sorted, 0.5), 3),
