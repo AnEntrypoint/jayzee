@@ -3598,3 +3598,9 @@ Open after this pass:
 - Change: `WorkersDoNotFitError` (code `workers-do-not-fit`, status -8) in src/engine/EngineWorld.js.
 - Change: `engine_plan_fits` export (planner probe, no initialisation) and `scripts/measure-workers-budget.mjs`, which bisects the smallest budget that fits 1024 players at a worker count. Witness: its JSON output, quoted in the Phase B result below.
 - Gate: scripts/check-engine-state-hash-1024.mjs runs 2, 4 and 8 workers in child processes; 2 and 4 must match hash 8e96da08 and count 30720; 8 must be refused.
+
+## 8-worker refusal: measured runtime overhead and planner constant (Phase A, 2026-11-11)
+
+- Measurement written, not yet run: `scripts/measure-threaded-footprint.mjs` loads the threaded glue in stages and reports the heap size after the factory (pool threads), after engine_init (arena), after world configure (job system), after the spawns (body storage) and after the planet configure. It takes the glue, the worker count and the budget as arguments.
+- Planned change: add the measured job-system and body-storage overhead per worker to the planner's fit formula in engine/src/budget.cpp. The number is set in Phase B from the measurement, and the default budget is not changed.
+- Witness: the state-hash gate's 8-worker case must be refused with `workers-do-not-fit`, and 2 and 4 workers must hash 8e96da08 with count 30720.
