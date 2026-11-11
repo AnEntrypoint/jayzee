@@ -3680,3 +3680,5 @@ Phase B (2026-11-11): both glues rebuilt (64 MiB sha256 e5bfb97f…, 512 MiB thr
 - Change: `scripts/check-scenario-combat-bots.mjs`, run as `check:scenario-combat-bots` and appended to `npm test`. Gates per tier: at least half the bots eliminated and the kill log agrees with the deaths, living bots within 0.1 m of the surface and supported after the settle window, two runs agree bit for bit on every health value and the final positions, worst tick work within 16.7 ms.
 - Limit: characters do not collide with each other (they are not bodies), so bots pass through one another. Line of sight is not tested, so a shot ignores walls.
 - Witness: Phase B, both glues rebuilt and the bots scenario on both tiers.
+
+Phase B (2026-11-11): both glues rebuilt (64 MiB sha256 16dba745…, 512 MiB threaded sha256 2521a27f…). The character, deathrun and combat-bots scenarios print RESULT: PASS on both tiers. `npm test` exit 0 with no FAIL lines.
