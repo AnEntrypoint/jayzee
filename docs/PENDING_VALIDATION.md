@@ -3737,3 +3737,11 @@ Phase B (2026-11-11): the engine is unchanged in this stretch, so the glues are 
 - Physics spikes over 8 ms across all 72 planet and trace configs: 2, both 64 WebGL2, both in the physics phase, 0 allocations since warm-up. The 1024 tier shows no physics on the main thread (its physics runs in the worker).
 - Not identified: the cause of the physics spike. Ruled out by the record: allocation (0 since warm-up), render or upload (0.7 ms and 0.45 ms in the same frames), host load (the spike is 25 to 29 ms of physics work inside the callback, not a gap). Candidates not tested: a first call into an uncompiled wasm function during the run (lazy compilation), and a one-time Jolt structure update. Each needs its own test.
 - Status: NOT GREEN. The 64 WebGL2 physics spike is a code defect that is not fixed. Stretches 7, 8 and 9 stay local and unpushed.
+
+## 64 WebGL2 physics spike: Phase A outcome (2026-11-11), OPEN
+
+- Data: trace-run8, 64 WebGL2, timed frame 194 (global 254), in-callback 26.04 ms, of which the physics phase is 25.22 ms and the median physics phase is 2 ms. Allocations since warm-up: 0. planet-run2, 64 WebGL2, frame 148: 29.42 ms in callback, physics 29.13 ms.
+- Hypothesis, untested: a first call into a wasm function that the browser compiles on demand, which stalls the main thread inside the physics call. It fits the data (one-off, inside a wasm call, no allocation). It is not confirmed: the trace of trace-run8 was not saved, and the browser's compile mode is not set by this project.
+- Ruled out by the record: wasm arena allocation (0), render and upload (0.7 ms and 0.45 ms in the same frames), the page's JS (its phases are separate), and host load (the cost is in-callback, not a gap).
+- Not changed: no code fix. A warm-up that exercises rare Jolt paths would change the engine's initial state and so the pinned state hashes; that change needs its own determinism witness, and it has not been made.
+- Next test: save the browser trace in the failing config and read the wasm events inside the physics call. A compile stall appears as a compile event in that window. If it does, the fix is to force eager compilation of the engine module before the timed frames.
