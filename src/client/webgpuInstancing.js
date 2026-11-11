@@ -103,6 +103,17 @@ export function createWebGPUInstancedMesh(geometry, material, capacity, attribut
     markMatricesDirty(id)
   }
 
+  function setScaledTranslationFrom(id, source, at) {
+    const a = mesh.instanceMatrix.array, o = id * 16
+    const size = source[at + 3]
+    a[o] = size; a[o + 1] = 0; a[o + 2] = 0; a[o + 3] = 0
+    a[o + 4] = 0; a[o + 5] = size; a[o + 6] = 0; a[o + 7] = 0
+    a[o + 8] = 0; a[o + 9] = 0; a[o + 10] = size; a[o + 11] = 0
+    a[o + 12] = source[at]; a[o + 13] = source[at + 1]; a[o + 14] = source[at + 2]; a[o + 15] = 1
+    if (hidden[id]) shadowMatrices.set(a.subarray(o, o + 16), o)
+    markMatricesDirty(id)
+  }
+
   function setVisibleAt(id, visible) {
     const a = mesh.instanceMatrix.array, o = id * 16
     if (visible) {
@@ -145,6 +156,7 @@ export function createWebGPUInstancedMesh(geometry, material, capacity, attribut
     releaseId,
     setMatrixAt,
     setTranslatedAt,
+    setScaledTranslationFrom,
     setVisibleAt,
     setAttributeAt,
     clear,

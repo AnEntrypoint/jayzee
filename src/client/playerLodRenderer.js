@@ -44,10 +44,6 @@ export function createCrowdDotRendererWebGL(scene, opts = {}) {
   let capacity = opts.capacity || DOT_CAPACITY
   const geo = makeDotGeometry(dotSize)
   const mat = makeDotMaterial()
-  const position = new THREE.Vector3()
-  const scale = new THREE.Vector3()
-  const quaternion = new THREE.Quaternion()
-  const matrix = new THREE.Matrix4()
   let activeCount = 0
   const decodeOptions = { dotCellM, dotSize, viewerY: 0, groundHeightFn: null }
   let poses = crowdPoseBuffer(capacity)
@@ -78,12 +74,15 @@ export function createCrowdDotRendererWebGL(scene, opts = {}) {
     poses = crowdPoseBufferFor(poses, dots ? dots.length : 0)
     const count = decodeCrowdDotPoses(dots, decodeOptions, poses)
     ensureCapacity(count)
+    const out = im.instanceMatrix.array
     for (let i = 0; i < count; i++) {
       const at = i * CROWD_POSE_STRIDE
+      const o = i * 16
       const size = poses[at + 3]
-      position.set(poses[at], poses[at + 1], poses[at + 2])
-      scale.set(size, size, size)
-      im.setMatrixAt(i, matrix.compose(position, quaternion, scale))
+      out[o] = size; out[o + 1] = 0; out[o + 2] = 0; out[o + 3] = 0
+      out[o + 4] = 0; out[o + 5] = size; out[o + 6] = 0; out[o + 7] = 0
+      out[o + 8] = 0; out[o + 9] = 0; out[o + 10] = size; out[o + 11] = 0
+      out[o + 12] = poses[at]; out[o + 13] = poses[at + 1]; out[o + 14] = poses[at + 2]; out[o + 15] = 1
     }
     im.count = count
     im.instanceMatrix.needsUpdate = true

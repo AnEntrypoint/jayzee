@@ -1,4 +1,3 @@
-import * as THREE from 'three'
 import { CROWD_DOT_CELL_M } from '../snapshot-lod-pure/constants.js'
 import { CROWD_DOT_SIZE, CROWD_POSE_STRIDE, crowdPoseBuffer, crowdPoseBufferFor, decodeCrowdDotPoses } from './crowdDots.js'
 import { makeDotGeometry } from './dotGeometry.js'
@@ -13,10 +12,6 @@ export function createCrowdDotRendererWebGPU(scene, opts = {}) {
   const dotSize = opts.dotSize || CROWD_DOT_SIZE
   let capacity = opts.capacity || DOT_CAPACITY
   const geo = makeDotGeometry(dotSize)
-  const position = new THREE.Vector3()
-  const scale = new THREE.Vector3()
-  const quaternion = new THREE.Quaternion()
-  const matrix = new THREE.Matrix4()
   let inst = buildInstance(capacity)
   let activeCount = 0
   const decodeOptions = { dotCellM, dotSize, viewerY: 0, groundHeightFn: null }
@@ -48,14 +43,7 @@ export function createCrowdDotRendererWebGPU(scene, opts = {}) {
     const count = decodeCrowdDotPoses(dots, decodeOptions, poses)
     ensureCapacity(count)
     inst.clear()
-    for (let i = 0; i < count; i++) {
-      const at = i * CROWD_POSE_STRIDE
-      const size = poses[at + 3]
-      const id = inst.acquireId()
-      position.set(poses[at], poses[at + 1], poses[at + 2])
-      scale.set(size, size, size)
-      inst.setMatrixAt(id, matrix.compose(position, quaternion, scale))
-    }
+    for (let i = 0; i < count; i++) inst.setScaledTranslationFrom(inst.acquireId(), poses, i * CROWD_POSE_STRIDE)
     activeCount = count
   }
 
