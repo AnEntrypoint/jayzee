@@ -20,7 +20,8 @@ export const resolvePairs = (count, radius, restitution) => {
   const wordMask = slots - 1
   const words = (count * 3) | 0
   const grid = stateGrid
-  let stale = grid[0] === count ? 0 : 1
+  const bodies = count | 0
+  let stale = (grid[0] | 0) === bodies ? 0 : 1
   for (let o = 0; o < words; o += 3) {
     const cx = Math.floor(pos[o] / reach) | 0
     const cy = Math.floor(pos[o + 1] / reach) | 0
@@ -41,7 +42,7 @@ export const resolvePairs = (count, radius, restitution) => {
       next[i] = head[b] | 0
       head[b] = i
     }
-    grid[0] = count
+    grid[0] = bodies
   }
   for (let oi = 0, i = 0; oi < words; oi += 3, i++) {
     const cx = cells[oi] | 0

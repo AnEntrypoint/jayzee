@@ -6,6 +6,13 @@ const MIN_GRID_BUCKETS = 64
 const GRID_BUCKETS_PER_BODY = 2
 const GRID_BUCKETS_PER_OCCUPANCY_WORD = 4
 const FNV_OFFSET = 0x811c9dc5
+const FNV_PRIME = 0x01000193
+
+const fnvWords = (hash, words, length = words.length) => {
+  let h = hash
+  for (let i = 0; i < length; i++) h = Math.imul(h ^ words[i], FNV_PRIME)
+  return h
+}
 
 export const gridBucketsFor = (capacity) => {
   let buckets = MIN_GRID_BUCKETS
@@ -16,7 +23,6 @@ export const gridBucketsFor = (capacity) => {
 export class World {
   #step
   #stepMany
-  #hash
   #capacity
   #tickRate
   #gravity
@@ -27,6 +33,8 @@ export class World {
   #boxCount
   #position
   #velocity
+  #positionWords
+  #velocityWords
   #count = 0
   #tick = 0
   #accumulator = 0
@@ -37,7 +45,6 @@ export class World {
     const kernel = instantiateKernel({ capacity: resolved.capacity, boxCount: Math.max(1, resolved.boxCount), buckets, occupancyWords: buckets / GRID_BUCKETS_PER_OCCUPANCY_WORD })
     this.#step = kernel.run.step
     this.#stepMany = kernel.run.stepMany
-    this.#hash = kernel.run.hash
     this.#capacity = resolved.capacity
     this.#tickRate = resolved.tickRate
     this.#gravity = resolved.gravity
@@ -48,6 +55,8 @@ export class World {
     this.#boxCount = resolved.boxCount
     this.#position = kernel.positions
     this.#velocity = kernel.velocities
+    this.#positionWords = new Uint32Array(this.#position.buffer, this.#position.byteOffset, resolved.capacity * 6)
+    this.#velocityWords = new Uint32Array(this.#velocity.buffer, this.#velocity.byteOffset, resolved.capacity * 6)
     kernel.boxes.set(resolved.flatBoxes)
   }
 
@@ -112,7 +121,8 @@ export class World {
   }
 
   hash() {
-    return this.#hash(this.#count, FNV_OFFSET) >>> 0
+    const wordCount = this.#count * 6
+    return fnvWords(fnvWords(FNV_OFFSET, this.#positionWords, wordCount), this.#velocityWords, wordCount) >>> 0
   }
 
   snapshot() {

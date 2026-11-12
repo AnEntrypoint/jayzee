@@ -105,6 +105,23 @@ bool prime(const std::uint32_t (&counts)[kClasses]) {
   return true;
 }
 
+bool refill(const std::uint32_t (&counts)[kClasses]) {
+  for (std::uint32_t i = 0; i < kClasses; ++i) {
+    std::uint32_t held = 0;
+    for (void* block = freeHeads[i]; block != nullptr && held < counts[i]; block = linkField(static_cast<char*>(block))) held += 1;
+    const std::uint32_t c = kMinClass + i;
+    for (; held < counts[i]; ++held) {
+      char* raw = carveBlock(std::size_t(1) << c);
+      if (raw == nullptr) return false;
+      classField(raw) = c;
+      capacityField(raw) = std::size_t(1) << c;
+      linkField(raw) = freeHeads[i];
+      freeHeads[i] = raw;
+    }
+  }
+  return true;
+}
+
 void installJoltHooks() {
   JPH::Allocate = joltAllocate;
   JPH::Reallocate = joltReallocate;

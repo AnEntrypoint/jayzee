@@ -24,6 +24,7 @@ constexpr std::uint64_t primedBytes() {
 }
 
 bool prime(const std::uint32_t (&counts)[kClasses]);
+bool refill(const std::uint32_t (&counts)[kClasses]);
 void installJoltHooks();
 void* allocate(std::size_t bytes);
 void* allocateAligned(std::size_t bytes, std::size_t alignment);

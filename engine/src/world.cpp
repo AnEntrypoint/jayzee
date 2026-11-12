@@ -340,6 +340,9 @@ Status World::configure(const Config& config) {
     body->SetUserData(static_cast<JPH::uint64>(slot) + 1);
     bodyIds_[slot] = body->GetID().GetIndexAndSequenceNumber();
   }
+  std::uint32_t spare[pool::kClasses];
+  for (std::uint32_t i = 0; i < pool::kClasses; ++i) spare[i] = pool::kPrimeCounts[i];
+  if (!pool::refill(spare)) return kFull;
   return kOk;
 }
 

@@ -269,7 +269,7 @@ gate('a body the host moves into another cell between two pair passes is found i
   assert.ok(Math.abs(k.pos[3] - k.pos[0] - 1) < 1e-12, 'the moved body was not separated: ' + Array.from(k.pos))
 })
 
-gate('stepMany runs the ticks one step call each would run, bit for bit, and hash is FNV-1a over the float64 words of the live bodies', () => {
+gate('stepMany runs the ticks one step call each would run, bit for bit', () => {
   const { count, pos, vel } = pile()
   const args = [count, 1, -9.8, 0.1, 1 / 60, 0.5, 0.2, 4]
   const single = load({ pos, vel })
@@ -278,14 +278,6 @@ gate('stepMany runs the ticks one step call each would run, bit for bit, and has
   batched.run.stepMany(7, ...args)
   assert.equal(bitsOf(batched.pos), bitsOf(single.pos))
   assert.equal(bitsOf(batched.vel), bitsOf(single.vel))
-  const fnv = (hash, values) => {
-    let h = hash
-    for (const word of new Uint32Array(values.buffer, values.byteOffset, count * 6)) h = Math.imul(h ^ word, 0x01000193)
-    return h
-  }
-  const expected = fnv(fnv(0x811c9dc5, batched.pos), batched.vel) >>> 0
-  assert.equal(batched.run.hash(count, 0x811c9dc5) >>> 0, expected)
-  assert.notEqual(batched.run.hash(count - 1, 0x811c9dc5) >>> 0, expected)
 })
 
 gate('the views the kernel hands out are its own storage, so a step copies nothing', () => {

@@ -22,6 +22,7 @@ export const gridBucketsFor = (capacity) => {
 
 export class World {
   #step
+  #stepMany
   #capacity
   #tickRate
   #gravity
@@ -43,6 +44,7 @@ export class World {
     const buckets = gridBucketsFor(resolved.capacity)
     const kernel = instantiateKernel({ capacity: resolved.capacity, boxCount: Math.max(1, resolved.boxCount), buckets, occupancyWords: buckets / GRID_BUCKETS_PER_OCCUPANCY_WORD })
     this.#step = kernel.run.step
+    this.#stepMany = kernel.run.stepMany
     this.#capacity = resolved.capacity
     this.#tickRate = resolved.tickRate
     this.#gravity = resolved.gravity
@@ -108,9 +110,12 @@ export class World {
     this.#accumulator = Math.min(this.#accumulator + seconds, MAX_STEPS_PER_ADVANCE * dt)
     let steps = 0
     while (this.#accumulator >= dt) {
-      this.step()
       this.#accumulator -= dt
       steps += 1
+    }
+    if (steps > 0) {
+      this.#stepMany(steps, this.#count, this.#boxCount, this.#gravity, this.#drag, dt, this.#radius, this.#restitution, this.#iterations)
+      this.#tick += steps
     }
     return steps
   }
