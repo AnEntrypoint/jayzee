@@ -1,9 +1,21 @@
 import assert from 'node:assert/strict'
 import { finish, gate } from './lib/gate.mjs'
-import { lazyPack, lazyPackCounts, pack, unpack } from '../src/protocol/msgpack.js'
+import { ensurePacked, isPacked, lazyPack, lazyPackCounts, pack, unpack } from '../src/protocol/msgpack.js'
 
 const hex = (bytes) => Buffer.from(bytes).toString('hex')
 const MESSAGE = { type: 'snapshot', payload: { seq: 4, tick: 90, serverTime: 1500, players: [[1, 0.5, -0, 2]], entities: [], removed: undefined, delta: 1, dots: undefined, me: undefined, chartEpoch: 3 } }
+
+gate('the spoint lazy packer surface is kept: isPacked is true as soon as the module loads and ensurePacked resolves to a packer that packs the same bytes', async () => {
+  assert.equal(isPacked(), true)
+  const packer = await ensurePacked
+  const plain = { type: 'snapshot', payload: { seq: 4, tick: 90, serverTime: 1500, players: [[1, 0.5, 2]], entities: ['crate'], removed: undefined, delta: 1, dots: undefined, me: undefined, chartEpoch: 3 } }
+  assert.equal(hex(new Uint8Array(packer.pack(plain))), hex(pack(plain)))
+  assert.equal(hex(pack({ type: 3, payload: null })), hex(new Uint8Array(packer.pack({ type: 3, payload: null }))))
+})
+
+gate('stated difference: spoint resolves msgpackr through a dynamic import and pack throws until it has; jayzee imports it statically, so pack works in the first statement of a module', () => {
+  assert.equal(unpack(pack({ type: 3, payload: null })).type, 3)
+})
 
 gate('a lazy packer that is never read never packs', () => {
   const before = { ...lazyPackCounts }

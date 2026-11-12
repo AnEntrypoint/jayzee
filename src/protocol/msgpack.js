@@ -144,3 +144,9 @@ export function lazyPack(value) {
     },
   }
 }
+
+export function isPacked() {
+  return true
+}
+
+export const ensurePacked = Promise.resolve(packer)
