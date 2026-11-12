@@ -244,9 +244,8 @@ Status World::bind(const budget::Capacity& capacity) {
   transforms_ = carveArray<Transform>(n);
   air_ = carveArray<std::uint8_t>(n);
   ceiling_ = carveArray<float>(n);
-  releaseQueue_ = carveArray<std::uint32_t>(n);
-  releaseKeys_ = carveArray<float>(n);
-  if (releaseQueue_ == nullptr || releaseKeys_ == nullptr) return kFull;
+  releaseQueue_ = carveArray<std::uint64_t>(n);
+  if (releaseQueue_ == nullptr) return kFull;
   if (bodyIds_ == nullptr || batch_ == nullptr || freeSlots_ == nullptr || generations_ == nullptr || alive_ == nullptr ||
       positions_ == nullptr || velocities_ == nullptr || transforms_ == nullptr || air_ == nullptr || ceiling_ == nullptr) {
     return kFull;
@@ -295,6 +294,9 @@ Status World::configure(const Config& config) {
   queueCount_ = 0;
   queueHead_ = 0;
   queueStale_ = true;
+  queueDrifted_ = false;
+  sinceRefill_ = 0;
+  releaseRefills_ = 0;
   viewSet_ = false;
 
   runtime_->physics.Init(joltBodyCapacity(limits_), 0, joltPairCapacity(limits_), joltContactCapacity(limits_), runtime_->broadPhase,
@@ -988,52 +990,75 @@ bool World::inView(std::uint32_t slot, double cosine, double& distance) const {
   return dx * viewDir_[0] + dy * viewDir_[1] + dz * viewDir_[2] >= cosine * distance;
 }
 
+namespace {
+
+constexpr std::uint32_t kReleaseKeyShift = 32;
+
+std::uint32_t orderedBits(float metres) {
+  std::uint32_t bits = 0;
+  std::memcpy(&bits, &metres, sizeof(bits));
+  return bits;
+}
+
+std::uint32_t slotOf(std::uint64_t entry) {
+  return static_cast<std::uint32_t>(entry);
+}
+
+}
+
 void World::refillReleaseQueue() {
   ENGINE_PROFILE_SCOPE("engine release refill");
   constexpr float kOutOfViewMetres = 1.0e6f;
   constexpr std::uint32_t kLeastChunk = 1024;
   queueStale_ = false;
+  queueDrifted_ = false;
+  sinceRefill_ = 0;
+  releaseRefills_ += 1;
   queueHead_ = 0;
   queueCount_ = 0;
+  for (int axis = 0; axis < 3; ++axis) {
+    queueEye_[axis] = viewEye_[axis];
+    queueDir_[axis] = viewDir_[axis];
+  }
   const bool ordered = viewSet_ && (tuning_ & kTuneReleaseBySlot) == 0;
+  const double orderingCos = std::max(viewCos_ - kReleaseViewMarginCos, -1.0);
   for (std::uint32_t slot = 0; slot < fresh_; ++slot) {
     if (alive_[slot] != kSlotHeld) continue;
-    releaseQueue_[queueCount_] = slot;
+    std::uint64_t entry = slot;
+    if (ordered) {
+      double distance = 0.0;
+      const bool visible = inView(slot, orderingCos, distance);
+      entry |= static_cast<std::uint64_t>(orderedBits(static_cast<float>(distance) + (visible ? 0.0f : kOutOfViewMetres))) << kReleaseKeyShift;
+    }
+    releaseQueue_[queueCount_] = entry;
     queueCount_ += 1;
-    if (!ordered) continue;
-    double distance = 0.0;
-    const bool visible = inView(slot, std::max(viewCos_ - kReleaseViewMarginCos, -1.0), distance);
-    releaseKeys_[slot] = static_cast<float>(distance) + (visible ? 0.0f : kOutOfViewMetres);
   }
   if (!ordered) return;
   if ((tuning_ & kTuneReleaseBlocks) != 0) {
     std::uint32_t begin = 0;
     while (begin < queueCount_) {
-      const std::uint32_t block = releaseQueue_[begin] / kReleaseBlockSlots;
-      float nearest = releaseKeys_[releaseQueue_[begin]];
+      const std::uint32_t block = slotOf(releaseQueue_[begin]) / kReleaseBlockSlots;
+      std::uint64_t nearest = releaseQueue_[begin] >> kReleaseKeyShift;
       std::uint32_t end = begin;
-      while (end < queueCount_ && releaseQueue_[end] / kReleaseBlockSlots == block) {
-        nearest = std::min(nearest, releaseKeys_[releaseQueue_[end]]);
+      while (end < queueCount_ && slotOf(releaseQueue_[end]) / kReleaseBlockSlots == block) {
+        nearest = std::min(nearest, releaseQueue_[end] >> kReleaseKeyShift);
         end += 1;
       }
-      for (std::uint32_t at = begin; at < end; ++at) releaseKeys_[releaseQueue_[at]] = nearest;
+      for (std::uint32_t at = begin; at < end; ++at) releaseQueue_[at] = (nearest << kReleaseKeyShift) | slotOf(releaseQueue_[at]);
       begin = end;
     }
   }
-  const float* keys = releaseKeys_;
-  auto nearer = [keys](std::uint32_t a, std::uint32_t b) { return keys[a] < keys[b] || (keys[a] == keys[b] && a < b); };
   const std::uint32_t chunk = std::min(queueCount_, std::max(awakeLimit(), kLeastChunk));
-  if (chunk < queueCount_) std::nth_element(releaseQueue_, releaseQueue_ + chunk, releaseQueue_ + queueCount_, nearer);
-  std::sort(releaseQueue_, releaseQueue_ + chunk, nearer);
+  if (chunk < queueCount_) std::nth_element(releaseQueue_, releaseQueue_ + chunk, releaseQueue_ + queueCount_);
+  std::sort(releaseQueue_, releaseQueue_ + chunk);
   queueCount_ = chunk;
-  queueEye_[0] = viewEye_[0];
-  queueEye_[1] = viewEye_[1];
-  queueEye_[2] = viewEye_[2];
 }
 
 Status World::setReleaseView(const double* eye, const double* direction, double cosHalfAngle, double range) {
-  constexpr double kMovedMetres = 4.0;
-  constexpr double kTurnedCos = 0.98;
+  constexpr double kDriftedMetres = 4.0;
+  constexpr double kDriftedCos = 0.98;
+  constexpr double kJumpedMetres = 64.0;
+  constexpr double kJumpedCos = 0.7;
   if (runtime_ == nullptr) return kNotConfigured;
   for (int axis = 0; axis < 3; ++axis) {
     if (!std::isfinite(eye[axis]) || !std::isfinite(direction[axis])) return kRange;
@@ -1045,9 +1070,15 @@ Status World::setReleaseView(const double* eye, const double* direction, double 
   const double mx = eye[0] - queueEye_[0];
   const double my = eye[1] - queueEye_[1];
   const double mz = eye[2] - queueEye_[2];
-  const bool moved = mx * mx + my * my + mz * mz > kMovedMetres * kMovedMetres;
-  const bool turned = unit[0] * viewDir_[0] + unit[1] * viewDir_[1] + unit[2] * viewDir_[2] < kTurnedCos;
-  if (!viewSet_ || moved || turned || cone != viewCos_ || range != viewRange_) queueStale_ = true;
+  const double moved = mx * mx + my * my + mz * mz;
+  const double facing = cone > -1.0 ? unit[0] * queueDir_[0] + unit[1] * queueDir_[1] + unit[2] * queueDir_[2] : 1.0;
+  if ((tuning_ & kTuneReleaseBySlot) == 0) {
+    if (!viewSet_ || cone != viewCos_ || range != viewRange_ || moved > kJumpedMetres * kJumpedMetres || facing < kJumpedCos) {
+      queueStale_ = true;
+    } else if (moved > kDriftedMetres * kDriftedMetres || facing < kDriftedCos) {
+      queueDrifted_ = true;
+    }
+  }
   for (int axis = 0; axis < 3; ++axis) {
     viewEye_[axis] = eye[axis];
     viewDir_[axis] = unit[axis];
@@ -1077,6 +1108,7 @@ std::uint32_t World::unsettledInView() const {
 }
 
 void World::releaseHeld() {
+  if (sinceRefill_ < kDriftRefillSteps) sinceRefill_ += 1;
   if (heldCount_ == 0) return;
   const std::uint32_t active = runtime_->physics.GetNumActiveBodies(JPH::EBodyType::RigidBody);
   const std::uint32_t limit = awakeLimit();
@@ -1085,9 +1117,9 @@ void World::releaseHeld() {
   JPH::BodyID* batch = asBodyIds(batch_);
   std::uint32_t released = 0;
   while (room > 0 && heldCount_ > 0) {
-    if (queueStale_ || queueHead_ == queueCount_) refillReleaseQueue();
+    if (queueStale_ || queueHead_ == queueCount_ || (queueDrifted_ && sinceRefill_ >= kDriftRefillSteps)) refillReleaseQueue();
     if (queueHead_ == queueCount_) break;
-    const std::uint32_t slot = releaseQueue_[queueHead_];
+    const std::uint32_t slot = slotOf(releaseQueue_[queueHead_]);
     queueHead_ += 1;
     if (alive_[slot] != kSlotHeld) continue;
     batch[released] = JPH::BodyID(bodyIds_[slot]);

@@ -134,6 +134,7 @@ set(ENGINE_EXPORTS
   _engine_world_set_release_view
   _engine_world_clear_release_view
   _engine_world_unsettled_in_view
+  _engine_world_release_refills
   _engine_world_active_bodies
   _engine_world_add_box
   _engine_world_add_trunk

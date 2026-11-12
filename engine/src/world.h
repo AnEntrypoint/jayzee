@@ -37,6 +37,7 @@ constexpr std::uint32_t kTuneDirectManifolds = 32u;
 constexpr std::uint32_t kTuneReleaseBlocks = 64u;
 constexpr std::uint32_t kTuneAll = kTuneGravityAfterStep | kTuneWholeIslands | kTuneAirborne | kTuneBroadphaseInterval | kTuneReleaseBySlot | kTuneDirectManifolds | kTuneReleaseBlocks;
 constexpr std::uint32_t kReleaseBlockSlots = 64;
+constexpr std::uint32_t kDriftRefillSteps = 16;
 #if defined(ENGINE_BROADPHASE_INTERVAL)
 constexpr std::uint32_t kDefaultTuning = kTuneAirborne | kTuneBroadphaseInterval;
 #else
@@ -172,6 +173,7 @@ class World {
   Status setSleep(float seconds, float pointSpeed);
   std::uint32_t heldBodies() const;
   std::uint32_t unsettledInView() const;
+  std::uint32_t releaseRefills() const { return releaseRefills_; }
   Status setReleaseView(const double* eye, const double* direction, double cosHalfAngle, double range);
   Status clearReleaseView();
   std::uint32_t airborneBodies() const;
@@ -232,10 +234,14 @@ class World {
   std::uint32_t queueCount_ = 0;
   std::uint32_t queueHead_ = 0;
   bool queueStale_ = true;
+  bool queueDrifted_ = false;
+  std::uint32_t sinceRefill_ = 0;
+  std::uint32_t releaseRefills_ = 0;
   bool viewSet_ = false;
   double viewEye_[3] = {0.0, 0.0, 0.0};
   double viewDir_[3] = {0.0, 0.0, 0.0};
   double queueEye_[3] = {0.0, 0.0, 0.0};
+  double queueDir_[3] = {0.0, 0.0, 0.0};
   double viewCos_ = -1.0;
   double viewRange_ = 0.0;
   bool spawnAsleep_ = false;
@@ -264,8 +270,7 @@ class World {
   Transform* transforms_ = nullptr;
   std::uint8_t* air_ = nullptr;
   float* ceiling_ = nullptr;
-  std::uint32_t* releaseQueue_ = nullptr;
-  float* releaseKeys_ = nullptr;
+  std::uint64_t* releaseQueue_ = nullptr;
   float radius_ = 0.0f;
 };
 
