@@ -3,6 +3,7 @@ const LANE_FIELDS = 5
 const SHOWN_SCOPES = 16
 const ENGINE_SCOPE_PREFIX = 'engine '
 const NOTABLE_QUIET_MAX_MS = 2
+const SAMPLED_EVERY = 16
 const ENGINE_ENTRY_SCOPES = Object.freeze(['engine tick batch', 'engine follow', 'engine pose export'])
 const round = (value) => Number(value.toFixed(3))
 
@@ -94,11 +95,12 @@ export const createTickProfile = ({ module, budgetMs, keep = 12 }) => {
         if (quietSumMs[scope] > 0) quiet.push({ scope: names[scope], meanMs: round(quietMeanMs[scope]), maxMs: round(quietMaxMs[scope]), meanCalls: round(quietMeanCalls[scope]) })
       }
       quiet.sort((a, b) => b.meanMs - a.meanMs)
-      const mutedScopes = names.filter((name, scope) => name !== '' && module._engine_profile_scope_muted(scope) === 1)
+      const sampledScopes = names.filter((name, scope) => name !== '' && module._engine_profile_scope_muted(scope) === 1)
       return {
         quietTicks,
         slowTicks,
-        mutedScopes,
+        sampledScopes,
+        sampledEvery: SAMPLED_EVERY,
         quiet: quiet.filter((row, rank) => rank < SHOWN_SCOPES * 2 || row.scope.startsWith(ENGINE_SCOPE_PREFIX) || row.maxMs > NOTABLE_QUIET_MAX_MS),
         slow: slow.slice().sort((a, b) => a.tick - b.tick).map(({ tick, ms, table }) => ({ tick, ms: round(ms), ...describeSlowTick({ ms, table, scopes, lanes, names, quietMeanMs, quietMaxMs, quietMeanCalls }) })),
       }

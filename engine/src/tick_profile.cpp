@@ -14,8 +14,9 @@ constexpr std::uint32_t kScopeFields = 4;
 constexpr std::uint32_t kLaneFields = 5;
 constexpr std::uint32_t kOverflowScope = kScopes - 1;
 constexpr std::uint32_t kNoLane = 0xffffffffu;
-constexpr std::uint32_t kMutedScope = 0xffffffffu;
+constexpr std::uint32_t kSkippedScope = 0xffffffffu;
 constexpr double kMuteCalls = 64.0;
+constexpr std::uint32_t kSampleEvery = 16;
 
 struct Row {
   double ms;
@@ -26,6 +27,7 @@ struct Row {
 
 struct Lane {
   Row rows[kScopes];
+  std::uint32_t skipped[kScopes];
   double events;
   double lastMs;
   double widestGapMs;
@@ -38,6 +40,7 @@ struct Mark {
   double startMs;
   std::uint32_t scope;
   std::uint32_t lane;
+  double weight;
 };
 
 static_assert(sizeof(Mark) <= 64);
@@ -94,14 +97,19 @@ ExternalProfileMeasurement::ExternalProfileMeasurement(const char* inName, uint3
   (void)inColor;
   Mark mark;
   mark.scope = scopeOf(inName);
-  mark.lane = 0;
-  mark.startMs = 0.0;
-  if (muted[mark.scope].load(std::memory_order_relaxed)) {
-    mark.scope = kMutedScope;
-    std::memcpy(mUserData, &mark, sizeof(Mark));
-    return;
-  }
   mark.lane = laneOf();
+  mark.startMs = 0.0;
+  mark.weight = 1.0;
+  if (muted[mark.scope].load(std::memory_order_relaxed)) {
+    std::uint32_t& skipped = lanes[mark.lane].skipped[mark.scope];
+    skipped += 1;
+    if (skipped % kSampleEvery != 0) {
+      mark.scope = kSkippedScope;
+      std::memcpy(mUserData, &mark, sizeof(Mark));
+      return;
+    }
+    mark.weight = static_cast<double>(kSampleEvery);
+  }
   mark.startMs = emscripten_get_now();
   touch(lanes[mark.lane], mark.startMs, mark.scope, 0.0);
   std::memcpy(mUserData, &mark, sizeof(Mark));
@@ -110,13 +118,13 @@ ExternalProfileMeasurement::ExternalProfileMeasurement(const char* inName, uint3
 ExternalProfileMeasurement::~ExternalProfileMeasurement() {
   Mark mark;
   std::memcpy(&mark, mUserData, sizeof(Mark));
-  if (mark.scope == kMutedScope) return;
+  if (mark.scope == kSkippedScope) return;
   const double endMs = emscripten_get_now();
   Lane& lane = lanes[mark.lane];
   Row& row = lane.rows[mark.scope];
   const double elapsed = endMs - mark.startMs;
-  row.ms += elapsed;
-  row.calls += 1.0;
+  row.ms += elapsed * mark.weight;
+  row.calls += mark.weight;
   if (row.calls > kMuteCalls) muted[mark.scope].store(true, std::memory_order_relaxed);
   if (elapsed > row.longestMs) {
     row.longestMs = elapsed;

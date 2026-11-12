@@ -12,6 +12,7 @@
 #include <Jolt/Physics/Collision/Shape/SphereShape.h>
 
 #include "physics_origin.h"
+#include "tick_profile.h"
 #include "sphere_contact.h"
 
 namespace engine::planet {
@@ -20,6 +21,7 @@ namespace {
 
 bool sphereContact(Planet& terrain, JPH::Vec3Arg center, float radius, float maxSeparation, JPH::Vec3& surface, JPH::Vec3& axis,
                    float& depth) {
+  ENGINE_PROFILE_SCOPE("engine planet sphere contact");
   const PhysicsOrigin& o = physicsOrigin();
   const double x = center.GetX() + o.x;
   const double y = center.GetY() + o.y;
