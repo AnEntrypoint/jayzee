@@ -6,6 +6,7 @@
 
 #include "../model_pool.h"
 #include "../planet_frame.h"
+#include "shadow_cascades.h"
 
 namespace engine::render {
 
@@ -395,6 +396,7 @@ void planFrame(const SceneView& scene, Camera& camera, FramePlan& plan) {
 
   if (!scene.skipProps) planProps(scene, camera, plan);
   writePropCutoff(camera);
+  if (shadows::enabled()) shadows::fit(camera.viewProj);
 
   syncPages(scene, plan);
   resolveMaterials(scene.materials, scene.materialCount, scene.albedoReady, scene.albedoLayerOf, plan.materialWords);

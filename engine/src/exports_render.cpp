@@ -12,6 +12,7 @@
 #include "planet_frame.h"
 #include "render/render_backend.h"
 #include "render/render_frame.h"
+#include "render/shadow_cascades.h"
 #include "render/render_webgpu.h"
 #include "render/render_webgl2.h"
 #include "render/render_webgpu.h"
@@ -267,6 +268,24 @@ EMSCRIPTEN_KEEPALIVE std::uint32_t engine_render_prop_budget() {
 
 EMSCRIPTEN_KEEPALIVE std::uint32_t engine_render_prop_cutoff_bins() {
   return rnd::propBudget().bins;
+}
+
+EMSCRIPTEN_KEEPALIVE std::uint32_t engine_render_shadow_budget(std::uint32_t deviceTier) {
+  const rnd::shadows::Budget budget = rnd::shadows::budgetFor(deviceTier);
+  return (budget.cascades << 16) | budget.resolution;
+}
+
+EMSCRIPTEN_KEEPALIVE int engine_render_set_shadows(std::uint32_t cascades, std::uint32_t resolution, float distance) {
+  if (rnd::counters().sealed != 0) return engine::kSealed;
+  return rnd::shadows::configure(cascades, resolution, distance) ? engine::kOk : engine::kRange;
+}
+
+EMSCRIPTEN_KEEPALIVE int engine_render_set_sun(float x, float y, float z) {
+  return rnd::shadows::setSun(x, y, z) ? engine::kOk : engine::kRange;
+}
+
+EMSCRIPTEN_KEEPALIVE const rnd::shadows::State* engine_render_shadow_state() {
+  return &rnd::shadows::state();
 }
 
 EMSCRIPTEN_KEEPALIVE float engine_render_prop_cutoff_squared() {

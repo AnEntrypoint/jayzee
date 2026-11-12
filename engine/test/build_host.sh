@@ -32,6 +32,8 @@ c++ -std=c++20 -O2 -DNDEBUG -ffp-contract=off -fno-fast-math -fno-exceptions -fn
   "$engine/test/witness_character_planet.cpp" \
   "$engine/test/witness_terrain_lod.cpp" \
   "$engine/src/render/render_frame.cpp" \
+  "$engine/src/render/shadow_cascades.cpp" \
+  "$engine/test/witness_shadow_cascades.cpp" \
   "$engine/src/world.cpp" \
   "$engine/src/bridge.cpp" \
   "$engine/src/planet_frame.cpp" \

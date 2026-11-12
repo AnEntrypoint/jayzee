@@ -24,6 +24,7 @@ void modelsAndTiers();
 void visibilityAndOcclusion();
 void characterPlanet();
 void terrainLod();
+void shadowCascades();
 
 }
 
@@ -64,6 +65,7 @@ int main() {
   engine::witness::visibilityAndOcclusion();
   engine::witness::characterPlanet();
   engine::witness::terrainLod();
+  engine::witness::shadowCascades();
 
   check(engine::pool::failures() == 0, "no pool allocation failed during the run");
   return engine::test::finish();

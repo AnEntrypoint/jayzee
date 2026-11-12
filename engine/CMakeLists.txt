@@ -100,6 +100,7 @@ add_executable(engine_core
   src/snapshot_delta.cpp
   src/exports_interest.cpp
   src/render/render_frame.cpp
+  src/render/shadow_cascades.cpp
   src/render/render_webgpu.cpp
   src/render/render_webgl2.cpp
   src/exports_render.cpp
@@ -286,6 +287,10 @@ set(ENGINE_EXPORTS
   _engine_render_set_prop_plan
   _engine_render_prop_plans
   _engine_render_set_prop_budget
+  _engine_render_shadow_budget
+  _engine_render_set_shadows
+  _engine_render_set_sun
+  _engine_render_shadow_state
   _engine_render_prop_cutoff_squared
   _engine_render_set_page_lod
   _engine_terrain_lod_configure
