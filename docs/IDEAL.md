@@ -23,7 +23,7 @@ Every row id from the upstream register appears below as row N. Titles and gate 
 | row 6 | Physics kernel: sleeping islands, CCD, persistent contacts and warm start | 5 | built | scripts/check-physics-pure.mjs, scripts/check-ccd.mjs |
 | row 7 | Joints, springs, axis locks and friction and restitution combine modes | 6 | built | scripts/check-constraint-limits.mjs, scripts/check-jolt-limits.mjs |
 | row 8 | Character controller: wall planes and steps, with the walkable slope set by a normal-Y flo | 7 | owner-decision (Jolt CharacterManager) | scripts/check-character-step.mjs, scripts/check-movement.mjs |
-| row 9 | Queries: raycast, overlap, filters and pending geometry | 8 | partial | scripts/check-world-query.mjs |
+| row 9 | Queries: raycast, overlap, filters and pending geometry | 8 | built | scripts/check-world-query.mjs |
 | row 10 | Vehicles | 9 | owner-decision (Jolt VehiclePhysics) | scripts/check-flight-model.mjs, scripts/check-vehicle-tuning.mjs |
 | row 11 | Lag compensation with a rewind ring, a 1000 ms window and a rate limit | 10 | built | scripts/check-lag-compensation.mjs |
 | row 12 | Rollback loop with maxRollbackTicks 12 and window 32 | 11 | owner-decision (WebRTC bridge host) | scripts/check-rollback.mjs, scripts/check-rollback-bridge.mjs |
@@ -31,21 +31,21 @@ Every row id from the upstream register appears below as row N. Titles and gate 
 | row 14 | Desync detection, consensus voting and peer ejection | 13 | built | scripts/check-consensus.mjs, scripts/check-anticheat.mjs, scripts/check-event-log.mjs |
 | row 15 | Interest management: relevance radius 200 m and cell lookup | 14 | owner-decision (spawn learnings 57 to 58 not in either repo) | scripts/check-aoi.mjs |
 | row 16 | Bandwidth budget and priority: 900 bytes per tick, decay 0.02, 64 entities | 15 | built | scripts/check-aoi.mjs |
-| row 17 | Snapshot LOD: full detail for 30 players, 5 Hz beyond 120 m | 16 | partial | scripts/check-snapshot-lod.mjs, scripts/check-row16-client-decoder.mjs, scripts/check-lod-tiers.mjs |
+| row 17 | Snapshot LOD: full detail for 30 players, 5 Hz beyond 120 m | 16 | partial | scripts/check-snapshot-lod.mjs, scripts/check-row16-client-decoder.mjs, scripts/check-lod-tiers.mjs, scripts/check-snapshot-lod-ideal.mjs |
 | row 18 | Replication scope and audience | 17 | owner-decision (spawn learnings 30 to 37 not in either repo) | scripts/check-aoi.mjs |
-| row 19 | Server authority per tick, catch-up limits and starvation holds | 18 | partial | scripts/check-tick-authority.mjs, scripts/check-tick-order.mjs |
-| row 20 | Anticheat: input rate limit (capacity 120, refill 90 per second), envelope clamp, shot out | 19 | partial | scripts/check-anticheat.mjs |
+| row 19 | Server authority per tick, catch-up limits and starvation holds | 18 | built | scripts/check-tick-authority.mjs, scripts/check-tick-order.mjs, scripts/check-tick-host.mjs |
+| row 20 | Anticheat: input rate limit (capacity 120, refill 90 per second), envelope clamp, shot out | 19 | built | scripts/check-anticheat.mjs, scripts/check-anticheat-numbers.mjs |
 | row 21 | Replay record and playback | 20 | built | scripts/check-replay-player.mjs |
-| row 22 | Sessions: reconnect, migrate and session TTL of 30 s | 21 | partial | scripts/check-sessions.mjs |
+| row 22 | Sessions: reconnect, migrate and session TTL of 30 s | 21 | built | scripts/check-sessions.mjs, scripts/check-session-sockets.mjs |
 | row 23 | Heightfield terrain: baked data, fail-loud on stale code, CPU fallback | 22 | built | scripts/check-heightfield-physics.mjs |
 | row 24 | Terrain marks, paint and sculpt | 23 | built | scripts/check-terrain-pure.mjs, scripts/check-paint-store.mjs |
-| row 25 | Caves, erosion, structures and spline carve | 24 | partial | scripts/check-terrain-witness.mjs, scripts/check-marching-drift.mjs |
-| row 26 | Fire kernel (integer-only, hashed seeds), fire wire and fire modules | 25 | partial | scripts/check-fire.mjs, scripts/check-fire-modules.mjs |
+| row 25 | Caves, erosion, structures and spline carve | 24 | built | scripts/check-terrain-witness.mjs, scripts/check-marching-drift.mjs, scripts/check-carved-height.mjs |
+| row 26 | Fire kernel (integer-only, hashed seeds), fire wire and fire modules | 25 | partial | scripts/check-fire.mjs, scripts/check-fire-modules.mjs, scripts/check-fire-define.mjs |
 | row 27 | Pathfinding with a budget of 20000 and partial results | 26 | owner-decision (recast WASM bake, licence) | scripts/check-pathfinding.mjs |
-| row 28 | Spatial index with cells of 32 m | 27 | partial | scripts/check-octree.mjs |
-| row 29 | Stage loading and shapes | 28 | partial | scripts/check-stage.mjs |
+| row 28 | Spatial index with cells of 32 m | 27 | built | scripts/check-octree.mjs, scripts/check-cell-index-3d.mjs |
+| row 29 | Stage loading and shapes | 28 | built | scripts/check-stage.mjs, scripts/check-stage-resolvers.mjs |
 | row 30 | Clusters and sharding | 29 | owner-decision (RegionRouter host, IPC, HTTP) | scripts/check-clusters.mjs |
-| row 31 | Chart re-anchor and cube-sphere | 30 | partial | scripts/check-chart-anchor.mjs, scripts/check-chart-reanchor.mjs |
+| row 31 | Chart re-anchor and cube-sphere | 30 | partial | scripts/check-chart-anchor.mjs, scripts/check-chart-reanchor.mjs, scripts/check-chart-world.mjs |
 | row 32 | Apps runtime and hook order: onSpawn, onInput, update, lateUpdate | 31 | built | scripts/check-hook-order.mjs |
 | row 33 | Scripting limits: op caps, a 32 MiB memory cap and a 5 s kill | 32 | built | scripts/check-sandbox.mjs, scripts/check-script-limits.mjs |
 | row 34 | World persistence and state restore | 33 | owner-decision (snapshot format change to add a fingerprint) | scripts/check-world-persistence.mjs |
@@ -58,7 +58,7 @@ Every row id from the upstream register appears below as row N. Titles and gate 
 | row 41 | Upstream's 93 documented endpoints (39 published, 21 per-game, 30 manual-only, 3 disabled) | U41 | built | scripts/check-upstream-endpoints.mjs |
 | row 42 | Binary snapshot format: 29-byte entity records, 22-byte player records, smallest-three qua | 40 | built | scripts/check-bin-snapshot.mjs; scripts/check-snapshot-packer.mjs; scripts/check-msgpack-packer.mjs; scripts/check-lod-tiers.mjs |
 | row 43 | Replay file .spointreplay, magic v2 | 41 | built | scripts/check-replay-file.mjs; scripts/check-replay-dialect.mjs; scripts/check-msgpackr-compat.mjs |
-| row 44 | Lag compensation, hitscan and the rewind spatial index | 42 | partial | scripts/check-lag-compensation.mjs, scripts/check-chart-transfer.mjs |
+| row 44 | Lag compensation, hitscan and the rewind spatial index | 42 | partial | scripts/check-lag-compensation.mjs, scripts/check-chart-transfer.mjs, scripts/check-lag-chart-shot.mjs |
 | row 45 | Anticheat and lockstep helpers: CheatEjection, DesyncDetector, ConsensusVoter, EventLog, I | 43 | built | scripts/check-anticheat.mjs, scripts/check-event-log.mjs, scripts/check-consensus.mjs |
 | row 46 | Protocol: InputCodec and ComponentSchema | 44 | built | scripts/check-protocol-codecs.mjs |
 | row 47 | Transports: WebTransport and QUIC datagrams, Wireweave and WebRTC, worker postMessage, Net | 45 | owner-decision (sockets, WebRTC, Wireweave) | scripts/check-transport-framing.mjs |
@@ -67,11 +67,11 @@ Every row id from the upstream register appears below as row N. Titles and gate 
 | row 50 | Server SDK surfaces: ServerAPI, AgentAuthoringAPI, StaticHandler, DevHmr, RoomOrchestrator | 48 | owner-decision (HTTP and WebSocket surfaces) | scripts/check-sdk-surfaces.mjs |
 | row 51 | Physics extras: Jolt wrapper, CharacterManager, ShapeBuilder, StaticTileIndex, FlightModel | 49 | owner-decision (Jolt wrapper, Draco and Meshopt WASM) | scripts/check-physics-extras.mjs |
 | row 52 | Terrain, 21 or more files, including PlanetFrame, ChartReanchor*, CaveSDF, CavePatches, Ca | 50 | owner-decision (physics, DOM and fetch modules) | scripts/check-terrain-pure.mjs, scripts/check-spline-erosion-witness.mjs |
-| row 53 | Behaviours: buffs, fire, fluid, softbody, FSM, ragdoll activation, water level, terrain pa | 51 | partial | scripts/check-behaviours.mjs, scripts/check-behaviour-health-destructible.mjs |
+| row 53 | Behaviours: buffs, fire, fluid, softbody, FSM, ragdoll activation, water level, terrain pa | 51 | built | scripts/check-behaviours.mjs, scripts/check-behaviour-health-destructible.mjs, scripts/check-fluid-softbody.mjs, scripts/check-combat-runtime.mjs, scripts/check-game-fsm-xstate.mjs |
 | row 54 | Shipped content: 29 built-in placed-app directories (src/stdlib-apps (spoint)), 12 world d | 52 | built | scripts/check-content.mjs |
-| row 55 | Packages: mapspinner, streaming-gltf (EP_progressive_lod schemas), ecs, and spoint-core, a | 53 | partial | scripts/check-packages.mjs, scripts/check-mapspinner-atmosphere.mjs, scripts/check-mapspinner-fields.mjs |
-| row 56 | Game systems: AbilityTree, QuestSystem, ProgressionSystem, StatsSystem and EventChainManag | 54 | partial | scripts/check-game-systems.mjs |
-| row 57 | Animation | 55 | partial | scripts/check-animation.mjs, scripts/check-animation-rig.mjs, scripts/check-animation-control.mjs |
+| row 55 | Packages: mapspinner, streaming-gltf (EP_progressive_lod schemas), ecs, and spoint-core, a | 53 | partial | scripts/check-packages.mjs, scripts/check-mapspinner-atmosphere.mjs, scripts/check-mapspinner-fields.mjs, scripts/check-streaming-gltf-runtime.mjs |
+| row 56 | Game systems: AbilityTree, QuestSystem, ProgressionSystem, StatsSystem and EventChainManag | 54 | partial | scripts/check-game-systems.mjs, scripts/check-game-host.mjs |
+| row 57 | Animation | 55 | built | scripts/check-animation.mjs, scripts/check-animation-rig.mjs, scripts/check-animation-control.mjs, scripts/check-animation-blender.mjs |
 | row 58 | Pathfinding: NavmeshQuery, ChartNavmeshQuery, RecastIntegration | 56 | owner-decision (recast WASM bake) | scripts/check-pathfinding.mjs |
 | row 59 | Client rendering and tools: client/editor, client/hud, client/xr and client/core, includin | 57 | owner-decision (WebGPU, XR, editor DOM) | scripts/check-client-pure.mjs |
 | row 60 | Deployment and tooling: edge/cf-do (Cloudflare Durable Object), src-tauri/tauri.conf.json  | 58 | owner-decision (edge and Tauri, not in jayzee) | scripts/check-bundle-freshness.mjs |
@@ -739,7 +739,7 @@ Rows: 58. Built: 7. Partial: 22. Missing: 7. Owner-decision: 22. Slice A is 46 r
 
 | Source | Rows | built | partial | missing | owner-decision | dropped |
 |---|---|---|---|---|---|---|
-| Upstream gap register | 67 | 26 | 16 | 0 | 25 | 0 |
+| Upstream gap register | 67 | 35 | 7 | 0 | 25 | 0 |
 | 2. spoint FEATURES.md rows 1 to 60 | 60 | 49 | 8 | 0 | 2 | 1 |
 | 2. spoint FEATURES.md rows 61 to 120 | 60 | 34 | 10 | 0 | 16 | 0 |
 | 2. spoint FEATURES.md rows 121 to 176 (mapspinner) | 56 | 10 | 6 | 0 | 40 | 0 |

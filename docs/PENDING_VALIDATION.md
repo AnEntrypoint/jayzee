@@ -4915,3 +4915,24 @@ The task: the extra wiki is the bottom-line featureset; memory stays flat, and w
 Not run in this pass: the planet witness in a browser with `instanceBudget` set (`vegetationInstances` at or under the budget on every drawn frame, page memory unchanged), the Kaggle gate (no engine source changed, so the wasm hashes are the pinned ones).
 
 Open after this pass, in rank order: the governor over the model slots (screen-size LOD row), over terrain pages (LOD by altitude row) and over the prop records; the C++ rows still missing in the baseline list (character against the planet shape, the planet-surface ray cast, promotion of touched vegetation, shadows, the spawn terrain store import).
+
+## Phase W (2026-11-12): the open rows worked in parallel, then built and gated together
+
+Owner instruction: everything in the extra featureset is to be covered. Four workers took disjoint rows in one checkout; each committed only its own files; the gates were registered and the ledgers updated after.
+
+- Gap register rows now built (docs/IDEAL.md section 1): 9, 19, 20, 22, 25, 28, 29, 53, 57. Rows with a narrower residue, still partial: 17, 26, 31, 44, 55, 56. The totals row is 35 built, 7 partial. Each row's sentence is in docs/PARITY.md for ranked rows 8 to 30 and in docs/IDEAL.md's proof column for all fifteen.
+- New gates in the chain: snapshot-lod-ideal, tick-host, anticheat-numbers, session-sockets, carved-height, fire-define, cell-index-3d, stage-resolvers, chart-world, animation-blender, lag-chart-shot, game-host, fluid-softbody, combat-runtime, game-fsm-xstate, streaming-gltf-runtime, engine-prop-budget, engine-veg-promotion.
+- Engine (C++): a prop budget in the render plan (nearest kept by a carried distance cutoff with hysteresis; host witness: 11071 in the frustum, budget 2000, kept 2000, shed 9071); vegetation promotion to pooled bodies (off by default, cap 64); a host witness of the character on the planet shape. All twelve glues rebuilt and `engine/artifacts.json` repinned; `check:engine-state-hash-1024` and `check:scenario-determinism` pass, so the pinned rigid-body hashes did not move.
+- `loadRendererForDevice` sets the prop budget from the device budget (a share of the budget at 256 bytes a prop); `EngineWorld` wraps the promotion exports.
+
+Deviations and things to review:
+
+- A character with a zero command on a walkable slope now has its solved velocity zeroed (it slid 1.17 m in 16 s on a 26.6 degree slope). It is on by default; idle character positions can differ at rounding level from before.
+- `src/terrain-pure/marchingCubes.js` no longer matches spoint byte for byte: the vertex weld key overflowed beyond 5.12 units and left open meshes at radius 6 and above. `scripts/check-marching-drift.mjs` will report it against a spoint checkout.
+- `packQuat` and `unpackQuat` in snapshot-lod-pure are renamed `packRotationWord` and `unpackRotationWord`.
+- `probeSpawnGroundY` returns null under an unlanded heightfield or pending static colliders, where it returned a height before.
+- No spoint checkout is in this container, so the new modules are jayzee designs witnessed on their own, not differentials against spoint.
+
+Not run: any browser witness (the prop budget on WebGPU, the vegetation draw under a budget, hiding a promoted instance), the Kaggle gate on the new wasm, `scripts/check-game-fsm-xstate-live.mjs` (needs xstate installed).
+
+Open after this pass: terrain LOD by altitude with geomorph seams; screen-size LOD for models; shadows in C++; HZB on WebGL2; the spawn terrain store import; the prop cutoff in the WebGPU cull shader; promoted instances hidden in the draw and carried in saved state; the governor over model slots and terrain pages; the 7 partial gap rows; the owner-decision rows (25 in the gap register), which need a browser, a GPU, a real socket or a licence.

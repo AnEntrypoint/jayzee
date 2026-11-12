@@ -344,15 +344,15 @@ Physics
 
 - [ ] Rigid bodies, pooled, batch add and remove, generation-checked handles: partial (world.cpp; pool witness recorded in phase 4)
 - [ ] Radial planet gravity toward the centre, world gravity zero: partial
-- [ ] Character capsule with ground, 60-degree slope, step-up and wall planes: partial (JS characterManager only; no C++ CharacterVirtual)
-- [ ] Character against the planet shape: missing
+- [ ] Character capsule with ground, 60-degree slope, step-up and wall planes: supported (C++ CharacterVirtual in world.cpp; `check:scenario-character`, `check:scenario-character-terrain`)
+- [ ] Character against the planet shape: supported (engine/test/witness_character_planet.cpp: stands, walks a hill, stops at a 63.4 degree slope, an idle capsule does not drift, 0 arena carves)
 - [ ] CCD swept stop for fast bodies: partial (box-only pure logic)
 - [ ] Sleeping islands and warm-started contacts: partial
 - [ ] Vehicles (wheels, suspension, slip, chassis pinning): partial (JS only)
 - [ ] Joints and friction and restitution combine modes: partial
 - [ ] Triggers and sensors (enter and exit without response): partial (pure logic)
 - [ ] Ray and overlap queries with layer filters and hit normals: partial
-- [ ] Planet-surface ray and shape cast: missing (surface_shape.h CastRay returns false)
+- [ ] Planet-surface ray and shape cast: supported (planet_shape.cpp CastRay and the capsule and sphere cast shapes; `check:engine-raycast`, `check:engine-shapecast`)
 - [ ] Moving platforms that carry riders: partial (velocity only; rider carry not witnessed)
 - [ ] Deterministic physics with equal hashes across client and server: partial (cross-thread hash witness open)
 
@@ -379,7 +379,7 @@ Vegetation
 - [ ] One body for all vegetation through a custom shape: partial
 - [ ] Placement streaming with no allocation as the player moves: partial
 - [ ] Collision classes: trunk capsule, rock hull, pass-through: partial
-- [ ] Promotion of touched instances to pooled dynamic bodies: missing
+- [ ] Promotion of touched instances to pooled dynamic bodies: partial (off by default, cap 64, refusals counted; `check:engine-veg-promotion` and the host witness; the promoted body is the pool sphere, the draw does not yet hide a promoted instance, and saved state does not carry promoted bodies)
 - [ ] Placement rules (slope caps, snow, footprint exclusion): partial
 - [ ] Vegetation LOD bands with hysteresis: partial (src/engine/vegetationDetail.js thins each patch to a prefix of its instances by distance, with a hysteresis band, under a fixed shown-instance budget; `check:display-governor`; the browser draw is not witnessed)
 - [ ] Grass density and wind from one law on CPU and shader: partial (no wind in C++)
@@ -451,7 +451,7 @@ Memory and budgets
 - [ ] Per-frame upload budget per tier: supported
 - [ ] Body and vegetation pools with generation ids: partial
 - [ ] Fixed rings for input, snapshot, transform and events: partial
-- [ ] Budget degradation (lower LOD, fewer slots) instead of allocation: partial (src/engine/displayGovernor.js holds any set of slots to a fixed cost by coarsening levels, then shedding; wired to vegetation only; props, models and terrain pages are not yet governed)
+- [ ] Budget degradation (lower LOD, fewer slots) instead of allocation: partial (src/engine/displayGovernor.js holds any set of slots to a fixed cost by coarsening levels, then shedding; wired to vegetation; the render plan keeps the nearest props under a prop budget set from the device budget, `check:engine-prop-budget`, which does not yet reduce the WebGPU draw; models and terrain pages are not yet governed)
 - [ ] Jolt heap and caps that fail rather than grow: partial
 
 Landscape dataset decision
