@@ -312,6 +312,16 @@ set(ENGINE_EXPORTS
   _engine_render_cull_ready
   _engine_render_cull_counts
   _engine_models_slot_of
+  _engine_models_set_lods
+  _engine_models_lod_count
+  _engine_models_lod_level
+  _engine_models_lod_indices
+  _engine_models_set_index_budget
+  _engine_models_index_budget
+  _engine_models_set_lod_pixels
+  _engine_models_lod_pixels
+  _engine_models_lod_select
+  _engine_models_lod_stats
   _engine_render_unplace_page
   _engine_render_uploads
   _engine_render_visible

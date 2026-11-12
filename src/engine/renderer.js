@@ -2,6 +2,10 @@ import { instantiateWithinBudget } from './glueTier.js'
 import { chooseDeviceBudget, instanceBudgetFor, readDeviceSignals } from './deviceBudget.js'
 
 export const PROP_DISPLAY_BYTES = 256
+export const MODEL_INDEX_DISPLAY_BYTES = 4
+export const MODEL_MAX_LODS = 4
+export const MODEL_LOD_UNSET = 255
+const LOD_STATS_WORDS = 8
 
 export const RENDER_BACKEND = Object.freeze({ WEBGPU: 0, WEBGL2: 1 })
 
@@ -180,6 +184,42 @@ export const createRenderer = (module, backend, { modelTier = -1, device = null,
       }
     },
 
+    setModelIndexBudget(indices) {
+      if (!Number.isInteger(indices) || indices < 0) throw new RangeError('the model index budget is a whole number of indices drawn per frame, or 0 for no limit')
+      status(module._engine_models_set_index_budget(indices), 'set model index budget')
+    },
+
+    setModelLodPixels(pixels) {
+      if (!(pixels > 0) || !Number.isFinite(pixels)) throw new RangeError('the full-detail size is a positive finite number of pixels')
+      status(module._engine_models_set_lod_pixels(pixels), 'set model lod pixels')
+    },
+
+    setModelLods(handle, indexCounts) {
+      if (!Array.isArray(indexCounts) || indexCounts.length < 1 || indexCounts.length > MODEL_MAX_LODS) throw new RangeError('a model holds 1 to ' + MODEL_MAX_LODS + ' lod index ranges, coarse to fine')
+      for (const count of indexCounts) if (!Number.isInteger(count) || count < 1) throw new RangeError('each lod range is a whole number of indices at least 1')
+      status(module._engine_models_set_lods(handle, indexCounts[0], indexCounts[1] ?? 0, indexCounts[2] ?? 0, indexCounts[3] ?? 0), 'set model lods')
+    },
+
+    modelLodLevel(handle) {
+      return module._engine_models_lod_level(handle)
+    },
+
+    modelLod() {
+      const at = module._engine_models_lod_stats() / 4
+      const words = module.HEAPU32
+      return {
+        cost: words[at],
+        demand: words[at + 1],
+        budget: words[at + 2],
+        passes: words[at + 3],
+        shed: words[at + 4],
+        changed: words[at + 5],
+        slots: words[at + 6],
+        bias: module.HEAPF32[at + LOD_STATS_WORDS - 1],
+        fullPixels: module._engine_models_lod_pixels(),
+      }
+    },
+
     setOcclusion(on) {
       if (typeof on !== 'boolean') throw new TypeError('occlusion takes a boolean')
       status(module._engine_render_set_occlusion(on ? 1 : 0), 'set occlusion')
@@ -286,7 +326,9 @@ export const loadRendererForDevice = ({ navigatorLike = globalThis.navigator, os
   return loadRendererWithinBudget({ ...rest, navigatorLike, budgetBytes: budget.budgetBytes }).then((loaded) => {
     const propBudget = instanceBudgetFor(budget, PROP_DISPLAY_BYTES)
     loaded.value.setPropBudget(propBudget)
-    return { ...loaded, deviceBudget: budget, propBudget }
+    const modelIndexBudget = rest.models === false ? 0 : instanceBudgetFor(budget, MODEL_INDEX_DISPLAY_BYTES)
+    if (modelIndexBudget > 0) loaded.value.setModelIndexBudget(modelIndexBudget)
+    return { ...loaded, deviceBudget: budget, propBudget, modelIndexBudget }
   })
 }
 

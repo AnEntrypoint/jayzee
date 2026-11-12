@@ -56,6 +56,57 @@ EMSCRIPTEN_KEEPALIVE std::uint32_t engine_models_clusters_ptr() {
   return static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(engine::models::clusterTable()));
 }
 
+EMSCRIPTEN_KEEPALIVE int engine_models_set_lods(double handle, std::uint32_t coarsest, std::uint32_t second, std::uint32_t third, std::uint32_t fourth) {
+  const std::uint32_t counts[engine::models::kMaxLods] = {coarsest, second, third, fourth};
+  std::uint32_t count = 0;
+  while (count < engine::models::kMaxLods && counts[count] != 0) count += 1;
+  for (std::uint32_t k = count; k < engine::models::kMaxLods; ++k) {
+    if (counts[k] != 0) return engine::kRange;
+  }
+  return static_cast<int>(engine::models::setLods(handle, counts, count));
+}
+
+EMSCRIPTEN_KEEPALIVE std::uint32_t engine_models_lod_count(double handle) {
+  const std::int32_t slot = engine::models::slotOf(handle);
+  return slot < 0 ? 0 : engine::models::slotLodCount(static_cast<std::uint32_t>(slot));
+}
+
+EMSCRIPTEN_KEEPALIVE std::uint32_t engine_models_lod_level(double handle) {
+  const std::int32_t slot = engine::models::slotOf(handle);
+  return slot < 0 ? engine::models::kLodUnset : engine::models::slotLodLevel(static_cast<std::uint32_t>(slot));
+}
+
+EMSCRIPTEN_KEEPALIVE std::uint32_t engine_models_lod_indices(double handle, std::uint32_t level) {
+  const std::int32_t slot = engine::models::slotOf(handle);
+  return slot < 0 ? 0 : engine::models::slotLodIndices(static_cast<std::uint32_t>(slot), level);
+}
+
+EMSCRIPTEN_KEEPALIVE int engine_models_set_index_budget(std::uint32_t indices) {
+  engine::models::setIndexBudget(indices);
+  return engine::kOk;
+}
+
+EMSCRIPTEN_KEEPALIVE std::uint32_t engine_models_index_budget() {
+  return engine::models::indexBudget();
+}
+
+EMSCRIPTEN_KEEPALIVE int engine_models_set_lod_pixels(float pixels) {
+  return engine::models::setLodFullPixels(pixels) ? engine::kOk : engine::kRange;
+}
+
+EMSCRIPTEN_KEEPALIVE float engine_models_lod_pixels() {
+  return engine::models::lodFullPixels();
+}
+
+EMSCRIPTEN_KEEPALIVE const engine::models::LodStats* engine_models_lod_select(double x, double y, double z, float pixelsPerUnit) {
+  const double eye[3] = {x, y, z};
+  return &engine::models::selectLods(eye, pixelsPerUnit);
+}
+
+EMSCRIPTEN_KEEPALIVE const engine::models::LodStats* engine_models_lod_stats() {
+  return &engine::models::lodStats();
+}
+
 EMSCRIPTEN_KEEPALIVE int engine_models_slot_of(double handle) {
   return engine::models::slotOf(handle);
 }

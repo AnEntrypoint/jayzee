@@ -377,7 +377,7 @@ void modelsAndTiers() {
   }
   check(churnFailures == 0, "10000 acquire, upload and release cycles all succeed");
   check(models::liveCount() == 0, "the churn leaves no live slot");
-  check(models::bytesFor(kLayout) == 78096, "the pool's byte size is unchanged by the churn");
+  check(models::bytesFor(kLayout) == 78272, "the pool's byte size is unchanged by the churn");
   observe("model churn cycles", kChurnCycles);
 
   alignas(16) std::uint8_t clusterVertices[kClusterVertices * kVertexStride] = {};

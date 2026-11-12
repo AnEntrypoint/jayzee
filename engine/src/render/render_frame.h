@@ -182,6 +182,8 @@ std::uint32_t pageLayers();
 void resetPlan(FramePlan& plan);
 void planFrame(const SceneView& scene, Camera& camera, FramePlan& plan);
 void planProps(const SceneView& scene, const Camera& camera, FramePlan& plan);
+float pixelsPerUnit(const Camera& camera, std::uint32_t viewportHeight);
+void selectModelLods(const Camera& camera, const FrameOrigin& origin, std::uint32_t viewportHeight);
 void resolveMaterials(const MaterialSlot* table, std::uint32_t count, const std::uint8_t* albedoReady, std::int32_t (*albedoLayerOf)(double handle), std::uint32_t* words);
 std::uint32_t uploadRunEnd(const FramePlan& plan, std::uint32_t start);
 std::uint32_t albedoRunEnd(const FramePlan& plan, std::uint32_t start);

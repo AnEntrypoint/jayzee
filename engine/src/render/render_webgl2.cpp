@@ -588,6 +588,7 @@ int frame(const SceneView& scene, const FramePlan& plan, const Camera& camera) {
         engine::models::clearDirty(s);
         modelBudget -= vertexSlotBytes + indexSlotBytes;
       }
+      engine::render::selectModelLods(camera, scene.origin, surfaceHeight);
     }
   }
 

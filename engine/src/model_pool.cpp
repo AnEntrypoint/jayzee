@@ -16,6 +16,19 @@ struct Meta {
   std::uint32_t dirty;
 };
 
+struct SlotLod {
+  std::uint32_t count;
+  std::uint32_t end[kMaxLods];
+  float centre[3];
+  float radius;
+  std::uint8_t level;
+  std::uint8_t first;
+  std::uint8_t second;
+  std::uint8_t pad;
+};
+
+static_assert(sizeof(SlotLod) == 40);
+
 constexpr std::uint64_t kMaxPoolBytes = 0x7fffffffull;
 constexpr std::uint32_t kMinStrideBytes = 12;
 constexpr float kBoundSlack = 1.0e-5f;
@@ -26,8 +39,16 @@ Meta* gMeta = nullptr;
 std::uint8_t* gVertices = nullptr;
 std::uint8_t* gIndices = nullptr;
 Cluster* gClusters = nullptr;
+SlotLod* gLods = nullptr;
+float* gLodScratch = nullptr;
 Layout gLayout{};
 bool gBound = false;
+LodStats gLodStats{};
+std::uint32_t gIndexBudget = kNoIndexBudget;
+std::uint32_t gLodSlots = 0;
+float gLodFullPixels = kLodFullPixels;
+float gLodBias = 0.0f;
+bool gLodActive = false;
 
 std::uint32_t clustersFor(std::uint32_t indices) {
   return (indices + kClusterIndices - 1) / kClusterIndices;
@@ -60,13 +81,17 @@ void buildClusters(std::uint32_t slot) {
 
   bool trusted = true;
   for (std::uint32_t i = 0; i < meta.indices && trusted; ++i) trusted = indexAt(indices, i) < meta.vertices;
+  float slotLow[3] = {kUnbounded, kUnbounded, kUnbounded};
+  float slotHigh[3] = {-kUnbounded, -kUnbounded, -kUnbounded};
+  bool slotBounded = trusted && meta.indices != 0;
 
   for (std::uint32_t c = 0; c < stride; ++c) {
     const std::uint32_t first = c * kClusterIndices;
     const std::uint32_t last = first + kClusterIndices < meta.indices ? first + kClusterIndices : meta.indices;
     Cluster& cluster = out[c];
     cluster = Cluster{{0.0f, 0.0f, 0.0f}, kUnbounded, first, last > first ? last - first : 0};
-    if (!trusted || cluster.indexCount == 0) continue;
+    if (cluster.indexCount == 0) continue;
+    if (!trusted) continue;
 
     float low[3] = {kUnbounded, kUnbounded, kUnbounded};
     float high[3] = {-kUnbounded, -kUnbounded, -kUnbounded};
@@ -80,8 +105,15 @@ void buildClusters(std::uint32_t slot) {
         if (p[k] > high[k]) high[k] = p[k];
       }
     }
-    if (!finite) continue;
+    if (!finite) {
+      slotBounded = false;
+      continue;
+    }
 
+    for (int k = 0; k < 3; ++k) {
+      if (low[k] < slotLow[k]) slotLow[k] = low[k];
+      if (high[k] > slotHigh[k]) slotHigh[k] = high[k];
+    }
     for (int k = 0; k < 3; ++k) cluster.centre[k] = 0.5f * (low[k] + high[k]);
     float farthest = 0.0f;
     for (std::uint32_t i = first; i < last; ++i) {
@@ -95,6 +127,66 @@ void buildClusters(std::uint32_t slot) {
     }
     cluster.radius = std::sqrt(farthest) * (1.0f + kBoundSlack);
   }
+  SlotLod& lod = gLods[slot];
+  lod.radius = kUnbounded;
+  for (int k = 0; k < 3; ++k) lod.centre[k] = 0.0f;
+  if (!slotBounded) return;
+  float span = 0.0f;
+  for (int k = 0; k < 3; ++k) {
+    lod.centre[k] = 0.5f * (slotLow[k] + slotHigh[k]);
+    const float half = 0.5f * (slotHigh[k] - slotLow[k]);
+    span += half * half;
+  }
+  lod.radius = std::sqrt(span) * (1.0f + kBoundSlack);
+}
+
+void resetLods(std::uint32_t slot, std::uint32_t indices) {
+  SlotLod& lod = gLods[slot];
+  if (lod.count > 1) gLodSlots -= 1;
+  lod.count = indices != 0 ? 1 : 0;
+  lod.end[0] = indices;
+  for (std::uint32_t k = 1; k < kMaxLods; ++k) lod.end[k] = indices;
+  lod.level = kLodUnset;
+}
+
+std::uint32_t lodIndices(const SlotLod& lod, std::uint32_t level) {
+  if (level >= lod.count) return 0;
+  const std::uint32_t stored = lod.count - 1 - level;
+  return lod.end[stored] - (stored == 0 ? 0 : lod.end[stored - 1]);
+}
+
+std::uint32_t evaluateLods(const float* lodOf, float bias, bool second) {
+  std::uint32_t cost = 0;
+  for (std::uint32_t slot = 0; slot < gLayout.slots; ++slot) {
+    SlotLod& lod = gLods[slot];
+    std::uint8_t& out = second ? lod.second : lod.first;
+    if (gMeta[slot].vertices == 0 || gMeta[slot].dirty != 0 || lod.count == 0) {
+      out = kLodUnset;
+      continue;
+    }
+    const int last = static_cast<int>(lod.count) - 1;
+    const float t = lodOf[slot] + bias;
+    int level = last;
+    if (t == t) {
+      if (lod.level == kLodUnset) {
+        level = static_cast<int>(std::floor(t));
+      } else {
+        const int previous = lod.level > last ? last : lod.level;
+        const int up = static_cast<int>(std::floor(t - kLodHysteresis));
+        if (up > previous) {
+          level = up;
+        } else {
+          const int down = static_cast<int>(std::floor(t + kLodHysteresis));
+          level = down < previous ? down : previous;
+        }
+      }
+      if (level < 0) level = 0;
+      if (level > last) level = last;
+    }
+    out = static_cast<std::uint8_t>(level);
+    cost += lodIndices(lod, static_cast<std::uint32_t>(level));
+  }
+  return cost;
 }
 
 std::size_t alignUp(std::size_t value) {
@@ -115,6 +207,10 @@ std::size_t vertexBytes(const Layout& layout) {
 
 std::size_t indexBytes(const Layout& layout) {
   return alignUp(static_cast<std::size_t>(layout.slots) * layout.indicesPerSlot * kIndexBytes);
+}
+
+std::size_t lodBytes(std::uint32_t slots) {
+  return alignUp(static_cast<std::size_t>(slots) * sizeof(SlotLod)) + alignUp(static_cast<std::size_t>(slots) * sizeof(float));
 }
 
 std::size_t clusterBytes(const Layout& layout) {
@@ -143,7 +239,7 @@ bool validLayout(const Layout& layout) {
 }
 
 std::size_t bytesFor(const Layout& layout) {
-  return metaBytes(layout.slots) + tableBytes(layout.slots) + vertexBytes(layout) + indexBytes(layout) + clusterBytes(layout);
+  return metaBytes(layout.slots) + tableBytes(layout.slots) + vertexBytes(layout) + indexBytes(layout) + clusterBytes(layout) + lodBytes(layout.slots);
 }
 
 Status bind(void* base, std::size_t bytes, const Layout& layout) {
@@ -163,6 +259,17 @@ Status bind(void* base, std::size_t bytes, const Layout& layout) {
   cursor += indexBytes(layout);
   gClusters = reinterpret_cast<Cluster*>(cursor);
   std::memset(gClusters, 0, clusterBytes(layout));
+  cursor += clusterBytes(layout);
+  gLods = reinterpret_cast<SlotLod*>(cursor);
+  std::memset(gLods, 0, lodBytes(layout.slots));
+  gLodScratch = reinterpret_cast<float*>(cursor + alignUp(static_cast<std::size_t>(layout.slots) * sizeof(SlotLod)));
+  for (std::uint32_t slot = 0; slot < layout.slots; ++slot) gLods[slot].level = kLodUnset;
+  gLodStats = LodStats{};
+  gIndexBudget = kNoIndexBudget;
+  gLodSlots = 0;
+  gLodFullPixels = kLodFullPixels;
+  gLodBias = 0.0f;
+  gLodActive = false;
   gLayout = layout;
   gBound = true;
   return kOk;
@@ -187,6 +294,7 @@ double acquire(std::uint32_t vertices, std::uint32_t indices) {
   std::uint32_t slot = 0;
   if (!handles::acquire(gTable, slot)) return kFull;
   gMeta[slot] = Meta{vertices, indices, 0};
+  resetLods(slot, indices);
   return handles::handleOf(gTable, slot);
 }
 
@@ -237,6 +345,7 @@ Status release(double handle) {
   std::uint32_t slot = 0;
   if (!gBound || !handles::wholeHandle(handle, whole) || !handles::resolve(gTable, whole, slot)) return kBadId;
   gMeta[slot] = Meta{0, 0, 0};
+  resetLods(slot, 0);
   handles::release(gTable, slot);
   return kOk;
 }
@@ -323,14 +432,15 @@ void modelOffset(std::uint32_t slot, float out[3]) {
 std::uint32_t visibleRuns(std::uint32_t slot, const float planes[6][4], Range* out, std::uint32_t* kept, const double frameOrigin[3]) {
   if (kept != nullptr) *kept = 0;
   if (!held(slot)) return 0;
-  const std::uint32_t count = slotClusterCount(slot);
+  const std::uint32_t window = slotClusterWindow(slot);
+  const std::uint32_t count = window & 0xffffu;
   const Cluster* clusters = slotClusters(slot);
   const Range base = slotRange(slot);
   float offset[3];
   modelOffset(slot, offset);
   std::uint32_t runs = 0;
   std::uint32_t survivors = 0;
-  for (std::uint32_t c = 0; c < count; ++c) {
+  for (std::uint32_t c = window >> 16; c < count; ++c) {
     const Cluster& cluster = clusters[c];
     const float centre[3] = {static_cast<float>(cluster.centre[0] * kModelScale + offset[0] - frameOrigin[0]),
                              static_cast<float>(cluster.centre[1] * kModelScale + offset[1] - frameOrigin[1]),
@@ -347,6 +457,180 @@ std::uint32_t visibleRuns(std::uint32_t slot, const float planes[6][4], Range* o
   }
   if (kept != nullptr) *kept = survivors;
   return runs;
+}
+
+Status setLods(double handle, const std::uint32_t* indexCounts, std::uint32_t count) {
+  std::uint32_t slot = 0;
+  if (!resolveSlot(handle, slot)) return kBadId;
+  if (indexCounts == nullptr || count < 1 || count > kMaxLods) return kRange;
+  std::uint64_t total = 0;
+  for (std::uint32_t k = 0; k < count; ++k) {
+    if (indexCounts[k] == 0 || indexCounts[k] % 3 != 0) return kRange;
+    if (k + 1 < count && indexCounts[k] % kClusterIndices != 0) return kRange;
+    total += indexCounts[k];
+  }
+  if (total != gMeta[slot].indices) return kRange;
+  SlotLod& lod = gLods[slot];
+  if (lod.count > 1) gLodSlots -= 1;
+  lod.count = count;
+  std::uint32_t end = 0;
+  for (std::uint32_t k = 0; k < kMaxLods; ++k) {
+    if (k < count) end += indexCounts[k];
+    lod.end[k] = end;
+  }
+  lod.level = kLodUnset;
+  if (count > 1) gLodSlots += 1;
+  return kOk;
+}
+
+std::uint32_t slotLodCount(std::uint32_t slot) {
+  return held(slot) ? gLods[slot].count : 0;
+}
+
+std::uint32_t slotLodLevel(std::uint32_t slot) {
+  if (!held(slot)) return kLodUnset;
+  return gLods[slot].level;
+}
+
+std::uint32_t slotLodIndices(std::uint32_t slot, std::uint32_t level) {
+  return held(slot) ? lodIndices(gLods[slot], level) : 0;
+}
+
+std::uint32_t slotClusterWindow(std::uint32_t slot) {
+  if (!held(slot)) return 0;
+  const SlotLod& lod = gLods[slot];
+  if (lod.count <= 1 && lod.level == kLodUnset) return clustersFor(gMeta[slot].indices);
+  const std::uint32_t level = lod.level == kLodUnset ? 0 : lod.level;
+  if (level >= lod.count) return 0;
+  const std::uint32_t stored = lod.count - 1 - level;
+  const std::uint32_t first = stored == 0 ? 0 : lod.end[stored - 1] / kClusterIndices;
+  return (first << 16) | clustersFor(lod.end[stored]);
+}
+
+float slotPixels(std::uint32_t slot, const double eye[3], float pixelsPerUnit) {
+  if (!held(slot)) return 0.0f;
+  const SlotLod& lod = gLods[slot];
+  float offset[3];
+  modelOffset(slot, offset);
+  double squared = 0.0;
+  for (int k = 0; k < 3; ++k) {
+    const double d = static_cast<double>(lod.centre[k]) * kModelScale + offset[k] - eye[k];
+    squared += d * d;
+  }
+  const float distance = static_cast<float>(std::sqrt(squared));
+  const float radius = lod.radius * kModelScale;
+  if (!(distance > radius)) return kUnbounded;
+  return 2.0f * radius * pixelsPerUnit / distance;
+}
+
+void setIndexBudget(std::uint32_t indices) {
+  gIndexBudget = indices;
+  gLodStats.budget = indices;
+}
+
+std::uint32_t indexBudget() {
+  return gIndexBudget;
+}
+
+bool setLodFullPixels(float pixels) {
+  if (!(pixels > 0.0f) || !std::isfinite(pixels)) return false;
+  gLodFullPixels = pixels;
+  return true;
+}
+
+float lodFullPixels() {
+  return gLodFullPixels;
+}
+
+const LodStats& lodStats() {
+  return gLodStats;
+}
+
+const LodStats& selectLods(const double eye[3], float pixelsPerUnit) {
+  gLodStats.budget = gIndexBudget;
+  gLodStats.passes = 0;
+  gLodStats.shed = 0;
+  gLodStats.changed = 0;
+  if (!gBound) return gLodStats;
+  if (gLodSlots == 0 && gIndexBudget == kNoIndexBudget) {
+    if (gLodActive) {
+      for (std::uint32_t slot = 0; slot < gLayout.slots; ++slot) gLods[slot].level = kLodUnset;
+      gLodActive = false;
+      gLodBias = 0.0f;
+    }
+    gLodStats.cost = 0;
+    gLodStats.demand = 0;
+    gLodStats.slots = 0;
+    gLodStats.bias = 0.0f;
+    return gLodStats;
+  }
+  gLodActive = true;
+  std::uint32_t demand = 0;
+  std::uint32_t drawn = 0;
+  for (std::uint32_t slot = 0; slot < gLayout.slots; ++slot) {
+    gLodScratch[slot] = 0.0f;
+    if (gMeta[slot].vertices == 0 || gMeta[slot].dirty != 0) continue;
+    drawn += 1;
+    demand += lodIndices(gLods[slot], 0);
+    const float pixels = slotPixels(slot, eye, pixelsPerUnit);
+    if (pixels < gLodFullPixels) gLodScratch[slot] = std::log2(gLodFullPixels / pixels);
+  }
+  const bool limited = gIndexBudget != kNoIndexBudget;
+  if (!limited) gLodBias = 0.0f;
+  bool second = false;
+  std::uint32_t passes = 1;
+  std::uint32_t shed = 0;
+  std::uint32_t cost = evaluateLods(gLodScratch, gLodBias, false);
+  while (limited && cost > gIndexBudget && gLodBias < kLodMaxBias) {
+    gLodBias = gLodBias + kLodBiasStep < kLodMaxBias ? gLodBias + kLodBiasStep : kLodMaxBias;
+    cost = evaluateLods(gLodScratch, gLodBias, false);
+    passes += 1;
+  }
+  if (limited && cost > gIndexBudget) {
+    std::uint32_t running = 0;
+    for (std::uint32_t slot = 0; slot < gLayout.slots; ++slot) {
+      SlotLod& lod = gLods[slot];
+      if (lod.first == kLodUnset) continue;
+      std::uint32_t level = lod.first;
+      std::uint32_t c = lodIndices(lod, level);
+      if (running + c > gIndexBudget) {
+        while (level < lod.count && running + c > gIndexBudget) {
+          level += 1;
+          c = lodIndices(lod, level);
+        }
+        lod.first = static_cast<std::uint8_t>(level);
+        shed += 1;
+      }
+      running += c;
+    }
+    cost = running;
+  } else if (limited && gLodBias > 0.0f && static_cast<float>(cost) <= static_cast<float>(gIndexBudget) * kLodRelax) {
+    const float lower = gLodBias - kLodBiasStep > 0.0f ? gLodBias - kLodBiasStep : 0.0f;
+    const std::uint32_t lowerCost = evaluateLods(gLodScratch, lower, true);
+    passes += 1;
+    if (static_cast<float>(lowerCost) <= static_cast<float>(gIndexBudget) * kLodAdmit) {
+      second = true;
+      gLodBias = lower;
+      cost = lowerCost;
+    }
+  }
+  std::uint32_t changed = 0;
+  for (std::uint32_t slot = 0; slot < gLayout.slots; ++slot) {
+    SlotLod& lod = gLods[slot];
+    const std::uint8_t chosen = second ? lod.second : lod.first;
+    if (chosen != lod.level) {
+      lod.level = chosen;
+      changed += 1;
+    }
+  }
+  gLodStats.cost = cost;
+  gLodStats.demand = demand;
+  gLodStats.passes = passes;
+  gLodStats.shed = shed;
+  gLodStats.changed = changed;
+  gLodStats.slots = drawn;
+  gLodStats.bias = gLodBias;
+  return gLodStats;
 }
 
 const std::uint8_t* slotVertices(std::uint32_t slot) {

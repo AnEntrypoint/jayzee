@@ -350,7 +350,9 @@ fn cullA(@builtin(global_invocation_id) id: vec3u) {
   if (gid >= params.total) {
     return;
   }
-  if (slotReady[gid / params.clustersPerSlot] == 0u || clusters[gid * 6u + 5u] == 0u) {
+  let window = slotReady[gid / params.clustersPerSlot];
+  let local = gid % params.clustersPerSlot;
+  if (local < (window >> 16u) || local >= (window & 0xffffu) || clusters[gid * 6u + 5u] == 0u) {
     return;
   }
   let s = sphereOf(gid);
@@ -1662,9 +1664,10 @@ int frame(const SceneView& scene, const FramePlan& plan, const Camera& camera) {
       engine::models::clearDirty(s);
       modelBudget -= vertexSlotBytes + indexSlotBytes;
     }
+    engine::render::selectModelLods(camera, scene.origin, surfaceHeight);
 
     if (visibilityReady) {
-      for (std::uint32_t s = 0; s < visSlots; ++s) readyWords[s] = engine::models::slotReady(s) ? 1u : 0u;
+      for (std::uint32_t s = 0; s < visSlots; ++s) readyWords[s] = engine::models::slotReady(s) ? engine::models::slotClusterWindow(s) : 0u;
       writeBuffer(slotReadyBuf, 0, readyWords, static_cast<std::uint64_t>(visSlots) * 4);
       const engine::models::Layout& layout = engine::models::layout();
       paramWords[0] = visStride;

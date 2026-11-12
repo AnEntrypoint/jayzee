@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstring>
 
+#include "../model_pool.h"
 #include "../planet_frame.h"
 
 namespace engine::render {
@@ -289,6 +290,20 @@ void planProps(const SceneView& scene, const Camera& camera, FramePlan& plan) {
   state.propsShed = shed;
   state.propsShedTotal += shed;
   for (std::uint32_t c = 0; c < kPropClasses; ++c) state.visible[c] = plan.propCount[c];
+}
+
+float pixelsPerUnit(const Camera& camera, std::uint32_t viewportHeight) {
+  const float* bottom = camera.planes[2];
+  const float* top = camera.planes[3];
+  const float cosine = bottom[0] * top[0] + bottom[1] * top[1] + bottom[2] * top[2];
+  if (!(cosine > -1.0f && cosine < 1.0f)) return 0.0f;
+  return 0.5f * std::sqrt((1.0f - cosine) / (1.0f + cosine)) * static_cast<float>(viewportHeight);
+}
+
+void selectModelLods(const Camera& camera, const FrameOrigin& origin, std::uint32_t viewportHeight) {
+  if (!models::bound()) return;
+  const double eye[3] = {origin.x + camera.eye[0], origin.y + camera.eye[1], origin.z + camera.eye[2]};
+  models::selectLods(eye, pixelsPerUnit(camera, viewportHeight));
 }
 
 void planFrame(const SceneView& scene, Camera& camera, FramePlan& plan) {

@@ -19,6 +19,7 @@ void phase8Resources();
 void phase10Plan();
 void vegetationPlan();
 void vegetationPromotion();
+void modelLod();
 void modelsAndTiers();
 void visibilityAndOcclusion();
 void characterPlanet();
@@ -57,6 +58,7 @@ int main() {
   engine::witness::phase10Plan();
   engine::witness::vegetationPlan();
   engine::witness::vegetationPromotion();
+  engine::witness::modelLod();
   engine::witness::modelsAndTiers();
   engine::witness::visibilityAndOcclusion();
   engine::witness::characterPlanet();
