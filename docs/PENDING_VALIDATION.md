@@ -4933,6 +4933,8 @@ Deviations and things to review:
 - `probeSpawnGroundY` returns null under an unlanded heightfield or pending static colliders, where it returned a height before.
 - No spoint checkout is in this container, so the new modules are jayzee designs witnessed on their own, not differentials against spoint.
 
+Full test on the combined tree, once: "checks: 328 run, 0 already passed on this tree, 0 failed, 6255 PASS lines, wall 118707 ms, jobs 4" and "RESULT: PASS" (310 checks and 5918 lines before this phase). The longest step was the full test at 119 s.
+
 Not run: any browser witness (the prop budget on WebGPU, the vegetation draw under a budget, hiding a promoted instance), the Kaggle gate on the new wasm, `scripts/check-game-fsm-xstate-live.mjs` (needs xstate installed).
 
 Open after this pass: terrain LOD by altitude with geomorph seams; screen-size LOD for models; shadows in C++; HZB on WebGL2; the spawn terrain store import; the prop cutoff in the WebGPU cull shader; promoted instances hidden in the draw and carried in saved state; the governor over model slots and terrain pages; the 7 partial gap rows; the owner-decision rows (25 in the gap register), which need a browser, a GPU, a real socket or a licence.
