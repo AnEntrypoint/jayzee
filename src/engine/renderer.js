@@ -6,6 +6,10 @@ export const MODEL_INDEX_DISPLAY_BYTES = 4
 export const MODEL_MAX_LODS = 4
 export const MODEL_LOD_UNSET = 255
 const LOD_STATS_WORDS = 8
+export const TERRAIN_MAX_LEVELS = 16
+export const TERRAIN_NO_PARENT = -1
+const TERRAIN_MORPH_WORD = 6
+const TERRAIN_RATIO_WORD = 7
 
 export const RENDER_BACKEND = Object.freeze({ WEBGPU: 0, WEBGL2: 1 })
 
@@ -182,6 +186,37 @@ export const createRenderer = (module, backend, { modelTier = -1, device = null,
         shed: module._engine_render_props_shed(),
         cutoffBands: module._engine_render_prop_cutoff_bins(),
       }
+    },
+
+    configureTerrainLod({ pageBudget, levels = TERRAIN_MAX_LEVELS, fullDetailAltitudeM = 1 }) {
+      if (!Number.isInteger(pageBudget) || pageBudget < 0) throw new RangeError('the terrain page budget is a whole number of drawn pages, or 0 for no limit')
+      if (!Number.isInteger(levels) || levels < 1 || levels > TERRAIN_MAX_LEVELS) throw new RangeError('terrain levels must be a whole number from 1 to ' + TERRAIN_MAX_LEVELS)
+      if (!(fullDetailAltitudeM > 0) || !Number.isFinite(fullDetailAltitudeM)) throw new RangeError('the full-detail altitude is a positive finite number of metres')
+      status(module._engine_terrain_lod_configure(pageBudget, levels, fullDetailAltitudeM), 'configure terrain lod')
+    },
+
+    selectTerrainLod(altitudeM) {
+      const at = module._engine_terrain_lod_select(finite(altitudeM, 'altitude')) >> 2
+      const words = module.HEAPU32
+      return {
+        pageBudget: words[at],
+        levels: words[at + 1],
+        level: words[at + 2],
+        window: words[at + 3],
+        spanCells: words[at + 4],
+        switches: words[at + 5],
+        morph: module.HEAPF32[at + TERRAIN_MORPH_WORD],
+        ratio: module.HEAPF32[at + TERRAIN_RATIO_WORD],
+      }
+    },
+
+    setPageLod(slot, { level, parentSlot = TERRAIN_NO_PARENT, quadrant = 0 }) {
+      if (!Number.isInteger(slot) || slot < 0 || slot >= L.PAGE_LAYERS) throw new RangeError('page slot out of range: ' + slot)
+      status(module._engine_render_set_page_lod(slot, level, parentSlot, quadrant), 'set page lod')
+    },
+
+    terrainPages() {
+      return { placed: module._engine_render_pages_placed(), shed: module._engine_render_pages_shed() }
     },
 
     setModelIndexBudget(indices) {

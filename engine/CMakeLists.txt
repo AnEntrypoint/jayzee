@@ -91,6 +91,7 @@ add_executable(engine_core
   src/codec.cpp
   src/textures.cpp
   src/model_pool.cpp
+  src/terrain_lod.cpp
   src/device_tier.cpp
   src/exports_models.cpp
   src/materials.cpp
@@ -285,6 +286,13 @@ set(ENGINE_EXPORTS
   _engine_render_set_prop_plan
   _engine_render_prop_plans
   _engine_render_set_prop_budget
+  _engine_render_set_page_lod
+  _engine_terrain_lod_configure
+  _engine_terrain_lod_select
+  _engine_terrain_lod_state
+  _engine_render_pages_placed
+  _engine_render_pages_shed
+  _engine_render_page_records
   _engine_render_prop_budget
   _engine_render_prop_cutoff_bins
   _engine_render_props_in_frustum

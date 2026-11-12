@@ -7,6 +7,7 @@
 
 #include "../budget.h"
 #include "../page_cache.h"
+#include "../terrain_lod.h"
 #include "../world.h"
 
 namespace engine::render {
@@ -21,6 +22,9 @@ constexpr std::uint32_t kPageQuads = kPageSide - 1;
 constexpr std::uint32_t kPageVertices = 6 * kPageQuads * kPageQuads;
 constexpr std::uint32_t kPageRecordWords = 16;
 constexpr std::uint32_t kPageRecordBytes = kPageRecordWords * 4;
+constexpr std::uint32_t kPageMorphWord = 1;
+constexpr std::uint32_t kPageParentWord = 2;
+constexpr std::uint32_t kPageLodWord = 3;
 constexpr std::uint32_t kMaterialSlots = 256;
 constexpr std::uint32_t kMaterialWords = 10;
 constexpr std::uint32_t kMaterialBytes = kMaterialWords * 4;
@@ -103,6 +107,7 @@ struct SceneView {
   const std::uint8_t* bodyClass;
   const planet::PageCache* pages;
   const PagePlacement* placements;
+  const terrain::PageLod* pageLods;
   const MaterialSlot* materials;
   std::uint32_t materialCount;
   const LightSlot* lights;
@@ -164,6 +169,9 @@ struct Counters {
   std::uint32_t propsInFrustum;
   std::uint32_t propsShed;
   std::uint64_t propsShedTotal;
+  std::uint32_t pagesPlaced;
+  std::uint32_t pagesShed;
+  std::uint64_t pagesShedTotal;
 };
 
 struct PropBudget {

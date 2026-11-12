@@ -117,6 +117,47 @@ void releaseSlot(FramePlan& plan, std::uint32_t slot) {
   plan.dirty[slot] = 0;
 }
 
+terrain::PageLod pageLodOf(const SceneView& scene, std::uint32_t slot) {
+  if (scene.pageLods == nullptr || !terrain::enabled()) return terrain::PageLod{0, 0, terrain::kNoParent};
+  return scene.pageLods[slot];
+}
+
+void writePageLod(const SceneView& scene, const FramePlan& plan, std::uint32_t slot, std::uint32_t* out) {
+  if (!terrain::enabled()) return;
+  const terrain::LodState& lod = terrain::state();
+  const terrain::PageLod page = pageLodOf(scene, slot);
+  std::uint32_t parentLayer = kNoLayer;
+  if (page.parentSlot != terrain::kNoParent && page.parentSlot < pageLayers()) parentLayer = plan.slotLayer[page.parentSlot];
+  const float morph = parentLayer == kNoLayer ? 0.0f : terrain::morphOf(page.level, lod.ratio, lod.levels);
+  out[kPageMorphWord] = bitsOf(morph);
+  out[kPageParentWord] = parentLayer;
+  out[kPageLodWord] = (static_cast<std::uint32_t>(page.level) << terrain::kLevelShift) | (page.quadrant & terrain::kQuadrantMask);
+}
+
+void pageAllowances(const SceneView& scene, const FramePlan& plan, std::uint32_t* allowance) {
+  std::uint32_t placed[terrain::kMaxLevels];
+  for (std::uint32_t level = 0; level < terrain::kMaxLevels; ++level) {
+    placed[level] = 0;
+    allowance[level] = 0;
+  }
+  for (std::uint32_t slot = 0; slot < pageLayers(); ++slot) {
+    if (plan.slotLayer[slot] == kNoLayer || scene.placements[slot].placed == 0) continue;
+    const std::uint32_t level = pageLodOf(scene, slot).level;
+    placed[level < terrain::kMaxLevels ? level : terrain::kMaxLevels - 1] += 1;
+  }
+  const terrain::LodState& lod = terrain::state();
+  std::uint32_t room = lod.pageBudget;
+  for (std::uint32_t distance = 0; distance < terrain::kMaxLevels && room > 0; ++distance) {
+    for (std::uint32_t side = 0; side < (distance == 0 ? 1u : 2u) && room > 0; ++side) {
+      const std::int64_t level = side == 0 ? static_cast<std::int64_t>(lod.level) + distance : static_cast<std::int64_t>(lod.level) - distance;
+      if (level < 0 || level >= static_cast<std::int64_t>(terrain::kMaxLevels)) continue;
+      const std::uint32_t take = placed[level] < room ? placed[level] : room;
+      allowance[level] = take;
+      room -= take;
+    }
+  }
+}
+
 void writePageRecord(FramePlan& plan, std::uint32_t index, const PagePlacement& placement, std::uint32_t layer, const FrameOrigin& origin) {
   std::uint32_t* out = plan.pageRecords + index * kPageRecordWords;
   std::memset(out, 0, kPageRecordBytes);
@@ -153,11 +194,31 @@ void syncPages(const SceneView& scene, FramePlan& plan) {
       plan.uploadLayer[plan.uploadCount] = plan.slotLayer[slot];
       plan.uploadCount += 1;
     }
-    if (scene.placements[slot].placed != 0) {
-      writePageRecord(plan, plan.pageCount, scene.placements[slot], plan.slotLayer[slot], scene.origin);
-      plan.pageCount += 1;
-    }
   }
+  const bool limited = terrain::enabled() && scene.placements != nullptr;
+  std::uint32_t allowance[terrain::kMaxLevels];
+  if (limited) pageAllowances(scene, plan, allowance);
+  std::uint32_t placedPages = 0;
+  std::uint32_t shedPages = 0;
+  for (std::uint32_t slot = 0; slot < pageLayers(); ++slot) {
+    if (plan.slotLayer[slot] == kNoLayer || scene.placements[slot].placed == 0) continue;
+    placedPages += 1;
+    if (limited) {
+      const std::uint32_t level = pageLodOf(scene, slot).level;
+      std::uint32_t& room = allowance[level < terrain::kMaxLevels ? level : terrain::kMaxLevels - 1];
+      if (room == 0) {
+        shedPages += 1;
+        continue;
+      }
+      room -= 1;
+    }
+    writePageRecord(plan, plan.pageCount, scene.placements[slot], plan.slotLayer[slot], scene.origin);
+    writePageLod(scene, plan, slot, plan.pageRecords + plan.pageCount * kPageRecordWords);
+    plan.pageCount += 1;
+  }
+  state.pagesPlaced = placedPages;
+  state.pagesShed = shedPages;
+  state.pagesShedTotal += shedPages;
 }
 
 MaterialSlot defaultMaterial() {

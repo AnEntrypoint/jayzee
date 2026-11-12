@@ -23,6 +23,7 @@ void modelLod();
 void modelsAndTiers();
 void visibilityAndOcclusion();
 void characterPlanet();
+void terrainLod();
 
 }
 
@@ -62,6 +63,7 @@ int main() {
   engine::witness::modelsAndTiers();
   engine::witness::visibilityAndOcclusion();
   engine::witness::characterPlanet();
+  engine::witness::terrainLod();
 
   check(engine::pool::failures() == 0, "no pool allocation failed during the run");
   return engine::test::finish();
