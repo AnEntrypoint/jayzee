@@ -26,7 +26,7 @@ const moduleOf = (loaded) => (loaded && loaded.default !== undefined ? loaded.de
 
 const describe = (error) => ({ message: error && error.message ? error.message : String(error), code: error && (error.code || error.reasonCode) ? error.code || error.reasonCode : null })
 
-export function createBrowserServer({ post, now, timers = null, importApp, readModel = null, save = null, log = () => {} } = {}) {
+export function createBrowserServer({ post, now, timers = null, importApp, readModel = null, save = null, prepare = null, log = () => {} } = {}) {
   if (typeof post !== 'function') throw new TypeError('createBrowserServer needs a post function')
   if (typeof now !== 'function') throw new TypeError('createBrowserServer needs a clock function in milliseconds')
   if (typeof importApp !== 'function') throw new TypeError('createBrowserServer needs an importApp function')
@@ -81,6 +81,7 @@ export function createBrowserServer({ post, now, timers = null, importApp, readM
     starting = true
     stats.inits += 1
     try {
+      if (typeof prepare === 'function') await prepare()
       const apps = {}
       const urls = message.apps || {}
       for (const name of Object.keys(urls)) apps[name] = moduleOf(await importApp(urls[name]))
