@@ -131,6 +131,9 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   mkdirSync(dirname(verdictPath), { recursive: true })
   writeFileSync(verdictPath, JSON.stringify(verdict, null, 1) + '\n')
   console.log(JSON.stringify(verdict))
+  const settle = results.configs.filter((c) => c.role === 'settle' && Number.isFinite(c.maxMs))
+  const worstOf = (variant) => settle.filter((c) => c.variant === variant).map((c) => c.maxMs.toFixed(1)).join(' ')
+  if (settle.length > 0) console.log('settle rows, run first and not judged: worst tick of each, reference ' + worstOf('reference') + ' ms; candidate ' + worstOf('base') + ' ms')
   if (!verdict.ok) {
     console.error('RESULT: FAIL ' + verdict.failures.join('; '))
     process.exit(1)

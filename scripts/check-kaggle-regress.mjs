@@ -6,7 +6,7 @@ import { finish, gate } from './lib/gate.mjs'
 import { classRecord, judge } from './kaggle/regress.mjs'
 import { decide } from './kaggle/push-gate.mjs'
 import { repeatedSpikes } from './kaggle/spikes.mjs'
-import { BASELINE, PROFILE_COMPACT_REPEATS, PROFILE_REPEATS, PROFILE_UNRECLAIMED_REPEATS, PROFILE_VARIANT, RECLAIM_OFF, RELEASE_ORDER_REPEATS, TUNE_DEFAULT, TUNE_DEFAULT_BY_SLOT, buildPlan } from './kaggle/plan.mjs'
+import { BASELINE, PROFILE_COMPACT_REPEATS, PROFILE_REPEATS, PROFILE_UNRECLAIMED_REPEATS, PROFILE_VARIANT, RECLAIM_OFF, RELEASE_ORDER_REPEATS, SETTLE_REPEATS, TUNE_DEFAULT, TUNE_DEFAULT_BY_SLOT, buildPlan } from './kaggle/plan.mjs'
 import { describeSlowTick } from './kaggle/tickProfile.mjs'
 import { canaryStalls, densestPhase, nearPhase, overBudgetTimes, periodFit, phaseShare, slowTickTimes } from './kaggle/slowTickClock.mjs'
 import { PIPE_BYTES, distinctDryRows, judgePreflight } from './kaggle/preflight.mjs'
@@ -423,6 +423,24 @@ gate('the regress plan carries the profile build at the top tier as rows the gat
   for (const row of rows) assert.ok(row.args[0].includes('/variants/' + PROFILE_VARIANT + '/'))
   assert.equal(rows.filter((row) => Number(row.args[1]) === top.bodies).length, PROFILE_REPEATS + PROFILE_UNRECLAIMED_REPEATS)
   assert.ok(PROFILE_REPEATS >= 5 && PROFILE_COMPACT_REPEATS >= 3)
+})
+
+gate('the gate rows run after ' + 2 * SETTLE_REPEATS + ' settle rows of the same two builds and arguments, which the judge does not read', () => {
+  const runs = buildPlan('regress').runs
+  const settle = runs.filter((run) => run.role === 'settle')
+  const gated = runs.filter((run) => run.role === 'gate')
+  assert.equal(settle.length, 2 * SETTLE_REPEATS)
+  assert.ok(SETTLE_REPEATS >= 5)
+  assert.ok(runs.indexOf(settle.at(-1)) < runs.indexOf(gated[0]), 'a gate row runs before the last settle row')
+  settle.forEach((row, i) => assert.deepEqual(row.args, gated[i % 2].args))
+  const row = (variant, role, overTicks) => ({ kind: 'tick', variant, role, bodies: BASELINE.topTier.bodies, workers: BASELINE.topTier.workers, warm: true, ticks: 900, p99Ms: 9, p99QuietMs: 9, quietTicks: 800, maxMs: 12, activeMeanMs: 6, overBudget: overTicks.length, overBudgetHost: 0, overTicks })
+  const stalled = [{ tick: 150, ms: 40, host: false }]
+  const configs = []
+  for (let i = 0; i < SETTLE_REPEATS; i++) configs.push(row('reference', 'settle', stalled), row('base', 'settle', stalled))
+  for (let i = 0; i < BASELINE.topTier.repeats; i++) configs.push(row('reference', 'gate', []), row('base', 'gate', []))
+  const judged = judge(BASELINE, { configs, machine: { class: 'none-0-0-0' } })
+  assert.equal(judged.topTier.candidateOverBudget, 0)
+  assert.equal(judged.topTier.candidateUnmarkedOverTicks.length, 0)
 })
 
 gate('release by view is judged against release in slot order on eight alternated pairs at the top tier, not on rows run in one block', () => {
