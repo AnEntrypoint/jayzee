@@ -6,7 +6,7 @@ import { finish, gate } from './lib/gate.mjs'
 import { classRecord, judge } from './kaggle/regress.mjs'
 import { decide } from './kaggle/push-gate.mjs'
 import { repeatedSpikes } from './kaggle/spikes.mjs'
-import { AIRBORNE_AWAKE_REPEATS, AIRBORNE_REPEATS, BASELINE, PROFILE_COMPACT_REPEATS, PROFILE_REPEATS, PROFILE_UNRECLAIMED_REPEATS, PROFILE_VARIANT, RECLAIM_OFF, TUNE_DEFAULT, TUNE_WITHOUT_AIRBORNE, buildPlan } from './kaggle/plan.mjs'
+import { BASELINE, PROFILE_COMPACT_REPEATS, PROFILE_REPEATS, PROFILE_UNRECLAIMED_REPEATS, PROFILE_VARIANT, RECLAIM_OFF, RELEASE_ORDER_REPEATS, TUNE_DEFAULT, TUNE_DEFAULT_BY_SLOT, buildPlan } from './kaggle/plan.mjs'
 import { describeSlowTick } from './kaggle/tickProfile.mjs'
 import { canaryStalls, densestPhase, nearPhase, overBudgetTimes, periodFit, phaseShare, slowTickTimes } from './kaggle/slowTickClock.mjs'
 import { PIPE_BYTES, distinctDryRows, judgePreflight } from './kaggle/preflight.mjs'
@@ -425,15 +425,14 @@ gate('the regress plan carries the profile build at the top tier as rows the gat
   assert.ok(PROFILE_REPEATS >= 5 && PROFILE_COMPACT_REPEATS >= 3)
 })
 
-gate('the airborne skip is judged on ten alternated pairs at the top tier and five with every body awake, not on three repeats', () => {
-  const rows = buildPlan('regress').runs.filter((run) => run.role === 'airborne')
+gate('release by view is judged against release in slot order on eight alternated pairs at the top tier, not on rows run in one block', () => {
+  const rows = buildPlan('regress').runs.filter((run) => run.role === 'release order')
   const knobs = rows.map((row) => row.args[9])
-  const top10 = knobs.filter((knob) => !knob.includes('awake=0'))
-  assert.equal(top10.length, 2 * AIRBORNE_REPEATS)
-  assert.ok(AIRBORNE_REPEATS >= 10 && AIRBORNE_AWAKE_REPEATS >= 5)
-  top10.forEach((knob, i) => assert.equal(knob, 'tune=' + (i % 2 === 0 ? TUNE_WITHOUT_AIRBORNE : TUNE_DEFAULT)))
-  assert.equal(knobs.filter((knob) => knob.includes('awake=0')).length, 2 * AIRBORNE_AWAKE_REPEATS)
-  assert.equal(TUNE_DEFAULT - TUNE_WITHOUT_AIRBORNE, 4)
+  assert.equal(knobs.length, 2 * RELEASE_ORDER_REPEATS)
+  assert.ok(RELEASE_ORDER_REPEATS >= 8)
+  knobs.forEach((knob, i) => assert.equal(knob, 'tune=' + (i % 2 === 0 ? TUNE_DEFAULT : TUNE_DEFAULT_BY_SLOT)))
+  assert.equal(TUNE_DEFAULT_BY_SLOT - TUNE_DEFAULT, 16)
+  assert.ok(rows.every((row) => row.args[1] === String(BASELINE.topTier.bodies)))
 })
 
 gate('the baseline names a full commit, margins above one and the hook runs the push gate', () => {

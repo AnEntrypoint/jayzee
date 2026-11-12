@@ -74,15 +74,8 @@ export const PROFILE_VARIANT = 'profile'
 export const PROFILE_REPEATS = 6
 export const PROFILE_UNRECLAIMED_REPEATS = 0
 export const CANARY_THREADS = Object.freeze([1, 4])
-export const AIRBORNE_REPEATS = 10
-export const AIRBORNE_AWAKE_REPEATS = 5
 export const TUNE_DEFAULT = 12
-export const TUNE_WITHOUT_AIRBORNE = 8
-export const SLOT_ORDER_REPEATS = 5
-export const COLLISION_REPEATS = 4
-export const TUNE_DIRECT_MANIFOLDS = 32
-export const TUNE_RELEASE_BLOCKS = 64
-export const COLLISION_TUNINGS = Object.freeze([TUNE_DEFAULT, TUNE_DEFAULT + TUNE_DIRECT_MANIFOLDS, TUNE_DEFAULT + TUNE_RELEASE_BLOCKS, TUNE_DEFAULT + TUNE_DIRECT_MANIFOLDS + TUNE_RELEASE_BLOCKS])
+export const RELEASE_ORDER_REPEATS = 8
 export const PROFILE_COMPACT_REPEATS = 3
 export const RECLAIM_OFF = 'reclaim=off'
 export const SETTLE_TICKS = 3000
@@ -96,15 +89,8 @@ const regressWith = (candidate) => () => {
   runs.push(calibrate())
   for (let repeat = 0; repeat < repeats; repeat++) for (const glue of [referenceGlue(BASELINE.referenceCommit), candidate]) runs.push(tick(glue, bodies, workers, { role: 'gate' }))
   for (let tier = 0; tier < MARBLE_TIERS; tier++) runs.push(marble(tier, BASELINE.marble.runs, BASELINE.marble.warmRuns))
-  for (let repeat = 0; repeat < AIRBORNE_REPEATS; repeat++) {
-    for (const tune of [TUNE_WITHOUT_AIRBORNE, TUNE_DEFAULT]) runs.push(tick(candidate, bodies, workers, { role: 'airborne', knobs: 'tune=' + tune }))
-  }
-  for (let repeat = 0; repeat < AIRBORNE_AWAKE_REPEATS; repeat++) {
-    for (const tune of [TUNE_WITHOUT_AIRBORNE, TUNE_DEFAULT]) runs.push(tick(candidate, COMPACT_BODIES, workers, { role: 'airborne', knobs: ALL_AWAKE + ',tune=' + tune }))
-  }
-  for (let repeat = 0; repeat < SLOT_ORDER_REPEATS; repeat++) runs.push(tick(candidate, bodies, workers, { role: 'locality', knobs: 'tune=' + TUNE_DEFAULT_BY_SLOT }))
-  for (let repeat = 0; repeat < COLLISION_REPEATS; repeat++) {
-    for (const tune of COLLISION_TUNINGS) runs.push(tick(candidate, bodies, workers, { role: 'collision', knobs: 'tune=' + tune }))
+  for (let repeat = 0; repeat < RELEASE_ORDER_REPEATS; repeat++) {
+    for (const tune of [TUNE_DEFAULT, TUNE_DEFAULT_BY_SLOT]) runs.push(tick(candidate, bodies, workers, { role: 'release order', knobs: 'tune=' + tune }))
   }
   for (const count of RECORD_WORKERS) runs.push(tick(candidate, bodies, count, { role: 'record' }))
   for (const glue of TICK_GLUES.filter((path) => path !== candidate)) runs.push(tick(glue, bodies, workers, { role: 'record' }))
