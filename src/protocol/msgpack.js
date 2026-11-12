@@ -125,3 +125,22 @@ export function unpack(input) {
   }
   return value
 }
+
+export const lazyPackCounts = { created: 0, packed: 0, reads: 0 }
+
+export function lazyPack(value) {
+  assertEncodable(value)
+  lazyPackCounts.created++
+  let bytes = null
+  return {
+    get packed() { return bytes !== null },
+    get bytes() {
+      lazyPackCounts.reads++
+      if (bytes === null) {
+        bytes = pack(value)
+        lazyPackCounts.packed++
+      }
+      return bytes
+    },
+  }
+}
