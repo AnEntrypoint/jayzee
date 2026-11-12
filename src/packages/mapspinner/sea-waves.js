@@ -92,74 +92,71 @@ export function seaHeightMean(oceanChoppiness, oceanAmplitude) {
   return mean * oceanAmplitude
 }
 
-export const SEA_OCTAVE_COUNT = OCTAVE_COUNT
-export const SEA_LF_OCTAVE_COUNT = 3
-export const SEA_BASE_FREQUENCY = 0.16
-export const SEA_FREQUENCY_GAIN = 1.9
-export const SEA_WAVE_SPEED = 0.8
-const SEA_STRETCH_X = 0.75
-const OCTAVE_ROTATE_A = 0.8
-const OCTAVE_ROTATE_B = 0.6
+export const SEA_OCTAVES = OCTAVE_COUNT
+export const SEA_FREQ = 0.2
+export const SEA_FREQ_LF = 0.16
+export const SEA_SPEED = 2.4
+const SEA_OCTAVE_ANGLE = 1.57079633
+const SEA_FREQ_GAIN = 1.9
+const TIME_SPLIT_X = 0.6
+const TIME_SPLIT_Y = 0.4
+const OCTAVE_TIME_SLOWDOWN = 0.08
+const LF_DIR_A = 0.866
+const LF_DIR_B = 0.5
 
 function finiteArg(name, value) {
   if (typeof value !== 'number' || !Number.isFinite(value)) throw new RangeError(`sea waves: ${name} must be a finite number, got ${value}`)
   return value
 }
 
-function seaOctaves(x, z, time, oceanChoppiness, octaves) {
-  let ux = x * SEA_STRETCH_X
-  let uy = z
-  let frequency = SEA_BASE_FREQUENCY
-  let amplitude = BASE_AMPLITUDE_M
-  let choppiness = oceanChoppiness
-  let total = 0
-  const drift = time * SEA_WAVE_SPEED
-  for (let i = 0; i < octaves; i++) {
-    const phase = PHASE_STEP * i
-    const forward = waveOctave((ux + drift) * frequency + phase, (uy + drift) * frequency + phase, choppiness)
-    const backward = waveOctave((ux - drift) * frequency + phase, (uy - drift) * frequency + phase, choppiness)
-    total += amplitude * 0.5 * (forward + backward)
-    const rx = OCTAVE_ROTATE_A * ux + OCTAVE_ROTATE_B * uy
-    uy = OCTAVE_ROTATE_A * uy - OCTAVE_ROTATE_B * ux
-    ux = rx
-    frequency *= SEA_FREQUENCY_GAIN
-    amplitude *= AMPLITUDE_GAIN
-    choppiness += (1 - choppiness) * CHOPPINESS_TO_ONE_RATE
-  }
-  return total
-}
-
-function checkedArgs(x, z, time, oceanChoppiness, oceanAmplitude) {
+function checkedArgs(x, y, time, oceanChoppiness, oceanAmplitude) {
   finiteArg('x', x)
-  finiteArg('z', z)
+  finiteArg('y', y)
   finiteArg('time', time)
   finiteArg('oceanAmplitude', oceanAmplitude)
   if (!(finiteArg('oceanChoppiness', oceanChoppiness) > 0)) throw new RangeError(`sea waves: oceanChoppiness must be positive, got ${oceanChoppiness}`)
 }
 
-export function seaHeight(x, z, time, oceanChoppiness, oceanAmplitude) {
-  checkedArgs(x, z, time, oceanChoppiness, oceanAmplitude)
-  return seaOctaves(x, z, time, oceanChoppiness, OCTAVE_COUNT) * oceanAmplitude
+export function seaOctave(ux, uy, choppiness) {
+  return waveOctave(ux, uy, choppiness)
 }
 
-export function seaHeightLF(x, z, time, oceanChoppiness, oceanAmplitude) {
-  checkedArgs(x, z, time, oceanChoppiness, oceanAmplitude)
-  const means = octaveMeans(oceanChoppiness)
-  let tail = 0
-  let amplitude = BASE_AMPLITUDE_M
+export function seaHeight(x, y, time, oceanChoppiness, oceanAmplitude, octaveStart = 0, octaveEnd = OCTAVE_COUNT) {
+  checkedArgs(x, y, time, oceanChoppiness, oceanAmplitude)
+  if (!Number.isInteger(octaveStart) || !Number.isInteger(octaveEnd)) throw new RangeError(`sea waves: the octave range must be integers, got ${octaveStart} and ${octaveEnd}`)
+  let frequency = SEA_FREQ
+  let amplitude = oceanAmplitude * BASE_AMPLITUDE_M
+  let choppiness = oceanChoppiness
+  const timeX = time * SEA_SPEED * TIME_SPLIT_X
+  const timeY = time * SEA_SPEED * TIME_SPLIT_Y
+  let height = 0
   for (let i = 0; i < OCTAVE_COUNT; i++) {
-    if (i >= SEA_LF_OCTAVE_COUNT) tail += amplitude * means[i]
+    if (i >= octaveStart && i < octaveEnd) {
+      const angle = i * SEA_OCTAVE_ANGLE
+      const sa = Math.sin(angle)
+      const ca = Math.cos(angle)
+      const slow = 1 - OCTAVE_TIME_SLOWDOWN * i
+      height += waveOctave((ca * x + sa * y + timeX * slow) * frequency, (ca * y - sa * x + timeY * slow) * frequency, choppiness) * amplitude
+    }
+    frequency *= SEA_FREQ_GAIN
     amplitude *= AMPLITUDE_GAIN
+    choppiness += (1 - choppiness) * CHOPPINESS_TO_ONE_RATE
   }
-  return (seaOctaves(x, z, time, oceanChoppiness, SEA_LF_OCTAVE_COUNT) + tail) * oceanAmplitude
+  return height
 }
 
-export function seaHeightLFBound(oceanAmplitude) {
-  let bound = 0
-  let amplitude = BASE_AMPLITUDE_M
-  for (let i = 0; i < OCTAVE_COUNT; i++) {
-    if (i >= SEA_LF_OCTAVE_COUNT) bound += amplitude
-    amplitude *= AMPLITUDE_GAIN
-  }
-  return bound * Math.abs(oceanAmplitude)
+export function seaHeightLF(x, y, time, oceanChoppiness, oceanAmplitude) {
+  checkedArgs(x, y, time, oceanChoppiness, oceanAmplitude)
+  const qx = x * SEA_FREQ_LF
+  const qy = y * SEA_FREQ_LF
+  const s0 = time * SEA_SPEED * TIME_SPLIT_X
+  const s1 = time * SEA_SPEED * TIME_SPLIT_Y
+  const a = waveOctave(qx + LF_DIR_A * s0, qy + LF_DIR_B * s0, oceanChoppiness)
+  const b = waveOctave(qx - LF_DIR_B * s1, qy + LF_DIR_A * s1, oceanChoppiness)
+  return (a + b) * (oceanAmplitude * BASE_AMPLITUDE_M * 0.5)
+}
+
+export function seaOctaveMean(oceanChoppiness, octave = 0) {
+  if (!Number.isInteger(octave) || octave < 0 || octave >= OCTAVE_COUNT) throw new RangeError(`sea waves: octave must be an integer in 0..${OCTAVE_COUNT - 1}, got ${octave}`)
+  return octaveMeans(oceanChoppiness)[octave]
 }
