@@ -2,7 +2,8 @@ import assert from 'node:assert/strict'
 import { finish, gate } from './lib/gate.mjs'
 import { LEVEL_UNSET, createDisplayGovernor, lodOf } from '../src/engine/displayGovernor.js'
 import { VEG_HIDDEN, createVegetationDetail } from '../src/engine/vegetationDetail.js'
-import { createVegetationPool, planVegetationPool } from '../src/engine/vegetation.js'
+import { MATRIX_BYTES, createVegetationPool, planVegetationPool } from '../src/engine/vegetation.js'
+import { createLeafBlock, createVegetationFollower } from '../src/engine/vegetationStream.js'
 import { sceneSpec, sceneSpecForDevice } from '../src/engine/planetScene.js'
 import { chooseDeviceBudget } from '../src/engine/deviceBudget.js'
 import { PLANET_RADIUS_M } from '../src/engine/sphere.js'
@@ -224,6 +225,43 @@ gate('a patch that leaves its slot takes its detail level with it, and the next 
   assert.ok(pool.shownTotal() <= 100)
 })
 
+gate('a pool the device bounds below the wanted block keeps the patches nearest the camera and defers the rest, where the row order would keep one edge', () => {
+  const block = createLeafBlock({ level: 10, block: 4 })
+  block.update(0, 1, 0)
+  const pool = () => createVegetationPool({
+    plan: planVegetationPool({ maxBufferBytes: 4 * CAP * MATRIX_BYTES, residentPatches: 16, capacityPerPatch: CAP }),
+    worldSeed: 5,
+    heightAt: () => 0,
+    patchCentre,
+    now: () => 0,
+    cullRadiusM: 1,
+  })
+  const central = [5, 6, 9, 10].map((k) => block.ids[k])
+  const near = pool()
+  near.sync(block.nearest)
+  assert.deepEqual(block.nearest.slice(0, 4).sort((a, b) => a - b), central.slice().sort((a, b) => a - b))
+  for (const id of central) assert.notEqual(near.slotOf(id), undefined)
+  assert.equal(near.stats().resident, 4)
+  assert.equal(near.stats().deferred, 12)
+  const rows = pool()
+  rows.sync(block.ids)
+  assert.equal(rows.slotOf(central[0]), undefined)
+  assert.deepEqual(block.nearest.slice().sort((a, b) => a - b), block.ids.slice().sort((a, b) => a - b))
+  const picks = (plan) => {
+    const fresh = createLeafBlock({ level: 10, block: 4 })
+    const seen = []
+    const follow = createVegetationFollower({ scene: { plan, streamStep: (ids) => { seen.push(ids) } }, block: fresh })
+    follow(0, 1, 0, 0)
+    follow(0, 1, 0, 0)
+    return { seen, fresh }
+  }
+  const bounded = picks({ bound: 'device' })
+  assert.equal(bounded.seen[0], null)
+  assert.equal(bounded.seen[1], bounded.fresh.nearest)
+  const whole = picks({ bound: 'patches' })
+  assert.equal(whole.seen[1], whole.fresh.ids)
+})
+
 gate('a scene takes its shown-instance budget as a whole number chosen once, from the device budget or by hand, or none', () => {
   assert.equal(sceneSpec().instanceBudget, null)
   assert.equal(sceneSpec({ instanceBudget: 4096 }).instanceBudget, 4096)
@@ -232,8 +270,10 @@ gate('a scene takes its shown-instance budget as a whole number chosen once, fro
   assert.throws(() => sceneSpec({ fullDetailM: 0 }), RangeError)
   const small = sceneSpecForDevice(chooseDeviceBudget({ deviceMemoryBytes: 536870912 }))
   const large = sceneSpecForDevice(chooseDeviceBudget({ deviceMemoryBytes: 8589934592 }))
-  assert.equal(small.instanceBudget, 65536)
-  assert.equal(large.instanceBudget, 524288)
+  assert.equal(small.instanceBudget, 32768)
+  assert.equal(large.instanceBudget, 262144)
+  assert.equal(small.deviceBufferBytes, 4 * 1048576)
+  assert.equal(large.deviceBufferBytes, 32 * 1048576)
   assert.equal(sceneSpecForDevice(chooseDeviceBudget({ deviceMemoryBytes: 536870912 }), { instanceBudget: 10 }).instanceBudget, 10)
 })
 

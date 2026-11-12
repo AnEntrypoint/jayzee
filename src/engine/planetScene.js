@@ -57,7 +57,11 @@ export const sceneSpec = (overrides = {}) => {
   return spec
 }
 
-export const sceneSpecForDevice = (deviceBudget, overrides = {}) => sceneSpec({ instanceBudget: instanceBudgetFor(deviceBudget, MATRIX_BYTES), ...overrides })
+export const sceneSpecForDevice = (deviceBudget, overrides = {}) => sceneSpec({
+  instanceBudget: instanceBudgetFor(deviceBudget, MATRIX_BYTES),
+  deviceBufferBytes: Math.min(DEFAULT_SCENE.deviceBufferBytes, deviceBudget.displayBytes),
+  ...overrides,
+})
 
 const bindVegetation = (module, vegetation, plan, cullRadiusM) => {
   const memory = vegetation.memory()
@@ -186,5 +190,5 @@ export const buildPlanetScene = ({ spec: overrides = {}, module, now, generate =
     }
   }
 
-  return { spec, area, population, colliders, vegetation, detail, report, generate: generatePending, streamStep }
+  return { spec, area, population, colliders, vegetation, plan, detail, report, generate: generatePending, streamStep }
 }

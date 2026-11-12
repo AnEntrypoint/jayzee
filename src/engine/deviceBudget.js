@@ -8,6 +8,7 @@ export const DEVICE_BUDGET_RULES = Object.freeze({
   managementShare: 0.125,
   managementFloorBytes: 32 * MIB,
   displayShare: 0.0625,
+  shownShare: 0.5,
   unknownSmallBytes: 2 * GIB,
   unknownLargeBytes: 4 * GIB,
   unknownSmallCores: 4,
@@ -55,8 +56,8 @@ export const chooseDeviceBudget = (signals, rules = DEVICE_BUDGET_RULES) => {
   })
 }
 
-export const instanceBudgetFor = (budget, bytesPerInstance) => {
+export const instanceBudgetFor = (budget, bytesPerInstance, rules = DEVICE_BUDGET_RULES) => {
   if (!Number.isInteger(bytesPerInstance) || bytesPerInstance < 1) throw new RangeError('bytesPerInstance must be a whole number at least 1')
   if (!budget || !(budget.displayBytes >= 0)) throw new TypeError('instanceBudgetFor needs a budget from chooseDeviceBudget')
-  return Math.floor(budget.displayBytes / bytesPerInstance)
+  return Math.floor((budget.displayBytes * rules.shownShare) / bytesPerInstance)
 }

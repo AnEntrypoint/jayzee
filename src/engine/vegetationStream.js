@@ -8,6 +8,10 @@ export const createLeafBlock = ({ level, block }) => {
   const side = 2 ** level
   if (!Number.isInteger(block) || block < 2 || block % 2 !== 0 || block > side) throw new RangeError('block must be an even whole number from 2 to the face side, ' + side)
   const ids = new Array(block * block).fill(0)
+  const nearest = new Array(block * block).fill(0)
+  const middle = (block - 1) / 2
+  const fromCentre = (k) => ((k % block) - middle) ** 2 + (Math.floor(k / block) - middle) ** 2
+  const order = Array.from({ length: block * block }, (_, k) => k).sort((a, b) => fromCentre(a) - fromCentre(b) || a - b)
   const half = block / 2
   let face = -1
   let tx0 = -1
@@ -39,12 +43,14 @@ export const createLeafBlock = ({ level, block }) => {
     tx0 = nx
     ty0 = ny
     for (let j = 0; j < block; j++) for (let i = 0; i < block; i++) ids[j * block + i] = leafPatchId(face, level, tx0 + i, ty0 + j)
+    for (let k = 0; k < order.length; k++) nearest[k] = ids[order[k]]
     moves += 1
     return true
   }
 
   return {
     ids,
+    nearest,
     update,
     get face() { return face },
     get first() { return [tx0, ty0] },
@@ -56,10 +62,11 @@ const SETTLED_FRAMES = 2
 
 export const createVegetationFollower = ({ scene, block }) => {
   let settled = 0
+  const wanted = scene.plan && scene.plan.bound === 'device' ? block.nearest : block.ids
   return (x, y, z, pagesPending) => {
     settled = pagesPending > 0 ? 0 : settled + 1
     const moved = settled >= SETTLED_FRAMES && block.update(x, y, z)
-    scene.streamStep(moved ? block.ids : null, x, y, z)
+    scene.streamStep(moved ? wanted : null, x, y, z)
     return moved
   }
 }

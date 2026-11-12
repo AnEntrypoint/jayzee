@@ -68,7 +68,8 @@ gate('a device that reports no memory is sized by its core count, and one that r
 gate('the shown-instance budget is a fixed share of the memory budget, so a smaller device shows fewer instances and allocates nothing more', () => {
   const small = instanceBudgetFor(chooseDeviceBudget(browser(0.5)), MATRIX_BYTES)
   const large = instanceBudgetFor(chooseDeviceBudget(browser(8)), MATRIX_BYTES)
-  assert.equal(small, (64 * MIB * DEVICE_BUDGET_RULES.displayShare) / MATRIX_BYTES)
+  assert.equal(small, (64 * MIB * DEVICE_BUDGET_RULES.displayShare * DEVICE_BUDGET_RULES.shownShare) / MATRIX_BYTES)
+  assert.equal(small, 32768)
   assert.equal(large, small * 8)
   assert.throws(() => instanceBudgetFor(chooseDeviceBudget(browser(1)), 0), RangeError)
   assert.throws(() => instanceBudgetFor(null, 64), TypeError)
