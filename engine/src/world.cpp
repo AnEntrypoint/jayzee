@@ -2,7 +2,6 @@
 #include "tick_profile.h"
 #include <Jolt/Jolt.h>
 
-#include <Jolt/Core/Factory.h>
 #include <Jolt/Core/JobSystemSingleThreaded.h>
 #if defined(ENGINE_THREADS)
 #include <Jolt/Core/JobSystemThreadPool.h>
@@ -24,6 +23,7 @@
 #include <Jolt/Physics/Collision/RayCast.h>
 #include <Jolt/Physics/Collision/ShapeCast.h>
 #include <Jolt/Physics/Collision/ObjectLayer.h>
+#include <Jolt/Physics/Collision/PhysicsMaterial.h>
 #include <Jolt/Physics/Collision/Shape/BoxShape.h>
 #include <Jolt/Physics/Collision/Shape/CapsuleShape.h>
 #include <Jolt/Physics/Collision/Shape/SphereShape.h>
@@ -223,8 +223,13 @@ Status World::initialize() {
   JPH::RegisterDefaultAllocator();
   pool::installJoltHooks();
   JPH::Trace = silentTrace;
-  JPH::Factory::sInstance = new JPH::Factory();
-  JPH::RegisterTypes();
+  if (!JPH::VerifyJoltVersionID()) std::abort();
+  JPH::CollisionDispatch::sInit();
+  JPH::ConvexShape::sRegister();
+  JPH::SphereShape::sRegister();
+  JPH::BoxShape::sRegister();
+  JPH::CapsuleShape::sRegister();
+  if (JPH::PhysicsMaterial::sDefault == nullptr) JPH::PhysicsMaterial::sDefault = new JPH::PhysicsMaterial();
   planet::registerCollisions();
   vegetation::registerCollisions();
   joltReady = true;
