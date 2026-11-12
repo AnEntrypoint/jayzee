@@ -33,7 +33,10 @@ constexpr std::uint32_t kTuneWholeIslands = 2u;
 constexpr std::uint32_t kTuneAirborne = 4u;
 constexpr std::uint32_t kTuneBroadphaseInterval = 8u;
 constexpr std::uint32_t kTuneReleaseBySlot = 16u;
-constexpr std::uint32_t kTuneAll = kTuneGravityAfterStep | kTuneWholeIslands | kTuneAirborne | kTuneBroadphaseInterval | kTuneReleaseBySlot;
+constexpr std::uint32_t kTuneDirectManifolds = 32u;
+constexpr std::uint32_t kTuneReleaseBlocks = 64u;
+constexpr std::uint32_t kTuneAll = kTuneGravityAfterStep | kTuneWholeIslands | kTuneAirborne | kTuneBroadphaseInterval | kTuneReleaseBySlot | kTuneDirectManifolds | kTuneReleaseBlocks;
+constexpr std::uint32_t kReleaseBlockSlots = 64;
 #if defined(ENGINE_BROADPHASE_INTERVAL)
 constexpr std::uint32_t kDefaultTuning = kTuneAirborne | kTuneBroadphaseInterval;
 #else

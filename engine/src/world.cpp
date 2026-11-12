@@ -1006,6 +1006,20 @@ void World::refillReleaseQueue() {
     releaseKeys_[slot] = static_cast<float>(distance) + (visible ? 0.0f : kOutOfViewMetres);
   }
   if (!ordered) return;
+  if ((tuning_ & kTuneReleaseBlocks) != 0) {
+    std::uint32_t begin = 0;
+    while (begin < queueCount_) {
+      const std::uint32_t block = releaseQueue_[begin] / kReleaseBlockSlots;
+      float nearest = releaseKeys_[releaseQueue_[begin]];
+      std::uint32_t end = begin;
+      while (end < queueCount_ && releaseQueue_[end] / kReleaseBlockSlots == block) {
+        nearest = std::min(nearest, releaseKeys_[releaseQueue_[end]]);
+        end += 1;
+      }
+      for (std::uint32_t at = begin; at < end; ++at) releaseKeys_[releaseQueue_[at]] = nearest;
+      begin = end;
+    }
+  }
   const float* keys = releaseKeys_;
   auto nearer = [keys](std::uint32_t a, std::uint32_t b) { return keys[a] < keys[b] || (keys[a] == keys[b] && a < b); };
   const std::uint32_t chunk = std::min(queueCount_, std::max(awakeLimit(), kLeastChunk));
@@ -1115,6 +1129,7 @@ Status World::applyTuning(std::uint32_t flags) {
   tuning_ = flags;
   JPH::PhysicsSettings settings = runtime_->physics.GetPhysicsSettings();
   settings.mUseLargeIslandSplitter = (flags & kTuneWholeIslands) == 0;
+  settings.mUseManifoldReduction = (flags & kTuneDirectManifolds) == 0;
   runtime_->physics.SetPhysicsSettings(settings);
   if (wasAirborne && (flags & kTuneAirborne) == 0) {
     JPH::BodyInterface& bodies = runtime_->physics.GetBodyInterfaceNoLock();
