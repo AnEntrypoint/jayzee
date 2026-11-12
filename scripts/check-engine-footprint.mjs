@@ -13,7 +13,7 @@ const THREADED_WASM_LIMIT = 800000
 const RESIDENT_LIMIT_MIB = 256
 const WRITTEN_MIB = 512
 const PREFAULT_MIB = 8
-const CARVED_MIB = 1
+const CARVED_BYTES = 65536
 const PLAN = { players: 1024, workers: 4, budgetBytes: 1024 * MIB }
 const self = fileURLToPath(import.meta.url)
 
@@ -26,7 +26,7 @@ if (process.argv[2] === 'prefault') {
   const first = module._engine_arena_prefault(PREFAULT_MIB * MIB)
   const after = residentMib()
   const again = module._engine_arena_prefault(PREFAULT_MIB * MIB)
-  const carved = module._engine_arena_carve(CARVED_MIB * MIB, 64) !== 0
+  const carved = module._engine_arena_carve(CARVED_BYTES, 64) !== 0
   const toppedUp = module._engine_arena_prefault(PREFAULT_MIB * MIB)
   module._engine_arena_seal()
   const sealed = module._engine_arena_prefault(2 * PREFAULT_MIB * MIB)
@@ -61,13 +61,13 @@ if (process.argv[2] === 'prefault') {
     assert.ok(run.after - run.before > WRITTEN_MIB, 'a written instance added only ' + Math.round(run.after - run.before) + ' MiB')
   })
 
-  gate('the arena prefault writes ' + PREFAULT_MIB + ' MiB ahead of the cursor once, nothing on a second call, only what a carve of ' + CARVED_MIB + ' MiB used up after it, and nothing once the arena is sealed', () => {
+  gate('the arena prefault writes ' + PREFAULT_MIB + ' MiB ahead of the cursor once, nothing on a second call, only what a host carve of ' + CARVED_BYTES + ' bytes used up after it, and nothing once the arena is sealed', () => {
     const run = JSON.parse(execFileSync(process.execPath, [self, 'prefault'], { encoding: 'utf8' }))
     assert.equal(run.first, PREFAULT_MIB * MIB)
     assert.ok(run.addedMib > PREFAULT_MIB * 0.75 && run.addedMib < PREFAULT_MIB * 2, 'the prefault added ' + run.addedMib + ' MiB of resident memory')
     assert.equal(run.again, 0)
     assert.equal(run.carved, true)
-    assert.ok(run.toppedUp >= CARVED_MIB * MIB && run.toppedUp < CARVED_MIB * MIB + 4096, 'the top-up wrote ' + run.toppedUp + ' bytes')
+    assert.ok(run.toppedUp >= CARVED_BYTES && run.toppedUp < CARVED_BYTES + 4096, 'the top-up wrote ' + run.toppedUp + ' bytes')
     assert.equal(run.sealed, 0)
   })
 
