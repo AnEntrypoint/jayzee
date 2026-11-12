@@ -3,13 +3,13 @@ import { createPoseHandoffCore } from './poseHandoffCore.js'
 
 export const HANDOFF_POOL = 3
 
-export const createPhysicsHandoff = ({ module, glue, players, budgetBytes, workers = 1, solverIterations, path, pool = HANDOFF_POOL, timeTicks = 0, warm = true }) => {
+export const createPhysicsHandoff = ({ module, glue, players, budgetBytes, workers = 1, solverIterations, path, pool = HANDOFF_POOL, timeTicks = 0, warm = true, skipUnchanged = true }) => {
   const worker = new Worker(new URL('./physicsWorker.js', import.meta.url), { type: 'module' })
   const poseBytes = module._engine_pose_bytes()
   const reserve = module._engine_pose_reserve()
   const buffers = poseRegionBuffers({ slots: pool, poseBytes })
   const region = attachPoseRegion(buffers, { owner: true })
-  const core = createPoseHandoffCore({ module, region, reserve, send: (slot) => worker.postMessage(slot) })
+  const core = createPoseHandoffCore({ module, region, reserve, skipUnchanged, send: (slot) => worker.postMessage(slot) })
   const handoff = core.handoff
   handoff.poseBytes = poseBytes
 

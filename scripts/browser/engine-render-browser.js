@@ -15,6 +15,7 @@ const DRAW = QUERY.get('draw') !== '0'
 const MODELS = QUERY.get('models') === '1'
 const HOLD_END = QUERY.get('hold') === '1'
 const VEGETATION = QUERY.get('veg') !== '0'
+const BODY_WORK_ALWAYS = QUERY.get('bodyWork') === 'always'
 const PRESENT = { fifo: 0, mailbox: 1, immediate: 2 }[QUERY.get('present') ?? 'fifo'] ?? 0
 const THREADS = QUERY.get('threads') === '1' && TIER === 1024
 const WORKERS = THREADS ? 4 : 1
@@ -480,8 +481,9 @@ const run = async () => {
   const vegetationBlock = planetScene && VEGETATION && PATH === 'planet' ? createLeafBlock({ level: planetScene.spec.patchLevel, block: WITNESS_PATCH_BLOCK }) : null
   if (vegetationBlock) vegetationBlock.update(0, PLANET.radius, 0)
   const followVegetation = vegetationBlock ? createVegetationFollower({ scene: planetScene, block: vegetationBlock }) : null
-  const handoff = TIER === 1024 ? createPhysicsHandoff({ module, glue: new URL(TIER_GLUE, import.meta.url).href, players: TIER, budgetBytes: TIER_BUDGET, solverIterations: runConfig.solverIterations, workers: WORKERS, timeTicks: TIMED ? FRAMES : 0, path: { window: PATH_WINDOW, perFrame: PAGES_PER_FRAME, stepM: PATH_STEP_M, heightM: PATH_HEIGHT_M, baseY: BASE_Y }, warm: WARM_CHOICES[QUERY.get('warmRelease') ?? 'apart'] }) : null
+  const handoff = TIER === 1024 ? createPhysicsHandoff({ module, glue: new URL(TIER_GLUE, import.meta.url).href, players: TIER, budgetBytes: TIER_BUDGET, solverIterations: runConfig.solverIterations, workers: WORKERS, timeTicks: TIMED ? FRAMES : 0, path: { window: PATH_WINDOW, perFrame: PAGES_PER_FRAME, stepM: PATH_STEP_M, heightM: PATH_HEIGHT_M, baseY: BASE_Y }, warm: WARM_CHOICES[QUERY.get('warmRelease') ?? 'apart'], skipUnchanged: !BODY_WORK_ALWAYS }) : null
   if (handoff) await handoff.ready
+  if (BODY_WORK_ALWAYS && module._engine_render_set_prop_plan(1) !== 0) throw new Error('engine_render_set_prop_plan refused')
 
   const aspect = canvas.width / canvas.height
   const frameTimes = new Float64Array(FRAMES)
@@ -637,6 +639,9 @@ const run = async () => {
     result.allocationsSinceWarmup = String(lastStats.allocationsSinceWarmup)
     result.createsAfterSeal = lastStats.createsAfterSeal
     result.checksum = String(lastStats.checksum)
+    result.propPlans = lastStats.propPlans
+    result.posesUnchanged = handoff ? handoff.unchanged : null
+    result.bodyWork = BODY_WORK_ALWAYS ? 'always' : 'when a body moved'
     result.sceneDigest = sceneDigest(module, placed, lastCamera)
     result.visible = lastStats.visible
     result.vegetation = { draws: lastStats.vegetationDraws, instances: lastStats.vegetationInstances, blockMoves: vegetationBlock ? vegetationBlock.moves : null }

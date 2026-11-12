@@ -40,7 +40,24 @@ struct RenderState {
   const MaterialSlot* boundMaterials;
   std::uint32_t boundCount;
   std::uint32_t lightCount;
+  std::uint64_t plannedStamp;
+  std::uint32_t propsPlanned;
+  std::uint32_t planPropsAlways;
 };
+
+constexpr std::uint64_t kDigestPrime = 0x9e3779b97f4a7c15ull;
+
+std::uint32_t classDigest(const std::uint8_t* classes, std::uint32_t count) {
+  std::uint64_t digest = count;
+  std::uint32_t at = 0;
+  for (; at + 8 <= count; at += 8) {
+    std::uint64_t word;
+    std::memcpy(&word, classes + at, 8);
+    digest = (digest ^ word) * kDigestPrime;
+  }
+  for (; at < count; ++at) digest = (digest ^ classes[at]) * kDigestPrime;
+  return static_cast<std::uint32_t>(digest ^ (digest >> 32));
+}
 
 RenderState* renderState = nullptr;
 
@@ -81,6 +98,9 @@ void initState(RenderState& state, std::uint32_t* propRecords, std::uint8_t* bod
   state.boundMaterials = state.materials;
   state.boundCount = kMaterialSlots;
   state.lightCount = 0;
+  state.plannedStamp = 0;
+  state.propsPlanned = 0;
+  state.planPropsAlways = 0;
 }
 
 }
@@ -137,13 +157,14 @@ EMSCRIPTEN_KEEPALIVE int engine_render_seal() {
   return engine::kOk;
 }
 
-EMSCRIPTEN_KEEPALIVE int engine_render_frame() {
-  if (rnd::renderState == nullptr || rnd::counters().ready == 0) return engine::kNotConfigured;
-  rnd::RenderState& state = *rnd::renderState;
-  rnd::counters().apiCalls = 0;
-  rnd::counters().vegetationDraws = 0;
-  rnd::counters().vegetationInstances = 0;
-  rnd::SceneView scene{};
+}
+
+namespace engine::render {
+
+namespace {
+
+SceneView sceneOf(RenderState& state) {
+  SceneView scene{};
   scene.transforms = engine::world().transforms();
   scene.bodyCount = engine::world().bodyCapacity();
   scene.bodyClass = state.bodyClass;
@@ -169,10 +190,34 @@ EMSCRIPTEN_KEEPALIVE int engine_render_frame() {
   scene.lightCount = state.lightCount;
   scene.albedoReady = state.albedoReady;
   scene.albedoPixels = state.albedoPixels;
-  scene.albedoLayerOf = rnd::albedoLayerOfHandle;
+  scene.albedoLayerOf = albedoLayerOfHandle;
+  scene.bodyStamp = state.planPropsAlways != 0 ? ~counters().frames : (static_cast<std::uint64_t>(engine::world().poseEpoch()) << 32) | classDigest(state.bodyClass, scene.bodyCount);
+  scene.skipProps = false;
+  return scene;
+}
+
+}
+
+}
+
+extern "C" {
+
+EMSCRIPTEN_KEEPALIVE int engine_render_frame() {
+  if (rnd::renderState == nullptr || rnd::counters().ready == 0) return engine::kNotConfigured;
+  rnd::RenderState& state = *rnd::renderState;
+  rnd::counters().apiCalls = 0;
+  rnd::counters().vegetationDraws = 0;
+  rnd::counters().vegetationInstances = 0;
+  rnd::SceneView scene = rnd::sceneOf(state);
+  const bool drawsEveryBody = rnd::counters().backend == static_cast<std::uint32_t>(rnd::BackendKind::kWebGpu);
+  scene.skipProps = drawsEveryBody && state.planPropsAlways == 0 && state.propsPlanned != 0 && state.plannedStamp == scene.bodyStamp;
   {
     engine::phase::Scope scope(engine::phase::kPlan);
     rnd::planFrame(scene, state.camera, state.plan);
+  }
+  if (!scene.skipProps) {
+    state.plannedStamp = scene.bodyStamp;
+    state.propsPlanned = 1;
   }
   int status = engine::kOk;
   {
@@ -183,6 +228,26 @@ EMSCRIPTEN_KEEPALIVE int engine_render_frame() {
   rnd::counters().apiCallsLast = rnd::counters().apiCalls;
   rnd::counters().frames += 1;
   return status;
+}
+
+EMSCRIPTEN_KEEPALIVE int engine_render_refresh_props() {
+  if (rnd::renderState == nullptr || rnd::counters().ready == 0) return engine::kNotConfigured;
+  rnd::RenderState& state = *rnd::renderState;
+  const rnd::SceneView scene = rnd::sceneOf(state);
+  rnd::planProps(scene, state.camera, state.plan);
+  state.plannedStamp = scene.bodyStamp;
+  state.propsPlanned = 1;
+  return engine::kOk;
+}
+
+EMSCRIPTEN_KEEPALIVE int engine_render_set_prop_plan(std::uint32_t always) {
+  if (rnd::renderState == nullptr) return engine::kNotConfigured;
+  rnd::renderState->planPropsAlways = always != 0 ? 1u : 0u;
+  return engine::kOk;
+}
+
+EMSCRIPTEN_KEEPALIVE std::uint64_t engine_render_prop_plans() {
+  return rnd::counters().propPlans;
 }
 
 EMSCRIPTEN_KEEPALIVE float* engine_render_camera() {

@@ -34,7 +34,7 @@ std::int32_t exportPoses(std::uint8_t* dst, std::uint32_t capacity) {
   const std::uint32_t needed = bytesFor(bodies);
   if (capacity < needed) return -1;
   const PhysicsOrigin& origin = physicsOrigin();
-  Header header{origin.x, origin.y, origin.z, world.tick(), bodies, 0};
+  Header header{origin.x, origin.y, origin.z, world.tick(), bodies, world.poseEpoch()};
   std::memcpy(dst, &header, kHeaderBytes);
   std::memcpy(dst + kHeaderBytes, rows, bodies * sizeof(Transform));
   return static_cast<std::int32_t>(needed);
@@ -44,7 +44,7 @@ std::int32_t exportHeader(std::uint8_t* dst, std::uint32_t capacity) {
   World& world = engine::world();
   if (world.transforms() == nullptr || dst == nullptr || capacity < kHeaderBytes) return -1;
   const PhysicsOrigin& origin = physicsOrigin();
-  Header header{origin.x, origin.y, origin.z, world.tick(), world.bodyCapacity(), 0};
+  Header header{origin.x, origin.y, origin.z, world.tick(), world.bodyCapacity(), world.poseEpoch()};
   std::memcpy(dst, &header, kHeaderBytes);
   return static_cast<std::int32_t>(kHeaderBytes);
 }
@@ -62,7 +62,7 @@ int importPoses(const std::uint8_t* src, std::uint32_t bytes) {
   origin.x = header.originX;
   origin.y = header.originY;
   origin.z = header.originZ;
-  return engine::world().applyPoses(reinterpret_cast<const Transform*>(src + kHeaderBytes), header.bodies);
+  return engine::world().applyPoses(reinterpret_cast<const Transform*>(src + kHeaderBytes), header.bodies, header.epoch);
 }
 
 }

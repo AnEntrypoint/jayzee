@@ -13,7 +13,7 @@ struct Header {
   double originZ;
   std::uint64_t tick;
   std::uint32_t bodies;
-  std::uint32_t reserved;
+  std::uint32_t epoch;
 };
 
 static_assert(sizeof(Header) == 40);

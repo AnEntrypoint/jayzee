@@ -121,6 +121,20 @@ gate('the WebGPU backend keeps body records in slot order, sends only the runs t
   assert.ok(read('engine/src/render/render_frame.cpp').includes('camera.bodyOffset[0] = static_cast<float>(scene.bodyOrigin.x - scene.origin.x);'))
 })
 
+gate('the two per-body passes of a frame run only when a pose or a class changed, the WebGL2 lists are still built every frame, and the counters are refreshed on demand', () => {
+  const exportsText = read('engine/src/exports_render.cpp')
+  const webgpu = read('engine/src/render/render_webgpu.cpp')
+  const frame = read('engine/src/render/render_frame.cpp')
+  assert.ok(exportsText.includes('scene.skipProps = drawsEveryBody && state.planPropsAlways == 0 && state.propsPlanned != 0 && state.plannedStamp == scene.bodyStamp;'), 'the plan pass is skipped for a backend that draws from its lists, or with no stamp')
+  assert.ok(exportsText.includes('(static_cast<std::uint64_t>(engine::world().poseEpoch()) << 32) | classDigest(state.bodyClass, scene.bodyCount)'), 'the stamp does not cover the classes')
+  assert.ok(webgpu.includes('if (uploadedOnce && uploadedStamp == scene.bodyStamp) return;'))
+  assert.ok(frame.includes('if (!scene.skipProps) planProps(scene, camera, plan);'))
+  assert.ok(exportsText.includes('EMSCRIPTEN_KEEPALIVE int engine_render_refresh_props()'))
+  assert.ok(read('src/engine/renderer.js').includes('module._engine_render_refresh_props()'), 'the page reads counters of an older frame')
+  const world = read('engine/src/world.cpp')
+  assert.equal(world.split('posesTouched_ = true;').length - 1, 2, 'a writer of the pose rows does not mark them touched')
+})
+
 gate('the render sources never map a buffer, wait on a future or allocate on the heap', () => {
   for (const file of RENDER_FILES.filter((f) => f !== 'engine/src/exports_render.cpp' && f.endsWith('.cpp'))) {
     for (const pattern of FORBIDDEN_IN_RENDER) assert.doesNotMatch(sources[file], pattern, file + ' matches ' + pattern)

@@ -209,9 +209,11 @@ export const createRenderer = (module, backend, { modelTier = -1, device = null,
     },
 
     stats() {
+      if (module._engine_render_refresh_props && module._engine_render_refresh_props() !== 0) throw new Error('engine_render_refresh_props refused')
       return Object.freeze({
         backend: RENDER_BACKEND_NAMES[backend],
         frames: Number(module._engine_render_frames()),
+        propPlans: module._engine_render_prop_plans ? Number(module._engine_render_prop_plans()) : null,
         apiCallsLastFrame: module._engine_render_api_calls_last_frame(),
         checksum: module._engine_render_checksum(),
         visible: Object.freeze(Array.from({ length: L.PROP_CLASSES }, (_, cls) => module._engine_render_visible(cls))),

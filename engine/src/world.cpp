@@ -1214,9 +1214,11 @@ void World::step(std::uint32_t steps) {
   }
 }
 
-Status World::applyPoses(const Transform* rows, std::uint32_t count) {
+Status World::applyPoses(const Transform* rows, std::uint32_t count, std::uint32_t epoch) {
   if (transforms_ == nullptr || count != limits_.bodies) return kRange;
   std::memcpy(transforms_, rows, static_cast<std::size_t>(count) * sizeof(Transform));
+  poseEpoch_ = epoch;
+  posesTouched_ = false;
   for (std::uint32_t slot = 0; slot < fresh_; ++slot) {
     if (alive_[slot] != kSlotFree && alive_[slot] != kSlotHeld) alive_[slot] = kSlotAlive;
   }
@@ -1255,7 +1257,16 @@ int World::allocateSlot() {
   return -1;
 }
 
+std::uint32_t World::poseEpoch() {
+  if (posesTouched_) {
+    posesTouched_ = false;
+    poseEpoch_ += 1;
+  }
+  return poseEpoch_;
+}
+
 void World::hide(std::uint32_t slot) {
+  posesTouched_ = true;
   Transform& transform = transforms_[slot];
   transform.qx = 0.0f;
   transform.qy = 0.0f;
@@ -1282,6 +1293,7 @@ void World::sync(std::uint32_t slot) {
   velocity[0] = v.GetX();
   velocity[1] = v.GetY();
   velocity[2] = v.GetZ();
+  posesTouched_ = true;
   Transform& transform = transforms_[slot];
   transform.x = p.GetX();
   transform.y = p.GetY();

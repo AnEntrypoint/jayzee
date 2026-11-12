@@ -66,6 +66,7 @@ for (let f = 0; f < FRAMES; f++) {
   assert.equal(written, poseBytes, 'pose export at frame ' + f)
   frames.push(module.HEAPU8.slice(buffer, buffer + poseBytes))
 }
+const EPOCH_OFFSET = 36
 const lastExport = frames.at(-1)
 const directHeaderBytes = module._engine_pose_header(buffer, poseBytes)
 const directHeader = module.HEAPU8.slice(buffer, buffer + HEADER_BYTES)
@@ -82,6 +83,22 @@ gate('the header and the engine rows read in place are byte for byte the exporte
   assert.deepEqual(directHeader, lastExport.subarray(0, HEADER_BYTES))
   assert.equal(Buffer.compare(directRows, lastExport.subarray(HEADER_BYTES)), 0)
   assert.equal(module._engine_pose_header(buffer, HEADER_BYTES - 1), -1)
+})
+
+gate('the pose epoch stays while no row changes, moves when a rebase rewrites the rows, and an import takes the epoch of its buffer', () => {
+  const sleepTicks = 400
+  for (let t = 0; t < sleepTicks; t++) module._engine_tick(1)
+  const still = module._engine_pose_epoch()
+  for (let t = 0; t < 10; t++) module._engine_tick(1)
+  assert.equal(module._engine_pose_epoch(), still, 'the epoch moved though every body is asleep')
+  assert.equal(module._engine_follow(FRAMES * WALK_STEP_M + 5000, 0, 0), 0)
+  const moved = module._engine_pose_epoch()
+  assert.notEqual(moved, still)
+  assert.equal(module._engine_pose_export(buffer, poseBytes), poseBytes)
+  assert.equal(new DataView(module.HEAPU8.buffer, buffer, poseBytes).getUint32(EPOCH_OFFSET, true), moved)
+  module.HEAPU8.set(lastExport, buffer)
+  assert.equal(module._engine_pose_import(buffer, poseBytes), 0)
+  assert.equal(module._engine_pose_epoch(), new DataView(lastExport.buffer, lastExport.byteOffset).getUint32(EPOCH_OFFSET, true))
 })
 
 gate('the origin walk crosses rebases, and the origin in the buffer changes with them', () => {

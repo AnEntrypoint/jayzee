@@ -186,19 +186,7 @@ void resolveMaterials(const MaterialSlot* table, std::uint32_t count, const std:
   }
 }
 
-void planFrame(const SceneView& scene, Camera& camera, FramePlan& plan) {
-  extractPlanes(camera.viewProj, camera.planes);
-  for (std::uint32_t c = 0; c < kPropClasses; ++c) camera.classRadius[c] = kPropRadius;
-  const std::uint32_t lights = scene.lightCount < kLightSlots ? scene.lightCount : kLightSlots;
-  camera.counts[0] = lights;
-  camera.counts[1] = scene.bodyCount;
-  camera.counts[2] = 0;
-  camera.counts[3] = 0;
-  camera.bodyOffset[0] = static_cast<float>(scene.bodyOrigin.x - scene.origin.x);
-  camera.bodyOffset[1] = static_cast<float>(scene.bodyOrigin.y - scene.origin.y);
-  camera.bodyOffset[2] = static_cast<float>(scene.bodyOrigin.z - scene.origin.z);
-  camera.bodyOffset[3] = 0.0f;
-
+void planProps(const SceneView& scene, const Camera& camera, FramePlan& plan) {
   for (std::uint32_t c = 0; c < kPropClasses; ++c) plan.propCount[c] = 0;
   std::uint64_t hash = kFnvOffset;
   for (std::uint32_t i = 0; i < scene.bodyCount; ++i) {
@@ -220,15 +208,32 @@ void planFrame(const SceneView& scene, Camera& camera, FramePlan& plan) {
     std::memcpy(plan.propRecords + (cls * plan.bodySlots + index) * kRecordWords, out, kRecordBytes);
   }
   plan.checksum = hash;
+  state.checksum = hash;
+  state.propPlans += 1;
+  for (std::uint32_t c = 0; c < kPropClasses; ++c) state.visible[c] = plan.propCount[c];
+}
+
+void planFrame(const SceneView& scene, Camera& camera, FramePlan& plan) {
+  extractPlanes(camera.viewProj, camera.planes);
+  for (std::uint32_t c = 0; c < kPropClasses; ++c) camera.classRadius[c] = kPropRadius;
+  const std::uint32_t lights = scene.lightCount < kLightSlots ? scene.lightCount : kLightSlots;
+  camera.counts[0] = lights;
+  camera.counts[1] = scene.bodyCount;
+  camera.counts[2] = 0;
+  camera.counts[3] = 0;
+  camera.bodyOffset[0] = static_cast<float>(scene.bodyOrigin.x - scene.origin.x);
+  camera.bodyOffset[1] = static_cast<float>(scene.bodyOrigin.y - scene.origin.y);
+  camera.bodyOffset[2] = static_cast<float>(scene.bodyOrigin.z - scene.origin.z);
+  camera.bodyOffset[3] = 0.0f;
+
+  if (!scene.skipProps) planProps(scene, camera, plan);
 
   syncPages(scene, plan);
   resolveMaterials(scene.materials, scene.materialCount, scene.albedoReady, scene.albedoLayerOf, plan.materialWords);
 
-  state.checksum = hash;
   state.uploads = plan.uploadCount;
   state.pages = plan.pageCount;
   state.lights = lights;
-  for (std::uint32_t c = 0; c < kPropClasses; ++c) state.visible[c] = plan.propCount[c];
 }
 
 }

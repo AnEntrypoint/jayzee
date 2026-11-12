@@ -1,10 +1,14 @@
 const QUEUE_CAPACITY = 4096
 
-export const createPoseHandoffCore = ({ module, region, reserve, send }) => {
+export const POSE_EPOCH_OFFSET = 36
+
+export const createPoseHandoffCore = ({ module, region, reserve, send, skipUnchanged = true }) => {
   const queued = new Int32Array(QUEUE_CAPACITY)
   const queue = { head: 0, count: 0 }
   const heapPose = new Uint8Array(module.HEAPU8.buffer, reserve, region.poseBytes)
-  const handoff = { imported: -1, failure: null, pending: 0 }
+  const handoff = { imported: -1, failure: null, pending: 0, unchanged: 0 }
+  const stamped = skipUnchanged && typeof module._engine_pose_epoch === 'function'
+  let appliedEpoch = -1
 
   const pump = () => {
     while (queue.count > 0) {
@@ -21,11 +25,18 @@ export const createPoseHandoffCore = ({ module, region, reserve, send }) => {
 
   const receive = (slot) => {
     handoff.pending -= 1
-    heapPose.set(region.view(slot))
-    const status = module._engine_pose_import(reserve, region.poseBytes)
-    if (status !== 0) {
-      handoff.failure = 'engine_pose_import status ' + status
-      return
+    const view = region.view(slot)
+    const epoch = stamped ? (view[POSE_EPOCH_OFFSET] | (view[POSE_EPOCH_OFFSET + 1] << 8) | (view[POSE_EPOCH_OFFSET + 2] << 16) | (view[POSE_EPOCH_OFFSET + 3] << 24)) >>> 0 : -1
+    if (stamped && epoch === appliedEpoch) {
+      handoff.unchanged += 1
+    } else {
+      heapPose.set(view)
+      const status = module._engine_pose_import(reserve, region.poseBytes)
+      if (status !== 0) {
+        handoff.failure = 'engine_pose_import status ' + status
+        return
+      }
+      appliedEpoch = epoch
     }
     handoff.imported = region.frameOf(slot)
     region.release(slot)

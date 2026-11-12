@@ -161,6 +161,7 @@ set(ENGINE_EXPORTS
   _engine_pose_export
   _engine_pose_header
   _engine_pose_rows
+  _engine_pose_epoch
   _engine_pose_import
   _engine_follow
   _engine_retired_slots
@@ -270,6 +271,9 @@ set(ENGINE_EXPORTS
   _engine_render_creates_after_seal
   _engine_render_frame
   _engine_render_frames
+  _engine_render_refresh_props
+  _engine_render_set_prop_plan
+  _engine_render_prop_plans
   _engine_render_init
   _engine_render_light_count
   _engine_render_lights

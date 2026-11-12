@@ -40,6 +40,10 @@ EMSCRIPTEN_KEEPALIVE std::int32_t engine_pose_header(std::uint8_t* dst, std::uin
   return engine::pose::exportHeader(dst, capacity);
 }
 
+EMSCRIPTEN_KEEPALIVE std::uint32_t engine_pose_epoch() {
+  return engine::world().poseEpoch();
+}
+
 EMSCRIPTEN_KEEPALIVE const std::uint8_t* engine_pose_rows() {
   return engine::pose::rowBytes();
 }

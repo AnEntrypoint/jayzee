@@ -1274,9 +1274,15 @@ void drawProps(wgpu::RenderPassEncoder& pass) {
   ENGINE_RENDER_CALL(pass.DrawIndirect(argsBuf, kArgsPropWord * 4));
 }
 
+std::uint64_t uploadedStamp = 0;
+bool uploadedOnce = false;
+
 void uploadBodyRecords(const SceneView& scene) {
   constexpr std::uint32_t kMergeGapRecords = 64;
   constexpr std::uint32_t kNoRun = 0xffffffffu;
+  if (uploadedOnce && uploadedStamp == scene.bodyStamp) return;
+  uploadedStamp = scene.bodyStamp;
+  uploadedOnce = true;
   std::uint32_t runStart = kNoRun;
   std::uint32_t runEnd = 0;
   for (std::uint32_t i = 0; i < scene.bodyCount; ++i) {
@@ -1581,6 +1587,7 @@ int init(const char* selector, std::uint32_t width, std::uint32_t height) {
     if (instanceShadow == nullptr) return engine::kRange;
   }
   std::memset(instanceShadow, 0, static_cast<std::size_t>(bodyBytes));
+  uploadedOnce = false;
 
   if (engine::models::bound()) {
     modelVertexBuf = makeBuffer(engine::models::vertexPoolBytes(), wgpu::BufferUsage::Vertex | wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst);

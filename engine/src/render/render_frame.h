@@ -107,6 +107,8 @@ struct SceneView {
   std::int32_t (*albedoLayerOf)(double handle);
   FrameOrigin origin;
   FrameOrigin bodyOrigin;
+  std::uint64_t bodyStamp;
+  bool skipProps;
 };
 
 constexpr std::uint32_t kModelPathForward = 0;
@@ -153,6 +155,7 @@ struct Counters {
   std::uint32_t vegetationInstances;
   std::uint32_t cullFresh;
   std::uint32_t countReadback;
+  std::uint64_t propPlans;
 };
 
 Counters& counters();
@@ -162,6 +165,7 @@ bool acceptCreate();
 std::uint32_t pageLayers();
 void resetPlan(FramePlan& plan);
 void planFrame(const SceneView& scene, Camera& camera, FramePlan& plan);
+void planProps(const SceneView& scene, const Camera& camera, FramePlan& plan);
 void resolveMaterials(const MaterialSlot* table, std::uint32_t count, const std::uint8_t* albedoReady, std::int32_t (*albedoLayerOf)(double handle), std::uint32_t* words);
 std::uint32_t uploadRunEnd(const FramePlan& plan, std::uint32_t start);
 std::uint32_t albedoRunEnd(const FramePlan& plan, std::uint32_t start);

@@ -173,6 +173,7 @@ class World {
   Status clearReleaseView();
   std::uint32_t airborneBodies() const;
   std::uint64_t tempPeakBytes() const;
+  std::uint32_t poseEpoch();
   std::uint32_t updateErrors() const { return updateErrors_; }
   std::uint32_t awakeLimit() const;
   std::uint32_t wakeCount(std::uint32_t count) const;
@@ -195,7 +196,7 @@ class World {
   const double* velocities() const { return velocities_; }
   const Transform* transforms() const { return transforms_; }
   std::uint64_t rebases() const { return rebases_; }
-  Status applyPoses(const Transform* rows, std::uint32_t count);
+  Status applyPoses(const Transform* rows, std::uint32_t count, std::uint32_t epoch);
 
  private:
   struct Runtime;
@@ -222,6 +223,8 @@ class World {
   std::uint32_t retired_ = 0;
   std::uint32_t awakeBudget_ = 0;
   std::uint32_t heldCount_ = 0;
+  std::uint32_t poseEpoch_ = 0;
+  bool posesTouched_ = true;
   std::uint32_t updateErrors_ = 0;
   std::uint32_t queueCount_ = 0;
   std::uint32_t queueHead_ = 0;
