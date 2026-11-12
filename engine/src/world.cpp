@@ -1112,6 +1112,14 @@ std::uint32_t World::unsettledInView() const {
   return unsettled;
 }
 
+bool World::prepareRelease() {
+  if (runtime_ == nullptr || heldCount_ == 0) return false;
+  const bool driftDue = queueDrifted_ && sinceRefill_ + 1 >= kDriftRefillSteps;
+  if (!queueStale_ && queueHead_ != queueCount_ && !driftDue) return false;
+  refillReleaseQueue();
+  return true;
+}
+
 void World::releaseHeld() {
   if (sinceRefill_ < kDriftRefillSteps) sinceRefill_ += 1;
   if (heldCount_ == 0) return;

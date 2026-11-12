@@ -183,6 +183,7 @@ class World {
   std::uint32_t awakeLimit() const;
   std::uint32_t wakeCount(std::uint32_t count) const;
   void releaseHeld();
+  bool prepareRelease();
   void setTick(std::uint64_t tick);
   void applyRadialGravity(JPH::PhysicsSystem& system, float dt);
   void gravityRange(std::uint32_t begin, std::uint32_t end);

@@ -60,6 +60,13 @@ const SCRATCH_VIEW_TARGET = 4
 const SCRATCH_VIEW_COS = 7
 const SCRATCH_VIEW_RANGE = 8
 
+const prepareNothing = () => 0
+
+export const createReleasePrepare = (module) => {
+  if (typeof module._engine_world_prepare_release !== 'function') return prepareNothing
+  return () => module._engine_world_prepare_release()
+}
+
 export const createPoseStepper = ({ module, streamer, region, reserve }) => {
   const heapPose = new Uint8Array(module.HEAPU8.buffer, reserve, region.poseBytes)
   const { poseBytes } = region
