@@ -1,3 +1,4 @@
+import { clearInputBucket, isInputRateLimited, sanitizeInputPayload } from '../anticheat/InputGuard.js'
 import { MSG } from '../protocol/messages.js'
 import { pack } from '../protocol/msgpack.js'
 import { PlayerManager } from '../netcode/playerManager.js'
@@ -69,7 +70,7 @@ export function createTickHost({
   const playersById = new Map()
   const allIds = []
   const memo = newRecordMemo()
-  const stats = { ticks: 0, snapshots: 0, snapshotBytes: 0, snapshotsRefused: 0, teleports: 0, teleportReleases: 0 }
+  const stats = { inputsAccepted: 0, inputsRateLimited: 0, ticks: 0, snapshots: 0, snapshotBytes: 0, snapshotsRefused: 0, teleports: 0, teleportReleases: 0 }
   const releases = []
   let tick = 0
   let snapshotSeq = 0
@@ -195,7 +196,20 @@ export function createTickHost({
     lagCompensator.clearPlayerHistory(id)
     movementState.playerIdleCounts.delete(id)
     movementState.playerAccumDt.delete(id)
+    clearInputBucket(playerManager.getPlayer(id))
     playerManager.removePlayer(id)
+    return true
+  }
+
+  const receiveInput = (id, input, clientSeq) => {
+    const player = playerManager.getPlayer(id)
+    if (!player) return false
+    if (isInputRateLimited(player, now())) {
+      stats.inputsRateLimited++
+      return false
+    }
+    playerManager.addInput(id, sanitizeInputPayload(input), clientSeq)
+    stats.inputsAccepted++
     return true
   }
 
@@ -236,7 +250,7 @@ export function createTickHost({
   return {
     addPlayer,
     removePlayer,
-    receiveInput: (id, input, clientSeq) => playerManager.addInput(id, input, clientSeq),
+    receiveInput,
     teleport,
     tick: runTick,
     steps,
