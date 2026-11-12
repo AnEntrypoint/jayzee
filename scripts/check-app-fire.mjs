@@ -3,6 +3,7 @@ import { FIRE_APP_NAME, createAppFires, createFireLatticeSource } from '../src/a
 import { createHookRunner } from '../src/apps/hookOrder.js'
 import { FIRE_STATE } from '../src/fire/index.js'
 import { createTrunkStreamer } from '../src/fire/trunkStreamer.js'
+import { createColliderStreamer } from '../src/terrain-pure/colliderStreamer.js'
 import { createPlanetFrame } from '../src/terrain-pure/planetFrame.js'
 
 const fail = (what) => { throw new Error(what) }
@@ -215,6 +216,102 @@ gate('negative control: a fire that is defined but whose runtime never ticks bur
   runtime.fire.ignite(spot)
   for (let tick = 1; tick <= 120; tick++) runtime.step(tick)
   if (!(runtime.sent.length > 0 && burntTrunks(runtime) > 0)) fail('the same fire did not burn once its runtime ticked')
+})
+
+const makeColliderWorld = async (specOverrides = {}) => {
+  const frame = createPlanetFrame({ sampler, anchorDir: [0, 1, 0], offsetY: 0 })
+  const state = { tick: 0 }
+  const hooks = createHookRunner({ tickDt: TICK_DT })
+  const fires = createAppFires({ hooks, tickOf: () => state.tick, tickDt: TICK_DT })
+  const source = createFireLatticeSource(LATTICE)
+  const holder = { streamer: null }
+  const warnings = []
+  const fire = fires.register(7, { ...SPEC, role: 'authority', ...specOverrides }, { appCtx: { send: () => {} }, frameOf: () => frame, latticeFor: source.latticeFor, trunkStreamerOf: () => holder.streamer, warn: (text) => warnings.push(text) })
+  const probe = { fire, frame, source }
+  const trunkPlacements = placementsNear(probe, SPOT_XZ[0], SPOT_XZ[1], 40, 8).map((t) => ({ id: t.trunkId, x: t.x, y: t.y, z: t.z }))
+  const bodies = new Map()
+  const removed = []
+  let nextBody = 1
+  let handedOut = false
+  const physics = {
+    addBody(shape, args, position, type, opts) { const id = nextBody++; bodies.set(id, { position: [...position], rotation: [...opts.rotation] }); return id },
+    removeBody(id) { bodies.delete(id); removed.push(id) },
+    preallocatePool() {},
+    getBodyPosition: (id) => bodies.get(id).position,
+    getBodyRotation: (id) => bodies.get(id).rotation,
+    setBodyTransform(id, position, rotation) { bodies.set(id, { position: [...position], rotation: [...rotation] }) },
+  }
+  const saved = { log: console.log, warn: console.warn, error: console.error }
+  console.log = () => {}
+  console.warn = () => {}
+  const streamer = createColliderStreamer({
+    physics, frame, latticeSpec: { CHUNK: 64, GRID: 4 }, idField: 'id',
+    placementsFor: () => { if (handedOut) return []; handedOut = true; return trunkPlacements },
+    bodyArgs: (p) => ({ shape: 'box', args: new Float32Array([0.3, 2, 0.3]), position: [p.x, p.y, p.z], rotation: [0, 0, 0, 1], shapeKey: 'trunk' }),
+    setColliderIds() {},
+    getCenters: () => [[SPOT_XZ[0], SPOT_XZ[1]]],
+    radius: 150, cap: 512, intervalMs: 300000,
+    now: () => performance.now(), setTimer: (fn, ms) => setTimeout(fn, ms), clearTimer: (handle) => clearTimeout(handle), yieldToLoop: () => new Promise((resolve) => setImmediate(resolve)), cpuUsage: () => process.cpuUsage(),
+    logTag: '[gate]',
+  })
+  await streamer.start()
+  console.log = saved.log
+  console.warn = saved.warn
+  const restore = () => {}
+  const step = (tick) => { state.tick = tick; const result = hooks.tick(tick); if (result.errors.length > 0) fail('hook error: ' + result.errors[0].message) }
+  return { frame, fire, holder, streamer, bodies, removed, trunkPlacements, warnings, step, restore, spot: [SPOT_XZ[0], frame.groundHeightLocal(SPOT_XZ[0], SPOT_XZ[1]), SPOT_XZ[1]] }
+}
+
+gate('with the real trunk collider streamer the fire follows spoint: it installs isTrunkCharred as the exclusion and sweeps the collider of each trunk whose cell has burnt out', async () => {
+  const w = await makeColliderWorld()
+  try {
+    const before = w.streamer.liveCount
+    if (!(before > 20)) fail(`the collider streamer placed only ${before} trunks`)
+    w.step(0)
+    w.fire.ignite(w.spot)
+    for (let tick = 1; tick <= 20; tick++) w.step(tick)
+    expect([w.fire.stats.collidersSwept, w.streamer.liveCount], [0, before], 'no streamer is attached yet, so nothing is swept')
+    w.holder.streamer = w.streamer
+    let firstSweepTick = -1
+    for (let tick = 21; tick <= 900; tick++) {
+      w.step(tick)
+      if (firstSweepTick === -1 && w.fire.stats.collidersSwept > 0) firstSweepTick = tick
+    }
+    if (firstSweepTick === -1) fail('no trunk collider was swept in 900 ticks')
+    const charred = w.trunkPlacements.filter((t) => w.fire.isTrunkCharred(t.id))
+    if (!(charred.length > 5)) fail(`only ${charred.length} trunks are charred`)
+    expect(w.fire.stats.collidersSwept, w.removed.length, 'colliders swept against bodies removed')
+    for (const t of charred) if (w.streamer._live.has(t.id)) fail(`charred trunk ${t.id} still has a collider`)
+    for (const t of w.trunkPlacements) if (!w.fire.isTrunkCharred(t.id) && !w.streamer._live.has(t.id)) fail(`trunk ${t.id} is not charred but lost its collider`)
+    expect(w.streamer.liveCount, before - w.removed.length, 'live colliders')
+  } finally {
+    w.restore()
+    w.streamer.stop()
+  }
+})
+
+gate('negative control: a fire with no trunk collider streamer burns the same cells and removes no collider', async () => {
+  const w = await makeColliderWorld()
+  try {
+    w.step(0)
+    w.fire.ignite(w.spot)
+    for (let tick = 1; tick <= 900; tick++) w.step(tick)
+    if (!(w.trunkPlacements.filter((t) => w.fire.isTrunkCharred(t.id)).length > 5)) fail('the fire did not char the trunks')
+    expect([w.fire.stats.collidersSwept, w.removed.length], [0, 0], 'swept and removed')
+  } finally {
+    w.restore()
+    w.streamer.stop()
+  }
+})
+
+gate('a trunk collider streamer that lacks sweepExcluded or refresh is refused when the fire first meets it, and trunkStreamerOf must be a function', async () => {
+  const frame = createPlanetFrame({ sampler, anchorDir: [0, 1, 0], offsetY: 0 })
+  const hooks = createHookRunner({ tickDt: TICK_DT })
+  const fires = createAppFires({ hooks, tickOf: () => 0, tickDt: TICK_DT })
+  refuses(() => fires.register(1, { ...SPEC, role: 'authority' }, { appCtx: { send: () => {} }, frameOf: () => frame, lattice: LATTICE, trunkStreamerOf: 'streamer' }), 'trunkStreamerOf is a function', 'non-function supplier')
+  const fire = fires.register(2, { ...SPEC, role: 'authority' }, { appCtx: { send: () => {} }, frameOf: () => frame, lattice: LATTICE, trunks: { setExclude() {} } })
+  fire.start(0)
+  refuses(() => fire.tick(1, TICK_DT), 'no sweepExcluded function', 'half a streamer')
 })
 
 finish()

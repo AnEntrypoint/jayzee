@@ -61,7 +61,11 @@ export function defineFire(rawSpec, env) {
   if (typeof frameOf !== 'function') throw new TypeError('[fire] defineFire needs env.frameOf, a function returning the live planet frame')
   if (typeof latticeFor !== 'function') throw new TypeError('[fire] defineFire needs env.latticeFor, a function (radius, cellsPerFireCell) returning the fire lattice')
   const spec = resolveFireSpec(rawSpec)
-  const trunks = checkTrunks(env.trunks)
+  const colliderContract = env.trunks !== null && env.trunks !== undefined && typeof env.trunks.setExclude === 'function'
+  if (env.trunkStreamerOf !== undefined && env.trunkStreamerOf !== null && typeof env.trunkStreamerOf !== 'function') throw new TypeError('[fire] env.trunkStreamerOf is a function returning the trunk collider streamer, or is absent')
+  const trunkStreamerOf = typeof env.trunkStreamerOf === 'function' ? env.trunkStreamerOf : (colliderContract ? () => env.trunks : null)
+  const trunks = colliderContract ? null : checkTrunks(env.trunks)
+  const warn = typeof env.warn === 'function' ? env.warn : null
   const authority = spec.role === 'authority'
   const frame0 = frameOf()
   const radius = spec.radius ?? frame0?.radius
@@ -86,7 +90,7 @@ export function defineFire(rawSpec, env) {
   const outbox = new Array(FIRE_MAX_ROWS_PER_MESSAGE).fill(null)
   let outCount = 0
   const checksumRows = []
-  const stats = { emitted: 0, messages: 0, received: 0, refused: 0, trunkWrites: 0, trunkRefreshes: 0, checksums: 0, keyframesAdopted: 0 }
+  const stats = { emitted: 0, messages: 0, received: 0, refused: 0, trunkWrites: 0, trunkRefreshes: 0, checksums: 0, keyframesAdopted: 0, collidersSwept: 0, colliderRefreshes: 0, colliderRefreshFailures: 0 }
   let simTick = 0
   let started = false
   const checksumPeriodTicks = spec.config.stepTicks * spec.config.checksumEverySteps
@@ -197,6 +201,46 @@ export function defineFire(rawSpec, env) {
     return stats.trunkWrites - before
   }
 
+  let colliderStreamer = null
+  let colliderSerial = -1
+  let colliderScars = 0
+  const charScratch = { face: 0, I: 0, J: 0 }
+
+  function isTrunkCharred(trunkId) {
+    if (kernel.activeCount === 0 && kernel.scarCount === 0) return false
+    lattice.cellOfPlacementId(trunkId, charScratch)
+    return kernel.stateCodeAt(charScratch.face, charScratch.I, charScratch.J) === FIRE_STATE.BURNT
+  }
+
+  function refreshTrunkColliders() {
+    stats.colliderRefreshes++
+    const pending = colliderStreamer.refresh()
+    if (pending && typeof pending.then === 'function') {
+      pending.then(null, (error) => {
+        stats.colliderRefreshFailures++
+        if (warn !== null) warn('[fire] trunk collider refresh failed and the ring is left partial: ' + (error && error.message ? error.message : String(error)))
+      })
+    }
+  }
+
+  function syncTrunkColliders() {
+    if (trunkStreamerOf === null) return 0
+    if (colliderStreamer === null) {
+      const streamer = trunkStreamerOf()
+      if (!streamer || typeof streamer.setExclude !== 'function') return 0
+      for (const name of ['sweepExcluded', 'refresh']) if (typeof streamer[name] !== 'function') throw new TypeError(`[fire] the trunk collider streamer has no ${name} function: the fire sweeps charred trunks out and refreshes the ring when cells regrow`)
+      colliderStreamer = streamer
+      streamer.setExclude(isTrunkCharred)
+    }
+    if (kernel.changeSerial === colliderSerial) return 0
+    colliderSerial = kernel.changeSerial
+    const swept = colliderStreamer.sweepExcluded()
+    stats.collidersSwept += swept
+    if (kernel.scarCount < colliderScars) refreshTrunkColliders()
+    colliderScars = kernel.scarCount
+    return swept
+  }
+
   const gameplay = spec.gameplay === null ? null : createFireGameplay({
     gameplay: spec.gameplay,
     getWorld: () => ({ kernel, lattice }),
@@ -232,6 +276,7 @@ export function defineFire(rawSpec, env) {
     }
     if (!authority) ledger.compare(simTick)
     syncTrunks()
+    syncTrunkColliders()
     flush()
   }
 
@@ -308,6 +353,7 @@ export function defineFire(rawSpec, env) {
       ledger.compare(simTick)
     }
     syncTrunks()
+    syncTrunkColliders()
     return true
   }
 
@@ -339,6 +385,8 @@ export function defineFire(rawSpec, env) {
     isBurningAt: (position) => { const c = cellOfPosition(position); return kernel.stateCodeAt(c.face, c.I, c.J) === FIRE_STATE.BURNING },
     syncWeather,
     syncTrunks,
+    syncTrunkColliders,
+    isTrunkCharred,
     refreshTrunks,
     keyframe,
     receive,

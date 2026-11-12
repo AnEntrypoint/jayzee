@@ -38,7 +38,7 @@ export function createAppFires({ hooks, tickOf, tickDt }) {
     if (env === null || typeof env !== 'object') throw new TypeError('[fire] register needs its environment: { appCtx, frameOf, lattice or latticeFor, trunks }')
     const latticeFor = env.latticeFor ?? (env.lattice ? createFireLatticeSource(env.lattice).latticeFor : null)
     if (typeof latticeFor !== 'function') throw new TypeError('[fire] register needs env.latticeFor or env.lattice { chunkM, cellsPerChunk }')
-    const fire = defineFire(spec, { appCtx: env.appCtx, frameOf: env.frameOf, latticeFor, trunks: env.trunks })
+    const fire = defineFire(spec, { appCtx: env.appCtx, frameOf: env.frameOf, latticeFor, trunks: env.trunks, trunkStreamerOf: env.trunkStreamerOf, warn: env.warn })
     const entry = { id, fire }
     hooks.add(id, {
       onSpawn: () => fire.start(tickOf()),
