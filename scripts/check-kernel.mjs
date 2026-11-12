@@ -234,6 +234,60 @@ gate('a pass on one bucket resolves the pairs a pass on 4096 buckets resolves, b
   }
 })
 
+const pile = () => {
+  const count = 48
+  const pos = new Float64Array(count * 3)
+  const vel = new Float64Array(count * 3)
+  for (let i = 0; i < count; i++) {
+    pos[i * 3] = (i % 4) * 0.9
+    pos[i * 3 + 1] = 0.5 + Math.floor(i / 16) * 0.9
+    pos[i * 3 + 2] = (Math.floor(i / 4) % 4) * 0.9
+    vel[i * 3 + 1] = -0.3 - (i % 5) * 0.1
+  }
+  return { count, pos, vel }
+}
+const bitsOf = (values) => Buffer.from(values.buffer, values.byteOffset, values.byteLength).toString('hex')
+
+gate('a pair pass that finds every body in the cell it had reuses its grid, and resolves what a fresh kernel resolves, bit for bit', () => {
+  const { count, pos, vel } = pile()
+  const kept = load({ pos, vel })
+  kept.run.resolvePairs(count, 0.5, 0.2)
+  const between = { pos: Float64Array.from(kept.pos), vel: Float64Array.from(kept.vel) }
+  kept.run.resolvePairs(count, 0.5, 0.2)
+  const fresh = load(between)
+  fresh.run.resolvePairs(count, 0.5, 0.2)
+  assert.equal(bitsOf(kept.pos), bitsOf(fresh.pos))
+  assert.equal(bitsOf(kept.vel), bitsOf(fresh.vel))
+})
+
+gate('a body the host moves into another cell between two pair passes is found in its new cell', () => {
+  const k = load({ pos: Float64Array.from([0, 5, 0, 20, 5, 0]), vel: new Float64Array(6) })
+  k.run.resolvePairs(2, 0.5, 0)
+  assert.deepEqual(Array.from(k.pos), [0, 5, 0, 20, 5, 0])
+  k.pos[3] = 0.6
+  k.run.resolvePairs(2, 0.5, 0)
+  assert.ok(Math.abs(k.pos[3] - k.pos[0] - 1) < 1e-12, 'the moved body was not separated: ' + Array.from(k.pos))
+})
+
+gate('stepMany runs the ticks one step call each would run, bit for bit, and hash is FNV-1a over the float64 words of the live bodies', () => {
+  const { count, pos, vel } = pile()
+  const args = [count, 1, -9.8, 0.1, 1 / 60, 0.5, 0.2, 4]
+  const single = load({ pos, vel })
+  for (let tick = 0; tick < 7; tick++) single.run.step(...args)
+  const batched = load({ pos, vel })
+  batched.run.stepMany(7, ...args)
+  assert.equal(bitsOf(batched.pos), bitsOf(single.pos))
+  assert.equal(bitsOf(batched.vel), bitsOf(single.vel))
+  const fnv = (hash, values) => {
+    let h = hash
+    for (const word of new Uint32Array(values.buffer, values.byteOffset, count * 6)) h = Math.imul(h ^ word, 0x01000193)
+    return h
+  }
+  const expected = fnv(fnv(0x811c9dc5, batched.pos), batched.vel) >>> 0
+  assert.equal(batched.run.hash(count, 0x811c9dc5) >>> 0, expected)
+  assert.notEqual(batched.run.hash(count - 1, 0x811c9dc5) >>> 0, expected)
+})
+
 gate('the views the kernel hands out are its own storage, so a step copies nothing', () => {
   const k = load({ pos: Float64Array.from([0, 10, 0]), vel: new Float64Array(3) })
   const buffer = k.pos.buffer

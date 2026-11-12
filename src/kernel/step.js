@@ -10,3 +10,7 @@ export const step = (count, boxCount, gravity, drag, dt, radius, restitution, it
     resolvePairs(count, radius, restitution)
   }
 }
+
+export const stepMany = (ticks, count, boxCount, gravity, drag, dt, radius, restitution, iterations) => {
+  for (let t = 0; t < ticks; t++) step(count, boxCount, gravity, drag, dt, radius, restitution, iterations)
+}
