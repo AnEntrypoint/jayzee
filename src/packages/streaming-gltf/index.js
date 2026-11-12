@@ -3,3 +3,4 @@ export { EPS_AREA, FAN_EDGE_MAX_CLUSTER_DIAGONALS, triangleArea, collapseDegener
 export { PROGRESSIVE_LOD_ROOT_SCHEMA, PROGRESSIVE_LOD_SCHEMA_NAMES, createSchemaValidator } from './progressive-lod-schema.js'
 export { shouldSwapMaterials, shouldStripNormalMaps, setThreeRef, applyLowTierMaterials } from './material-tier-swap.js'
 export { buildClusterLod } from './meshlet-codec.js'
+export { PROGRESSIVE_BAKE_VERSION, DEFAULT_BAKE_RATIOS, BAKE_REFUSAL, ProgressiveBakeError, planProgressiveBake, writeProgressiveBake, decimateToRatio, encodeLodPayload, decodeLodPayload } from './progressive-bake.js'
