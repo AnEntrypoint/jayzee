@@ -76,8 +76,12 @@ function spawnRejoinGround(ctx, sp) {
   return spawnHoldOutcome(r && r.hit ? r.position?.[1] : null, SPAWN_HOLD_REASON.RAY_MISSED_GROUND)
 }
 
+export function probeSpawnGround(ctx, sp) {
+  return probeSpawnHoldGround(ctx, sp)
+}
+
 export function probeSpawnGroundY(ctx, sp) {
-  return spawnSurfaceGround(ctx, sp).y
+  return probeSpawnGround(ctx, sp).y
 }
 
 export function spawnClearanceM(ctx, x, y, z) {
@@ -169,12 +173,16 @@ export function teleportTarget(ctx, spec) {
   return resolveTarget(spec, { frame, heightAt })
 }
 
-export function teleportPosition(ctx, target) {
-  const standY = target.standNearY !== null ? probeSpawnGroundY(ctx, [target.x, target.standNearY, target.z]) : null
-  if (target.y !== null) return [target.x, target.y, target.z]
-  if (standY !== null) return [target.x, ctx.physicsIntegration.standingCentreY(standY), target.z]
-  if (target.standNearY !== null) return [target.x, target.standNearY, target.z]
+export function teleportPlacement(ctx, target) {
+  const probe = target.standNearY !== null ? probeSpawnGround(ctx, [target.x, target.standNearY, target.z]) : null
+  if (target.y !== null) return { position: [target.x, target.y, target.z], holdReason: null }
+  if (probe !== null && probe.y !== null) return { position: [target.x, ctx.physicsIntegration.standingCentreY(probe.y), target.z], holdReason: null }
+  if (probe !== null) return { position: [target.x, target.standNearY, target.z], holdReason: probe.reason }
   const position = snapToGround(ctx, target.x, Number.NEGATIVE_INFINITY, target.z, target.clearance, target.snap)
   if (!position) throw new Error('teleport: no terrain height at target and no explicit y')
-  return position
+  return { position, holdReason: null }
+}
+
+export function teleportPosition(ctx, target) {
+  return teleportPlacement(ctx, target).position
 }

@@ -1,4 +1,6 @@
 import { checksumBodies, createChecksumFold } from '../anticheat/LockstepChecksum.js'
+import { createCorrectionObserver } from '../rollback-pure/correctionObserver.js'
+import { STATS_POST_INTERVAL_MS, startStatsPost } from '../rollback-pure/peerSimRuntime.js'
 import { playerDefault } from '../player-defaults-pure/playerDefaults.js'
 import { resolveNetcodeProfile } from './netcodeProfile.js'
 import { PEER_LOOP_FACTORIES, PEER_SIMULATED_PROFILES } from './peerLoops.js'
@@ -43,10 +45,30 @@ export function createPeerSimSession(ctx, { roster, localPubkey, bridge, tickSys
     return m
   }
 
-  function simulate(tick, dt, inputsByPeer) {
+  function simulate(tick, dt, inputsByPeer, resim) {
     ctx.handlerState.fn(tick, dt, toPlayerInputs(inputsByPeer))
-    connections.flushAll()
+    if (!resim) connections.flushAll()
   }
+
+  function capture() {
+    return { bodies: physics.snapshotBodies(), players: playerManager.snapshotState() }
+  }
+
+  function apply(snap) {
+    physics.restoreBodies(snap.bodies)
+    playerManager.restoreState(snap.players)
+  }
+
+  function connectedPlayers() {
+    const out = []
+    for (const id of playerIdByPeer.values()) {
+      const p = playerManager.getPlayer(id)
+      if (p) out.push({ id, position: p.state.position })
+    }
+    return out
+  }
+
+  const observeRollback = createCorrectionObserver({ connected: connectedPlayers, localPlayerId })
 
   function checksumOf(tick, snap) {
     const fold = createChecksumFold().pushInt(tick)
@@ -72,7 +94,20 @@ export function createPeerSimSession(ctx, { roster, localPubkey, bridge, tickSys
     return fold.digest()
   }
 
-  const { loop, transport, voter } = PEER_LOOP_FACTORIES[profile.name]({ bridge, tickSystem, roster: sorted, localPeerId: localPubkey, simulate, getLocalInput, liveChecksum, options: profile.options, now })
+  const { loop, transport, voter } = PEER_LOOP_FACTORIES[profile.name]({ bridge, tickSystem, roster: sorted, localPeerId: localPubkey, simulate, getLocalInput, liveChecksum, checksumOf, observeRollback, capture, apply, options: profile.options, now })
+
+  let stopStats = null
+
+  function getStats() {
+    return { profile: profile.name, options: profile.options, localPlayerId, loop: loop.getStats(), transport: transport.getStats(), ...(voter ? {} : { corrections: observeRollback.snapshot() }) }
+  }
+
+  function haltStats() {
+    if (!stopStats) return false
+    stopStats()
+    stopStats = null
+    return true
+  }
 
   return {
     profile,
@@ -88,11 +123,20 @@ export function createPeerSimSession(ctx, { roster, localPubkey, bridge, tickSys
     start() {
       loop.start()
     },
+    startStats({ post, schedule, cancel, every = STATS_POST_INTERVAL_MS } = {}) {
+      if (typeof post !== 'function' || typeof schedule !== 'function' || typeof cancel !== 'function') throw new Error('[PeerSimSession] startStats needs post, schedule and cancel')
+      if (!Number.isFinite(every) || every <= 0) throw new Error('[PeerSimSession] startStats interval must be a positive number of milliseconds')
+      if (stopStats) throw new Error('[PeerSimSession] stats interval is already running')
+      stopStats = startStatsPost({ getStats, post, schedule, cancel, every })
+      return haltStats
+    },
+    get statsRunning() { return stopStats !== null },
     stop() {
+      haltStats()
       loop.stop()
       transport.destroy()
-      voter.destroy()
+      if (voter) voter.destroy()
     },
-    getStats() { return { profile: profile.name, options: profile.options, localPlayerId, loop: loop.getStats(), transport: transport.getStats() } },
+    getStats,
   }
 }

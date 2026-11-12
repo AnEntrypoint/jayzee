@@ -4,7 +4,9 @@
 #include <cmath>
 #include <cstring>
 
+#include "../model_pool.h"
 #include "../planet_frame.h"
+#include "shadow_cascades.h"
 
 namespace engine::render {
 
@@ -15,6 +17,7 @@ constexpr std::uint64_t kFnvPrime = 0x100000001b3ull;
 
 Counters state{};
 ModelSettings settings{kModelPathVisibility, 1u};
+PropBudget budget{kNoPropBudget, kPropBudgetBins};
 
 std::uint32_t bitsOf(float value) {
   std::uint32_t bits;
@@ -54,6 +57,51 @@ bool inFrustum(const float planes[6][4], const float* centre, float radius) {
   return true;
 }
 
+bool propInView(const SceneView& scene, const Camera& camera, std::uint32_t i, float* rel) {
+  const Transform& t = scene.transforms[i];
+  const float body[3] = {t.x, t.y, t.z};
+  relativeOfBody(body, scene.bodyOrigin, scene.origin, rel);
+  if (scene.bodyClass[i] >= kPropClasses) return false;
+  if (t.qx == 0.0f && t.qy == 0.0f && t.qz == 0.0f && t.qw == 0.0f) return false;
+  return inFrustum(camera.planes, rel, kPropRadius);
+}
+
+std::uint32_t propBin(const Camera& camera, const float* rel) {
+  const float dx = rel[0] - camera.eye[0];
+  const float dy = rel[1] - camera.eye[1];
+  const float dz = rel[2] - camera.eye[2];
+  return propBudgetBin(dx * dx + dy * dy + dz * dz);
+}
+
+std::uint32_t carryCutoff(const SceneView& scene, const Camera& camera) {
+  std::uint32_t histogram[kPropBudgetBins];
+  std::memset(histogram, 0, sizeof histogram);
+  for (std::uint32_t i = 0; i < scene.bodyCount; ++i) {
+    float rel[3];
+    if (propInView(scene, camera, i, rel)) histogram[propBin(camera, rel)] += 1;
+  }
+  const std::uint32_t grow = budget.limit - (budget.limit >> kPropBudgetHeadroomShift);
+  std::uint32_t within = 0;
+  std::uint32_t fits = 0;
+  std::uint32_t fitsWithHeadroom = 0;
+  std::uint32_t withinCarried = 0;
+  for (std::uint32_t bin = 0; bin < kPropBudgetBins; ++bin) {
+    if (bin == budget.bins) withinCarried = within;
+    within += histogram[bin];
+    if (within <= budget.limit) fits = bin + 1;
+    if (within <= grow) fitsWithHeadroom = bin + 1;
+  }
+  if (budget.bins == kPropBudgetBins) withinCarried = within;
+  if (withinCarried > budget.limit) {
+    budget.bins = fits;
+  } else if (fitsWithHeadroom > budget.bins) {
+    budget.bins = fitsWithHeadroom;
+  }
+  within = 0;
+  for (std::uint32_t bin = 0; bin < budget.bins; ++bin) within += histogram[bin];
+  return budget.limit - within;
+}
+
 std::uint32_t firstFreeLayer(const FramePlan& plan) {
   for (std::uint32_t layer = 0; layer < pageLayers(); ++layer) {
     if (plan.layerSlot[layer] == kNoLayer) return layer;
@@ -68,6 +116,47 @@ void releaseSlot(FramePlan& plan, std::uint32_t slot) {
     plan.slotLayer[slot] = kNoLayer;
   }
   plan.dirty[slot] = 0;
+}
+
+terrain::PageLod pageLodOf(const SceneView& scene, std::uint32_t slot) {
+  if (scene.pageLods == nullptr || !terrain::enabled()) return terrain::PageLod{0, 0, terrain::kNoParent};
+  return scene.pageLods[slot];
+}
+
+void writePageLod(const SceneView& scene, const FramePlan& plan, std::uint32_t slot, std::uint32_t* out) {
+  if (!terrain::enabled()) return;
+  const terrain::LodState& lod = terrain::state();
+  const terrain::PageLod page = pageLodOf(scene, slot);
+  std::uint32_t parentLayer = kNoLayer;
+  if (page.parentSlot != terrain::kNoParent && page.parentSlot < pageLayers()) parentLayer = plan.slotLayer[page.parentSlot];
+  const float morph = parentLayer == kNoLayer ? 0.0f : terrain::morphOf(page.level, lod.ratio, lod.levels);
+  out[kPageMorphWord] = bitsOf(morph);
+  out[kPageParentWord] = parentLayer;
+  out[kPageLodWord] = (static_cast<std::uint32_t>(page.level) << terrain::kLevelShift) | (page.quadrant & terrain::kQuadrantMask);
+}
+
+void pageAllowances(const SceneView& scene, const FramePlan& plan, std::uint32_t* allowance) {
+  std::uint32_t placed[terrain::kMaxLevels];
+  for (std::uint32_t level = 0; level < terrain::kMaxLevels; ++level) {
+    placed[level] = 0;
+    allowance[level] = 0;
+  }
+  for (std::uint32_t slot = 0; slot < pageLayers(); ++slot) {
+    if (plan.slotLayer[slot] == kNoLayer || scene.placements[slot].placed == 0) continue;
+    const std::uint32_t level = pageLodOf(scene, slot).level;
+    placed[level < terrain::kMaxLevels ? level : terrain::kMaxLevels - 1] += 1;
+  }
+  const terrain::LodState& lod = terrain::state();
+  std::uint32_t room = lod.pageBudget;
+  for (std::uint32_t distance = 0; distance < terrain::kMaxLevels && room > 0; ++distance) {
+    for (std::uint32_t side = 0; side < (distance == 0 ? 1u : 2u) && room > 0; ++side) {
+      const std::int64_t level = side == 0 ? static_cast<std::int64_t>(lod.level) + distance : static_cast<std::int64_t>(lod.level) - distance;
+      if (level < 0 || level >= static_cast<std::int64_t>(terrain::kMaxLevels)) continue;
+      const std::uint32_t take = placed[level] < room ? placed[level] : room;
+      allowance[level] = take;
+      room -= take;
+    }
+  }
 }
 
 void writePageRecord(FramePlan& plan, std::uint32_t index, const PagePlacement& placement, std::uint32_t layer, const FrameOrigin& origin) {
@@ -106,11 +195,31 @@ void syncPages(const SceneView& scene, FramePlan& plan) {
       plan.uploadLayer[plan.uploadCount] = plan.slotLayer[slot];
       plan.uploadCount += 1;
     }
-    if (scene.placements[slot].placed != 0) {
-      writePageRecord(plan, plan.pageCount, scene.placements[slot], plan.slotLayer[slot], scene.origin);
-      plan.pageCount += 1;
-    }
   }
+  const bool limited = terrain::enabled() && scene.placements != nullptr;
+  std::uint32_t allowance[terrain::kMaxLevels];
+  if (limited) pageAllowances(scene, plan, allowance);
+  std::uint32_t placedPages = 0;
+  std::uint32_t shedPages = 0;
+  for (std::uint32_t slot = 0; slot < pageLayers(); ++slot) {
+    if (plan.slotLayer[slot] == kNoLayer || scene.placements[slot].placed == 0) continue;
+    placedPages += 1;
+    if (limited) {
+      const std::uint32_t level = pageLodOf(scene, slot).level;
+      std::uint32_t& room = allowance[level < terrain::kMaxLevels ? level : terrain::kMaxLevels - 1];
+      if (room == 0) {
+        shedPages += 1;
+        continue;
+      }
+      room -= 1;
+    }
+    writePageRecord(plan, plan.pageCount, scene.placements[slot], plan.slotLayer[slot], scene.origin);
+    writePageLod(scene, plan, slot, plan.pageRecords + plan.pageCount * kPageRecordWords);
+    plan.pageCount += 1;
+  }
+  state.pagesPlaced = placedPages;
+  state.pagesShed = shedPages;
+  state.pagesShedTotal += shedPages;
 }
 
 MaterialSlot defaultMaterial() {
@@ -131,6 +240,34 @@ Counters& counters() {
 
 ModelSettings& modelSettings() {
   return settings;
+}
+
+const PropBudget& propBudget() {
+  return budget;
+}
+
+void setPropBudget(std::uint32_t limit) {
+  budget.limit = limit;
+  if (limit == kNoPropBudget) budget.bins = kPropBudgetBins;
+}
+
+std::uint32_t propBudgetBin(float distanceSquared) {
+  const std::uint32_t bits = bitsOf(distanceSquared) >> kPropBudgetBinShift;
+  if (bits <= kPropBudgetNearBits) return 0;
+  return std::min(bits - kPropBudgetNearBits, kPropBudgetBins - 1);
+}
+
+float propCutoffSquared(std::uint32_t bins) {
+  const std::uint32_t bits = (bins + kPropBudgetNearBits) << kPropBudgetBinShift;
+  float value;
+  std::memcpy(&value, &bits, sizeof value);
+  return value;
+}
+
+void writePropCutoff(Camera& camera) {
+  const bool cut = budget.limit != kNoPropBudget && budget.bins < kPropBudgetBins;
+  camera.counts[kCameraCutoffFlagWord] = cut ? 1u : 0u;
+  camera.eye[kCameraCutoffWord] = cut && budget.bins != 0 ? propCutoffSquared(budget.bins) : 0.0f;
 }
 
 void countCall() {
@@ -188,6 +325,10 @@ void resolveMaterials(const MaterialSlot* table, std::uint32_t count, const std:
 
 void planProps(const SceneView& scene, const Camera& camera, FramePlan& plan) {
   for (std::uint32_t c = 0; c < kPropClasses; ++c) plan.propCount[c] = 0;
+  const bool budgeted = budget.limit != kNoPropBudget;
+  std::uint32_t boundaryRoom = budgeted ? carryCutoff(scene, camera) : 0;
+  std::uint32_t inView = 0;
+  std::uint32_t shed = 0;
   std::uint64_t hash = kFnvOffset;
   for (std::uint32_t i = 0; i < scene.bodyCount; ++i) {
     std::uint32_t out[kRecordWords];
@@ -203,6 +344,16 @@ void planProps(const SceneView& scene, const Camera& camera, FramePlan& plan) {
     if (cls >= kPropClasses) continue;
     if (t.qx == 0.0f && t.qy == 0.0f && t.qz == 0.0f && t.qw == 0.0f) continue;
     if (!inFrustum(camera.planes, rel, kPropRadius)) continue;
+    inView += 1;
+    if (budgeted) {
+      const std::uint32_t bin = propBin(camera, rel);
+      const bool boundary = bin == budget.bins && boundaryRoom > 0;
+      if (bin >= budget.bins && !boundary) {
+        shed += 1;
+        continue;
+      }
+      if (boundary) boundaryRoom -= 1;
+    }
     const std::uint32_t index = plan.propCount[cls];
     plan.propCount[cls] = index + 1;
     std::memcpy(plan.propRecords + (cls * plan.bodySlots + index) * kRecordWords, out, kRecordBytes);
@@ -210,7 +361,24 @@ void planProps(const SceneView& scene, const Camera& camera, FramePlan& plan) {
   plan.checksum = hash;
   state.checksum = hash;
   state.propPlans += 1;
+  state.propsInFrustum = inView;
+  state.propsShed = shed;
+  state.propsShedTotal += shed;
   for (std::uint32_t c = 0; c < kPropClasses; ++c) state.visible[c] = plan.propCount[c];
+}
+
+float pixelsPerUnit(const Camera& camera, std::uint32_t viewportHeight) {
+  const float* bottom = camera.planes[2];
+  const float* top = camera.planes[3];
+  const float cosine = bottom[0] * top[0] + bottom[1] * top[1] + bottom[2] * top[2];
+  if (!(cosine > -1.0f && cosine < 1.0f)) return 0.0f;
+  return 0.5f * std::sqrt((1.0f - cosine) / (1.0f + cosine)) * static_cast<float>(viewportHeight);
+}
+
+void selectModelLods(const Camera& camera, const FrameOrigin& origin, std::uint32_t viewportHeight) {
+  if (!models::bound()) return;
+  const double eye[3] = {origin.x + camera.eye[0], origin.y + camera.eye[1], origin.z + camera.eye[2]};
+  models::selectLods(eye, pixelsPerUnit(camera, viewportHeight));
 }
 
 void planFrame(const SceneView& scene, Camera& camera, FramePlan& plan) {
@@ -227,6 +395,8 @@ void planFrame(const SceneView& scene, Camera& camera, FramePlan& plan) {
   camera.bodyOffset[3] = 0.0f;
 
   if (!scene.skipProps) planProps(scene, camera, plan);
+  writePropCutoff(camera);
+  if (shadows::enabled()) shadows::fit(camera.viewProj);
 
   syncPages(scene, plan);
   resolveMaterials(scene.materials, scene.materialCount, scene.albedoReady, scene.albedoLayerOf, plan.materialWords);

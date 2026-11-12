@@ -18,6 +18,10 @@ const NO_SLOT = -1
 const FREE = -1
 const DRAWS_PER_INSTANCE = 3
 const POLE_REFERENCE_LIMIT = 0.9
+const HIDDEN_DETAIL = 31
+export const VEG_HIDDEN_INSTANCES = 64
+const BASIS_FLOATS = 12
+const HIDDEN_FREE = -1
 
 const isCount = (v, name, min) => {
   if (!Number.isInteger(v) || v < min) throw new RangeError(name + ' must be a whole number at least ' + min)
@@ -63,6 +67,7 @@ export const createVegetationPool = ({
   radiusM = PLANET_RADIUS_M,
   cullRadiusM,
   allocate = defaultAllocate,
+  hiddenCapacity = VEG_HIDDEN_INSTANCES,
 }) => {
   if (!(cullRadiusM >= 0) || !Number.isFinite(cullRadiusM)) throw new TypeError('createVegetationPool needs cullRadiusM, the bounding radius of one patch in metres')
   if (!plan || !Number.isInteger(plan.slots)) throw new TypeError('createVegetationPool needs a plan from planVegetationPool')
@@ -72,6 +77,7 @@ export const createVegetationPool = ({
   if (typeof now !== 'function') throw new TypeError('createVegetationPool needs now(), the injected clock')
   if (!Number.isInteger(worldSeed)) throw new TypeError('worldSeed must be an integer')
   isCount(generatePerFrame, 'generatePerFrame', 1)
+  isCount(hiddenCapacity, 'hiddenCapacity', 1)
   if (generatePerFrame < plan.capacityPerPatch) throw new RangeError('generatePerFrame must be at least one patch capacity, or a full patch never generates')
   const slots = plan.slots
   const capacity = plan.capacityPerPatch
@@ -81,6 +87,8 @@ export const createVegetationPool = ({
   const countsBlock = allocate('u32', species.length * slots)
   const counts = species.map((_, s) => countsBlock.subarray(s * slots, (s + 1) * slots))
   const dirty = allocate('u8', slots)
+  const generatedBlock = new Uint32Array(species.length * slots)
+  const detail = new Uint8Array(slots)
   const ownerLow = new Int32Array(slots)
   const ownerHigh = new Int32Array(slots).fill(FREE)
   const home = new Int32Array(slots)
@@ -109,6 +117,13 @@ export const createVegetationPool = ({
   const centreScratch = { latRad: 0, lonRad: 0, capRad: 0 }
   const stepResult = { patches: 0, budgetInstances: 0 }
   const origins = allocate('f64', slots * 3)
+  const hiddenLow = new Int32Array(hiddenCapacity)
+  const hiddenHigh = new Int32Array(hiddenCapacity).fill(HIDDEN_FREE)
+  const hiddenSpecies = new Uint32Array(hiddenCapacity)
+  const hiddenIndex = new Uint32Array(hiddenCapacity)
+  const hiddenBasis = new Float32Array(hiddenCapacity * BASIS_FLOATS)
+  let hiddenCount = 0
+  let hiddenRefused = 0
 
   const ownerOf = (slot) => ownerHigh[slot] * UINT32_SPAN + (ownerLow[slot] >>> 0)
 
@@ -228,12 +243,113 @@ export const createVegetationPool = ({
         buf[o + 14] = r * z - radiusM * cz
         buf[o + 15] = 1
       }
-      counts[s][slot] = count
+      generatedBlock[s * slots + slot] = count
+      counts[s][slot] = detail[slot] >= HIDDEN_DETAIL ? 0 : count >>> detail[slot]
       total += count
     }
     dirty[slot] = 1
     generated += 1
     generatedInstances += total
+    if (hiddenCount > 0) {
+      for (let row = 0; row < hiddenCapacity; row++) {
+        if (hiddenHigh[row] === ownerHigh[slot] && hiddenLow[row] === ownerLow[slot]) blank(row, slot)
+      }
+    }
+  }
+
+  const blank = (row, slot) => {
+    const buf = buffers[hiddenSpecies[row]][slot]
+    const o = hiddenIndex[row] * TRANSFORM_STRIDE_FLOATS
+    for (let k = 0; k < BASIS_FLOATS; k++) {
+      hiddenBasis[row * BASIS_FLOATS + k] = buf[o + k]
+      buf[o + k] = 0
+    }
+    dirty[slot] = 1
+  }
+
+  const hiddenRow = (speciesIndex, slot, i) => {
+    for (let row = 0; row < hiddenCapacity; row++) {
+      if (hiddenHigh[row] === ownerHigh[slot] && hiddenLow[row] === ownerLow[slot] && hiddenSpecies[row] === speciesIndex && hiddenIndex[row] === i) return row
+    }
+    return HIDDEN_FREE
+  }
+
+  const checkInstance = (speciesIndex, slot, i) => {
+    if (!(speciesIndex >= 0 && speciesIndex < species.length)) throw new RangeError('species index out of range')
+    if (!(slot >= 0 && slot < slots) || ownerHigh[slot] === FREE) throw new RangeError('slot ' + slot + ' holds no patch')
+    if (!(i >= 0 && i < generatedBlock[speciesIndex * slots + slot])) throw new RangeError('instance ' + i + ' is not generated in slot ' + slot)
+  }
+
+  const hide = (speciesIndex, slot, i) => {
+    checkInstance(speciesIndex, slot, i)
+    if (hiddenRow(speciesIndex, slot, i) !== HIDDEN_FREE) return true
+    if (hiddenCount === hiddenCapacity) {
+      hiddenRefused += 1
+      return false
+    }
+    let row = 0
+    while (hiddenHigh[row] !== HIDDEN_FREE) row += 1
+    hiddenLow[row] = ownerLow[slot]
+    hiddenHigh[row] = ownerHigh[slot]
+    hiddenSpecies[row] = speciesIndex
+    hiddenIndex[row] = i
+    hiddenCount += 1
+    blank(row, slot)
+    return true
+  }
+
+  const reveal = (row) => {
+    const slot = findSlot(hiddenLow[row], hiddenHigh[row])
+    if (slot !== NO_SLOT && hiddenIndex[row] < generatedBlock[hiddenSpecies[row] * slots + slot]) {
+      const buf = buffers[hiddenSpecies[row]][slot]
+      const o = hiddenIndex[row] * TRANSFORM_STRIDE_FLOATS
+      for (let k = 0; k < BASIS_FLOATS; k++) buf[o + k] = hiddenBasis[row * BASIS_FLOATS + k]
+      dirty[slot] = 1
+    }
+    hiddenHigh[row] = HIDDEN_FREE
+    hiddenCount -= 1
+  }
+
+  const unhide = (speciesIndex, slot, i) => {
+    checkInstance(speciesIndex, slot, i)
+    const row = hiddenRow(speciesIndex, slot, i)
+    if (row === HIDDEN_FREE) return false
+    reveal(row)
+    return true
+  }
+
+  const unhideAll = () => {
+    for (let row = 0; row < hiddenCapacity; row++) {
+      if (hiddenHigh[row] !== HIDDEN_FREE) reveal(row)
+    }
+  }
+
+  const nearest = (x, y, z, withinM, out) => {
+    if (!(withinM >= 0) || !Number.isFinite(withinM)) throw new RangeError('withinM must be a finite distance in metres at zero or more')
+    const reach = cullRadiusM + withinM
+    let best = withinM * withinM
+    let found = false
+    for (let slot = 0; slot < slots; slot++) {
+      if (ownerHigh[slot] === FREE) continue
+      const ox = x - origins[slot * 3], oy = y - origins[slot * 3 + 1], oz = z - origins[slot * 3 + 2]
+      if (ox * ox + oy * oy + oz * oz > reach * reach) continue
+      for (let s = 0; s < species.length; s++) {
+        const buf = buffers[s][slot]
+        const count = generatedBlock[s * slots + slot]
+        for (let i = 0; i < count; i++) {
+          const o = i * TRANSFORM_STRIDE_FLOATS + 12
+          const dx = ox - buf[o], dy = oy - buf[o + 1], dz = oz - buf[o + 2]
+          const d = dx * dx + dy * dy + dz * dz
+          if (d > best) continue
+          best = d
+          found = true
+          out[0] = s
+          out[1] = slot
+          out[2] = i
+        }
+      }
+    }
+    return found
   }
 
   const sync = (patchIds) => {
@@ -250,7 +366,11 @@ export const createVegetationPool = ({
       removeSlot(slot)
       ownerHigh[slot] = FREE
       resident -= 1
-      for (let s = 0; s < counts.length; s++) counts[s][slot] = 0
+      for (let s = 0; s < counts.length; s++) {
+        counts[s][slot] = 0
+        generatedBlock[s * slots + slot] = 0
+      }
+      detail[slot] = 0
       freeStack[freeTop] = slot
       freeTop += 1
       dequeue(slot)
@@ -298,10 +418,32 @@ export const createVegetationPool = ({
 
   const instanceTotal = () => {
     let total = 0
-    for (let s = 0; s < counts.length; s++) {
-      for (let slot = 0; slot < slots; slot++) total += counts[s][slot]
-    }
+    for (let k = 0; k < generatedBlock.length; k++) total += generatedBlock[k]
     return total
+  }
+
+  const shownTotal = () => {
+    let total = 0
+    for (let k = 0; k < countsBlock.length; k++) total += countsBlock[k]
+    return total
+  }
+
+  const generatedAt = (slot) => {
+    let total = 0
+    for (let s = 0; s < counts.length; s++) total += generatedBlock[s * slots + slot]
+    return total
+  }
+
+  const setDetail = (slot, level) => {
+    if (detail[slot] === level) return
+    detail[slot] = level
+    let grew = false
+    for (let s = 0; s < counts.length; s++) {
+      const shown = level >= HIDDEN_DETAIL ? 0 : generatedBlock[s * slots + slot] >>> level
+      if (shown > counts[s][slot]) grew = true
+      counts[s][slot] = shown
+    }
+    if (grew) dirty[slot] = 1
   }
 
   const drawRanges = (speciesIndex, out) => {
@@ -329,6 +471,15 @@ export const createVegetationPool = ({
   return {
     sync,
     step,
+    setDetail,
+    hide,
+    unhide,
+    unhideAll,
+    nearest,
+    isHidden: (speciesIndex, slot, i) => hiddenRow(speciesIndex, slot, i) !== HIDDEN_FREE,
+    generatedAt,
+    shownTotal,
+    detailOf: (slot) => detail[slot],
     drawRanges,
     readWorld,
     origin: (slot) => [origins[slot * 3], origins[slot * 3 + 1], origins[slot * 3 + 2]],
@@ -340,7 +491,7 @@ export const createVegetationPool = ({
       return slot === NO_SLOT ? undefined : slot
     },
     bytes: () => buffers.reduce((acc, arr) => acc + arr.reduce((x, b) => x + b.byteLength, 0), 0),
-    stats: () => ({ resident, pending: pendingCount, deferred, generated, generatedInstances, generateMs: timing[0] }),
+    stats: () => ({ resident, pending: pendingCount, deferred, generated, generatedInstances, generateMs: timing[0], hidden: hiddenCount, hiddenRefused }),
     sharing: (patchBytes) => copyAccounting({ patches: resident, patchBytes, instances: instanceTotal() }),
   }
 }

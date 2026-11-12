@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>jayzee singleplayer</title>
+<script>
+if (!self.crossOriginIsolated && 'serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./coi-sw.js')
+  navigator.serviceWorker.addEventListener('controllerchange', () => location.reload())
+}
+</script>
+<style>
+body { margin: 0; background: #101418; color: #d8dee9; font: 14px/1.4 monospace; }
+canvas { display: block; background: #1b2330; }
+#status { margin: 0; padding: 8px 12px; white-space: pre; }
+</style>
+</head>
+<body>
+<canvas id="field" width="640" height="480"></canvas>
+<pre id="status">starting the server worker</pre>
+<script type="module" src="./boot.js"></script>
+</body>
+</html>

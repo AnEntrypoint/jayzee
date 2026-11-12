@@ -3,9 +3,9 @@ import { decodeSmallestThreeInto, encodeSmallestThree, POSITION_UNITS_LIMIT, qua
 export const PLAYER_TIER_FULL = 0
 export const PLAYER_TIER_REDUCED = 1
 
-export const packQuat = (rx, ry, rz, rw) => encodeSmallestThree([rx, ry, rz, rw])
+export const packRotationWord = (rx, ry, rz, rw) => encodeSmallestThree([rx, ry, rz, rw])
 
-export const unpackQuat = (packed, out) => decodeSmallestThreeInto(packed, out)
+export const unpackRotationWord = (packed, out) => decodeSmallestThreeInto(packed, out)
 
 export const packReducedPlayerPose = (id, x, z, yawN) => [
   id,

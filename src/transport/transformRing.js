@@ -42,14 +42,19 @@ const clearSlots = (control, capacity) => {
   }
 }
 
-export const allocateRingBuffer = (capacity = 64) => {
-  if (!isRingAvailable()) return null
+export const createRingBuffer = (capacity = 64) => {
+  if (!Number.isInteger(capacity) || capacity <= 0) throw new RangeError(`[transform-ring] capacity must be a positive integer, got ${String(capacity)}`)
   const sab = new SharedArrayBuffer(layoutBytes(capacity))
   const header = new Int32Array(sab, 0, HEADER_INTS)
   Atomics.store(header, HEADER_MAGIC, RING_MAGIC)
   Atomics.store(header, HEADER_CAPACITY, capacity)
   clearSlots(viewsOf(sab, capacity).control, capacity)
   return { sab, capacity }
+}
+
+export const allocateRingBuffer = (capacity = 64) => {
+  if (!isRingAvailable()) return null
+  return createRingBuffer(capacity)
 }
 
 export const assertRingLayout = (sab, capacity) => {

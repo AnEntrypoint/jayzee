@@ -130,4 +130,79 @@ gate('a query refuses malformed input: a zero radius, an inverted box, a bad ori
   mustThrow(() => queries.overlapBox([1, 0, 0], [0, 1, 1]))
 })
 
+gate('a ray that reaches a parked static collider first is refused as static-colliders-migrating, and is answered again once it is restored', () => {
+  const queries = createQueries(worldWith([[9, 0, 0]]), { radius: 1, boxes: [[2, -1, -1, 3, 1, 1], [5, -1, -1, 6, 1, 1]] })
+  same(queries.park(0), true, 'first park')
+  same(queries.park(0), false, 'second park of the same collider')
+  same(queries.pendingCount, 1, 'pending count')
+  same(queries.isPending(0), true, 'pending flag')
+  const refused = queries.raycast([0, 0, 0], [1, 0, 0], 50)
+  same(refused.hit, false, 'hit while pending')
+  same(refused.unavailable, 'static-colliders-migrating', 'reason')
+  same(refused.distance, 50, 'distance while pending')
+  same(queries.restore(0), true, 'restore')
+  const hit = queries.raycast([0, 0, 0], [1, 0, 0], 50)
+  same(hit.kind, 'box', 'kind after restore')
+  same(hit.id, 0, 'index after restore')
+  same(hit.unavailable, undefined, 'no reason on an answer')
+  mustReject(() => same(refused.kind, 'box', 'kind while pending'))
+})
+
+gate('a parked static collider behind the nearest live hit, off the ray or beyond its reach does not refuse the ray', () => {
+  const queries = createQueries(worldWith([[9, 0, 0]]), { radius: 1, boxes: [[2, -1, -1, 3, 1, 1], [5, -1, -1, 6, 1, 1], [0, 20, 0, 1, 21, 1]] })
+  queries.park(1)
+  queries.park(2)
+  const front = queries.raycast([0, 0, 0], [1, 0, 0])
+  same(front.kind, 'box', 'kind in front of the parked collider')
+  same(front.id, 0, 'index in front of the parked collider')
+  same(queries.raycast([0, 0, 0], [0, 0, 1]).unavailable, undefined, 'ray off the parked colliders')
+  same(queries.raycast([4, 0, 0], [1, 0, 0], 0.5).unavailable, undefined, 'ray that stops short of the parked collider')
+  same(queries.raycast([4, 0, 0], [1, 0, 0]).unavailable, 'static-colliders-migrating', 'ray that reaches the parked collider before the body')
+  same(queries.raycast([4, 0, 0], [1, 0, 0], Infinity, { boxes: false }).kind, 'body', 'ray with boxes disabled')
+  mustReject(() => same(queries.raycast([4, 0, 0], [1, 0, 0]).kind, 'body', 'ray through a parked collider'))
+})
+
+gate('overlapStatics lists the colliders touching a region in index order and refuses a region that touches a parked one', () => {
+  const queries = createQueries(worldWith([]), { radius: 1, boxes: [[2, -1, -1, 3, 1, 1], [5, -1, -1, 6, 1, 1], [40, 0, 0, 41, 1, 1]] })
+  sameJson(queries.overlapStatics([0, -1, -1], [5, 1, 1]), [0, 1], 'colliders in the region')
+  queries.park(1)
+  let code = null
+  let index = null
+  try {
+    queries.overlapStatics([0, -1, -1], [5, 1, 1])
+  } catch (error) {
+    code = error.code
+    index = error.index
+  }
+  same(code, 'static-colliders-migrating', 'refusal code')
+  same(index, 1, 'refused collider')
+  sameJson(queries.overlapStatics([0, -1, -1], [4, 1, 1]), [0], 'region clear of the parked collider')
+  sameJson(queries.overlapStatics([39, 0, 0], [42, 1, 1]), [2], 'far region')
+  mustThrow(() => queries.overlapStatics([0, -1, -1], [5, 1, 1]))
+  mustThrow(() => queries.overlapStatics([1, 0, 0], [0, 1, 1]))
+})
+
+gate('drain restores parked colliders nearest the movers first, up to its limit, and a parked index outside the list is refused', () => {
+  const queries = createQueries(worldWith([]), { radius: 1, boxes: [[100, 0, 0, 101, 1, 1], [10, 0, 0, 11, 1, 1], [50, 0, 0, 51, 1, 1]] })
+  queries.park(0)
+  queries.park(1)
+  queries.park(2)
+  sameJson(queries.drain(0, [[0, 0, 0]]), [], 'zero limit')
+  sameJson(queries.drain(2, [[0, 0, 0]]), [1, 2], 'nearest two')
+  same(queries.pendingCount, 1, 'pending after the first drain')
+  same(queries.raycast([90, 0.5, 0.5], [1, 0, 0]).unavailable, 'static-colliders-migrating', 'far collider still parked')
+  sameJson(queries.drain(8, [[0, 0, 0]]), [0], 'the rest')
+  same(queries.pendingCount, 0, 'pending after the second drain')
+  near(queries.raycast([90, 0.5, 0.5], [1, 0, 0]).distance, 10, 'far collider answers')
+  queries.park(0)
+  queries.park(1)
+  sameJson(queries.drain(1, [[0, 0, 0], [104, 0, 0]]), [0], 'nearest to any mover')
+  sameJson(queries.drain(5), [1], 'no movers drains in index order')
+  mustThrow(() => queries.park(7))
+  mustThrow(() => queries.restore(-1))
+  mustThrow(() => queries.drain(-1))
+  mustThrow(() => queries.drain(1, [[0, 0]]))
+  mustReject(() => sameJson(queries.drain(2, [[0, 0, 0]]), [0, 1], 'drain of an empty set'))
+})
+
 finish()

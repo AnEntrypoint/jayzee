@@ -327,17 +327,25 @@ gate('GLB mesh: positions are read at the declared byteStride, not a packed 12',
   assert(badMesh.vertices[3] !== padMesh.vertices[3], 'control: a 12-byte read matched the 16-byte layout')
 })
 
-gate('GLB mesh: uint32 indices are read and other index types are refused rather than misread', () => {
+gate('GLB mesh: uint8 and uint32 indices are read, and a float index type or an index run past the data is refused', () => {
   const wide = triangleFile({ indexComponent: 5125 })
   const wideGlb = buildGlb(wide.json, wide.bin)
   assert(extractStandardMeshAt(wideGlb, parseGlb(wideGlb), 0).indices.join(',') === '0,1,2', 'uint32 indices differ')
   const bytes = triangleFile({ indexComponent: 5121 })
   const byteGlb = buildGlb(bytes.json, bytes.bin)
-  refusesWith(() => extractStandardMeshAt(byteGlb, parseGlb(byteGlb), 0), 'glb-index-type-unsupported')
+  assert(extractStandardMeshAt(byteGlb, parseGlb(byteGlb), 0).indices.join(',') === '0,1,2', 'uint8 indices differ')
+  const floatIndex = triangleFile({ indexComponent: 5125 })
+  floatIndex.json.accessors[1].componentType = 5126
+  const floatGlb = buildGlb(floatIndex.json, floatIndex.bin)
+  refusesWith(() => extractStandardMeshAt(floatGlb, parseGlb(floatGlb), 0), 'glb-index-type-unsupported')
+  const overrun = triangleFile({ indexComponent: 5125 })
+  overrun.json.accessors[1].count = 300
+  const overrunGlb = buildGlb(overrun.json, overrun.bin)
+  refusesWith(() => extractStandardMeshAt(overrunGlb, parseGlb(overrunGlb), 0), 'glb-index-range-invalid')
   refusesWith(() => extractStandardMeshAt(wideGlb, parseGlb(wideGlb), 1), 'glb-mesh-missing')
 })
 
-gate('GLB mesh: Draco and Meshopt primitives are refused, not decoded', () => {
+gate('GLB mesh: a Draco primitive and a Meshopt view with no count, stride or mode are refused', () => {
   const { json, bin } = triangleFile()
   const draco = structuredClone(json)
   draco.meshes[0].primitives[0].extensions = { KHR_draco_mesh_compression: { bufferView: 0 } }
@@ -346,7 +354,7 @@ gate('GLB mesh: Draco and Meshopt primitives are refused, not decoded', () => {
   const meshopt = structuredClone(json)
   meshopt.bufferViews[0].extensions = { EXT_meshopt_compression: { buffer: 0 } }
   const meshoptGlb = buildGlb(meshopt, bin)
-  refusesWith(() => extractStandardMeshAt(meshoptGlb, parseGlb(meshoptGlb), 0), 'glb-meshopt-unsupported')
+  refusesWith(() => extractStandardMeshAt(meshoptGlb, parseGlb(meshoptGlb), 0), 'glb-meshopt-invalid')
   const plain = buildGlb(json, bin)
   accepts(() => extractStandardMeshAt(plain, parseGlb(plain), 0))
 })

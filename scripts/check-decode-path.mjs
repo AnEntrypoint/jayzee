@@ -70,7 +70,7 @@ await gate('a device that plans tier 2 is refused on the 64 MiB arena, which hol
 
 await gate('a device at tier 0 binds the model pool on the 64 MiB arena, which is the highest tier it holds', () => {
   assert.equal(engineGlue._engine_models_bind_plan(...TIER0_LIMITS), 0)
-  assert.equal(Number(engineGlue._engine_models_pool_bytes()), 23169408)
+  assert.equal(Number(engineGlue._engine_models_pool_bytes()), 23175040)
 })
 
 await gate('a second bind is refused and reports the model pool is already bound', () => {

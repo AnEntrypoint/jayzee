@@ -12,6 +12,7 @@
 #include "planet_frame.h"
 #include "render/render_backend.h"
 #include "render/render_frame.h"
+#include "render/shadow_cascades.h"
 #include "render/render_webgpu.h"
 #include "render/render_webgl2.h"
 #include "render/render_webgpu.h"
@@ -28,6 +29,7 @@ struct RenderState {
   FramePlan plan;
   Camera camera;
   PagePlacement placements[kMaxPageLayers];
+  terrain::PageLod pageLods[kMaxPageLayers];
   LightSlot lights[kLightSlots];
   LightSlot relLights[kLightSlots];
   double lightPositions[kLightSlots * 3];
@@ -86,6 +88,7 @@ void initState(RenderState& state, std::uint32_t* propRecords, std::uint8_t* bod
   std::memset(&state.camera, 0, sizeof state.camera);
   for (std::uint32_t c = 0; c < kPropClasses; ++c) state.camera.classMaterial[c] = c;
   std::memset(state.placements, 0, sizeof state.placements);
+  for (std::uint32_t slot = 0; slot < kMaxPageLayers; ++slot) state.pageLods[slot] = terrain::PageLod{0, 0, terrain::kNoParent};
   std::memset(state.lights, 0, sizeof state.lights);
   std::memset(state.lightPositions, 0, sizeof state.lightPositions);
   const MaterialSlot fallback = ownDefaultMaterial();
@@ -171,6 +174,7 @@ SceneView sceneOf(RenderState& state) {
   scene.bodyClass = state.bodyClass;
   scene.pages = &engine::planet::state().pages;
   scene.placements = state.placements;
+  scene.pageLods = state.pageLods;
   scene.materials = state.boundMaterials;
   scene.materialCount = state.boundCount;
   scene.origin = state.origin;
@@ -212,6 +216,7 @@ EMSCRIPTEN_KEEPALIVE int engine_render_frame() {
   rnd::SceneView scene = rnd::sceneOf(state);
   const bool drawsEveryBody = rnd::counters().backend == static_cast<std::uint32_t>(rnd::BackendKind::kWebGpu);
   scene.skipProps = drawsEveryBody && state.planPropsAlways == 0 && state.propsPlanned != 0 && state.plannedStamp == scene.bodyStamp;
+  if (rnd::propBudget().limit != rnd::kNoPropBudget) scene.skipProps = false;
   {
     engine::phase::Scope scope(engine::phase::kPlan);
     rnd::planFrame(scene, state.camera, state.plan);
@@ -249,6 +254,51 @@ EMSCRIPTEN_KEEPALIVE int engine_render_set_prop_plan(std::uint32_t always) {
 
 EMSCRIPTEN_KEEPALIVE std::uint64_t engine_render_prop_plans() {
   return rnd::counters().propPlans;
+}
+
+EMSCRIPTEN_KEEPALIVE int engine_render_set_prop_budget(std::uint32_t limit) {
+  rnd::setPropBudget(limit);
+  if (rnd::renderState != nullptr) rnd::renderState->propsPlanned = 0;
+  return engine::kOk;
+}
+
+EMSCRIPTEN_KEEPALIVE std::uint32_t engine_render_prop_budget() {
+  return rnd::propBudget().limit;
+}
+
+EMSCRIPTEN_KEEPALIVE std::uint32_t engine_render_prop_cutoff_bins() {
+  return rnd::propBudget().bins;
+}
+
+EMSCRIPTEN_KEEPALIVE std::uint32_t engine_render_shadow_budget(std::uint32_t deviceTier) {
+  const rnd::shadows::Budget budget = rnd::shadows::budgetFor(deviceTier);
+  return (budget.cascades << 16) | budget.resolution;
+}
+
+EMSCRIPTEN_KEEPALIVE int engine_render_set_shadows(std::uint32_t cascades, std::uint32_t resolution, float distance) {
+  if (rnd::counters().sealed != 0) return engine::kSealed;
+  return rnd::shadows::configure(cascades, resolution, distance) ? engine::kOk : engine::kRange;
+}
+
+EMSCRIPTEN_KEEPALIVE int engine_render_set_sun(float x, float y, float z) {
+  return rnd::shadows::setSun(x, y, z) ? engine::kOk : engine::kRange;
+}
+
+EMSCRIPTEN_KEEPALIVE const rnd::shadows::State* engine_render_shadow_state() {
+  return &rnd::shadows::state();
+}
+
+EMSCRIPTEN_KEEPALIVE float engine_render_prop_cutoff_squared() {
+  if (rnd::renderState == nullptr || rnd::renderState->camera.counts[rnd::kCameraCutoffFlagWord] == 0) return 0.0f;
+  return rnd::renderState->camera.eye[rnd::kCameraCutoffWord];
+}
+
+EMSCRIPTEN_KEEPALIVE std::uint32_t engine_render_props_in_frustum() {
+  return rnd::counters().propsInFrustum;
+}
+
+EMSCRIPTEN_KEEPALIVE std::uint32_t engine_render_props_shed() {
+  return rnd::counters().propsShed;
 }
 
 EMSCRIPTEN_KEEPALIVE float* engine_render_camera() {
@@ -332,6 +382,39 @@ EMSCRIPTEN_KEEPALIVE int engine_render_place_page(std::uint32_t slot, double ox,
   placement.vEdge[2] = vz;
   placement.placed = 1;
   return engine::kOk;
+}
+
+EMSCRIPTEN_KEEPALIVE int engine_render_set_page_lod(std::uint32_t slot, std::uint32_t level, std::int32_t parentSlot, std::uint32_t quadrant) {
+  if (rnd::renderState == nullptr || slot >= rnd::pageLayers()) return engine::kRange;
+  if (level >= engine::terrain::kMaxLevels || quadrant > engine::terrain::kQuadrantMask) return engine::kRange;
+  if (parentSlot >= static_cast<std::int32_t>(rnd::pageLayers()) || parentSlot == static_cast<std::int32_t>(slot)) return engine::kRange;
+  const std::uint16_t parent = parentSlot < 0 ? engine::terrain::kNoParent : static_cast<std::uint16_t>(parentSlot);
+  rnd::renderState->pageLods[slot] = engine::terrain::PageLod{static_cast<std::uint8_t>(level), static_cast<std::uint8_t>(quadrant), parent};
+  return engine::kOk;
+}
+
+EMSCRIPTEN_KEEPALIVE int engine_terrain_lod_configure(std::uint32_t pageBudget, std::uint32_t levels, double fullDetailAltitude) {
+  return engine::terrain::configure(pageBudget, levels, fullDetailAltitude) ? engine::kOk : engine::kRange;
+}
+
+EMSCRIPTEN_KEEPALIVE const engine::terrain::LodState* engine_terrain_lod_select(double altitude) {
+  return &engine::terrain::select(altitude);
+}
+
+EMSCRIPTEN_KEEPALIVE const engine::terrain::LodState* engine_terrain_lod_state() {
+  return &engine::terrain::state();
+}
+
+EMSCRIPTEN_KEEPALIVE std::uint32_t engine_render_pages_placed() {
+  return rnd::counters().pagesPlaced;
+}
+
+EMSCRIPTEN_KEEPALIVE std::uint32_t engine_render_pages_shed() {
+  return rnd::counters().pagesShed;
+}
+
+EMSCRIPTEN_KEEPALIVE const std::uint32_t* engine_render_page_records() {
+  return rnd::renderState == nullptr ? nullptr : rnd::renderState->plan.pageRecords;
 }
 
 EMSCRIPTEN_KEEPALIVE int engine_render_unplace_page(std::uint32_t slot) {

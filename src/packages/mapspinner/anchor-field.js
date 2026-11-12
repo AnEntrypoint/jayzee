@@ -218,11 +218,30 @@ export function createAnchorField(opts = {}) {
     })
   }
 
+  function v2BandEntries(o) {
+    const count = Array.isArray(o.bands) ? o.bands.length : 'no'
+    if (count !== bands.length) {
+      throw new AnchorFieldError('anchor-field-partial-load', 'anchor-field load: version 2 carries ' + count + ' band(s), this build has ' + bands.length)
+    }
+    return o.bands.map((ob, b) => {
+      if (!ob || ob.baseLevel !== BANDS[b].level || !Array.isArray(ob.nodes)) {
+        throw new AnchorFieldError('anchor-field-partial-load', 'anchor-field load: band ' + b + ' is missing its level or nodes')
+      }
+      for (const e of ob.nodes) {
+        if (!Array.isArray(e) || !Number.isInteger(e[0]) || !Array.isArray(e[1]) || e[1].length !== K) {
+          throw new AnchorFieldError('anchor-field-partial-load', 'anchor-field load: band ' + b + ' has a malformed node entry')
+        }
+      }
+      return ob.nodes
+    })
+  }
+
   function load(json) {
     const o = typeof json === 'string' ? JSON.parse(json) : json
-    if (!o) return false
+    if (!o) throw new AnchorFieldError('anchor-field-unreadable', 'anchor-field load: no field data to read')
     if (o.version === 2) {
-      for (let b = 0; b < bands.length && b < o.bands.length; b++) rebuildBand(b, o.bands[b].nodes)
+      const entries = v2BandEntries(o)
+      entries.forEach((nodes, b) => rebuildBand(b, nodes))
       return true
     }
     if (o.version === 1) {
@@ -236,7 +255,7 @@ export function createAnchorField(opts = {}) {
       }
       return true
     }
-    return false
+    throw new AnchorFieldError('anchor-field-unknown-version', 'anchor-field load: unknown version ' + String(o.version))
   }
 
   function nodeParams(bandIdx, face, tx, ty) {

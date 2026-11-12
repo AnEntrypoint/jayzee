@@ -339,8 +339,30 @@ gate('a prepare made on an old epoch aborts and is refused as preparing for anot
   assert.equal(terrainTrace.staleEpoch, 'heightfields-preparing-for-another-anchor')
 })
 
-gate('following with no lattice needs createFieldLattice and passes it the event chart', () => {
-  const missing = makeTerrain()
+gate('following with no lattice builds the real field lattice on the chart the event left, with no factory passed in', () => {
+  const own = makeTerrain()
+  own.hs.lattice = null
+  own.hs.liveHeightFn = (x, z) => own.frame.groundHeightLocal(x, z)
+  const from = snapshotChart(own.frame)
+  own.tr.gate({ decision: { anchorDir: SMALL_TILT } })
+  own.frame.reanchor(SMALL_TILT)
+  own.tr.migrate({ epoch: 1, from })
+  assert.deepEqual(own.calls, ['setLattice'])
+  const lattice = own.hs.lattice
+  assert.deepEqual(lattice.anchor.up, from.up)
+  const expectedTilt = tilt.tiltDegBetween(from.up, own.frame.up)
+  assert.ok(expectedTilt > 1 && Math.abs(lattice.tiltDeg - expectedTilt) < 1e-9, 'tilt ' + lattice.tiltDeg)
+  assert.equal(own.tr.costs[0].fields.tiltDeg, lattice.tiltDeg)
+  assert.equal(own.tr.costs[0].mode, 'follow-lattice')
+  const placed = lattice.placement(10, 20)
+  assert.equal(placed.position.length, 3)
+  assert.equal(placed.rotation.length, 4)
+  const back = lattice.toLattice(...lattice.toChart(10, 20))
+  assert.ok(Math.hypot(back[0] - 10, back[1] - 20) < 0.5, 'lattice round trip ' + back)
+})
+
+gate('control: a migrator told to use no lattice factory refuses to follow, and an injected factory receives the event chart', () => {
+  const missing = makeTerrain({ createFieldLattice: null })
   missing.hs.lattice = null
   missing.tr.gate({ decision: { anchorDir: SMALL_TILT } })
   assert.ok(thrown(() => missing.tr.migrate({ epoch: 1, from: { tag: 'from' } })) instanceof TypeError)

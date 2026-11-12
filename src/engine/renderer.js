@@ -1,4 +1,15 @@
 import { instantiateWithinBudget } from './glueTier.js'
+import { chooseDeviceBudget, instanceBudgetFor, readDeviceSignals } from './deviceBudget.js'
+
+export const PROP_DISPLAY_BYTES = 256
+export const MODEL_INDEX_DISPLAY_BYTES = 4
+export const MODEL_MAX_LODS = 4
+export const MODEL_LOD_UNSET = 255
+const LOD_STATS_WORDS = 8
+export const TERRAIN_MAX_LEVELS = 16
+export const TERRAIN_NO_PARENT = -1
+const TERRAIN_MORPH_WORD = 6
+const TERRAIN_RATIO_WORD = 7
 
 export const RENDER_BACKEND = Object.freeze({ WEBGPU: 0, WEBGL2: 1 })
 
@@ -163,6 +174,87 @@ export const createRenderer = (module, backend, { modelTier = -1, device = null,
       status(module._engine_render_set_model_path(mode), 'set model path')
     },
 
+    setPropBudget(limit) {
+      if (!Number.isInteger(limit) || limit < 0) throw new RangeError('the prop budget is a whole number of shown props, or 0 for no limit')
+      status(module._engine_render_set_prop_budget(limit), 'set prop budget')
+    },
+
+    propBudget() {
+      return {
+        budget: module._engine_render_prop_budget(),
+        inFrustum: module._engine_render_props_in_frustum(),
+        shed: module._engine_render_props_shed(),
+        cutoffBands: module._engine_render_prop_cutoff_bins(),
+      }
+    },
+
+    configureTerrainLod({ pageBudget, levels = TERRAIN_MAX_LEVELS, fullDetailAltitudeM = 1 }) {
+      if (!Number.isInteger(pageBudget) || pageBudget < 0) throw new RangeError('the terrain page budget is a whole number of drawn pages, or 0 for no limit')
+      if (!Number.isInteger(levels) || levels < 1 || levels > TERRAIN_MAX_LEVELS) throw new RangeError('terrain levels must be a whole number from 1 to ' + TERRAIN_MAX_LEVELS)
+      if (!(fullDetailAltitudeM > 0) || !Number.isFinite(fullDetailAltitudeM)) throw new RangeError('the full-detail altitude is a positive finite number of metres')
+      status(module._engine_terrain_lod_configure(pageBudget, levels, fullDetailAltitudeM), 'configure terrain lod')
+    },
+
+    selectTerrainLod(altitudeM) {
+      const at = module._engine_terrain_lod_select(finite(altitudeM, 'altitude')) >> 2
+      const words = module.HEAPU32
+      return {
+        pageBudget: words[at],
+        levels: words[at + 1],
+        level: words[at + 2],
+        window: words[at + 3],
+        spanCells: words[at + 4],
+        switches: words[at + 5],
+        morph: module.HEAPF32[at + TERRAIN_MORPH_WORD],
+        ratio: module.HEAPF32[at + TERRAIN_RATIO_WORD],
+      }
+    },
+
+    setPageLod(slot, { level, parentSlot = TERRAIN_NO_PARENT, quadrant = 0 }) {
+      if (!Number.isInteger(slot) || slot < 0 || slot >= L.PAGE_LAYERS) throw new RangeError('page slot out of range: ' + slot)
+      status(module._engine_render_set_page_lod(slot, level, parentSlot, quadrant), 'set page lod')
+    },
+
+    terrainPages() {
+      return { placed: module._engine_render_pages_placed(), shed: module._engine_render_pages_shed() }
+    },
+
+    setModelIndexBudget(indices) {
+      if (!Number.isInteger(indices) || indices < 0) throw new RangeError('the model index budget is a whole number of indices drawn per frame, or 0 for no limit')
+      status(module._engine_models_set_index_budget(indices), 'set model index budget')
+    },
+
+    setModelLodPixels(pixels) {
+      if (!(pixels > 0) || !Number.isFinite(pixels)) throw new RangeError('the full-detail size is a positive finite number of pixels')
+      status(module._engine_models_set_lod_pixels(pixels), 'set model lod pixels')
+    },
+
+    setModelLods(handle, indexCounts) {
+      if (!Array.isArray(indexCounts) || indexCounts.length < 1 || indexCounts.length > MODEL_MAX_LODS) throw new RangeError('a model holds 1 to ' + MODEL_MAX_LODS + ' lod index ranges, coarse to fine')
+      for (const count of indexCounts) if (!Number.isInteger(count) || count < 1) throw new RangeError('each lod range is a whole number of indices at least 1')
+      status(module._engine_models_set_lods(handle, indexCounts[0], indexCounts[1] ?? 0, indexCounts[2] ?? 0, indexCounts[3] ?? 0), 'set model lods')
+    },
+
+    modelLodLevel(handle) {
+      return module._engine_models_lod_level(handle)
+    },
+
+    modelLod() {
+      const at = module._engine_models_lod_stats() / 4
+      const words = module.HEAPU32
+      return {
+        cost: words[at],
+        demand: words[at + 1],
+        budget: words[at + 2],
+        passes: words[at + 3],
+        shed: words[at + 4],
+        changed: words[at + 5],
+        slots: words[at + 6],
+        bias: module.HEAPF32[at + LOD_STATS_WORDS - 1],
+        fullPixels: module._engine_models_lod_pixels(),
+      }
+    },
+
     setOcclusion(on) {
       if (typeof on !== 'boolean') throw new TypeError('occlusion takes a boolean')
       status(module._engine_render_set_occlusion(on ? 1 : 0), 'set occlusion')
@@ -262,6 +354,17 @@ const bindModelPool = (module, device, navigatorLike) => {
 const status = (code, what) => {
   if (code !== 0) throw new Error(what + ' failed with engine status ' + code)
   return code
+}
+
+export const loadRendererForDevice = ({ navigatorLike = globalThis.navigator, osLike = null, ...rest }) => {
+  const budget = chooseDeviceBudget(readDeviceSignals({ navigatorLike, osLike }))
+  return loadRendererWithinBudget({ ...rest, navigatorLike, budgetBytes: budget.budgetBytes }).then((loaded) => {
+    const propBudget = instanceBudgetFor(budget, PROP_DISPLAY_BYTES)
+    loaded.value.setPropBudget(propBudget)
+    const modelIndexBudget = rest.models === false ? 0 : instanceBudgetFor(budget, MODEL_INDEX_DISPLAY_BYTES)
+    if (modelIndexBudget > 0) loaded.value.setModelIndexBudget(modelIndexBudget)
+    return { ...loaded, deviceBudget: budget, propBudget, modelIndexBudget }
+  })
 }
 
 export const loadRendererWithinBudget = ({ glueFor, budgetBytes, ...rest }) => {

@@ -7,6 +7,7 @@
 
 #include "../budget.h"
 #include "../page_cache.h"
+#include "../terrain_lod.h"
 #include "../world.h"
 
 namespace engine::render {
@@ -21,6 +22,9 @@ constexpr std::uint32_t kPageQuads = kPageSide - 1;
 constexpr std::uint32_t kPageVertices = 6 * kPageQuads * kPageQuads;
 constexpr std::uint32_t kPageRecordWords = 16;
 constexpr std::uint32_t kPageRecordBytes = kPageRecordWords * 4;
+constexpr std::uint32_t kPageMorphWord = 1;
+constexpr std::uint32_t kPageParentWord = 2;
+constexpr std::uint32_t kPageLodWord = 3;
 constexpr std::uint32_t kMaterialSlots = 256;
 constexpr std::uint32_t kMaterialWords = 10;
 constexpr std::uint32_t kMaterialBytes = kMaterialWords * 4;
@@ -35,6 +39,13 @@ constexpr std::uint32_t kArgsWords = 20;
 constexpr std::uint32_t kArgsPropWord = 0;
 constexpr std::uint32_t kArgsTerrainWord = 16;
 constexpr float kPropRadius = 0.8660254f;
+constexpr std::uint32_t kPropBudgetBins = 256;
+constexpr std::uint32_t kPropBudgetBinShift = 20;
+constexpr std::uint32_t kPropBudgetNearBits = 0x3e800000u >> kPropBudgetBinShift;
+constexpr std::uint32_t kPropBudgetHeadroomShift = 3;
+constexpr std::uint32_t kNoPropBudget = 0;
+constexpr std::uint32_t kCameraCutoffFlagWord = 2;
+constexpr std::uint32_t kCameraCutoffWord = 3;
 
 struct MaterialSlot {
   float colour[4];
@@ -98,6 +109,7 @@ struct SceneView {
   const std::uint8_t* bodyClass;
   const planet::PageCache* pages;
   const PagePlacement* placements;
+  const terrain::PageLod* pageLods;
   const MaterialSlot* materials;
   std::uint32_t materialCount;
   const LightSlot* lights;
@@ -156,16 +168,34 @@ struct Counters {
   std::uint32_t cullFresh;
   std::uint32_t countReadback;
   std::uint64_t propPlans;
+  std::uint32_t propsInFrustum;
+  std::uint32_t propsShed;
+  std::uint64_t propsShedTotal;
+  std::uint32_t pagesPlaced;
+  std::uint32_t pagesShed;
+  std::uint64_t pagesShedTotal;
+};
+
+struct PropBudget {
+  std::uint32_t limit;
+  std::uint32_t bins;
 };
 
 Counters& counters();
 ModelSettings& modelSettings();
+const PropBudget& propBudget();
+void setPropBudget(std::uint32_t limit);
+std::uint32_t propBudgetBin(float distanceSquared);
+float propCutoffSquared(std::uint32_t bins);
+void writePropCutoff(Camera& camera);
 void countCall();
 bool acceptCreate();
 std::uint32_t pageLayers();
 void resetPlan(FramePlan& plan);
 void planFrame(const SceneView& scene, Camera& camera, FramePlan& plan);
 void planProps(const SceneView& scene, const Camera& camera, FramePlan& plan);
+float pixelsPerUnit(const Camera& camera, std::uint32_t viewportHeight);
+void selectModelLods(const Camera& camera, const FrameOrigin& origin, std::uint32_t viewportHeight);
 void resolveMaterials(const MaterialSlot* table, std::uint32_t count, const std::uint8_t* albedoReady, std::int32_t (*albedoLayerOf)(double handle), std::uint32_t* words);
 std::uint32_t uploadRunEnd(const FramePlan& plan, std::uint32_t start);
 std::uint32_t albedoRunEnd(const FramePlan& plan, std::uint32_t start);

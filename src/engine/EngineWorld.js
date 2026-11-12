@@ -30,6 +30,10 @@ const MAX_PLAYERS = 1024
 const MAX_WORKERS = 8
 const DEFAULT_GLUE = new URL('../../engine/out/engine-core-64mib.mjs', import.meta.url).href
 const NO_VELOCITY = Object.freeze([0, 0, 0])
+const PROMOTED_ROW_WORDS = 2
+const PROMOTED_STATE_WORDS = 2
+const PROMOTED_BIT = 0x80000000
+export const PROMOTED_BODY_GONE = 0xffffffff
 
 export const TREE_CLASS = { trunk: 0, rock: 1, pass: 2 }
 
@@ -116,6 +120,8 @@ export class EngineWorld {
   #hashFloats = new Float64Array(0)
   #hashWords = new Uint32Array(0)
   #hashOut = new Uint32Array(1)
+  #promotionCap = 0
+  #promotedSeen = 0
 
   constructor(module, settings, layout) {
     this.#module = module
@@ -338,6 +344,7 @@ export class EngineWorld {
 
   step() {
     this.#bridge.tick(1)
+    if (this.#promotionCap !== 0) this.#adoptPromoted()
   }
 
   advance(seconds) {
@@ -382,21 +389,28 @@ export class EngineWorld {
   }
 
   exportState() {
-    return {
+    this.#adoptPromoted()
+    const state = {
       tick: this.tick,
       count: this.#alive.size,
       positions: this.#gather(this.#positions),
       velocities: this.#gather(this.#velocities),
     }
+    if (this.#promotedSeen > 0) state.promoted = this.#promotedState()
+    return state
   }
 
   importState(state) {
+    const promoted = state.promoted
+    if (promoted !== undefined && promoted.length % PROMOTED_STATE_WORDS !== 0) throw new RangeError('the promoted list holds pairs of instance and body index')
+    this.#adoptPromoted()
+    const order = promoted !== undefined || this.#promotedSeen > 0 ? this.#restorePromoted(promoted ?? [], state.count) : this.#handles()
     const words = this.#alive.size * 3
     if (state.count !== this.#alive.size) throw new RangeError('state holds ' + state.count + ' bodies, world has ' + this.#alive.size)
     if (state.positions.length !== words || state.velocities.length !== words) {
       throw new RangeError('state arrays do not match the body count')
     }
-    this.#handles().forEach((handle, index) => {
+    order.forEach((handle, index) => {
       const at = index * 3
       this.#write(this.#module._engine_set_position(handle, state.positions[at], state.positions[at + 1], state.positions[at + 2]), 'position')
       this.#write(this.#module._engine_set_velocity(handle, state.velocities[at], state.velocities[at + 1], state.velocities[at + 2]), 'velocity')
@@ -524,6 +538,7 @@ export class EngineWorld {
 
   configureVegetation({ origin, cellSize }) {
     if (!isFiniteNumber(origin) || !isFiniteNumber(cellSize)) throw new RangeError('vegetation origin and cellSize must be finite numbers')
+    this.#dropPromoted()
     this.#write(this.#module._engine_veg_configure(origin, cellSize), 'vegetation field')
   }
 
@@ -534,6 +549,120 @@ export class EngineWorld {
 
   attachVegetation() {
     this.#write(this.#module._engine_veg_attach(), 'vegetation body')
+  }
+
+  setVegetationPromotion(cap) {
+    if (!Number.isInteger(cap) || cap < 0) throw new RangeError('the promotion cap is a whole number of instances, or 0 for none')
+    this.#write(this.#module._engine_veg_set_promotion(cap), 'vegetation promotion')
+    this.#promotionCap = cap
+  }
+
+  promoteVegetation(instance) {
+    if (!Number.isInteger(instance) || instance < 0) throw new RangeError('the instance is a whole number index into the vegetation field')
+    this.#adoptPromoted()
+    const handle = this.#module._engine_veg_promote(instance)
+    if (handle < 0) throw engineError(handle, 'engine refused the promotion of instance ' + instance)
+    this.#adoptPromoted()
+    return handle
+  }
+
+  promotedVegetation() {
+    this.#adoptPromoted()
+    const rows = this.#module._engine_veg_promoted_rows() / 4
+    const out = []
+    for (let i = 0; i < this.#promotedSeen; i++) {
+      const instance = this.#module.HEAPU32[rows + i * PROMOTED_ROW_WORDS]
+      const handle = this.#module.HEAPU32[rows + i * PROMOTED_ROW_WORDS + 1]
+      const at = this.#module._engine_veg_instance(instance) / 4
+      const f = this.#module.HEAPF32
+      out.push({
+        instance,
+        handle,
+        alive: this.#alive.has(handle),
+        position: [f[at], f[at + 1], f[at + 2]],
+        yaw: f[at + 3],
+        scale: f[at + 4],
+        cls: (this.#module.HEAPU32[at + 5] & ~PROMOTED_BIT) >>> 0,
+      })
+    }
+    return out
+  }
+
+  vegetationPromotion() {
+    return {
+      cap: Number(this.#module._engine_veg_promotion_cap()),
+      promoted: Number(this.#module._engine_veg_promoted_count()),
+      refusals: Number(this.#module._engine_veg_promotion_refusals()),
+    }
+  }
+
+  restoreVegetation() {
+    this.#dropPromoted()
+    this.#write(this.#module._engine_veg_restore(), 'vegetation restore')
+  }
+
+  #adoptPromoted() {
+    const count = this.#module._engine_veg_promoted_count()
+    if (count === this.#promotedSeen) return
+    const rows = this.#module._engine_veg_promoted_rows() / 4
+    for (let i = this.#promotedSeen; i < count; i++) this.#alive.add(this.#module.HEAPU32[rows + i * PROMOTED_ROW_WORDS + 1])
+    this.#promotedSeen = count
+    this.#sortedHandles = null
+  }
+
+  #dropPromoted() {
+    this.#adoptPromoted()
+    const rows = this.#module._engine_veg_promoted_rows() / 4
+    for (let i = 0; i < this.#promotedSeen; i++) this.#alive.delete(this.#module.HEAPU32[rows + i * PROMOTED_ROW_WORDS + 1])
+    this.#promotedSeen = 0
+    this.#sortedHandles = null
+  }
+
+  #promotedState() {
+    const rows = this.#module._engine_veg_promoted_rows() / 4
+    const handles = this.#handles()
+    const out = new Uint32Array(this.#promotedSeen * PROMOTED_STATE_WORDS)
+    for (let i = 0; i < this.#promotedSeen; i++) {
+      const handle = this.#module.HEAPU32[rows + i * PROMOTED_ROW_WORDS + 1]
+      out[i * PROMOTED_STATE_WORDS] = this.#module.HEAPU32[rows + i * PROMOTED_ROW_WORDS]
+      out[i * PROMOTED_STATE_WORDS + 1] = this.#alive.has(handle) ? handles.indexOf(handle) : PROMOTED_BODY_GONE
+    }
+    return out
+  }
+
+  #restorePromoted(promoted, count) {
+    const heap = this.#module.HEAPU32
+    const rows = this.#module._engine_veg_promoted_rows() / 4
+    const wanted = promoted.length / PROMOTED_STATE_WORDS
+    let same = wanted === this.#promotedSeen
+    for (let i = 0; same && i < wanted; i++) {
+      const held = this.#alive.has(heap[rows + i * PROMOTED_ROW_WORDS + 1])
+      same = heap[rows + i * PROMOTED_ROW_WORDS] === promoted[i * PROMOTED_STATE_WORDS] && held === (promoted[i * PROMOTED_STATE_WORDS + 1] !== PROMOTED_BODY_GONE)
+    }
+    if (!same) {
+      this.restoreVegetation()
+      for (let i = 0; i < wanted; i++) {
+        const handle = this.promoteVegetation(promoted[i * PROMOTED_STATE_WORDS])
+        if (promoted[i * PROMOTED_STATE_WORDS + 1] === PROMOTED_BODY_GONE) this.despawn(handle)
+      }
+    }
+    const order = new Array(count).fill(-1)
+    const taken = new Set()
+    for (let i = 0; i < wanted; i++) {
+      const index = promoted[i * PROMOTED_STATE_WORDS + 1]
+      if (index === PROMOTED_BODY_GONE) continue
+      if (!(index < count) || order[index] !== -1) throw new RangeError('the promoted list names body index ' + index + ' twice or past the body count')
+      order[index] = heap[rows + i * PROMOTED_ROW_WORDS + 1]
+      taken.add(order[index])
+    }
+    let next = 0
+    for (const handle of this.#handles()) {
+      if (taken.has(handle)) continue
+      while (next < count && order[next] !== -1) next += 1
+      if (next < count) order[next] = handle
+      next += 1
+    }
+    return order
   }
 
   vegetationPlaced() {

@@ -156,6 +156,16 @@ class ObjectPairs final : public JPH::ObjectLayerPairFilter {
   }
 };
 
+class StandListener final : public JPH::CharacterContactListener {
+ public:
+  void OnContactSolve(const JPH::CharacterVirtual* character, const JPH::BodyID&, const JPH::SubShapeID&, JPH::RVec3Arg, JPH::Vec3Arg contactNormal,
+                      JPH::Vec3Arg contactVelocity, const JPH::PhysicsMaterial*, JPH::Vec3Arg, JPH::Vec3& ioNewCharacterVelocity) override {
+    if (standing && contactVelocity.IsNearZero() && !character->IsSlopeTooSteep(contactNormal)) ioNewCharacterVelocity = JPH::Vec3::sZero();
+  }
+
+  bool standing = false;
+};
+
 }
 
 struct World::Runtime {
@@ -184,6 +194,7 @@ struct World::Runtime {
   JPH::Ref<JPH::CharacterVirtual> characters[kMaxCharacters];
   JPH::Vec3 characterCommand[kMaxCharacters];
   JPH::Vec3 characterFall[kMaxCharacters];
+  StandListener stand;
   std::uint32_t characterCount = 0;
   float characterRadius = 0.0f;
   float characterHalfHeight = 0.0f;
@@ -268,6 +279,9 @@ Status World::configure(const Config& config) {
   if (!joltReady) return kNotConfigured;
   if (bodyIds_ == nullptr) return kNotConfigured;
 
+  forgetPromotions();
+  promoteCap_ = 0;
+  promotionRefusals_ = 0;
   releaseRuntime();
   physicsOrigin() = PhysicsOrigin{};
   void* raw = pool::allocateAligned(sizeof(Runtime), alignof(Runtime));
@@ -419,6 +433,78 @@ Status World::attachVegetation() {
   return kOk;
 }
 
+void World::forgetPromotions() {
+  if (vegetation::isBound()) {
+    for (std::uint32_t i = 0; i < promotedCount_; ++i) vegetation::restore(vegetation::state(), promoted_[i].instance);
+  }
+  promotedCount_ = 0;
+}
+
+Status World::setVegetationPromotion(std::uint32_t cap) {
+  if (runtime_ == nullptr) return kNotConfigured;
+  if (cap > kMaxPromotedInstances) return kRange;
+  promoteCap_ = cap;
+  return kOk;
+}
+
+Status World::restoreVegetation() {
+  if (runtime_ == nullptr) return kNotConfigured;
+  for (std::uint32_t i = 0; i < promotedCount_; ++i) despawn(promoted_[i].handle);
+  forgetPromotions();
+  return kOk;
+}
+
+int World::promoteAt(std::uint32_t instance, float x, float y, float z) {
+  vegetation::Field& field = vegetation::state();
+  if (!vegetation::promote(field, instance)) return kBadId;
+  const int slot = allocateSlot();
+  if (slot < 0) {
+    vegetation::restore(field, instance);
+    return kFull;
+  }
+  JPH::BodyInterface& bodies = runtime_->physics.GetBodyInterface();
+  const JPH::BodyID id(bodyIds_[slot]);
+  bodies.SetPositionAndRotation(id, JPH::RVec3(x, y, z), JPH::Quat::sIdentity(), JPH::EActivation::DontActivate);
+  if ((air_[slot] & kAirNow) != 0) bodies.SetObjectLayer(id, movingLayerOf(static_cast<std::uint32_t>(slot)));
+  air_[slot] = 0;
+  ceiling_[slot] = std::numeric_limits<float>::quiet_NaN();
+  bodies.AddBody(id, JPH::EActivation::Activate);
+  bodies.SetLinearAndAngularVelocity(id, JPH::Vec3::sZero(), JPH::Vec3::sZero());
+  alive_[slot] = kSlotAlive;
+  live_ += 1;
+  promoted_[promotedCount_] = PromotedRow{instance, (static_cast<std::uint32_t>(generations_[slot]) << kSlotBits) | static_cast<std::uint32_t>(slot)};
+  promotedCount_ += 1;
+  sync(static_cast<std::uint32_t>(slot));
+  return slot;
+}
+
+void World::promoteTouched() {
+  const vegetation::Touch* touches = nullptr;
+  const std::uint32_t count = vegetation::drainTouches(touches);
+  for (std::uint32_t i = 0; i < count; ++i) {
+    const vegetation::Touch& touch = touches[i];
+    if (promotedCount_ >= promoteCap_ || capacity_ - live_ - retired_ == 0) {
+      promotionRefusals_ += 1;
+      continue;
+    }
+    if (promoteAt(touch.instance, touch.x, touch.y, touch.z) == kFull) promotionRefusals_ += 1;
+  }
+}
+
+std::int64_t World::promoteVegetation(std::uint32_t instance) {
+  if (runtime_ == nullptr || vegetationBody_ == kNoBody) return kNotConfigured;
+  if (promotedCount_ >= kMaxPromotedInstances || capacity_ - live_ - retired_ == 0) return kFull;
+  const vegetation::Field& field = vegetation::state();
+  const vegetation::Instance* row = vegetation::instanceRow(field, instance);
+  if (row == nullptr || (row->cls & vegetation::kPromotedBit) != 0) return kBadId;
+  float anchor[3];
+  if (!vegetation::anchorOf(field, instance, anchor)) return kBadId;
+  const PhysicsOrigin& o = physicsOrigin();
+  const int slot = promoteAt(instance, static_cast<float>(anchor[0] - o.x), static_cast<float>(anchor[1] - o.y), static_cast<float>(anchor[2] - o.z));
+  if (slot < 0) return slot;
+  return static_cast<std::int64_t>(promoted_[promotedCount_ - 1].handle);
+}
+
 namespace {
 
 JPH::RVec3 toBody(const double* p) {
@@ -469,6 +555,7 @@ int World::addCharacter(const double* spec) {
   const std::uint32_t index = r.characterCount;
   follow(spec[0], spec[1], spec[2]);
   r.characters[index] = new JPH::CharacterVirtual(&r.characterSettings, toBody(spec), JPH::Quat::sIdentity(), &r.physics);
+  r.characters[index]->SetListener(&r.stand);
   if (!reserveContactBlocks(index + 1)) return kFull;
   r.characterCount += 1;
   return static_cast<int>(index);
@@ -531,6 +618,7 @@ void World::updateCharacters(float dt) {
     JPH::CharacterVirtual::ExtendedUpdateSettings extended;
     extended.mStickToFloorStepDown = up * -characterStickDown_;
     extended.mWalkStairsStepUp = up * characterStepUp_;
+    r.stand.standing = r.characterCommand[i] == JPH::Vec3::sZero();
     c->SetLinearVelocity(r.characterCommand[i] + r.characterFall[i]);
     c->ExtendedUpdate(dt, gravity, extended, broad, object, JPH::BodyFilter(), JPH::ShapeFilter(), r.temp);
   }
@@ -1252,8 +1340,16 @@ void World::step(std::uint32_t steps) {
           ENGINE_PROFILE_SCOPE("engine air layers");
           applyAirLayers();
         }
-        ENGINE_PROFILE_SCOPE("engine jolt update");
-        if (runtime_->physics.Update(dt, 1, &runtime_->temp, &runtime_->jobs) != JPH::EPhysicsUpdateError::None) updateErrors_ += 1;
+        const bool promoting = promoteCap_ != 0 && vegetationBody_ != kNoBody;
+        if (promoting) vegetation::armTouches(true);
+        {
+          ENGINE_PROFILE_SCOPE("engine jolt update");
+          if (runtime_->physics.Update(dt, 1, &runtime_->temp, &runtime_->jobs) != JPH::EPhysicsUpdateError::None) updateErrors_ += 1;
+        }
+        if (promoting) {
+          vegetation::armTouches(false);
+          promoteTouched();
+        }
       }
       {
         engine::phase::Scope scope(engine::phase::kReadback);

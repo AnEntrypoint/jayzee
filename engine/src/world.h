@@ -49,6 +49,14 @@ constexpr std::uint16_t kBodyLastGeneration = static_cast<std::uint16_t>((1u << 
 constexpr std::uint16_t kBodyRetiredGeneration = static_cast<std::uint16_t>(kBodyLastGeneration + 1u);
 constexpr std::uint32_t kFixedJoltBodies = 3;
 constexpr std::uint32_t kMaxCharacters = 16;
+constexpr std::uint32_t kMaxPromotedInstances = 64;
+
+struct PromotedRow {
+  std::uint32_t instance;
+  std::uint32_t handle;
+};
+
+static_assert(sizeof(PromotedRow) == 8);
 
 constexpr std::uint32_t joltBodyCapacity(const budget::Capacity& c) {
   return c.bodies + c.statics + c.trunks + kFixedJoltBodies;
@@ -151,6 +159,13 @@ class World {
   Status configurePlanet(double radius, double cellSize, double gravity, double maxHeight);
   Status attachVegetation();
   Status addTrunk(const double* trunk);
+  Status setVegetationPromotion(std::uint32_t cap);
+  Status restoreVegetation();
+  std::int64_t promoteVegetation(std::uint32_t instance);
+  std::uint32_t promotionCap() const { return promoteCap_; }
+  std::uint32_t promotedInstances() const { return promotedCount_; }
+  std::uint32_t promotionRefusals() const { return promotionRefusals_; }
+  const PromotedRow* promotedRows() const { return promoted_; }
   int addCharacter(const double* spec);
   void setCharacterVelocity(std::uint32_t index, const float* velocity);
   Status tuneCharacters(float stepUp, float stickDown);
@@ -220,6 +235,9 @@ class World {
   Status applyTuning(std::uint32_t flags);
   void rebase(double x, double y, double z);
   void removeBody(std::uint32_t index);
+  void promoteTouched();
+  int promoteAt(std::uint32_t instance, float x, float y, float z);
+  void forgetPromotions();
   void releaseRuntime();
   void classify(std::uint32_t joltBody, QueryHit& out) const;
 
@@ -263,6 +281,10 @@ class World {
   std::uint32_t planetBody_ = kNoBody;
   std::uint32_t vegetationBody_ = kNoBody;
   std::uint32_t trunkBodies_ = 0;
+  std::uint32_t promoteCap_ = 0;
+  std::uint32_t promotedCount_ = 0;
+  std::uint32_t promotionRefusals_ = 0;
+  PromotedRow promoted_[kMaxPromotedInstances] = {};
   std::uint64_t tick_ = 0;
   std::uint64_t rebases_ = 0;
   std::uint32_t* bodyIds_ = nullptr;

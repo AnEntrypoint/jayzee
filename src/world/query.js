@@ -1,3 +1,5 @@
+import { rayCapsule } from './rayShapes.js'
+
 const isVector = (value) => Array.isArray(value) && value.length === 3 && value.every((x) => typeof x === 'number' && Number.isFinite(x))
 
 const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
@@ -9,6 +11,14 @@ const normalise = (v) => {
 
 const MISS = Object.freeze({ hit: false, kind: null, id: null, distance: Infinity, normal: null, position: null })
 const NO_OPTIONS = Object.freeze({})
+export const STATIC_COLLIDERS_MIGRATING = 'static-colliders-migrating'
+const migrating = (maxDistance) => ({ hit: false, kind: null, id: null, distance: maxDistance, normal: null, position: null, unavailable: STATIC_COLLIDERS_MIGRATING })
+const refuse = (index) => {
+  const error = new Error('static collider ' + index + ' is migrating, so an answer here would miss it')
+  error.code = STATIC_COLLIDERS_MIGRATING
+  error.index = index
+  return error
+}
 const POSITION_SCRATCH = [0, 0, 0]
 
 const hitAt = (kind, id, origin, direction, distance, normal) => ({
@@ -77,9 +87,21 @@ const checkBox = (box, index) => {
   if (box[0] > box[3] || box[1] > box[4] || box[2] > box[5]) throw new RangeError('box ' + index + ' has min above max')
 }
 
-export const createQueries = (world, { radius, boxes = [] }) => {
+const checkCapsule = (capsule, index) => {
+  if (!capsule || !isVector(capsule.a) || !isVector(capsule.b) || !(typeof capsule.radius === 'number' && capsule.radius > 0)) {
+    throw new TypeError('capsule ' + index + ' needs finite end points a and b and a positive radius')
+  }
+}
+
+const checkMesh = (mesh, index) => {
+  if (!mesh || typeof mesh.raycast !== 'function') throw new TypeError('mesh ' + index + ' must be a triangle mesh with raycast')
+}
+
+export const createQueries = (world, { radius, boxes = [], capsules = [], meshes = [] }) => {
   if (!(typeof radius === 'number' && radius > 0)) throw new RangeError('radius must be a positive number, the body radius')
   boxes.forEach(checkBox)
+  capsules.forEach(checkCapsule)
+  meshes.forEach(checkMesh)
   const admits = (id, options) => {
     if (options.exclude && options.exclude.includes(id)) return false
     if (options.filter && !options.filter(id)) return false
@@ -87,6 +109,42 @@ export const createQueries = (world, { radius, boxes = [] }) => {
   }
   const bodyPosition = (id) => world.position(id, POSITION_SCRATCH)
   const count = () => world.count
+  const parked = new Set()
+  const checkIndex = (index) => {
+    if (!Number.isInteger(index) || !(index in boxes)) throw new RangeError('static collider ' + index + ' is not in the index')
+  }
+  const park = (index) => {
+    checkIndex(index)
+    if (parked.has(index)) return false
+    parked.add(index)
+    return true
+  }
+  const restore = (index) => {
+    checkIndex(index)
+    return parked.delete(index)
+  }
+  const gap2 = (box, point) => {
+    const dx = point[0] - Math.min(Math.max(point[0], box[0]), box[3])
+    const dy = point[1] - Math.min(Math.max(point[1], box[1]), box[4])
+    const dz = point[2] - Math.min(Math.max(point[2], box[2]), box[5])
+    return dx * dx + dy * dy + dz * dz
+  }
+  const drain = (limit, movers = []) => {
+    if (!(Number.isInteger(limit) && limit >= 0)) throw new RangeError('limit must be a whole number of colliders, zero or above')
+    if (!Array.isArray(movers) || !movers.every(isVector)) throw new TypeError('movers must be a list of finite [x, y, z] triples')
+    const order = [...parked].map((index) => {
+      let nearest = movers.length === 0 ? 0 : Infinity
+      for (const mover of movers) nearest = Math.min(nearest, gap2(boxes[index], mover))
+      return { index, nearest }
+    }).sort((a, b) => a.nearest - b.nearest || a.index - b.index)
+    const restored = []
+    for (let i = 0; i < order.length && restored.length < limit; i++) {
+      parked.delete(order[i].index)
+      restored.push(order[i].index)
+    }
+    return restored
+  }
+  const touches = (box, min, max) => box[0] <= max[0] && box[3] >= min[0] && box[1] <= max[1] && box[4] >= min[1] && box[2] <= max[2] && box[5] >= min[2]
 
   const raycast = (origin, direction, maxDistance = Infinity, options = NO_OPTIONS) => {
     if (!isVector(origin)) throw new TypeError('origin must be a finite [x, y, z] triple')
@@ -100,13 +158,46 @@ export const createQueries = (world, { radius, boxes = [] }) => {
       if (hit && hit.distance < best.distance) best = hitAt('body', id, origin, unit, hit.distance, hit.normal)
     }
     if (options.boxes !== false) {
+      let hidden = Infinity
       for (let index = 0; index < boxes.length; index++) {
         if (!(index in boxes)) continue
         const hit = rayBox(origin, unit, boxes[index], maxDistance)
-        if (hit && hit.distance < best.distance) best = hitAt('box', index, origin, unit, hit.distance, hit.normal)
+        if (!hit) continue
+        if (parked.has(index)) {
+          if (hit.distance < hidden) hidden = hit.distance
+          continue
+        }
+        if (hit.distance < best.distance) best = hitAt('box', index, origin, unit, hit.distance, hit.normal)
+      }
+      if (hidden < best.distance) return migrating(maxDistance)
+    }
+    if (options.capsules !== false) {
+      for (let index = 0; index < capsules.length; index++) {
+        const capsule = capsules[index]
+        const hit = rayCapsule(origin, unit, capsule.a, capsule.b, capsule.radius, maxDistance)
+        if (hit && hit.distance < best.distance) best = hitAt('capsule', index, origin, unit, hit.distance, hit.normal)
+      }
+    }
+    if (options.meshes !== false) {
+      for (let index = 0; index < meshes.length; index++) {
+        const hit = meshes[index].raycast(origin, unit, Math.min(maxDistance, best.distance), options.backFaces !== false)
+        if (!hit || !(hit.distance < best.distance)) continue
+        best = hitAt('mesh', index, origin, unit, hit.distance, [hit.normal[0], hit.normal[1], hit.normal[2]])
+        best.triangle = hit.triangle
       }
     }
     return best
+  }
+
+  const overlapStatics = (min, max) => {
+    if (!isVector(min) || !isVector(max) || min.some((x, a) => x > max[a])) throw new RangeError('min must hold no coordinate above max')
+    const indexes = []
+    for (let index = 0; index < boxes.length; index++) {
+      if (!(index in boxes) || !touches(boxes[index], min, max)) continue
+      if (parked.has(index)) throw refuse(index)
+      indexes.push(index)
+    }
+    return indexes
   }
 
   const overlapSphere = (center, reach, options = NO_OPTIONS) => {
@@ -142,5 +233,15 @@ export const createQueries = (world, { radius, boxes = [] }) => {
     return ids
   }
 
-  return { raycast, overlapSphere, overlapBox }
+  return {
+    raycast,
+    overlapSphere,
+    overlapBox,
+    overlapStatics,
+    park,
+    restore,
+    drain,
+    isPending: (index) => parked.has(index),
+    get pendingCount() { return parked.size },
+  }
 }

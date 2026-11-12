@@ -1,3 +1,4 @@
+import { createFieldLattice as createRealFieldLattice } from './fieldLattice.js'
 import { createPlanetFrame } from './planetFrame.js'
 import { tiltDegBetween, LATTICE_FOLLOW_TILT_DEG, LATTICE_RESET_FORCED_TILT_DEG, RESET_SURFACE_STEP_BOUND_M } from './fieldLatticeTilt.js'
 import { snapshotChart, createChartTransfer } from '../chart-pure/chartAnchor.js'
@@ -21,7 +22,7 @@ export class TerrainReanchorUnpreparedError extends Error {
   }
 }
 
-export function createTerrainReanchor({ frame, sampler, offsetY, reliefScale, physics, heightStreamer, colliderStreamers, getPlayers, blockers, now, createFieldLattice, logError = ignoreError }) {
+export function createTerrainReanchor({ frame, sampler, offsetY, reliefScale, physics, heightStreamer, colliderStreamers, getPlayers, blockers, now, createFieldLattice = createRealFieldLattice, logError = ignoreError }) {
   if (typeof now !== 'function') throw new TypeError('createTerrainReanchor needs a now() clock returning milliseconds')
   let prepared = null, preparing = null, prepareFailure = null, followDecided = false, pendingResetStepM = 0
   const costs = []

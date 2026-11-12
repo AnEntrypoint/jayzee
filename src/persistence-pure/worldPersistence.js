@@ -59,7 +59,7 @@ export function resolveWorldName(ctx) {
   return ctx.currentWorldDef?.name || ctx.worldName || envWorldName(ctx.env) || null
 }
 
-export function buildWorldSnapshot(appRuntime, physics, worldName, savedAt) {
+export function buildWorldSnapshot(appRuntime, physics, worldName, savedAt, worldDef = null) {
   const game = appRuntime.snapshotGameState({ includeStatic: true })
   const entities = []
   for (const [id, s] of game.entities) {
@@ -81,6 +81,7 @@ export function buildWorldSnapshot(appRuntime, physics, worldName, savedAt) {
   return {
     version: WORLD_SNAPSHOT_FORMAT_VERSION,
     world: worldName || null,
+    defFingerprint: worldDef ? worldDefFingerprint(worldDef) : null,
     chart: physics?._planetFrame ? snapshotChart(physics._planetFrame) : null,
     tick: game.tick,
     elapsed: game.elapsed,
@@ -99,7 +100,7 @@ export async function saveWorldSnapshot(ctx) {
   const log = loggerOf(ctx)
   try {
     await yieldToEventLoop()
-    const snap = buildWorldSnapshot(appRuntime, physics, resolveWorldName(ctx), ctx.now())
+    const snap = buildWorldSnapshot(appRuntime, physics, resolveWorldName(ctx), ctx.now(), ctx.currentWorldDef ?? null)
     await storage.set(WORLD_SNAPSHOT_KEY, snap)
     log.log(`${LOG_PREFIX} saved snapshot: tick=${snap.tick} entities=${snap.entities.length}`)
     return true
@@ -130,6 +131,13 @@ export async function restoreWorldSnapshot(ctx) {
   if (snap.world !== worldName && !legacyUnnamedMatch) {
     log.warn(`${LOG_PREFIX} snapshot world mismatch (saved="${snap.world}" current="${worldName}") -- discarding, booting clean`)
     return { restored: false, reason: 'world-mismatch' }
+  }
+  if (typeof snap.defFingerprint === 'string' && ctx.currentWorldDef) {
+    const current = worldDefFingerprint(ctx.currentWorldDef)
+    if (snap.defFingerprint !== current) {
+      log.warn(`${LOG_PREFIX} snapshot world definition mismatch (saved=${snap.defFingerprint} current=${current}) -- discarding, booting clean`)
+      return { restored: false, reason: 'def-mismatch' }
+    }
   }
   const chartPass = chartPassFromSnapshot(snap, physics)
   const entities = new Map()

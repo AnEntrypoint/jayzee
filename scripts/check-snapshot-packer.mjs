@@ -29,11 +29,14 @@ gate('the snapshot packer fixture is the one the generator wrote', () => {
   assert(fixture.cases.length === 7, 'case count ' + fixture.cases.length)
 })
 
+const REFUSED_SHAPES = ['a player that is not an array is refused', 'players not an array is refused']
+
 for (const testCase of fixture.cases) {
-  gate('packSnapshotBytes "' + testCase.name + '" returns the spoint result', () => {
+  const refusedShape = REFUSED_SHAPES.includes(testCase.name)
+  gate('packSnapshotBytes "' + testCase.name + '" ' + (refusedShape ? 'is refused with null, as in spoint' : 'splices to the bytes spoint packs for the whole message'), () => {
     const got = packSnapshotBytes(testCase.type, testCase.seq, revive(testCase.encoded), revive(testCase.me), testCase.chartEpoch, newRecordMemo())
     const gotHex = got === null ? null : hex(got)
-    assert(gotHex === testCase.spliced, 'jayzee ' + gotHex + ' differs from spoint ' + testCase.spliced)
+    assert(gotHex === (refusedShape ? null : testCase.full), 'jayzee ' + gotHex + ' differs from ' + (refusedShape ? 'null' : 'the spoint whole-message bytes'))
   })
   gate('the whole message for "' + testCase.name + '" packs to the spoint bytes', () => {
     const message = fullOf(testCase.type, testCase.seq, revive(testCase.encoded), revive(testCase.me), testCase.chartEpoch)
@@ -41,24 +44,28 @@ for (const testCase of fixture.cases) {
   })
 }
 
-gate('OPEN, known difference: under msgpackr 2.0.4 the head layout probe fails, so the splice refuses every shape and the caller packs the whole message', () => {
-  const before = snapshotPackCounts.refusals
+gate('stated difference: spoint refuses every fixture shape under msgpackr 2.0.4, and jayzee splices the five well-formed shapes and refuses the two malformed ones', () => {
+  const before = { ...snapshotPackCounts }
   const memo = newRecordMemo()
-  const probe = fixture.cases.filter((c) => c.spliced === null).length
-  assert(probe === fixture.cases.length, 'a case spliced in spoint: the refusal claim no longer holds')
+  const refusedInSpoint = fixture.cases.filter((c) => c.spliced === null).length
+  assert(refusedInSpoint === fixture.cases.length, 'a case spliced in spoint: the fixture no longer records a refusal for every shape')
+  assert(REFUSED_SHAPES.every((name) => fixture.cases.some((c) => c.name === name)), 'a refused shape is missing from the fixture')
   for (const testCase of fixture.cases) packSnapshotBytes(testCase.type, testCase.seq, revive(testCase.encoded), revive(testCase.me), testCase.chartEpoch, memo)
-  assert(snapshotPackCounts.refusals - before === fixture.cases.length, 'refusals counted ' + (snapshotPackCounts.refusals - before))
+  assert(snapshotPackCounts.refusals - before.refusals === REFUSED_SHAPES.length, 'refusals counted ' + (snapshotPackCounts.refusals - before.refusals))
+  assert(snapshotPackCounts.splices - before.splices === fixture.cases.length - REFUSED_SHAPES.length, 'splices counted ' + (snapshotPackCounts.splices - before.splices))
 })
 
-gate('two calls that share one record memo give the spoint results', () => {
+gate('two calls that share one record memo both give the spoint whole-message bytes, and the second call shares both records', () => {
   const memo = newRecordMemo()
   const shared = fixture.shared
   const encoded = revive(fixture.cases[1].encoded)
+  const sharesBefore = snapshotPackCounts.recordShares
   const first = packSnapshotBytes('snapshot', 10, encoded, undefined, 0, memo)
   const second = packSnapshotBytes('snapshot', 11, encoded, undefined, 0, memo)
-  assert((first === null ? null : hex(first)) === shared.first, 'first call differs from spoint')
-  assert((second === null ? null : hex(second)) === shared.second, 'second call differs from spoint')
-  assert(hex(pack(fullOf('snapshot', 11, encoded, undefined, 0))) === shared.secondFull, 'second whole message differs from spoint')
+  assert(shared.first === null && shared.second === null, 'spoint spliced the shared calls: the fixture changed')
+  assert(hex(first) === hex(pack(fullOf('snapshot', 10, encoded, undefined, 0))), 'first call differs from the whole message')
+  assert(hex(second) === shared.secondFull, 'second call differs from the spoint whole-message bytes')
+  assert(snapshotPackCounts.recordShares - sharesBefore === encoded.players.length, 'records shared ' + (snapshotPackCounts.recordShares - sharesBefore))
 })
 
 gate('the whole message reads back to the same payload', () => {

@@ -1,0 +1,100 @@
+{
+ "source": {
+  "package": "xstate",
+  "version": "5.33.4",
+  "note": "Each line is one step of scripts/lib/gameFsmScenario.mjs run on a real xstate actor through src/behaviours/fsmXstate.js: createMachine, createActor and a clock whose timers fire on tick. A transition that targets its own state is built with reenter true."
+ },
+ "selfTarget": {
+  "xstateDefault": [
+   "enter a"
+  ],
+  "reenterTrue": [
+   "enter a",
+   "exit a",
+   "enter a"
+  ]
+ },
+ "sections": {
+  "guarded start, cancel and restart": [
+   "{\"step\":[\"start\"],\"result\":null,\"state\":\"lobby\",\"context\":{\"players\":0,\"round\":0,\"score\":0,\"warned\":0},\"timeInState\":0,\"log\":[\"enter lobby\"],\"transitions\":[]}",
+   "{\"step\":[\"send\",\"START\"],\"result\":{\"ok\":true,\"event\":\"START\",\"state\":\"lobby\"},\"state\":\"lobby\",\"context\":{\"players\":0,\"round\":0,\"score\":0,\"warned\":1},\"timeInState\":0,\"log\":[\"start refused\"],\"transitions\":[]}",
+   "{\"step\":[\"send\",\"JOIN\"],\"result\":{\"ok\":true,\"event\":\"JOIN\",\"state\":\"lobby\"},\"state\":\"lobby\",\"context\":{\"players\":1,\"round\":0,\"score\":0,\"warned\":1},\"timeInState\":0,\"log\":[\"join 1\"],\"transitions\":[]}",
+   "{\"step\":[\"send\",\"START\"],\"result\":{\"ok\":true,\"event\":\"START\",\"state\":\"lobby\"},\"state\":\"lobby\",\"context\":{\"players\":1,\"round\":0,\"score\":0,\"warned\":2},\"timeInState\":0,\"log\":[\"start refused\"],\"transitions\":[]}",
+   "{\"step\":[\"send\",\"JOIN\",{\"count\":2}],\"result\":{\"ok\":true,\"event\":\"JOIN\",\"state\":\"lobby\"},\"state\":\"lobby\",\"context\":{\"players\":3,\"round\":0,\"score\":0,\"warned\":2},\"timeInState\":0,\"log\":[\"join 3\"],\"transitions\":[]}",
+   "{\"step\":[\"send\",\"LEAVE\"],\"result\":{\"ok\":true,\"event\":\"LEAVE\",\"state\":\"lobby\"},\"state\":\"lobby\",\"context\":{\"players\":2,\"round\":0,\"score\":0,\"warned\":2},\"timeInState\":0,\"log\":[\"leave 2\"],\"transitions\":[]}",
+   "{\"step\":[\"can\",\"START\"],\"result\":true,\"state\":\"lobby\",\"context\":{\"players\":2,\"round\":0,\"score\":0,\"warned\":2},\"timeInState\":0,\"log\":[],\"transitions\":[]}",
+   "{\"step\":[\"send\",\"START\"],\"result\":{\"ok\":true,\"event\":\"START\",\"state\":\"countdown\"},\"state\":\"countdown\",\"context\":{\"players\":2,\"round\":1,\"score\":0,\"warned\":2},\"timeInState\":0,\"log\":[\"exit lobby\",\"start accepted\",\"enter countdown 1\"],\"transitions\":[\"countdown\"]}",
+   "{\"step\":[\"send\",\"JOIN\"],\"result\":{\"ok\":false,\"reason\":\"unhandled\",\"event\":\"JOIN\",\"state\":\"countdown\"},\"state\":\"countdown\",\"context\":{\"players\":2,\"round\":1,\"score\":0,\"warned\":2},\"timeInState\":0,\"log\":[],\"transitions\":[]}",
+   "{\"step\":[\"advance\",1000],\"result\":null,\"state\":\"countdown\",\"context\":{\"players\":2,\"round\":1,\"score\":0,\"warned\":2},\"timeInState\":1000,\"log\":[],\"transitions\":[]}",
+   "{\"step\":[\"send\",\"RESTART\"],\"result\":{\"ok\":true,\"event\":\"RESTART\",\"state\":\"countdown\"},\"state\":\"countdown\",\"context\":{\"players\":2,\"round\":2,\"score\":0,\"warned\":2},\"timeInState\":0,\"log\":[\"exit countdown\",\"enter countdown 2\"],\"transitions\":[]}",
+   "{\"step\":[\"advance\",2500],\"result\":null,\"state\":\"countdown\",\"context\":{\"players\":2,\"round\":2,\"score\":0,\"warned\":2},\"timeInState\":2500,\"log\":[],\"transitions\":[]}",
+   "{\"step\":[\"send\",\"CANCEL\"],\"result\":{\"ok\":true,\"event\":\"CANCEL\",\"state\":\"lobby\"},\"state\":\"lobby\",\"context\":{\"players\":2,\"round\":2,\"score\":0,\"warned\":2},\"timeInState\":0,\"log\":[\"exit countdown\",\"enter lobby\"],\"transitions\":[\"lobby\"]}",
+   "{\"step\":[\"can\",\"CANCEL\"],\"result\":false,\"state\":\"lobby\",\"context\":{\"players\":2,\"round\":2,\"score\":0,\"warned\":2},\"timeInState\":0,\"log\":[],\"transitions\":[]}",
+   "{\"step\":[\"send\",\"LEAVE\"],\"result\":{\"ok\":true,\"event\":\"LEAVE\",\"state\":\"lobby\"},\"state\":\"lobby\",\"context\":{\"players\":1,\"round\":2,\"score\":0,\"warned\":2},\"timeInState\":0,\"log\":[\"leave 1\"],\"transitions\":[]}",
+   "{\"step\":[\"send\",\"LEAVE\"],\"result\":{\"ok\":true,\"event\":\"LEAVE\",\"state\":\"lobby\"},\"state\":\"lobby\",\"context\":{\"players\":0,\"round\":2,\"score\":0,\"warned\":2},\"timeInState\":0,\"log\":[\"leave 0\"],\"transitions\":[]}",
+   "{\"step\":[\"send\",\"LEAVE\"],\"result\":{\"ok\":false,\"reason\":\"unhandled\",\"event\":\"LEAVE\",\"state\":\"lobby\"},\"state\":\"lobby\",\"context\":{\"players\":0,\"round\":2,\"score\":0,\"warned\":2},\"timeInState\":0,\"log\":[],\"transitions\":[]}",
+   "{\"step\":[\"can\",\"LEAVE\"],\"result\":false,\"state\":\"lobby\",\"context\":{\"players\":0,\"round\":2,\"score\":0,\"warned\":2},\"timeInState\":0,\"log\":[],\"transitions\":[]}"
+  ],
+  "countdown timer, play, earned end and replay": [
+   "{\"step\":[\"start\"],\"result\":null,\"state\":\"lobby\",\"context\":{\"players\":0,\"round\":0,\"score\":0,\"warned\":0},\"timeInState\":0,\"log\":[\"enter lobby\"],\"transitions\":[]}",
+   "{\"step\":[\"send\",\"JOIN\",{\"count\":3}],\"result\":{\"ok\":true,\"event\":\"JOIN\",\"state\":\"lobby\"},\"state\":\"lobby\",\"context\":{\"players\":3,\"round\":0,\"score\":0,\"warned\":0},\"timeInState\":0,\"log\":[\"join 3\"],\"transitions\":[]}",
+   "{\"step\":[\"send\",\"START\"],\"result\":{\"ok\":true,\"event\":\"START\",\"state\":\"countdown\"},\"state\":\"countdown\",\"context\":{\"players\":3,\"round\":1,\"score\":0,\"warned\":0},\"timeInState\":0,\"log\":[\"exit lobby\",\"start accepted\",\"enter countdown 1\"],\"transitions\":[\"countdown\"]}",
+   "{\"step\":[\"advance\",2999],\"result\":null,\"state\":\"countdown\",\"context\":{\"players\":3,\"round\":1,\"score\":0,\"warned\":0},\"timeInState\":2999,\"log\":[],\"transitions\":[]}",
+   "{\"step\":[\"advance\",1],\"result\":null,\"state\":\"playing\",\"context\":{\"players\":3,\"round\":1,\"score\":1,\"warned\":0},\"timeInState\":0,\"log\":[\"exit countdown\",\"enter playing\"],\"transitions\":[\"playing\"]}",
+   "{\"step\":[\"send\",\"SCORE\",{\"points\":40}],\"result\":{\"ok\":true,\"event\":\"SCORE\",\"state\":\"playing\"},\"state\":\"playing\",\"context\":{\"players\":3,\"round\":1,\"score\":41,\"warned\":0},\"timeInState\":0,\"log\":[\"score 41\"],\"transitions\":[]}",
+   "{\"step\":[\"send\",\"END\"],\"result\":{\"ok\":false,\"reason\":\"unhandled\",\"event\":\"END\",\"state\":\"playing\"},\"state\":\"playing\",\"context\":{\"players\":3,\"round\":1,\"score\":41,\"warned\":0},\"timeInState\":0,\"log\":[],\"transitions\":[]}",
+   "{\"step\":[\"can\",\"END\"],\"result\":false,\"state\":\"playing\",\"context\":{\"players\":3,\"round\":1,\"score\":41,\"warned\":0},\"timeInState\":0,\"log\":[],\"transitions\":[]}",
+   "{\"step\":[\"send\",\"SCORE\",{\"points\":70}],\"result\":{\"ok\":true,\"event\":\"SCORE\",\"state\":\"playing\"},\"state\":\"playing\",\"context\":{\"players\":3,\"round\":1,\"score\":111,\"warned\":0},\"timeInState\":0,\"log\":[\"score 111\"],\"transitions\":[]}",
+   "{\"step\":[\"can\",\"END\"],\"result\":true,\"state\":\"playing\",\"context\":{\"players\":3,\"round\":1,\"score\":111,\"warned\":0},\"timeInState\":0,\"log\":[],\"transitions\":[]}",
+   "{\"step\":[\"send\",\"END\"],\"result\":{\"ok\":true,\"event\":\"END\",\"state\":\"results\"},\"state\":\"results\",\"context\":{\"players\":3,\"round\":1,\"score\":111,\"warned\":0},\"timeInState\":0,\"log\":[\"exit playing\",\"earned end\",\"enter results\"],\"transitions\":[\"results\"]}",
+   "{\"step\":[\"advance\",0],\"result\":null,\"state\":\"results\",\"context\":{\"players\":3,\"round\":1,\"score\":111,\"warned\":0},\"timeInState\":0,\"log\":[\"results shown\"],\"transitions\":[]}",
+   "{\"step\":[\"advance\",10],\"result\":null,\"state\":\"results\",\"context\":{\"players\":3,\"round\":1,\"score\":111,\"warned\":0},\"timeInState\":10,\"log\":[],\"transitions\":[]}",
+   "{\"step\":[\"send\",\"AGAIN\"],\"result\":{\"ok\":true,\"event\":\"AGAIN\",\"state\":\"lobby\"},\"state\":\"lobby\",\"context\":{\"players\":3,\"round\":1,\"score\":111,\"warned\":0},\"timeInState\":0,\"log\":[\"exit results\",\"enter lobby\"],\"transitions\":[\"lobby\"]}",
+   "{\"step\":[\"send\",\"START\"],\"result\":{\"ok\":true,\"event\":\"START\",\"state\":\"countdown\"},\"state\":\"countdown\",\"context\":{\"players\":3,\"round\":2,\"score\":111,\"warned\":0},\"timeInState\":0,\"log\":[\"exit lobby\",\"start accepted\",\"enter countdown 2\"],\"transitions\":[\"countdown\"]}",
+   "{\"step\":[\"advance\",3000],\"result\":null,\"state\":\"playing\",\"context\":{\"players\":3,\"round\":2,\"score\":112,\"warned\":0},\"timeInState\":0,\"log\":[\"exit countdown\",\"enter playing\"],\"transitions\":[\"playing\"]}"
+  ],
+  "forced end by payload, then quit into the final state": [
+   "{\"step\":[\"start\"],\"result\":null,\"state\":\"lobby\",\"context\":{\"players\":0,\"round\":0,\"score\":0,\"warned\":0},\"timeInState\":0,\"log\":[\"enter lobby\"],\"transitions\":[]}",
+   "{\"step\":[\"send\",\"JOIN\",{\"count\":2}],\"result\":{\"ok\":true,\"event\":\"JOIN\",\"state\":\"lobby\"},\"state\":\"lobby\",\"context\":{\"players\":2,\"round\":0,\"score\":0,\"warned\":0},\"timeInState\":0,\"log\":[\"join 2\"],\"transitions\":[]}",
+   "{\"step\":[\"send\",\"START\"],\"result\":{\"ok\":true,\"event\":\"START\",\"state\":\"countdown\"},\"state\":\"countdown\",\"context\":{\"players\":2,\"round\":1,\"score\":0,\"warned\":0},\"timeInState\":0,\"log\":[\"exit lobby\",\"start accepted\",\"enter countdown 1\"],\"transitions\":[\"countdown\"]}",
+   "{\"step\":[\"advance\",3000],\"result\":null,\"state\":\"playing\",\"context\":{\"players\":2,\"round\":1,\"score\":1,\"warned\":0},\"timeInState\":0,\"log\":[\"exit countdown\",\"enter playing\"],\"transitions\":[\"playing\"]}",
+   "{\"step\":[\"send\",\"END\",{\"force\":false}],\"result\":{\"ok\":false,\"reason\":\"unhandled\",\"event\":\"END\",\"state\":\"playing\"},\"state\":\"playing\",\"context\":{\"players\":2,\"round\":1,\"score\":1,\"warned\":0},\"timeInState\":0,\"log\":[],\"transitions\":[]}",
+   "{\"step\":[\"send\",\"END\",{\"force\":true}],\"result\":{\"ok\":true,\"event\":\"END\",\"state\":\"results\"},\"state\":\"results\",\"context\":{\"players\":2,\"round\":1,\"score\":1,\"warned\":0},\"timeInState\":0,\"log\":[\"exit playing\",\"forced end\",\"enter results\"],\"transitions\":[\"results\"]}",
+   "{\"step\":[\"send\",\"QUIT\"],\"result\":{\"ok\":true,\"event\":\"QUIT\",\"state\":\"closed\"},\"state\":\"closed\",\"context\":{\"players\":2,\"round\":1,\"score\":1,\"warned\":0},\"timeInState\":0,\"log\":[\"exit results\",\"enter closed\"],\"transitions\":[\"closed\"]}",
+   "{\"step\":[\"send\",\"AGAIN\"],\"result\":{\"ok\":false,\"reason\":\"unhandled\",\"event\":\"AGAIN\",\"state\":\"closed\"},\"state\":\"closed\",\"context\":{\"players\":2,\"round\":1,\"score\":1,\"warned\":0},\"timeInState\":0,\"log\":[],\"transitions\":[]}",
+   "{\"step\":[\"can\",\"AGAIN\"],\"result\":false,\"state\":\"closed\",\"context\":{\"players\":2,\"round\":1,\"score\":1,\"warned\":0},\"timeInState\":0,\"log\":[],\"transitions\":[]}",
+   "{\"step\":[\"advance\",1000],\"result\":null,\"state\":\"closed\",\"context\":{\"players\":2,\"round\":1,\"score\":1,\"warned\":0},\"timeInState\":1000,\"log\":[],\"transitions\":[]}",
+   "{\"step\":[\"send\",\"JOIN\"],\"result\":{\"ok\":false,\"reason\":\"unhandled\",\"event\":\"JOIN\",\"state\":\"closed\"},\"state\":\"closed\",\"context\":{\"players\":2,\"round\":1,\"score\":1,\"warned\":0},\"timeInState\":1000,\"log\":[],\"transitions\":[]}"
+  ],
+  "play times out: a guard that fails once is not retried, the later delay ends the round": [
+   "{\"step\":[\"start\"],\"result\":null,\"state\":\"lobby\",\"context\":{\"players\":0,\"round\":0,\"score\":0,\"warned\":0},\"timeInState\":0,\"log\":[\"enter lobby\"],\"transitions\":[]}",
+   "{\"step\":[\"send\",\"JOIN\",{\"count\":2}],\"result\":{\"ok\":true,\"event\":\"JOIN\",\"state\":\"lobby\"},\"state\":\"lobby\",\"context\":{\"players\":2,\"round\":0,\"score\":0,\"warned\":0},\"timeInState\":0,\"log\":[\"join 2\"],\"transitions\":[]}",
+   "{\"step\":[\"send\",\"START\"],\"result\":{\"ok\":true,\"event\":\"START\",\"state\":\"countdown\"},\"state\":\"countdown\",\"context\":{\"players\":2,\"round\":1,\"score\":0,\"warned\":0},\"timeInState\":0,\"log\":[\"exit lobby\",\"start accepted\",\"enter countdown 1\"],\"transitions\":[\"countdown\"]}",
+   "{\"step\":[\"advance\",3000],\"result\":null,\"state\":\"playing\",\"context\":{\"players\":2,\"round\":1,\"score\":1,\"warned\":0},\"timeInState\":0,\"log\":[\"exit countdown\",\"enter playing\"],\"transitions\":[\"playing\"]}",
+   "{\"step\":[\"advance\",2000],\"result\":null,\"state\":\"playing\",\"context\":{\"players\":2,\"round\":1,\"score\":2,\"warned\":0},\"timeInState\":2000,\"log\":[],\"transitions\":[]}",
+   "{\"step\":[\"send\",\"SCORE\",{\"points\":-50}],\"result\":{\"ok\":true,\"event\":\"SCORE\",\"state\":\"playing\"},\"state\":\"playing\",\"context\":{\"players\":2,\"round\":1,\"score\":-48,\"warned\":0},\"timeInState\":2000,\"log\":[\"score -48\"],\"transitions\":[]}",
+   "{\"step\":[\"advance\",1000],\"result\":null,\"state\":\"playing\",\"context\":{\"players\":2,\"round\":1,\"score\":-47,\"warned\":0},\"timeInState\":3000,\"log\":[],\"transitions\":[]}",
+   "{\"step\":[\"advance\",1999],\"result\":null,\"state\":\"playing\",\"context\":{\"players\":2,\"round\":1,\"score\":-46,\"warned\":0},\"timeInState\":4999,\"log\":[],\"transitions\":[]}",
+   "{\"step\":[\"advance\",1],\"result\":null,\"state\":\"results\",\"context\":{\"players\":2,\"round\":1,\"score\":-46,\"warned\":0},\"timeInState\":0,\"log\":[\"exit playing\",\"time up\",\"enter results\"],\"transitions\":[\"results\"]}",
+   "{\"step\":[\"advance\",500],\"result\":null,\"state\":\"results\",\"context\":{\"players\":2,\"round\":1,\"score\":-46,\"warned\":0},\"timeInState\":500,\"log\":[\"results shown\"],\"transitions\":[]}"
+  ],
+  "one long step past two delays takes one transition per tick": [
+   "{\"step\":[\"start\"],\"result\":null,\"state\":\"lobby\",\"context\":{\"players\":0,\"round\":0,\"score\":0,\"warned\":0},\"timeInState\":0,\"log\":[\"enter lobby\"],\"transitions\":[]}",
+   "{\"step\":[\"send\",\"JOIN\",{\"count\":2}],\"result\":{\"ok\":true,\"event\":\"JOIN\",\"state\":\"lobby\"},\"state\":\"lobby\",\"context\":{\"players\":2,\"round\":0,\"score\":0,\"warned\":0},\"timeInState\":0,\"log\":[\"join 2\"],\"transitions\":[]}",
+   "{\"step\":[\"send\",\"START\"],\"result\":{\"ok\":true,\"event\":\"START\",\"state\":\"countdown\"},\"state\":\"countdown\",\"context\":{\"players\":2,\"round\":1,\"score\":0,\"warned\":0},\"timeInState\":0,\"log\":[\"exit lobby\",\"start accepted\",\"enter countdown 1\"],\"transitions\":[\"countdown\"]}",
+   "{\"step\":[\"advance\",9000],\"result\":null,\"state\":\"playing\",\"context\":{\"players\":2,\"round\":1,\"score\":1,\"warned\":0},\"timeInState\":0,\"log\":[\"exit countdown\",\"enter playing\"],\"transitions\":[\"playing\"]}",
+   "{\"step\":[\"advance\",9000],\"result\":null,\"state\":\"results\",\"context\":{\"players\":2,\"round\":1,\"score\":1,\"warned\":0},\"timeInState\":0,\"log\":[\"exit playing\",\"time up\",\"enter results\"],\"transitions\":[\"results\"]}",
+   "{\"step\":[\"advance\",0],\"result\":null,\"state\":\"results\",\"context\":{\"players\":2,\"round\":1,\"score\":1,\"warned\":0},\"timeInState\":0,\"log\":[\"results shown\"],\"transitions\":[]}",
+   "{\"step\":[\"advance\",0],\"result\":null,\"state\":\"results\",\"context\":{\"players\":2,\"round\":1,\"score\":1,\"warned\":0},\"timeInState\":0,\"log\":[],\"transitions\":[]}"
+  ],
+  "stop: events after it report stopped and listeners are dropped": [
+   "{\"step\":[\"start\"],\"result\":null,\"state\":\"lobby\",\"context\":{\"players\":0,\"round\":0,\"score\":0,\"warned\":0},\"timeInState\":0,\"log\":[\"enter lobby\"],\"transitions\":[]}",
+   "{\"step\":[\"send\",\"JOIN\",{\"count\":2}],\"result\":{\"ok\":true,\"event\":\"JOIN\",\"state\":\"lobby\"},\"state\":\"lobby\",\"context\":{\"players\":2,\"round\":0,\"score\":0,\"warned\":0},\"timeInState\":0,\"log\":[\"join 2\"],\"transitions\":[]}",
+   "{\"step\":[\"send\",\"START\"],\"result\":{\"ok\":true,\"event\":\"START\",\"state\":\"countdown\"},\"state\":\"countdown\",\"context\":{\"players\":2,\"round\":1,\"score\":0,\"warned\":0},\"timeInState\":0,\"log\":[\"exit lobby\",\"start accepted\",\"enter countdown 1\"],\"transitions\":[\"countdown\"]}",
+   "{\"step\":[\"stop\"],\"result\":null,\"state\":\"countdown\",\"context\":{\"players\":2,\"round\":1,\"score\":0,\"warned\":0},\"timeInState\":0,\"log\":[],\"transitions\":[]}",
+   "{\"step\":[\"send\",\"CANCEL\"],\"result\":{\"ok\":false,\"reason\":\"stopped\",\"event\":\"CANCEL\",\"state\":\"countdown\"},\"state\":\"countdown\",\"context\":{\"players\":2,\"round\":1,\"score\":0,\"warned\":0},\"timeInState\":0,\"log\":[],\"transitions\":[]}",
+   "{\"step\":[\"advance\",5000],\"result\":null,\"state\":\"countdown\",\"context\":{\"players\":2,\"round\":1,\"score\":0,\"warned\":0},\"timeInState\":0,\"log\":[],\"transitions\":[]}",
+   "{\"step\":[\"send\",\"START\"],\"result\":{\"ok\":false,\"reason\":\"stopped\",\"event\":\"START\",\"state\":\"countdown\"},\"state\":\"countdown\",\"context\":{\"players\":2,\"round\":1,\"score\":0,\"warned\":0},\"timeInState\":0,\"log\":[],\"transitions\":[]}"
+  ]
+ }
+}

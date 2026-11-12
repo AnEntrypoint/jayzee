@@ -1,5 +1,6 @@
 import { wireCheatEjection } from '../anticheat/CheatEjection.js'
 import { ConsensusVoter } from '../consensus-pure/ConsensusVoter.js'
+import { buildRollbackPeerLoop } from '../rollback-pure/peerSimRuntime.js'
 import { createLockstepGameLoop } from './lockstepGameLoop.js'
 import { LockstepInputTransport } from './lockstepInputTransport.js'
 
@@ -11,6 +12,6 @@ export function buildLockstepPeerLoop({ bridge, tickSystem, roster, localPeerId,
   return { loop, transport, voter }
 }
 
-export const PEER_LOOP_FACTORIES = Object.freeze({ lockstep: buildLockstepPeerLoop })
+export const PEER_LOOP_FACTORIES = Object.freeze({ lockstep: buildLockstepPeerLoop, rollback: buildRollbackPeerLoop })
 
 export const PEER_SIMULATED_PROFILES = new Set(Object.keys(PEER_LOOP_FACTORIES))

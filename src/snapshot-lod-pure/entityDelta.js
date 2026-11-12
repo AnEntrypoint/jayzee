@@ -16,7 +16,7 @@ import {
   SNAPSHOT_ENTITY_ENC_CODE_VERSION
 } from './constants.js'
 import { FNV1A_32_OFFSET_BASIS, fnv1aStepBytes, fnv1aStepFloat32, fnv1aStepString } from './fnv1a.js'
-import { packQuat } from './records.js'
+import { packRotationWord } from './records.js'
 
 const VEL_ZERO = [0, 0, 0]
 const SCALE_ONE = [1, 1, 1]
@@ -28,7 +28,7 @@ const packEntityBin = (e, into) => {
   const pos = e.position, rot = e.rotation, v = e.velocity || VEL_ZERO, s = e.scale || SCALE_ONE
   return encodeEntityRecord({
     position: [pos[0], pos[1], pos[2]],
-    rotationWord: packQuat(rot[0], rot[1], rot[2], rot[3]),
+    rotationWord: packRotationWord(rot[0], rot[1], rot[2], rot[3]),
     velocity: [v[0] || 0, v[1] || 0, v[2] || 0],
     scale: [s[0] || 1, s[1] || 1, s[2] || 1],
     flags: 0
@@ -243,7 +243,30 @@ const nearestViewerDist2 = (entry, viewers) => {
   return best
 }
 
-const applyEntry = (id, entry, nextMap, entities, prevEntityMap, viewers, snapshotSeq, propModCap) => {
+const BASELINE_LENGTH = 7
+
+const copyBaseline = (enc, pool) => {
+  let base = pool !== null && pool.length > 0 ? pool.pop() : null
+  if (base === null) {
+    base = [0, '', new Uint8Array(ENTITY_RECORD_BYTES), '', null, 0]
+    if (pool !== null) base.push(true)
+  }
+  base[0] = enc[0]
+  base[1] = enc[1]
+  base[2].set(enc[2])
+  base[3] = enc[3]
+  base[4] = enc[4]
+  base[5] = enc[5]
+  return base
+}
+
+const releaseBaseline = (prev, pool) => {
+  if (pool === null || !prev) return
+  const base = prev[3]
+  if (base && base.length === BASELINE_LENGTH) pool.push(base)
+}
+
+const applyEntry = (id, entry, nextMap, entities, prevEntityMap, viewers, snapshotSeq, propModCap, pool = null) => {
   const k = resolveKey(entry)
   let enc = entry.enc
   let farTier = false
@@ -272,19 +295,19 @@ const applyEntry = (id, entry, nextMap, entities, prevEntityMap, viewers, snapsh
     nextMap.set(id, prev)
     return
   }
-  if (farTier) enc = stripVelocityForFar(enc)
-  nextMap.set(id, [k, entry.cust, entry.custStr, enc])
-  if (!prev || prev[0] !== k) {
-    if (prev && prev[3]) {
-      const fd = computeFieldDelta(prev[3], enc)
-      if (fd) {
-        if (farTier && fd[1] === FIELD_ROT) return
-        entities.push(fd)
-        return
-      }
-    }
-    entities.push(enc)
+  if (prev && prev[0] === k) {
+    nextMap.set(id, prev)
+    return
   }
+  if (farTier) enc = stripVelocityForFar(enc)
+  const fd = prev && prev[3] ? computeFieldDelta(prev[3], enc) : null
+  if (fd !== null && farTier && fd[1] === FIELD_ROT) {
+    nextMap.set(id, prev)
+    return
+  }
+  nextMap.set(id, [k, entry.cust, entry.custStr, copyBaseline(enc, pool)])
+  releaseBaseline(prev, pool)
+  entities.push(fd !== null ? fd : enc)
 }
 
 export const propTickMod = (snapHz) => {

@@ -45,7 +45,7 @@ function checkTransition(stateName, what, def, names) {
   }
 }
 
-function validateSpec(spec) {
+export function validateGameFSMSpec(spec) {
   if (!isPlainObject(spec)) throw new GameFSMError('game-fsm-spec-not-object', `spec is ${describeDef(spec)}: the machine is read from spec.states, so a value that is not a plain object carries no state to read and the failure would surface with no spec named`)
   if (spec.id !== undefined && (typeof spec.id !== 'string' || spec.id.length === 0)) {
     throw new GameFSMError('game-fsm-spec-id-not-string', `spec.id is ${describeDef(spec.id)}: it becomes the machine id, so a value that is not a non-empty string is coerced into an id no caller can look this machine up by`)
@@ -120,7 +120,7 @@ function compileState(raw) {
 }
 
 export function defineGameFSM(spec, appCtx, options = {}) {
-  validateSpec(spec)
+  validateGameFSMSpec(spec)
   if (appCtx !== undefined && !isPlainObject(appCtx)) {
     throw new GameFSMError('game-fsm-appctx-not-object', `appCtx is ${describeDef(appCtx)}: every hook is called as hook(appCtx, ...) and every guard reads it, so a value that is not a plain object turns each of those reads into a failure raised inside the hook, far from this call that could have named it`)
   }

@@ -91,6 +91,7 @@ add_executable(engine_core
   src/codec.cpp
   src/textures.cpp
   src/model_pool.cpp
+  src/terrain_lod.cpp
   src/device_tier.cpp
   src/exports_models.cpp
   src/materials.cpp
@@ -99,6 +100,7 @@ add_executable(engine_core
   src/snapshot_delta.cpp
   src/exports_interest.cpp
   src/render/render_frame.cpp
+  src/render/shadow_cascades.cpp
   src/render/render_webgpu.cpp
   src/render/render_webgl2.cpp
   src/exports_render.cpp
@@ -227,6 +229,14 @@ set(ENGINE_EXPORTS
   _engine_veg_place
   _engine_veg_attach
   _engine_veg_placed
+  _engine_veg_set_promotion
+  _engine_veg_promotion_cap
+  _engine_veg_promoted_count
+  _engine_veg_promotion_refusals
+  _engine_veg_promoted_rows
+  _engine_veg_restore
+  _engine_veg_promote
+  _engine_veg_instance
   _engine_codec_bytes
   _engine_codec_values
   _engine_codec_encode_entity
@@ -276,6 +286,23 @@ set(ENGINE_EXPORTS
   _engine_render_refresh_props
   _engine_render_set_prop_plan
   _engine_render_prop_plans
+  _engine_render_set_prop_budget
+  _engine_render_shadow_budget
+  _engine_render_set_shadows
+  _engine_render_set_sun
+  _engine_render_shadow_state
+  _engine_render_prop_cutoff_squared
+  _engine_render_set_page_lod
+  _engine_terrain_lod_configure
+  _engine_terrain_lod_select
+  _engine_terrain_lod_state
+  _engine_render_pages_placed
+  _engine_render_pages_shed
+  _engine_render_page_records
+  _engine_render_prop_budget
+  _engine_render_prop_cutoff_bins
+  _engine_render_props_in_frustum
+  _engine_render_props_shed
   _engine_render_init
   _engine_render_light_count
   _engine_render_lights
@@ -299,6 +326,16 @@ set(ENGINE_EXPORTS
   _engine_render_cull_ready
   _engine_render_cull_counts
   _engine_models_slot_of
+  _engine_models_set_lods
+  _engine_models_lod_count
+  _engine_models_lod_level
+  _engine_models_lod_indices
+  _engine_models_set_index_budget
+  _engine_models_index_budget
+  _engine_models_set_lod_pixels
+  _engine_models_lod_pixels
+  _engine_models_lod_select
+  _engine_models_lod_stats
   _engine_render_unplace_page
   _engine_render_uploads
   _engine_render_visible

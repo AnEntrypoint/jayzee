@@ -58,3 +58,29 @@ export const decodeWireFrame = (buffer) => {
   const items = decodeBatch(bytes.subarray(1))
   return items === null ? [buffer] : items
 }
+
+export const forEachBatchItem = (buffer, visit) => {
+  if (typeof visit !== 'function') throw new TypeError('[wireweave] forEachBatchItem needs a visit function (bytes, index)')
+  if (!(buffer instanceof ArrayBuffer) && !ArrayBuffer.isView(buffer)) throw new TypeError(`[wireweave] a wire frame must be an ArrayBuffer or a view of bytes, got ${Object.prototype.toString.call(buffer).slice(8, -1)}`)
+  const bytes = buffer instanceof ArrayBuffer ? new Uint8Array(buffer) : new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength)
+  if (!bytesBeginWithBatchPrefix(bytes)) { visit(bytes, 0); return 1 }
+  let offset = 1
+  let count = 0
+  while (offset < bytes.byteLength) {
+    if (offset + LENGTH_BYTES > bytes.byteLength) { count = 0; break }
+    const length = ((bytes[offset] << 24) | (bytes[offset + 1] << 16) | (bytes[offset + 2] << 8) | bytes[offset + 3]) >>> 0
+    offset += LENGTH_BYTES
+    if (offset + length > bytes.byteLength) { count = 0; break }
+    offset += length
+    count++
+  }
+  if (count === 0) { visit(bytes, 0); return 1 }
+  offset = 1
+  for (let index = 0; index < count; index++) {
+    const length = ((bytes[offset] << 24) | (bytes[offset + 1] << 16) | (bytes[offset + 2] << 8) | bytes[offset + 3]) >>> 0
+    offset += LENGTH_BYTES
+    visit(bytes.subarray(offset, offset + length), index)
+    offset += length
+  }
+  return count
+}

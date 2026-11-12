@@ -1,18 +1,10 @@
 import { Packr, Unpackr, NEVER, DECIMAL_ROUND } from 'msgpackr'
+import { FNV1A_32_OFFSET_BASIS, fnv1aStepString } from '../shared/fnv1a.js'
 
 export const WIRE_STRUCTURES = Object.freeze([
   Object.freeze(['type', 'payload']),
   Object.freeze(['seq', 'tick', 'serverTime', 'players', 'entities', 'removed', 'delta', 'dots', 'me', 'chartEpoch'])
 ])
-
-const FNV1A_32_OFFSET_BASIS = 0x811c9dc5
-const FNV1A_32_PRIME = 0x01000193
-
-const fnv1aStepString = (hash, text) => {
-  let next = hash
-  for (let i = 0; i < text.length; i++) next = Math.imul(next ^ text.charCodeAt(i), FNV1A_32_PRIME)
-  return next
-}
 
 const computeWireStructHash = () => {
   let hash = FNV1A_32_OFFSET_BASIS
@@ -133,3 +125,28 @@ export function unpack(input) {
   }
   return value
 }
+
+export const lazyPackCounts = { created: 0, packed: 0, reads: 0 }
+
+export function lazyPack(value) {
+  assertEncodable(value)
+  lazyPackCounts.created++
+  let bytes = null
+  return {
+    get packed() { return bytes !== null },
+    get bytes() {
+      lazyPackCounts.reads++
+      if (bytes === null) {
+        bytes = pack(value)
+        lazyPackCounts.packed++
+      }
+      return bytes
+    },
+  }
+}
+
+export function isPacked() {
+  return true
+}
+
+export const ensurePacked = Promise.resolve(packer)

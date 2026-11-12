@@ -8,7 +8,7 @@ import { resolveTarget, latLonToDir, dirToLatLon, parseDir3, angleFromAnchorDeg,
 import { beginTeleportHold, stepTeleportHold, TELEPORT_HOLD_MAX_MS } from '../src/sessions-pure/teleportHold.js'
 import {
   SPAWN_HOLD_REASON, SPAWN_CLEARANCE, SPAWN_HOLD_MAX_MS, SPAWN_HOLD_MOVED_EPS,
-  snapToGround, probeSpawnHoldGround, probeSpawnGroundY, spawnClearanceM, rankSpawnPointsByWalkingRoom,
+  snapToGround, probeSpawnHoldGround, probeSpawnGround, probeSpawnGroundY, teleportPlacement, spawnClearanceM, rankSpawnPointsByWalkingRoom,
   groundSnapSpawnPoint, resolveSpawnPointOnGround, holdReasonText, movedDuringHold, probeGround,
   teleportTarget, teleportPosition,
 } from '../src/sessions-pure/relocation.js'
@@ -318,13 +318,34 @@ gate('probeSpawnGroundY keeps the y of probeSpawnHoldGround when no hold gate ap
   strictEqual(probeSpawnGroundY(groundCtx(), [4, 5, 9]), 0, 'control: a higher pose still reads the floor')
 })
 
-gate('probeSpawnGroundY skips the heightfield and static gates that the hold probe applies', () => {
+gate('probeSpawnGroundY applies the heightfield and static holds: an unlanded field or a pending static collider gives no height', () => {
   const unlanded = groundCtx({ _terrainStreamer: { coversPosition: () => false, groundlessPlayers: [] } })
   strictEqual(probeSpawnHoldGround(unlanded, [0, 1, 0]).reason, SPAWN_HOLD_REASON.HEIGHTFIELD_NOT_LANDED)
-  strictEqual(probeSpawnGroundY(unlanded, [0, 1, 0]), 0, 'the reason-less probe still returns a height under an unlanded field')
+  strictEqual(probeSpawnGroundY(unlanded, [0, 1, 0]), null, 'an unlanded field gives no height')
+  deepStrictEqual(probeSpawnGround(unlanded, [0, 1, 0]), { y: null, reason: SPAWN_HOLD_REASON.HEIGHTFIELD_NOT_LANDED })
   const pending = groundCtx({ appRuntime: { _pendingTrimeshBuilds: new Set([1]), _pendingTrimeshEntities: new Map() } })
   strictEqual(probeSpawnHoldGround(pending, [0, 1, 0]).reason, SPAWN_HOLD_REASON.STATIC_COLLIDERS_PENDING)
-  strictEqual(probeSpawnGroundY(pending, [0, 1, 0]), 0, 'control: the static gate is also skipped by probeSpawnGroundY')
+  strictEqual(probeSpawnGroundY(pending, [0, 1, 0]), null, 'a pending static collider gives no height')
+  const far = groundCtx({ appRuntime: { _pendingTrimeshBuilds: new Set(), _pendingTrimeshEntities: new Map([[1, { position: [300, 0, 0] }]]) } })
+  strictEqual(probeSpawnGroundY(far, [0, 1, 0]), 0, 'control: a collider beyond 256 m does not hold the probe')
+  const landed = groundCtx({ _terrainStreamer: { coversPosition: () => true, groundlessPlayers: [] } })
+  strictEqual(probeSpawnGroundY(landed, [0, 1, 0]), 0, 'control: a landed field gives the floor')
+})
+
+gate('spawn placement does not stand a player on ground that is not final: the point is kept and the reason is named', () => {
+  const unlanded = groundCtx({ _terrainStreamer: { coversPosition: () => false, groundlessPlayers: [] } })
+  const pending = groundCtx({ appRuntime: { _pendingTrimeshBuilds: new Set([1]), _pendingTrimeshEntities: new Map() } })
+  const tgt = target({ x: 5, z: 6, standNearY: 40 })
+  deepStrictEqual(teleportPlacement(unlanded, tgt), { position: [5, 40, 6], holdReason: SPAWN_HOLD_REASON.HEIGHTFIELD_NOT_LANDED })
+  deepStrictEqual(teleportPlacement(pending, tgt), { position: [5, 40, 6], holdReason: SPAWN_HOLD_REASON.STATIC_COLLIDERS_PENDING })
+  deepStrictEqual(teleportPlacement(groundCtx(), tgt), { position: [5, 1, 6], holdReason: null }, 'control: final ground takes the standing centre')
+  deepStrictEqual(teleportPosition(unlanded, tgt), [5, 40, 6])
+  deepStrictEqual(teleportPlacement(unlanded, target({ x: 5, y: 9, z: 6, standNearY: 40 })), { position: [5, 9, 6], holdReason: null })
+  const sp = [1, 5, 2]
+  strictEqual(groundSnapSpawnPoint(unlanded, sp), sp)
+  deepStrictEqual(resolveSpawnPointOnGround(pending, sp), [1, 5, 2])
+  deepStrictEqual(resolveSpawnPointOnGround(groundCtx(), sp), [1, 1, 2], 'control: final ground lowers the point')
+  deepStrictEqual(rankSpawnPointsByWalkingRoom(unlanded, [[0, 1, 0], [10, 1, 0]]), [[0, 1, 0]])
 })
 
 gate('probeSpawnGroundY discard changes teleport output: no raycast takes standNearY raw, a floor lowers it to the standing centre', () => {
@@ -658,7 +679,7 @@ gate('exported constants match the spoint values read from source', () => {
 gate('sessions-pure source carries no comments, no timers, no fs or socket calls, and no direct wall-clock reads', () => {
   const dir = new URL('../src/sessions-pure/', import.meta.url)
   const files = readdirSync(dir).filter(f => f.endsWith('.js'))
-  strictEqual(files.length, 7)
+  strictEqual(files.length, 8)
   const violations = []
   const rules = [
     [/\/\/|\/\*/, 'comment'],

@@ -25,9 +25,15 @@ c++ -std=c++20 -O2 -DNDEBUG -ffp-contract=off -fno-fast-math -fno-exceptions -fn
   "$engine/test/witness_phase8_resources.cpp" \
   "$engine/test/witness_phase10_plan.cpp" \
   "$engine/test/witness_vegetation_plan.cpp" \
+  "$engine/test/witness_vegetation_promotion.cpp" \
   "$engine/test/witness_models.cpp" \
+  "$engine/test/witness_model_lod.cpp" \
   "$engine/test/witness_visibility.cpp" \
+  "$engine/test/witness_character_planet.cpp" \
+  "$engine/test/witness_terrain_lod.cpp" \
   "$engine/src/render/render_frame.cpp" \
+  "$engine/src/render/shadow_cascades.cpp" \
+  "$engine/test/witness_shadow_cascades.cpp" \
   "$engine/src/world.cpp" \
   "$engine/src/bridge.cpp" \
   "$engine/src/planet_frame.cpp" \
@@ -38,6 +44,7 @@ c++ -std=c++20 -O2 -DNDEBUG -ffp-contract=off -fno-fast-math -fno-exceptions -fn
   "$engine/src/materials.cpp" \
   "$engine/src/textures.cpp" \
   "$engine/src/model_pool.cpp" \
+  "$engine/src/terrain_lod.cpp" \
   "$engine/src/device_tier.cpp" \
   "$engine/src/arena.cpp" \
   "$engine/src/budget.cpp" \

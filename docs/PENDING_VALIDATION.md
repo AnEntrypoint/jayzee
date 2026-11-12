@@ -4893,3 +4893,66 @@ The order and grouping are the owner's. Witness for the stretch: build of every 
 - Planet witness, once, 356 s wall, all four ok with no missed interval: 1024-webgpu work p99 1.48 ms, 1024-webgl2 0.99 ms, 64-webgpu 1.95 ms, 64-webgl2 1.47 ms.
 - Page memory, once, 162 s wall, verdict ok: 1083.3 MB against the 1085.5 MB baseline (541.7 MB window, 539.0 MB worker), as expected for a figure that counts reserved memory.
 - Full test, once: exit 0, 308 checks run, 0 failed, 5899 PASS lines, 126 s wall.
+
+## Phase V, pending (2026-11-12): the budget read from the device, and the display held to it
+
+The task: the extra wiki is the bottom-line featureset; memory stays flat, and what is displayed scales to a budget the device sets. Read of the state: `loadRenderer` defaulted its memory budget to a fixed 64 MiB and no caller derived it from the device (only the model tier read `navigator.deviceMemory`); the baseline list in docs/ENGINE.md had every LOD row missing, so nothing lowered detail to stay inside a budget.
+
+1. `src/engine/deviceBudget.js`: `readDeviceSignals` reads the reported memory, the core count and a host's total and free memory once. `chooseDeviceBudget` takes a quarter of the device memory (or the free memory when that is less), sets aside the management reserve (an eighth, at least 32 MiB), and picks the largest built tier that fits what is left. `loadRendererForDevice` in `src/engine/renderer.js` loads at that tier and steps down through `instantiateWithinBudget` when a reservation fails. Witness: `check:device-budget` (8 lines, run in this pass: PASS).
+2. `src/engine/displayGovernor.js`: a fixed-capacity selector. Each slot has a weight (its full cost) and a continuous level from its distance; a level halves the cost and the last level hides the slot. One bias coarsens every slot until the cost is at or under the budget; a hysteresis band keeps a slot's level while it wavers; when the bias is at its limit the last slots are shed. The bias falls again only when the lower bias fits under 0.95 of the budget. It allocates at construction only. Witness: `check:display-governor` (10 lines, run in this pass: PASS, with the no-hysteresis control flipping 99 times in 100 frames).
+3. `src/engine/vegetation.js` keeps the generated count of each patch apart from the count the engine draws (the bound counts block). `setDetail(slot, level)` shows a prefix of the instances, which is a uniform thinning because the instances are drawn from the seed in order, and marks the patch for upload when the shown count grows. `src/engine/vegetationDetail.js` drives it from the eye position; `buildPlanetScene` takes `instanceBudget` (null keeps every instance, as before) and `streamStep` takes the eye. Witness: `check:display-governor`, `check:vegetation-stream`, `check:vegetation-leaf-patches`, `check:camera-relative`, `check:sphere-population`, `check:hygiene` (all run in this pass: PASS).
+
+4. `sceneSpecForDevice(deviceBudget, overrides)` in `src/engine/planetScene.js` sets a scene's `instanceBudget` and its vegetation buffer limit from the device budget: a sixteenth of the budget holds resident instance matrices (65,536 on a 64 MiB budget, 524,288 on 512 MiB) and half of those may be shown (32,768 and 262,144). When that limit holds fewer patches than the block wants, the follower hands the pool the block centre-out (`block.nearest`), so the patches nearest the camera are resident and the far ones are deferred; a pool that holds the whole block still gets the row order. `check:planet-witness-scene` runs a second lap of the orbit against the 512 MiB threaded engine with a budget of a quarter of the scene.
+
+### Phase B of Phase V (2026-11-12): toolchain set up on a fresh host, built, gated
+
+- The host had no Emscripten, no Jolt host library and no `engine/out`. emsdk 4.0.10 at the pinned commit installed and the Jolt host library built in 70 s; the twelve glues of the CI list built in 29 to 32 s each on 4 cores, none failed. `check:engine-artifacts` passes, so this host reproduces the pinned wasm hashes.
+- `check:planet-witness-scene`: "budgeted orbit {"budget":488,"worstShown":480,"meanShown":480,"bias":2,"moves":14,"bytes":536870912}" and "PASS with a shown-instance budget of a quarter of the scene, every frame of the lap shows at most the budget, the patches still stream with none deferred, and the engine memory keeps its size". The unbudgeted lap is unchanged (14 moves, 10248 generated, none deferred).
+- Full test, once: "checks: 310 run, 0 already passed on this tree, 0 failed, 5916 PASS lines, wall 115723 ms, jobs 4" and "RESULT: PASS". The longest step was the full test (116 s); `check:engine-host-witness` was its slowest check at 23 s, a cold compile.
+- After the device-bound residency order of item 4, the full test again, once: "checks: 310 run, 0 already passed on this tree, 0 failed, 5918 PASS lines, wall 109264 ms, jobs 4" and "RESULT: PASS".
+- Before the glues existed, the same run failed 54 checks, each on a missing `engine/out` glue or the missing Jolt headers, and no other.
+
+Not run in this pass: the planet witness in a browser with `instanceBudget` set (`vegetationInstances` at or under the budget on every drawn frame, page memory unchanged), the Kaggle gate (no engine source changed, so the wasm hashes are the pinned ones).
+
+Open after this pass, in rank order: the governor over the model slots (screen-size LOD row), over terrain pages (LOD by altitude row) and over the prop records; the C++ rows still missing in the baseline list (character against the planet shape, the planet-surface ray cast, promotion of touched vegetation, shadows, the spawn terrain store import).
+
+## Phase W (2026-11-12): the open rows worked in parallel, then built and gated together
+
+Owner instruction: everything in the extra featureset is to be covered. Four workers took disjoint rows in one checkout; each committed only its own files; the gates were registered and the ledgers updated after.
+
+- Gap register rows now built (docs/IDEAL.md section 1): 9, 19, 20, 22, 25, 28, 29, 53, 57. Rows with a narrower residue, still partial: 17, 26, 31, 44, 55, 56. The totals row is 35 built, 7 partial. Each row's sentence is in docs/PARITY.md for ranked rows 8 to 30 and in docs/IDEAL.md's proof column for all fifteen.
+- New gates in the chain: snapshot-lod-ideal, tick-host, anticheat-numbers, session-sockets, carved-height, fire-define, cell-index-3d, stage-resolvers, chart-world, animation-blender, lag-chart-shot, game-host, fluid-softbody, combat-runtime, game-fsm-xstate, streaming-gltf-runtime, engine-prop-budget, engine-veg-promotion.
+- Engine (C++): a prop budget in the render plan (nearest kept by a carried distance cutoff with hysteresis; host witness: 11071 in the frustum, budget 2000, kept 2000, shed 9071); vegetation promotion to pooled bodies (off by default, cap 64); a host witness of the character on the planet shape. All twelve glues rebuilt and `engine/artifacts.json` repinned; `check:engine-state-hash-1024` and `check:scenario-determinism` pass, so the pinned rigid-body hashes did not move.
+- `loadRendererForDevice` sets the prop budget from the device budget (a share of the budget at 256 bytes a prop); `EngineWorld` wraps the promotion exports.
+
+Deviations and things to review:
+
+- A character with a zero command on a walkable slope now has its solved velocity zeroed (it slid 1.17 m in 16 s on a 26.6 degree slope). It is on by default; idle character positions can differ at rounding level from before.
+- `src/terrain-pure/marchingCubes.js` no longer matches spoint byte for byte: the vertex weld key overflowed beyond 5.12 units and left open meshes at radius 6 and above. `scripts/check-marching-drift.mjs` will report it against a spoint checkout.
+- `packQuat` and `unpackQuat` in snapshot-lod-pure are renamed `packRotationWord` and `unpackRotationWord`.
+- `probeSpawnGroundY` returns null under an unlanded heightfield or pending static colliders, where it returned a height before.
+- No spoint checkout is in this container, so the new modules are jayzee designs witnessed on their own, not differentials against spoint.
+
+Full test on the combined tree, once: "checks: 328 run, 0 already passed on this tree, 0 failed, 6255 PASS lines, wall 118707 ms, jobs 4" and "RESULT: PASS" (310 checks and 5918 lines before this phase). The longest step was the full test at 119 s.
+
+Not run: any browser witness (the prop budget on WebGPU, the vegetation draw under a budget, hiding a promoted instance), the Kaggle gate on the new wasm, `scripts/check-game-fsm-xstate-live.mjs` (needs xstate installed).
+
+Open after this pass: terrain LOD by altitude with geomorph seams; screen-size LOD for models; shadows in C++; HZB on WebGL2; the spawn terrain store import; the prop cutoff in the WebGPU cull shader; promoted instances hidden in the draw and carried in saved state; the governor over model slots and terrain pages; the 7 partial gap rows; the owner-decision rows (25 in the gap register), which need a browser, a GPU, a real socket or a licence.
+
+## Phase X (2026-11-12): the rest of the ledger worked in parallel against the spoint checkout, the engine LODs
+
+Six workers on disjoint rows. spoint was cloned mid-pass (AnEntrypoint/spoint at 5f43c86, linked at /workspace/spoint); the ledger's readings are pinned at d5e3860.
+
+- docs/IDEAL.md: 56 rows moved from partial to built in this phase (gap register 39 built and 3 partial; partial rows in the whole file 97 before, 41 after). Each row's proof column carries its gates and a "Phase X" sentence with the residue. 54 gates were added to the chain.
+- Engine: promoted vegetation is carried in saved state and the hash; model slots hold up to 4 LOD ranges chosen by screen size under an index budget; terrain LOD by altitude on the CPU side; the prop cutoff reaches the WebGPU cull shader; a shadow cascade planner. All twelve glues rebuilt, four pins updated, `check:engine-state-hash-1024` and `check:scenario-determinism` unchanged.
+- The 37 spoint comparison gates were run against the checkout: 36 passed; `check-mapspinner-fields` failed because spoint's anchor-field load now throws named errors, which was ported (the height bake pin regenerated).
+
+Behaviour changes to review: cached entities go out as field deltas, not full records; the fire message carries a chart epoch and a bad epoch is refused; `PEER_SIMULATED_PROFILES` includes rollback; the world snapshot carries a definition fingerprint and restore can refuse with def-mismatch; `decodeName` reads the UTF-8 escapes `encodeName` writes; `loadRendererForDevice` sets a model index budget and a model with no LOD ranges is hidden when over it; spoint's 16-input push lag is ported in `CollisionSystem.js` but the tick host and the prediction engine still use the immediate push (owner decision).
+
+Duplicates to settle: two progressive bakes (`src/static/progressiveBake.js`, `src/packages/streaming-gltf/progressive-bake.js`); two worker server hosts (`src/transport/workerEntryHost.js`, `src/transport/browserServer.js`).
+
+Not run: any WebGPU draw witness (this host's headless Chrome cannot read back WebGPU output once the engine holds the device), the Kaggle gate on the new wasm.
+
+Open: the 41 partial rows; the terrain LOD shader blend and coarse-page streaming; the shadow depth pass; HZB on WebGL2; the spawn terrain store import; shaped promoted bodies; the owner-decision rows.
+
+Full test on the combined tree of Phase X: the first run, "checks: 382 run, 0 already passed on this tree, 3 failed, 6858 PASS lines" (`check:package-surface`: the serve bin now reaches `src/sdk/MetricsRoute.js` and five telemetry files that were not in the package file list; `check:decode-path`: the model pool is 44 bytes a slot larger, 23175040 bytes at tier 0; `check:sessions`: sessions-pure has an eighth file). After those three were fixed: "checks: 382 run, 0 already passed on this tree, 1 failed, 6859 PASS lines, wall 131588 ms, jobs 4", the one being `check:vegetation-allocations` ("1848 bytes under the path ... 1592 bytes at planetScene.js:93 heightInto, 256 bytes at planetScene.js:121 gridCentre"). It passed alone four times in a row on the same tree with 0 bytes under the path, and passed in the three earlier full runs of this session; it is a serial check that measures sampled heap, and the lines it names were not changed in this phase. Recorded as load-sensitive on this 4-core host, not settled. The longest step was the full test at 132 s.
