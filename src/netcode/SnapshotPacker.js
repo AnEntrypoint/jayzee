@@ -8,27 +8,65 @@ const KIND_WITH_BINS = 2
 
 export const snapshotPackCounts = { splices: 0, refusals: 0, recordPacks: 0, recordShares: 0 }
 
+const PROBE_INSERT = Uint8Array.of(0x41, 0x00, 0x00, 0x00, 0x90)
+const BUNDLE_MARKER_0 = 0xd6
+const BUNDLE_MARKER_1 = 0x62
+const BUNDLE_OFFSET_AT = 2
+const TAIL_FIELDS = 7
+const TAIL_HEADER = 0x90 | TAIL_FIELDS
+const RECORD_ENVELOPE = 0x40
+const RECORD_PAYLOAD = 0x41
+
 const _heads = new Map()
 const _numbers = [0, 0, 0]
-const _fields = [undefined, undefined, undefined, undefined, undefined, undefined]
+const _fields = [undefined, undefined, undefined, undefined, undefined, undefined, undefined]
 const _recs = []
 let _arena = null
 let _arenaUsed = 0
 
-function bytesEqual(a, b) {
-  if (a.length !== b.length) return false
-  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false
+function readUint32(bytes, at) {
+  return ((bytes[at] << 24) | (bytes[at + 1] << 16) | (bytes[at + 2] << 8) | bytes[at + 3]) >>> 0
+}
+
+function writeUint32(bytes, at, value) {
+  bytes[at] = (value >>> 24) & 0xff
+  bytes[at + 1] = (value >>> 16) & 0xff
+  bytes[at + 2] = (value >>> 8) & 0xff
+  bytes[at + 3] = value & 0xff
+}
+
+function rangesEqual(a, aFrom, b, bFrom, length) {
+  if (aFrom + length > a.length || bFrom + length > b.length) return false
+  for (let i = 0; i < length; i++) if (a[aFrom + i] !== b[bFrom + i]) return false
   return true
+}
+
+function typeSpanHolds(probe, flat, span) {
+  if (1 + span + PROBE_INSERT.length > probe.length) return null
+  if (!rangesEqual(probe, 1 + span, PROBE_INSERT, 0, PROBE_INSERT.length)) return null
+  const restLength = flat.length - 1 - span
+  if (probe.length !== flat.length + PROBE_INSERT.length) return null
+  if (!rangesEqual(probe, 1 + span + PROBE_INSERT.length, flat, 1 + span, restLength)) return null
+  const bundled = span >= BUNDLE_OFFSET_AT + 4 && flat[1] === BUNDLE_MARKER_0 && flat[2] === BUNDLE_MARKER_1
+  if (!bundled) return rangesEqual(probe, 1, flat, 1, span) ? { span, bundled: false } : null
+  if (!rangesEqual(probe, 1, flat, 1, BUNDLE_OFFSET_AT)) return null
+  if (!rangesEqual(probe, 1 + BUNDLE_OFFSET_AT + 4, flat, 1 + BUNDLE_OFFSET_AT + 4, span - BUNDLE_OFFSET_AT - 4)) return null
+  if (readUint32(probe, 1 + BUNDLE_OFFSET_AT) !== readUint32(flat, 1 + BUNDLE_OFFSET_AT) + PROBE_INSERT.length) return null
+  return { span, bundled: true }
 }
 
 function snapshotHead(type) {
   let head = _heads.get(type)
   if (head !== undefined) return head
-  const probe = pack({ type, payload: { seq: 0, tick: 0, serverTime: 0, players: [], entities: [], removed: undefined, delta: 1, dots: undefined, me: undefined, chartEpoch: 0 } })
-  const tail = pack([[], undefined, 1, undefined, undefined, 0]).subarray(1)
-  const cut = probe.length - tail.length - 4
-  const layoutHolds = cut > 0 && probe[cut] === 0x00 && probe[cut + 1] === 0x00 && probe[cut + 2] === 0x00 && probe[cut + 3] === 0x90 && bytesEqual(probe.subarray(cut + 4), tail)
-  head = layoutHolds ? Uint8Array.from(probe.subarray(0, cut)) : null
+  head = null
+  const kind = typeof type
+  if ((kind === 'number' && Number.isFinite(type)) || kind === 'string') {
+    const probe = pack({ type, payload: { seq: 0, tick: 0, serverTime: 0, players: [], entities: [], removed: undefined, delta: 1, dots: undefined, me: undefined, chartEpoch: 0 } })
+    const flat = pack([type, [], undefined, 1, undefined, undefined, 0])
+    if (probe[0] === RECORD_ENVELOPE && flat[0] === TAIL_HEADER) {
+      for (let span = 1; span < flat.length && head === null; span++) head = typeSpanHolds(probe, flat, span)
+    }
+  }
   _heads.set(type, head)
   return head
 }
@@ -125,22 +163,30 @@ export function packSnapshotBytes(type, seq, encoded, me, chartEpoch, memo) {
   const n = players.length
   _numbers[0] = seq; _numbers[1] = encoded.tick; _numbers[2] = encoded.serverTime
   const numbers = pack(_numbers)
-  _fields[0] = encoded.entities; _fields[1] = encoded.removed; _fields[2] = encoded.delta
-  _fields[3] = encoded.dots; _fields[4] = me; _fields[5] = chartEpoch
-  const tail = pack(_fields)
-  let total = head.length + (numbers.length - 1) + arrayHeaderLength(n) + (tail.length - 1)
+  let inserted = 1 + (numbers.length - 1) + arrayHeaderLength(n)
   for (let i = 0; i < n; i++) {
     const bytes = recordBytes(players[i], memo)
     if (bytes === null) { snapshotPackCounts.refusals++; return null }
     _recs[i] = bytes
-    total += bytes.length
+    inserted += bytes.length
   }
-  const out = carve(total)
+  _fields[0] = type
+  _fields[1] = encoded.entities; _fields[2] = encoded.removed; _fields[3] = encoded.delta
+  _fields[4] = encoded.dots; _fields[5] = me; _fields[6] = chartEpoch
+  const flat = pack(_fields)
+  _fields[1] = undefined; _fields[4] = undefined; _fields[5] = undefined
+  const span = head.span
+  if (flat[0] !== TAIL_HEADER || flat.length < 1 + span) { snapshotPackCounts.refusals++; return null }
+  const out = carve(flat.length + inserted)
   snapshotPackCounts.splices++
-  let offset = copyRange(out, head, 0, 0)
+  out[0] = RECORD_ENVELOPE
+  for (let i = 0; i < span; i++) out[1 + i] = flat[1 + i]
+  if (head.bundled) writeUint32(out, 1 + BUNDLE_OFFSET_AT, readUint32(flat, 1 + BUNDLE_OFFSET_AT) + inserted)
+  let offset = 1 + span
+  out[offset++] = RECORD_PAYLOAD
   offset = copyRange(out, numbers, 1, offset)
   offset = writeArrayHeader(out, offset, n)
   for (let i = 0; i < n; i++) offset = copyRange(out, _recs[i], 0, offset)
-  copyRange(out, tail, 1, offset)
+  copyRange(out, flat, 1 + span, offset)
   return out
 }
