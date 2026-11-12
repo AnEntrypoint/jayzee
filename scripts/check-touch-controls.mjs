@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
+import { existsSync } from 'node:fs'
 import { gate, finish } from './lib/gate.mjs'
-import { resolveControls, surfaceFromDraft, parseTouchSurfaces, TOUCH_CHIP_CAP, DRAFT_SURFACE_NAME } from '../src/client-pure/touchSurfaceSpec.js'
+import { resolveSurfaceControls as resolveControls, resolveControls as resolveDocument, MAX_TOUCH_CHIPS, TOUCH_SURFACE_UNUSABLE, surfaceFromDraft, parseTouchSurfaces, TOUCH_CHIP_CAP, DRAFT_SURFACE_NAME } from '../src/client-pure/touchSurfaceSpec.js'
 import { touchDraftFromBindings } from '../src/client-pure/touchDraft.js'
 
 const stick = { id: 'move', kind: 'stick', anchor: 'left', x: 0.1, y: 0.9, size: 40, action: 'move' }
@@ -88,5 +89,68 @@ gate('a binding draft converts to a parseable surface that resolveControls accep
   assert.deepEqual(codes(r), ['chip-cap-exceeded'])
   assert.throws(() => surfaceFromDraft({ sticks: [], buttons: [] }, { w: 0, h: 1 }), TypeError)
 })
+
+const id = (name) => ({ id: name })
+const plain = (r) => JSON.parse(JSON.stringify({ ok: r.ok, reasonCode: r.reasonCode, fallback: r.fallback, diagnostics: r.diagnostics, controls: r.controls }))
+const documents = [
+  { sticks: [id('move')], buttons: [id('jump'), id('fire')], pads: [id('look')], gestures: [id('pinch')], style: { tint: 'red' }, axes: ['a', 7, 'b'] },
+  { sticks: [id('move'), id('look')], buttons: [id('a'), id('b'), id('c')], pads: [id('p')] },
+  { pads: [id('p')], gestures: [id('g')] },
+  { sticks: 'nope', buttons: [id('a'), null, { id: '' }, { id: 5 }, id('b')] },
+  { buttons: [id('a')], style: 'loud', axes: 'x' },
+  {},
+]
+const draftDoc = { sticks: [id('draft-move')], buttons: [] }
+
+gate('resolveControls caps sticks, buttons and pads together at four chips in that order and keeps gestures apart', () => {
+  assert.equal(MAX_TOUCH_CHIPS, 4)
+  const r = resolveDocument(documents[1], draftDoc)
+  assert.equal(r.ok, true)
+  assert.deepEqual(r.controls.sticks.map((c) => c.id), ['move', 'look'])
+  assert.deepEqual(r.controls.buttons.map((c) => c.id), ['a', 'b'])
+  assert.deepEqual(r.controls.pads, [])
+  assert.deepEqual(r.diagnostics, ['chip-cap-exceeded:6>4'])
+  const four = resolveDocument(documents[0], draftDoc)
+  assert.deepEqual(four.diagnostics, [], 'negative control: four chips are within the cap')
+  assert.deepEqual(four.controls.gestures, [id('pinch')])
+  assert.deepEqual(four.controls.style, { tint: 'red' })
+  assert.deepEqual(four.controls.axes, ['a', 'b'])
+  assert.deepEqual(four.sendAction('jump'), { type: 'action', id: 'jump' })
+  assert.deepEqual(four.sendAxis('look', 0.5), { type: 'axis', id: 'look', value: 0.5 })
+})
+
+gate('a surface with neither a stick nor a button is unusable and hands back the draft', () => {
+  for (const doc of [documents[2], documents[5], { sticks: 'x', buttons: 3 }]) {
+    const r = resolveDocument(doc, draftDoc)
+    assert.equal(r.ok, false)
+    assert.equal(r.reasonCode, TOUCH_SURFACE_UNUSABLE)
+    assert.equal(r.fallback, draftDoc)
+    assert.equal(r.controls, null)
+  }
+  assert.deepEqual(resolveDocument({ sticks: 'x', buttons: 3 }, draftDoc).diagnostics, ['sticks-not-array', 'buttons-not-array'])
+})
+
+gate('malformed entries are dropped with a diagnostic, defaults fill style and axes, and a bad document or draft is refused', () => {
+  const r = resolveDocument(documents[3], draftDoc)
+  assert.deepEqual(r.diagnostics, ['sticks-not-array', 'bad-buttons-1', 'bad-buttons-2', 'bad-buttons-3'])
+  assert.deepEqual(r.controls.buttons.map((c) => c.id), ['a', 'b'])
+  const d = resolveDocument(documents[4], draftDoc)
+  assert.deepEqual(d.controls.style, {})
+  assert.deepEqual(d.controls.axes, ['touchActive', 'touchTwist'])
+  for (const [doc, draftValue, code] of [[null, draftDoc, 'touch-document-invalid'], [[], draftDoc, 'touch-document-invalid'], [{}, null, 'touch-draft-invalid'], [{}, [], 'touch-draft-invalid']]) {
+    assert.throws(() => resolveDocument(doc, draftValue), (e) => e instanceof TypeError && e.reasonCode === code)
+  }
+})
+
+const SPOINT_TOUCH = '/workspace/spoint/src/client/touchSurfaces.js'
+if (existsSync(SPOINT_TOUCH)) {
+  const spoint = await import(SPOINT_TOUCH)
+  gate('resolveControls returns what spoint touchSurfaces.js returns on every fixture document', () => {
+    assert.equal(spoint.MAX_TOUCH_CHIPS, MAX_TOUCH_CHIPS)
+    for (const doc of [...documents, { sticks: 'x', buttons: 3 }, { buttons: [id('a')], style: [1] }]) assert.deepEqual(plain(resolveDocument(doc, draftDoc)), plain(spoint.resolveControls(doc, draftDoc)), JSON.stringify(doc))
+  })
+} else {
+  console.log('INFO no spoint checkout: the comparison with touchSurfaces.js was not run')
+}
 
 finish()

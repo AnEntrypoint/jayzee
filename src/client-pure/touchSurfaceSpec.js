@@ -102,8 +102,8 @@ function usableControls(name, spec, diagnostics) {
 
 const resolved = (name, source, controls, diagnostics) => ({ surface: Object.freeze({ name, source, controls: Object.freeze(controls) }), diagnostics })
 
-export function resolveControls(touch, surfaceName) {
-  if (touch === null || typeof touch !== 'object') throw new TypeError('resolveControls: touch config must be an object')
+export function resolveSurfaceControls(touch, surfaceName) {
+  if (touch === null || typeof touch !== 'object') throw new TypeError('resolveSurfaceControls: touch config must be an object')
   const diagnostics = []
   const table = touch.surfaces ?? null
   const wanted = surfaceName ?? touch.active ?? null
@@ -122,4 +122,64 @@ export function resolveControls(touch, surfaceName) {
   }
   const controls = usableControls(DRAFT_SURFACE_NAME, touch.draft, diagnostics)
   return resolved(DRAFT_SURFACE_NAME, 'draft', controls ?? [], diagnostics)
+}
+
+export const MAX_TOUCH_CHIPS = TOUCH_CHIP_CAP
+export const TOUCH_SURFACE_UNUSABLE = 'touch-surface-unusable'
+const DEFAULT_TOUCH_AXES = Object.freeze(['touchActive', 'touchTwist'])
+const CONTROL_LISTS = Object.freeze(['sticks', 'buttons', 'pads', 'gestures'])
+
+function controlsRefusal(code, message) {
+  const error = new TypeError(`[touch-surfaces] ${code}: ${message}`)
+  error.reasonCode = code
+  return error
+}
+
+const plainObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value)
+
+export function resolveControls(surfaceDoc, draft) {
+  if (!plainObject(surfaceDoc)) throw controlsRefusal('touch-document-invalid', 'document must be an object')
+  if (!plainObject(draft)) throw controlsRefusal('touch-draft-invalid', 'draft must be an object')
+  const diagnostics = []
+  const lists = {}
+  for (const key of CONTROL_LISTS) {
+    const value = surfaceDoc[key] === undefined ? [] : surfaceDoc[key]
+    if (!Array.isArray(value)) {
+      diagnostics.push(`${key}-not-array`)
+      lists[key] = []
+      continue
+    }
+    lists[key] = value.filter((item, i) => {
+      if (!item || typeof item !== 'object' || typeof item.id !== 'string' || !item.id) {
+        diagnostics.push(`bad-${key}-${i}`)
+        return false
+      }
+      return true
+    })
+  }
+  const { sticks, buttons, pads, gestures } = lists
+  let chips = [...sticks, ...buttons, ...pads]
+  if (chips.length > MAX_TOUCH_CHIPS) {
+    diagnostics.push(`chip-cap-exceeded:${chips.length}>${MAX_TOUCH_CHIPS}`)
+    chips = chips.slice(0, MAX_TOUCH_CHIPS)
+  }
+  if (sticks.length === 0 && buttons.length === 0) {
+    return { ok: false, reasonCode: TOUCH_SURFACE_UNUSABLE, fallback: draft, diagnostics, controls: null }
+  }
+  return {
+    ok: true,
+    reasonCode: null,
+    fallback: null,
+    diagnostics,
+    controls: {
+      sticks: chips.filter((c) => sticks.includes(c)),
+      buttons: chips.filter((c) => buttons.includes(c)),
+      pads: chips.filter((c) => pads.includes(c)),
+      gestures,
+      style: plainObject(surfaceDoc.style) || Array.isArray(surfaceDoc.style) ? surfaceDoc.style : {},
+      axes: Array.isArray(surfaceDoc.axes) ? surfaceDoc.axes.filter((a) => typeof a === 'string') : [...DEFAULT_TOUCH_AXES],
+    },
+    sendAction(id) { return { type: 'action', id } },
+    sendAxis(id, value) { return { type: 'axis', id, value } },
+  }
 }
