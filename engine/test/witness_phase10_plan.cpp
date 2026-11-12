@@ -174,6 +174,22 @@ void propBudgetWitness(const rnd::SceneView& scene) {
   check(settledBins == boundaryBin && farthestKeptBin <= boundaryBin, "prop budget: no kept prop lies in a distance band beyond the band of the last prop a full sort would keep");
   check(binsBelow(keptDistance, keptCount, boundaryBin) == nearerThanBoundary, "prop budget: every prop in a nearer distance band than the boundary is kept");
 
+  rnd::writePropCutoff(camera);
+  check(camera.counts[rnd::kCameraCutoffFlagWord] == 1 && camera.eye[rnd::kCameraCutoffWord] == rnd::propCutoffSquared(settledBins),
+        "prop cutoff: under a budget the camera carries the cutoff flag and the squared distance where the cutoff band starts");
+  std::uint32_t shaderShown = 0;
+  std::uint32_t ruleMismatches = 0;
+  for (std::uint32_t i = 0; i < every; ++i) {
+    const bool inside = everyDistance[i] < camera.eye[rnd::kCameraCutoffWord];
+    shaderShown += inside ? 1 : 0;
+    if (inside != (rnd::propBudgetBin(everyDistance[i]) < settledBins)) ruleMismatches += 1;
+  }
+  observe("prop cutoff distance in metres carried to the shader", std::sqrt(static_cast<double>(camera.eye[rnd::kCameraCutoffWord])));
+  observe("prop cutoff props the shader rule shows", static_cast<double>(shaderShown));
+  check(ruleMismatches == 0, "prop cutoff: a squared distance below the carried cutoff is exactly a distance band below the cutoff band, for every prop in the frustum");
+  check(shaderShown == nearerThanBoundary && shaderShown <= kBudget && shaderShown > kBudget / 2,
+        "prop cutoff: the shader rule shows every prop nearer than the boundary band and none in it, so it stays inside the budget");
+
   rnd::planProps(scene, camera, plan);
   check(keptDigest() == settledDigest && rnd::propBudget().bins == settledBins, "prop budget: planning the same frame again keeps the same records and the same cutoff");
 
@@ -201,6 +217,9 @@ void propBudgetWitness(const rnd::SceneView& scene) {
   std::uint32_t cutoffMoves = 0;
   bool shedAdds = true;
   std::uint32_t lastBins = rnd::propBudget().bins;
+  bool cutoffCarried = true;
+  std::uint32_t mostShown = 0;
+  std::uint32_t leastShown = kWitnessBodySlots;
   for (std::uint32_t frame = 0; frame < kOrbitFrames; ++frame) {
     buildScene(600 + frame);
     rnd::planFrame(scene, camera, plan);
@@ -210,7 +229,17 @@ void propBudgetWitness(const rnd::SceneView& scene) {
     shedAdds = shedAdds && counters.propsShed + now == counters.propsInFrustum;
     if (rnd::propBudget().bins != lastBins) cutoffMoves += 1;
     lastBins = rnd::propBudget().bins;
+    const std::uint32_t orbitKept = collectDistances(keptDistance);
+    std::uint32_t orbitShown = 0;
+    for (std::uint32_t i = 0; i < orbitKept; ++i) orbitShown += keptDistance[i] < camera.eye[rnd::kCameraCutoffWord] ? 1 : 0;
+    cutoffCarried = cutoffCarried && camera.counts[rnd::kCameraCutoffFlagWord] == 1 && camera.eye[rnd::kCameraCutoffWord] == rnd::propCutoffSquared(lastBins);
+    mostShown = std::max(mostShown, orbitShown);
+    leastShown = std::min(leastShown, orbitShown);
   }
+  observe("prop cutoff most props the shader rule shows over the orbit", static_cast<double>(mostShown));
+  observe("prop cutoff least props the shader rule shows over the orbit", static_cast<double>(leastShown));
+  check(cutoffCarried && mostShown <= kBudget && leastShown > kBudget / 2,
+        "prop cutoff: over the orbit every frame carries the cutoff of its plan, and the shader rule shows at most the budget and more than half of it");
   observe("prop budget most kept over the orbit", static_cast<double>(most));
   observe("prop budget least kept over the orbit", static_cast<double>(least));
   observe("prop budget cutoff moves over the orbit", static_cast<double>(cutoffMoves));
@@ -225,6 +254,7 @@ void propBudgetWitness(const rnd::SceneView& scene) {
   bool restored = plan.checksum == kExpectedChecksum && counters.propsShed == 0;
   for (std::uint32_t c = 0; c < rnd::kPropClasses; ++c) restored = restored && plan.propCount[c] == kExpectedVisible[c];
   check(restored && rnd::propBudget().bins == rnd::kPropBudgetBins, "prop budget: clearing the budget restores the recorded visible counts and sheds nothing");
+  check(camera.counts[rnd::kCameraCutoffFlagWord] == 0 && camera.eye[rnd::kCameraCutoffWord] == 0.0f, "prop cutoff: with no budget the camera carries no cutoff flag and a zero cutoff word");
 }
 
 }

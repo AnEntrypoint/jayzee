@@ -256,6 +256,19 @@ std::uint32_t propBudgetBin(float distanceSquared) {
   return std::min(bits - kPropBudgetNearBits, kPropBudgetBins - 1);
 }
 
+float propCutoffSquared(std::uint32_t bins) {
+  const std::uint32_t bits = (bins + kPropBudgetNearBits) << kPropBudgetBinShift;
+  float value;
+  std::memcpy(&value, &bits, sizeof value);
+  return value;
+}
+
+void writePropCutoff(Camera& camera) {
+  const bool cut = budget.limit != kNoPropBudget && budget.bins < kPropBudgetBins;
+  camera.counts[kCameraCutoffFlagWord] = cut ? 1u : 0u;
+  camera.eye[kCameraCutoffWord] = cut && budget.bins != 0 ? propCutoffSquared(budget.bins) : 0.0f;
+}
+
 void countCall() {
   state.apiCalls += 1;
 }
@@ -381,6 +394,7 @@ void planFrame(const SceneView& scene, Camera& camera, FramePlan& plan) {
   camera.bodyOffset[3] = 0.0f;
 
   if (!scene.skipProps) planProps(scene, camera, plan);
+  writePropCutoff(camera);
 
   syncPages(scene, plan);
   resolveMaterials(scene.materials, scene.materialCount, scene.albedoReady, scene.albedoLayerOf, plan.materialWords);

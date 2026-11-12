@@ -214,7 +214,7 @@ EMSCRIPTEN_KEEPALIVE int engine_render_frame() {
   rnd::counters().vegetationInstances = 0;
   rnd::SceneView scene = rnd::sceneOf(state);
   const bool drawsEveryBody = rnd::counters().backend == static_cast<std::uint32_t>(rnd::BackendKind::kWebGpu);
-  scene.skipProps = drawsEveryBody && state.planPropsAlways == 0 && state.propsPlanned != 0 && state.plannedStamp == scene.bodyStamp;
+  scene.skipProps = drawsEveryBody && state.planPropsAlways == 0 && state.propsPlanned != 0 && state.plannedStamp == scene.bodyStamp && rnd::propBudget().limit == rnd::kNoPropBudget;
   {
     engine::phase::Scope scope(engine::phase::kPlan);
     rnd::planFrame(scene, state.camera, state.plan);
@@ -266,6 +266,11 @@ EMSCRIPTEN_KEEPALIVE std::uint32_t engine_render_prop_budget() {
 
 EMSCRIPTEN_KEEPALIVE std::uint32_t engine_render_prop_cutoff_bins() {
   return rnd::propBudget().bins;
+}
+
+EMSCRIPTEN_KEEPALIVE float engine_render_prop_cutoff_squared() {
+  if (rnd::renderState == nullptr || rnd::renderState->camera.counts[rnd::kCameraCutoffFlagWord] == 0) return 0.0f;
+  return rnd::renderState->camera.eye[rnd::kCameraCutoffWord];
 }
 
 EMSCRIPTEN_KEEPALIVE std::uint32_t engine_render_props_in_frustum() {

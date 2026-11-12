@@ -44,6 +44,8 @@ constexpr std::uint32_t kPropBudgetBinShift = 20;
 constexpr std::uint32_t kPropBudgetNearBits = 0x3e800000u >> kPropBudgetBinShift;
 constexpr std::uint32_t kPropBudgetHeadroomShift = 3;
 constexpr std::uint32_t kNoPropBudget = 0;
+constexpr std::uint32_t kCameraCutoffFlagWord = 2;
+constexpr std::uint32_t kCameraCutoffWord = 3;
 
 struct MaterialSlot {
   float colour[4];
@@ -184,6 +186,8 @@ ModelSettings& modelSettings();
 const PropBudget& propBudget();
 void setPropBudget(std::uint32_t limit);
 std::uint32_t propBudgetBin(float distanceSquared);
+float propCutoffSquared(std::uint32_t bins);
+void writePropCutoff(Camera& camera);
 void countCall();
 bool acceptCreate();
 std::uint32_t pageLayers();

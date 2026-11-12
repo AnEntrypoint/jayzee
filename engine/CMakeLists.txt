@@ -286,6 +286,7 @@ set(ENGINE_EXPORTS
   _engine_render_set_prop_plan
   _engine_render_prop_plans
   _engine_render_set_prop_budget
+  _engine_render_prop_cutoff_squared
   _engine_render_set_page_lod
   _engine_terrain_lod_configure
   _engine_terrain_lod_select
