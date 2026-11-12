@@ -186,4 +186,60 @@ gate('control: a peer whose simulation drifts is reported as a desync by the che
   assert.ok(env.sessionA.getStats().loop.desyncs > 0)
 })
 
+const fakeTimer = () => {
+  const timers = new Map()
+  let next = 1
+  return {
+    timers,
+    schedule(fn, every) { const handle = next++; timers.set(handle, { fn, every }); return handle },
+    cancel(handle) { timers.delete(handle) },
+    tick() { for (const t of [...timers.values()]) t.fn() },
+  }
+}
+
+gate('the session posts PEER_STATS on an injected 1000 ms interval and the post carries the live loop counters', () => {
+  const env = pair()
+  const timer = fakeTimer()
+  const posted = []
+  env.sessionA.start()
+  env.sessionA.startStats({ post: (message) => posted.push(message), schedule: timer.schedule, cancel: timer.cancel })
+  assert.equal(env.sessionA.statsRunning, true)
+  assert.deepEqual([...timer.timers.values()].map((t) => t.every), [1000])
+  assert.equal(posted.length, 0)
+  timer.tick()
+  env.stepA({ dx: 1 })
+  env.stepA({ dx: 1 })
+  timer.tick()
+  assert.deepEqual(posted.map((m) => m.type), ['PEER_STATS', 'PEER_STATS'])
+  assert.equal(posted[0].stats.loop.ticksSimulated, 0)
+  assert.equal(posted[1].stats.loop.ticksSimulated, 2)
+  assert.equal(posted[1].stats.profile, 'rollback')
+})
+
+gate('stopping the session cancels the stats interval, and the returned stop is safe to call twice', () => {
+  const env = pair()
+  const timer = fakeTimer()
+  const posted = []
+  env.sessionA.start()
+  const stop = env.sessionA.startStats({ post: (message) => posted.push(message), schedule: timer.schedule, cancel: timer.cancel, every: 250 })
+  assert.deepEqual([...timer.timers.values()].map((t) => t.every), [250])
+  env.sessionA.stop()
+  assert.equal(timer.timers.size, 0)
+  assert.equal(env.sessionA.statsRunning, false)
+  timer.tick()
+  assert.equal(posted.length, 0)
+  assert.equal(stop(), false)
+})
+
+gate('control: a second stats interval, a missing timer and a non-positive interval are refused', () => {
+  const env = pair()
+  const timer = fakeTimer()
+  const args = { post: () => {}, schedule: timer.schedule, cancel: timer.cancel }
+  assert.throws(() => env.sessionA.startStats({ post: () => {} }), { message: '[PeerSimSession] startStats needs post, schedule and cancel' })
+  assert.throws(() => env.sessionA.startStats({ ...args, every: 0 }), { message: '[PeerSimSession] startStats interval must be a positive number of milliseconds' })
+  env.sessionA.startStats(args)
+  assert.throws(() => env.sessionA.startStats(args), { message: '[PeerSimSession] stats interval is already running' })
+  assert.equal(timer.timers.size, 1)
+})
+
 finish()
