@@ -1,5 +1,6 @@
 import { resolveCombatConfig, resolveShotDamage, regenerateHealth, isInsidePowerupPickup, createKillStreakTracker, createFallTimers, POWERUP_PICKUP_RADIUS } from './combat.js'
 import { findHitSpatial, hitHeightRatio, normalizeShotDirection, resolveFireRequest, DEFAULT_HITBOX } from '../netcode/hitscan.js'
+import { createShotEpochResolver, SHOT_EPOCH_REFUSAL } from '../netcode/shotChartEpoch.js'
 
 export const COMBAT_REFUSAL = Object.freeze({
   NOT_JOINED: 'not-joined',
@@ -55,7 +56,7 @@ export function placePowerups({ count, min, max, random, groundAt, minSeparation
   return { powerups: placed, tries, short: count - placed.length }
 }
 
-export function createCombatRuntime({ config: overrides = {}, players, raycast = null, lagComp = null, now, send, broadcast, spawnPoints = [[0, 0, 0]], powerups = [], powerupRespawnMs = DEFAULT_POWERUP_RESPAWN_MS, hitbox = DEFAULT_HITBOX }) {
+export function createCombatRuntime({ config: overrides = {}, players, raycast = null, lagComp = null, now, send, broadcast, spawnPoints = [[0, 0, 0]], powerups = [], powerupRespawnMs = DEFAULT_POWERUP_RESPAWN_MS, hitbox = DEFAULT_HITBOX, chartLedger = null }) {
   const config = resolveCombatConfig(overrides)
   if (typeof players?.list !== 'function' || typeof players?.get !== 'function') throw new TypeError('[combat] runtime needs players with list and get')
   if (raycast !== null && typeof raycast !== 'function') throw new TypeError('[combat] raycast must be a function (origin, direction, range) or null')
@@ -64,11 +65,12 @@ export function createCombatRuntime({ config: overrides = {}, players, raycast =
   if (!Array.isArray(spawnPoints) || spawnPoints.length === 0 || !spawnPoints.every(isVec3)) throw new TypeError('[combat] spawnPoints must be a non-empty array of finite triples')
   if (!Array.isArray(powerups) || !powerups.every((p) => p && typeof p.id === 'string' && isVec3(p.position) && typeof p.kind === 'string')) throw new TypeError('[combat] each powerup needs an id, a position and a kind')
 
+  const shotEpochs = chartLedger === null ? null : createShotEpochResolver({ ledger: chartLedger, lagComp, hitbox })
   const combatants = new Map()
   const streaks = createKillStreakTracker({ now })
   const fallTimers = createFallTimers({ graceSec: config.fallKillGraceSec })
   const pickups = powerups.map((p) => ({ ...p, position: [...p.position], active: true, respawnAt: 0 }))
-  const stats = { shots: 0, hits: 0, blocked: 0, kills: 0, refused: 0, pickups: 0 }
+  const stats = { shots: 0, hits: 0, blocked: 0, kills: 0, refused: 0, pickups: 0, reexpressed: 0 }
   const impulse = [0, 0, 0]
 
   const bodyOf = (id) => {
@@ -164,7 +166,9 @@ export function createCombatRuntime({ config: overrides = {}, players, raycast =
     if (!c) return refuse(COMBAT_REFUSAL.NOT_JOINED)
     if (!alive(c)) return refuse(COMBAT_REFUSAL.DEAD)
     if (c.reloadUntil !== 0) return refuse(COMBAT_REFUSAL.RELOADING)
-    const direction = normalizeShotDirection(msg?.direction)
+    const stamped = shotEpochs === null ? null : shotEpochs.reexpress(msg)
+    if (stamped !== null && !stamped.ok && stamped.reason !== SHOT_EPOCH_REFUSAL.DIRECTION) return refuse(stamped.reason)
+    const direction = stamped !== null && stamped.ok ? stamped.direction : normalizeShotDirection(msg?.direction)
     if (!direction) return refuse(COMBAT_REFUSAL.DIRECTION)
     const shooter = bodyOf(id)
     if (!shooter) return refuse(COMBAT_REFUSAL.NO_BODY)
@@ -174,7 +178,8 @@ export function createCombatRuntime({ config: overrides = {}, players, raycast =
     }
     c.ammo--
     stats.shots++
-    const request = resolveFireRequest(lagComp, id, shooter.state.position, msg, hitbox)
+    if (stamped !== null && stamped.reexpressed) stats.reexpressed++
+    const request = resolveFireRequest(lagComp, id, shooter.state.position, stamped ?? msg, hitbox)
     const targetable = (target) => {
       const other = combatants.get(target.id)
       return other !== undefined && alive(other)
