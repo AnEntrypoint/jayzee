@@ -190,6 +190,9 @@ gate('reconfiguring the planet leaves held bodies held and wakes the released on
 })
 
 const TUNE_RELEASE_BY_SLOT = 16
+const TUNE_DEFAULT = 12
+const TUNE_RELEASE_BLOCKS = 64
+const RELEASE_BLOCK_SLOTS = 64
 const eyeAt = (module, slot, lift) => {
   const at = positions(module)
   return [at[slot * POSITION_WORDS], at[slot * POSITION_WORDS + 1] + lift, at[slot * POSITION_WORDS + 2]]
@@ -276,6 +279,25 @@ gate('the release view read from the frame scratch, as the frame path sets it, r
   })
   assert.ok(byValue.length > 0)
   assert.deepEqual(byScratch, byValue)
+})
+
+gate('with the block tuning the held bodies of the nearest block of 64 slots are released together from its lowest slot, where the view alone starts at the nearest body', async () => {
+  assert.ok(readFileSync(new URL('../engine/src/world.h', import.meta.url), 'utf8').includes('kReleaseBlockSlots = ' + RELEASE_BLOCK_SLOTS + ';'))
+  const firstWave = async (tuning) => {
+    const module = await boot({ budget: BUDGET })
+    assert.equal(module._engine_world_set_tuning(tuning), 0)
+    const eye = eyeAt(module, BODIES - 1, 3)
+    assert.equal(module._engine_world_set_release_view(eye[0], eye[1], eye[2], 0, 0, 0, 1, 1000), 0)
+    let wave = []
+    for (let guard = 0; guard < SETTLE_TICKS && wave.length === 0; guard++) wave = releasedAfter(module, 1).filter((slot) => slot >= BUDGET)
+    return wave
+  }
+  const lastBlock = Math.floor((BODIES - 1) / RELEASE_BLOCK_SLOTS) * RELEASE_BLOCK_SLOTS
+  const blocks = await firstWave(TUNE_DEFAULT | TUNE_RELEASE_BLOCKS)
+  assert.ok(blocks.length > 0 && blocks.length <= RELEASE_BLOCK_SLOTS, 'the first wave is ' + blocks.length + ' bodies')
+  assert.deepEqual(blocks.slice().sort((a, b) => a - b), range(lastBlock, lastBlock + blocks.length))
+  const nearest = await firstWave(TUNE_DEFAULT)
+  assert.ok(nearest.includes(BODIES - 1), 'control: the view alone did not start at the nearest body')
 })
 
 gate('the release view refuses a value that is not finite, a cone outside -1 to 1 and a range that is not above zero', async () => {

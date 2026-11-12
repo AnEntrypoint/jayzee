@@ -1126,6 +1126,7 @@ Status World::applyTuning(std::uint32_t flags) {
   if ((flags & kTuneBroadphaseInterval) != 0) return kRange;
 #endif
   const bool wasAirborne = (tuning_ & kTuneAirborne) != 0;
+  if (((tuning_ ^ flags) & (kTuneReleaseBySlot | kTuneReleaseBlocks)) != 0) queueStale_ = true;
   tuning_ = flags;
   JPH::PhysicsSettings settings = runtime_->physics.GetPhysicsSettings();
   settings.mUseLargeIslandSplitter = (flags & kTuneWholeIslands) == 0;

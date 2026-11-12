@@ -14,6 +14,7 @@ const PLANET = { radius: 6371000, cellSize: 1000, gravity: 9.8, maxHeight: 8000 
 const POSITION_WORDS = 3
 const TUNE_AIRBORNE = 4
 const TUNE_BROADPHASE_INTERVAL = 8
+const TUNE_DIRECT_MANIFOLDS = 32
 const SETTLE_TICKS = 2400
 const MID_TICK = 60
 
@@ -52,6 +53,7 @@ const plain = await run(0)
 const skipped = await run(TUNE_AIRBORNE)
 const interval = await run(TUNE_BROADPHASE_INTERVAL)
 const both = await run(TUNE_AIRBORNE | TUNE_BROADPHASE_INTERVAL)
+const direct = await run(TUNE_DIRECT_MANIFOLDS)
 
 gate('control: with no tuning no body is ever in the airborne layer', () => {
   assert.equal(Math.max(...plain.airborne), 0)
@@ -76,8 +78,13 @@ gate('rebuilding the broadphase tree every fourth step changes no position, alon
   assert.equal(bits(both.end), bits(plain.end))
 })
 
+gate('with manifold reduction off every sphere still comes to rest on the surface, and whether its positions equal the plain run bit for bit is reported, not assumed', () => {
+  assert.ok(direct.ticks < SETTLE_TICKS, 'not settled after ' + direct.ticks + ' ticks')
+  console.log('INFO direct manifolds: tick ' + MID_TICK + ' positions ' + (bits(direct.mid) === bits(plain.mid) ? 'equal' : 'differ from') + ' the plain run, resting positions ' + (bits(direct.end) === bits(plain.end) ? 'equal' : 'differ from') + ' it, settled in ' + direct.ticks + ' ticks against ' + plain.ticks)
+})
+
 gate('every body rests on the surface in each run', () => {
-  for (const result of [plain, skipped, interval, both]) {
+  for (const result of [plain, skipped, interval, both, direct]) {
     for (let i = 0; i < BODIES; i++) {
       const height = Math.sqrt(result.end[i * 3] ** 2 + result.end[i * 3 + 1] ** 2 + result.end[i * 3 + 2] ** 2) - PLANET.radius
       assert.ok(Math.abs(height - RADIUS) < 0.05, 'body ' + i + ' rests ' + height + ' m above the surface')
