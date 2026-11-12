@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { finish, gate } from './lib/gate.mjs'
 import { HOST_WAITS_MOST, HOST_WAIT_MOST_MS, THROTTLE_SAMPLE_MS, THROTTLE_SLACK_MS, excuseHostThrottled, isHostThrottledGap, throttledBetween } from './browser/hostThrottle.mjs'
+import { createWaitSampler } from './browser/waitSampler.mjs'
 import { RUN_QUEUE_LEAST_MS, driverLockMs, isDriverLockGap, isRunQueueGap, runQueueWaitMs } from './browser/gpuBatch.mjs'
 
 const missed = { ok: false, failures: ['missed frames: 2 rAF intervals over 25 ms, first at frame 64 (31.35 ms)'] }
@@ -80,6 +81,33 @@ gate('an interval in which the GPU thread waited for a CPU is named a run-queue 
   assert.equal(isRunQueueGap({ waitMs: 6, intervalMs: 60, pageIdle: true, workWithinBudget: true }), false)
   assert.equal(isRunQueueGap({ waitMs: 15, intervalMs: 34, pageIdle: false, workWithinBudget: true }), false)
   assert.equal(excuseHostThrottled(missed, [{ gpuRunQueueGap: true, intervalMs: 34 }]).ok, false)
+})
+
+gate('the wait sampler follows the main thread of every process its list names, picks up one that appears later, and its samples give the run-queue wait of an interval', () => {
+  let listed = [7]
+  let clockUs = 0
+  const waits = new Map([[7, 0], [9, 0]])
+  const sampler = createWaitSampler({ listPids: () => listed, readThread: (pid) => (waits.has(pid) ? { runNs: 0, waitNs: waits.get(pid) } : null), nowUs: () => clockUs, refreshTicks: 2 })
+  const step = (us, wait7, wait9) => {
+    clockUs = us
+    waits.set(7, wait7)
+    waits.set(9, wait9)
+    sampler.tick()
+  }
+  step(0, 0, 0)
+  listed = [7, 9, 11]
+  step(5000, 1e6, 0)
+  step(10000, 3e6, 2e6)
+  step(15000, 12e6, 2e6)
+  step(20000, 12e6, 9e6)
+  assert.deepEqual(sampler.pids(), [7, 9])
+  assert.equal(sampler.threadOf(7).samples, 5)
+  assert.equal(sampler.threadOf(9).samples, 3)
+  assert.equal(sampler.threadOf(11), null)
+  assert.equal(runQueueWaitMs(sampler.threadOf(7), 5000, 15000), 11)
+  assert.equal(runQueueWaitMs(sampler.threadOf(9), 12000, 20000), 7)
+  assert.equal(runQueueWaitMs(sampler.threadOf(9), 0, 20000), null)
+  assert.equal(isRunQueueGap({ waitMs: 11, intervalMs: 30, pageIdle: true, workWithinBudget: true }), true)
 })
 
 gate('any other failure keeps the run failed, and a passing run stays passing', () => {
