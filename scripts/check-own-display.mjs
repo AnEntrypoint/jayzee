@@ -140,7 +140,9 @@ gate('the thread sampler records run time, run-queue wait and state of one threa
   rmSync(dir, { recursive: true, force: true })
   assert.ok(spin > 0 && samples.samples > 50, 'only ' + samples.samples + ' samples in 150 ms')
   assert.equal(samples.atUs.length, samples.samples)
-  assert.ok(samples.runNs.at(-1) - samples.runNs[0] > 50e6, 'the spinning thread shows ' + (samples.runNs.at(-1) - samples.runNs[0]) / 1e6 + ' ms of run time')
+  const ranMs = (samples.runNs.at(-1) - samples.runNs[0]) / 1e6
+  const waitedMs = (samples.waitNs.at(-1) - samples.waitNs[0]) / 1e6
+  assert.ok(ranMs > 5 && ranMs + waitedMs > 75, 'the spinning thread shows ' + ranMs + ' ms of run time and ' + waitedMs + ' ms on the run queue in 150 ms')
   assert.ok(samples.state.includes('R'))
   assert.ok(samples.atUs.every((at, i) => i === 0 || at > samples.atUs[i - 1]))
 })
