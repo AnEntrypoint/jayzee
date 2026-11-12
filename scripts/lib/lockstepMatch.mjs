@@ -2,7 +2,7 @@ import { createEngineWorld } from '../../src/engine/EngineWorld.js'
 import { PLANET } from '../../src/engine/sceneSetup.js'
 import { glueUrl, tierWorldOptions } from './scenarioTiers.mjs'
 import { seededRandom } from './seededRandom.mjs'
-import { FNV_OFFSET, fnvWords } from './stateHash1024.mjs'
+import { FNV_OFFSET, fnvWordsInto } from './stateHash1024.mjs'
 
 const CHARACTER_RADIUS = 0.4
 const CHARACTER_HALF_HEIGHT = 0.6
@@ -214,24 +214,33 @@ export const createLockstepMatch = async (tier, schedule) => {
     return engineFloats
   }
 
-  const engineHash = () => {
+  const hashScratch = new Uint32Array(1)
+  const writeEngineHash = (out, at) => {
     engineState()
-    return fnvWords(FNV_OFFSET, engineWords)
+    fnvWordsInto(FNV_OFFSET, engineWords, out, at)
+  }
+  const engineHash = () => {
+    writeEngineHash(hashScratch, 0)
+    return hashScratch[0]
   }
 
-  const gameHash = () => {
+  const writeGameHash = (out, at) => {
     for (let i = 0; i < UNITS; i++) {
       gameWords[i * 2] = hp[i]
       gameWords[i * 2 + 1] = cooldown[i]
     }
-    return fnvWords(FNV_OFFSET, gameWords)
+    fnvWordsInto(FNV_OFFSET, gameWords, out, at)
+  }
+  const gameHash = () => {
+    writeGameHash(hashScratch, 0)
+    return hashScratch[0]
   }
 
   const record = () => {
     tick += 1
     if (tick % LOCKSTEP.checkpointTicks !== 0 || checkpoints >= checkpointCount) return
-    checkpointEngine[checkpoints] = engineHash()
-    checkpointGame[checkpoints] = gameHash()
+    writeEngineHash(checkpointEngine, checkpoints)
+    writeGameHash(checkpointGame, checkpoints)
     checkpoints += 1
   }
 

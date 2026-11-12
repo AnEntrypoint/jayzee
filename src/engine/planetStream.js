@@ -39,8 +39,9 @@ export const createPlanetStreamer = (module, { sink = null, window = PATH_WINDOW
   const cells = 4 * window * window
   const templates = fillTemplates()
   const probe = { face: 0, cx: 0, cy: 0 }
-  const spot = new Float64Array(3)
-  const pathSpot = new Float64Array(3 * PATH_PERIOD_FRAMES)
+  const SPOT_AT = 3 * PATH_PERIOD_FRAMES
+  const pathSpot = new Float64Array(SPOT_AT + 3)
+  const spot = pathSpot.subarray(SPOT_AT, SPOT_AT + 3)
   const pathCell = new Int32Array(3 * PATH_PERIOD_FRAMES)
 
   for (let f = 0; f < PATH_PERIOD_FRAMES; f++) {
@@ -159,9 +160,7 @@ export const createPlanetStreamer = (module, { sink = null, window = PATH_WINDOW
     get pending() { return counts.stage + counts.release },
     step(frame) {
       const at = 3 * (frame % PATH_PERIOD_FRAMES)
-      spot[0] = pathSpot[at]
-      spot[1] = pathSpot[at + 1]
-      spot[2] = pathSpot[at + 2]
+      pathSpot.copyWithin(SPOT_AT, at, at + 3)
       const face = pathCell[at]
       const cx = pathCell[at + 1]
       const cy = pathCell[at + 2]

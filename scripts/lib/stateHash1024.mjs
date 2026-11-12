@@ -11,6 +11,12 @@ export const THREAD_COUNTS = Object.freeze([2, 4, 7, 8])
 export const FNV_OFFSET = 0x811c9dc5
 const FNV_PRIME = 0x01000193
 
+export const fnvWordsInto = (hash, words, out, at) => {
+  let h = hash | 0
+  for (let i = 0; i < words.length; i++) h = Math.imul(h ^ words[i], FNV_PRIME)
+  out[at] = h
+}
+
 export const fnvWords = (hash, words) => {
   let h = hash
   for (let i = 0; i < words.length; i++) {
