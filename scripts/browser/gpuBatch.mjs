@@ -55,6 +55,22 @@ export const driverLockMs = (samples, fromUs, toUs) => {
 export const isDriverLockGap = ({ lockMs, intervalMs, pageIdle, workWithinBudget }) =>
   typeof lockMs === 'number' && lockMs >= DRIVER_LOCK_LEAST_MS && lockMs >= DRIVER_LOCK_SHARE * (intervalMs - FRAME_PERIOD_MS) && pageIdle === true && workWithinBudget === true
 
+export const RUN_QUEUE_LEAST_MS = 5
+
+export const runQueueWaitMs = (samples, fromUs, toUs) => {
+  if (!samples || samples.samples < 2 || !samples.waitNs) return null
+  const { atUs, waitNs } = samples
+  if (atUs[0] > fromUs || atUs[atUs.length - 1] < toUs) return null
+  let first = 0
+  while (first < atUs.length - 1 && atUs[first + 1] <= fromUs) first += 1
+  let last = first
+  while (last < atUs.length - 1 && atUs[last] < toUs) last += 1
+  return round((Number(waitNs[last]) - Number(waitNs[first])) / 1e6)
+}
+
+export const isRunQueueGap = ({ waitMs, intervalMs, pageIdle, workWithinBudget }) =>
+  typeof waitMs === 'number' && waitMs >= RUN_QUEUE_LEAST_MS && waitMs >= DRIVER_LOCK_SHARE * (intervalMs - FRAME_PERIOD_MS) && pageIdle === true && workWithinBudget === true
+
 export const tsAfterFrames = (events, frames) => {
   const starts = events.filter((event) => event.ph === 'X' && event.name === 'FireAnimationFrame').map((event) => event.ts).sort((a, b) => a - b)
   return starts.length > frames ? starts[frames] : 0

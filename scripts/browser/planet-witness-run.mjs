@@ -6,7 +6,7 @@ import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { runRenderWitness } from './render-witness.mjs'
 import { processesNaming, witnessBrowser } from './ownDisplay.mjs'
-import { describeBatches, driverLockMs, isDriverLockGap, tsAfterFrames } from './gpuBatch.mjs'
+import { describeBatches, driverLockMs, isDriverLockGap, isRunQueueGap, runQueueWaitMs, tsAfterFrames } from './gpuBatch.mjs'
 import { THROTTLE_SAMPLE_MS, THROTTLE_SLACK_MS, excuseHostThrottled, isHostThrottledGap, throttledBetween } from './hostThrottle.mjs'
 import { PLANET_FRAME_BUDGET_MS, PLANET_MISSED_FRAME_MS, PLANET_RUNS, planetQuery, planetVerdict } from '../../src/engine/planetWitness.js'
 
@@ -200,6 +200,8 @@ const frameCases = (result, samples, gapInfo, gpuRows = [], throttleSamples = []
     const hostThrottledGap = isHostThrottledGap({ throttled: throttledInGap, pageIdle: busyShare !== null && busyShare < 0.5, workWithinBudget: work <= PLANET_FRAME_BUDGET_MS })
     const gpuDriverLockMs = gap ? driverLockMs(gpuThread, gap.intervalFromTs, gap.intervalToTs) : null
     const gpuDriverLockGap = isDriverLockGap({ lockMs: gpuDriverLockMs, intervalMs: interval, pageIdle: busyShare !== null && busyShare < 0.5, workWithinBudget: work <= PLANET_FRAME_BUDGET_MS })
+    const gpuRunQueueMs = gap ? runQueueWaitMs(gpuThread, gap.intervalFromTs, gap.intervalToTs) : null
+    const gpuRunQueueGap = isRunQueueGap({ waitMs: gpuRunQueueMs, intervalMs: interval, pageIdle: busyShare !== null && busyShare < 0.5, workWithinBudget: work <= PLANET_FRAME_BUDGET_MS })
     const classification = hiddenInGap
       ? 'page-hidden-in-gap: another page was in front, so the browser held this page back'
       : work > PLANET_FRAME_BUDGET_MS
@@ -208,6 +210,8 @@ const frameCases = (result, samples, gapInfo, gpuRows = [], throttleSamples = []
       ? 'gpu-driver-lock-in-gap: the GPU process main thread slept ' + gpuDriverLockMs + ' ms in the graphics driver lock within this interval, with the page idle'
       : hostThrottledGap
       ? 'host-cpu-quota-in-gap: the container CPU quota throttled ' + throttledInGap.periods + ' period' + (throttledInGap.periods === 1 ? '' : 's') + ' (' + Math.round(throttledInGap.throttledMs) + ' ms of thread time) within the ' + throttledInGap.sampleWallMs + ' ms around this gap, with the page idle'
+      : gpuRunQueueGap
+      ? 'host-run-queue-in-gap: the GPU process main thread waited ' + gpuRunQueueMs + ' ms for a CPU within this interval, with the page idle; counted, since a loaded host is not a quiet witness'
       : busyShare !== null && busyShare >= 0.5
         ? 'page-main-thread-busy-in-gap: ' + gap.top.map((t) => t.name).join(', ')
         : 'renderer-main-thread-idle-in-gap: the wait is outside the page main thread (browser, GPU or host)'
@@ -222,6 +226,8 @@ const frameCases = (result, samples, gapInfo, gpuRows = [], throttleSamples = []
       hostThrottledGap,
       gpuDriverLockMs,
       gpuDriverLockGap,
+      gpuRunQueueMs,
+      gpuRunQueueGap,
       throttledInGap,
       samples: window.length,
       maxLoad1: window.length ? Math.max(...window.map((sample) => sample.load1)) : null,
