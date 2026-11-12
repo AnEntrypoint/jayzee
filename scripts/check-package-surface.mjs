@@ -35,7 +35,9 @@ const closureOf = (entries, read = (abs) => readFileSync(abs, 'utf8')) => {
 const entries = [manifest.exports['.'].default, ...Object.values(manifest.bin)]
 const surface = closureOf(entries)
 const packOutput = execFileSync('npm', ['pack', '--dry-run', '--json', '--ignore-scripts'], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
-const packed = JSON.parse(packOutput.slice(packOutput.indexOf('\n[') + 1))[0]
+const packLines = packOutput.split('\n')
+const packReport = JSON.parse(packLines.slice(packLines.findIndex((line) => line === '[' || line === '{')).join('\n'))
+const packed = Array.isArray(packReport) ? packReport[0] : Object.values(packReport)[0]
 const packedPaths = new Set(packed.files.map((file) => file.path))
 
 gate('the package exports one entry point and nothing else, so its surface is that entry and the bins', () => {
