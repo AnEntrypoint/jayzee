@@ -219,6 +219,10 @@ EMSCRIPTEN_KEEPALIVE int engine_world_configure(std::uint32_t capacity, std::uin
   return status;
 }
 
+EMSCRIPTEN_KEEPALIVE int engine_world_set_awake_design(std::uint32_t bodies) {
+  return engine::world().setAwakeDesign(bodies);
+}
+
 EMSCRIPTEN_KEEPALIVE int engine_world_set_awake_budget(std::uint32_t bodies) {
   return engine::world().setAwakeBudget(bodies);
 }

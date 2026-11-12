@@ -331,6 +331,24 @@ gate('a view that drifts ' + DRIFT_METRES_A_TICK + ' m a tick reorders the relea
   assert.equal(bySlot.refills, 1, 'slot order refilled ' + bySlot.refills + ' times')
 })
 
+const DESIGN_LEAST = 1024
+const DESIGN_MOST = 16384
+
+gate('the awake design sizes the next configure: refused under ' + DESIGN_LEAST + ' or over ' + DESIGN_MOST + ', it bounds the awake bodies of a world larger than it, and a world no larger than it has no bound', async () => {
+  const module = await loadEngineModule(glue)
+  for (const bad of [0, DESIGN_LEAST - 1, DESIGN_MOST + 1]) assert.notEqual(module._engine_world_set_awake_design(bad), 0, 'accepted ' + bad)
+  assert.equal(module._engine_world_set_awake_design(DESIGN_LEAST), 0)
+  assert.equal(module._engine_world_configure(2048, 60, -9.8, 0, RADIUS, 0, 8), 0)
+  assert.equal(module._engine_world_awake_limit(), DESIGN_LEAST)
+  assert.equal(module._engine_world_set_awake_budget(BUDGET), 0)
+  assert.equal(module._engine_world_awake_limit(), BUDGET)
+  assert.equal(module._engine_world_set_awake_design(DESIGN_MOST), 0)
+  assert.equal(module._engine_world_awake_limit(), BUDGET, 'a design set after configure took effect before the next configure')
+  assert.equal(module._engine_world_configure(DESIGN_LEAST, 60, -9.8, 0, RADIUS, 0, 8), 0)
+  assert.equal(module._engine_world_set_awake_budget(0), 0)
+  assert.equal(module._engine_world_awake_limit(), 0)
+})
+
 gate('the release view refuses a value that is not finite, a cone outside -1 to 1 and a range that is not above zero', async () => {
   const module = await boot({ budget: BUDGET })
   for (const bad of [[NaN, 0, 0, 1, 0, 0, 0.5, 10], [0, 0, 0, Infinity, 0, 0, 0.5, 10], [0, 0, 0, 1, 0, 0, 1.5, 10], [0, 0, 0, 1, 0, 0, 0.5, 0], [0, 0, 0, 1, 0, 0, 0.5, NaN]]) {

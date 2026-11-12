@@ -56,6 +56,10 @@ const warmReclaim = warmed ? await warmed.release() : null
 const loadMs = performance.now() - loadStarted
 
 const setupStarted = performance.now()
+const setDesign = exported('_engine_world_set_awake_design')
+const plannedAwake = knobs.awake !== undefined ? Number(knobs.awake) : TIER_1024.awakeBudget
+const awakeDesign = knobs.design !== undefined ? Number(knobs.design) : plannedAwake > 0 && plannedAwake <= TIER_1024.awakeBudget ? TIER_1024.awakeDesign : 0
+if (setDesign && awakeDesign > 0 && setDesign(awakeDesign) !== 0) emit({ ...base, refused: 'awake-design', design: awakeDesign })
 const status = module._engine_world_configure(bodies, TIER_1024.tickRate, TIER_1024.gravity, TIER_1024.drag, TIER_1024.radius, TIER_1024.restitution, iterations)
 if (status !== 0) emit({ ...base, refused: 'world-configure', status, planBodies: readLayout(module).bodies })
 if (!onPlanet) module._engine_world_add_box(...GROUND)
@@ -187,6 +191,7 @@ emit({
   unsettledViewBodyTicks: unsettledOf ? unsettled.reduce((sum, count) => sum + count, 0) : null,
   viewer: knobs.still !== undefined ? 'still' : 'path',
   releaseRefills: refillsOf ? refillsOf() : null,
+  awakeDesign: setDesign ? awakeDesign : null,
   heldAtEnd: heldOf ? held[ticks] : null,
   peakAirborne: airborneOf ? Math.max(...airborne) : null,
   profile: profile ? profile.summarise() : null,
