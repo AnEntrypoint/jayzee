@@ -41,6 +41,7 @@ export function createEntityTable({ capacity, world = null } = {}) {
   let freeCount = capacity
   let liveCount = 0
   let colliderEpoch = 0
+  let epoch = 0
   for (let i = 0; i < capacity; i++) free[i] = capacity - 1 - i
 
   const internTag = (name) => {
@@ -134,6 +135,11 @@ export function createEntityTable({ capacity, world = null } = {}) {
     },
     readPosition(out) { liveSlot(id); syncBody(slot); return read3(position, slot, out) },
     readVelocity(out) { liveSlot(id); syncBody(slot); return read3(velocity, slot, out) },
+    readRotation(out) {
+      liveSlot(id)
+      for (let a = 0; a < 4; a++) out[a] = rotation[slot * 4 + a]
+      return out
+    },
   })
 
   const spawn = (config = {}) => {
@@ -179,6 +185,7 @@ export function createEntityTable({ capacity, world = null } = {}) {
     if (name !== null) byName.set(name, id)
     handles[slot] = bind(id, slot)
     liveCount += 1
+    epoch += 1
     if (startRadius > 0) colliderEpoch += 1
     return id
   }
@@ -202,6 +209,7 @@ export function createEntityTable({ capacity, world = null } = {}) {
     free[freeCount] = slot
     freeCount += 1
     liveCount -= 1
+    epoch += 1
     return true
   }
 
@@ -253,6 +261,7 @@ export function createEntityTable({ capacity, world = null } = {}) {
     syncBody,
     get count() { return liveCount },
     get colliderEpoch() { return colliderEpoch },
+    get epoch() { return epoch },
     views: { position, velocity, rotation, radius, alive, tag, app, body, generation, ids },
   }
 }
