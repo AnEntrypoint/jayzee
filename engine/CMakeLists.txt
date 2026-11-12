@@ -276,6 +276,11 @@ set(ENGINE_EXPORTS
   _engine_render_refresh_props
   _engine_render_set_prop_plan
   _engine_render_prop_plans
+  _engine_render_set_prop_budget
+  _engine_render_prop_budget
+  _engine_render_prop_cutoff_bins
+  _engine_render_props_in_frustum
+  _engine_render_props_shed
   _engine_render_init
   _engine_render_light_count
   _engine_render_lights

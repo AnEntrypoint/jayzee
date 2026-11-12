@@ -251,6 +251,28 @@ EMSCRIPTEN_KEEPALIVE std::uint64_t engine_render_prop_plans() {
   return rnd::counters().propPlans;
 }
 
+EMSCRIPTEN_KEEPALIVE int engine_render_set_prop_budget(std::uint32_t limit) {
+  rnd::setPropBudget(limit);
+  if (rnd::renderState != nullptr) rnd::renderState->propsPlanned = 0;
+  return engine::kOk;
+}
+
+EMSCRIPTEN_KEEPALIVE std::uint32_t engine_render_prop_budget() {
+  return rnd::propBudget().limit;
+}
+
+EMSCRIPTEN_KEEPALIVE std::uint32_t engine_render_prop_cutoff_bins() {
+  return rnd::propBudget().bins;
+}
+
+EMSCRIPTEN_KEEPALIVE std::uint32_t engine_render_props_in_frustum() {
+  return rnd::counters().propsInFrustum;
+}
+
+EMSCRIPTEN_KEEPALIVE std::uint32_t engine_render_props_shed() {
+  return rnd::counters().propsShed;
+}
+
 EMSCRIPTEN_KEEPALIVE float* engine_render_camera() {
   return rnd::renderState == nullptr ? nullptr : reinterpret_cast<float*>(&rnd::renderState->camera);
 }

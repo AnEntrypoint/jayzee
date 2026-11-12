@@ -35,6 +35,11 @@ constexpr std::uint32_t kArgsWords = 20;
 constexpr std::uint32_t kArgsPropWord = 0;
 constexpr std::uint32_t kArgsTerrainWord = 16;
 constexpr float kPropRadius = 0.8660254f;
+constexpr std::uint32_t kPropBudgetBins = 256;
+constexpr std::uint32_t kPropBudgetBinShift = 20;
+constexpr std::uint32_t kPropBudgetNearBits = 0x3e800000u >> kPropBudgetBinShift;
+constexpr std::uint32_t kPropBudgetHeadroomShift = 3;
+constexpr std::uint32_t kNoPropBudget = 0;
 
 struct MaterialSlot {
   float colour[4];
@@ -156,10 +161,21 @@ struct Counters {
   std::uint32_t cullFresh;
   std::uint32_t countReadback;
   std::uint64_t propPlans;
+  std::uint32_t propsInFrustum;
+  std::uint32_t propsShed;
+  std::uint64_t propsShedTotal;
+};
+
+struct PropBudget {
+  std::uint32_t limit;
+  std::uint32_t bins;
 };
 
 Counters& counters();
 ModelSettings& modelSettings();
+const PropBudget& propBudget();
+void setPropBudget(std::uint32_t limit);
+std::uint32_t propBudgetBin(float distanceSquared);
 void countCall();
 bool acceptCreate();
 std::uint32_t pageLayers();

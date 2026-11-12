@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -86,6 +87,146 @@ void buildScene(std::uint32_t frame) {
   camera.eye[3] = 1.0f;
 }
 
+constexpr std::uint32_t kBudget = 2000;
+constexpr std::uint32_t kBudgetInBand = 2100;
+constexpr std::uint32_t kBudgetWide = 4000;
+constexpr std::uint32_t kOrbitFrames = 120;
+constexpr std::uint64_t kFnvOffset = 0xcbf29ce484222325ull;
+constexpr std::uint64_t kFnvPrime = 0x100000001b3ull;
+
+float everyDistance[kWitnessBodySlots];
+float sortedDistance[kWitnessBodySlots];
+
+std::uint32_t keptTotal() {
+  std::uint32_t total = 0;
+  for (std::uint32_t c = 0; c < rnd::kPropClasses; ++c) total += plan.propCount[c];
+  return total;
+}
+
+float recordDistanceSquared(std::uint32_t cls, std::uint32_t index) {
+  float rel[3];
+  std::memcpy(rel, plan.propRecords + (cls * plan.bodySlots + index) * rnd::kRecordWords, sizeof rel);
+  const float dx = rel[0] - camera.eye[0];
+  const float dy = rel[1] - camera.eye[1];
+  const float dz = rel[2] - camera.eye[2];
+  return dx * dx + dy * dy + dz * dz;
+}
+
+std::uint32_t collectDistances(float* out) {
+  std::uint32_t count = 0;
+  for (std::uint32_t c = 0; c < rnd::kPropClasses; ++c) {
+    for (std::uint32_t i = 0; i < plan.propCount[c]; ++i) out[count++] = recordDistanceSquared(c, i);
+  }
+  return count;
+}
+
+std::uint64_t keptDigest() {
+  std::uint64_t hash = kFnvOffset;
+  for (std::uint32_t c = 0; c < rnd::kPropClasses; ++c) {
+    hash = (hash ^ plan.propCount[c]) * kFnvPrime;
+    const std::uint32_t* words = plan.propRecords + c * plan.bodySlots * rnd::kRecordWords;
+    for (std::uint32_t w = 0; w < plan.propCount[c] * rnd::kRecordWords; ++w) hash = (hash ^ words[w]) * kFnvPrime;
+  }
+  return hash;
+}
+
+std::uint32_t binsBelow(const float* distances, std::uint32_t count, std::uint32_t bin) {
+  std::uint32_t below = 0;
+  for (std::uint32_t i = 0; i < count; ++i) below += rnd::propBudgetBin(distances[i]) < bin ? 1 : 0;
+  return below;
+}
+
+void propBudgetWitness(const rnd::SceneView& scene) {
+  using engine::test::check;
+  using engine::test::observe;
+
+  const rnd::Counters& counters = rnd::counters();
+  const std::uint32_t inFrustum = keptTotal();
+  check(rnd::propBudget().limit == rnd::kNoPropBudget && rnd::propBudget().bins == rnd::kPropBudgetBins,
+        "prop budget: the default is no limit with the cutoff past the last distance band");
+  check(counters.propsShed == 0 && counters.propsInFrustum == inFrustum, "prop budget: with no limit nothing is shed and every prop in the frustum is planned");
+  const std::uint32_t every = collectDistances(everyDistance);
+  std::memcpy(sortedDistance, everyDistance, sizeof(float) * every);
+  std::sort(sortedDistance, sortedDistance + every);
+  const std::uint32_t boundaryBin = rnd::propBudgetBin(sortedDistance[kBudget - 1]);
+  const std::uint32_t nearerThanBoundary = binsBelow(everyDistance, every, boundaryBin);
+  observe("prop budget props in the frustum", static_cast<double>(inFrustum));
+  observe("prop budget boundary band", static_cast<double>(boundaryBin));
+  observe("prop budget distance of the last prop inside the budget", std::sqrt(static_cast<double>(sortedDistance[kBudget - 1])));
+  check(inFrustum > kBudgetWide, "prop budget: the witness frustum holds more props than every budget used");
+
+  const std::uint64_t carvesBefore = engine::arena::carves();
+  rnd::setPropBudget(kBudget);
+  rnd::planProps(scene, camera, plan);
+  const std::uint32_t kept = keptTotal();
+  const std::uint32_t settledBins = rnd::propBudget().bins;
+  const std::uint64_t settledDigest = keptDigest();
+  observe("prop budget kept under the budget", static_cast<double>(kept));
+  observe("prop budget shed under the budget", static_cast<double>(counters.propsShed));
+  observe("prop budget carried cutoff band", static_cast<double>(settledBins));
+  check(kept == kBudget, "prop budget: with more props in the frustum than the budget the plan keeps exactly the budget");
+  check(counters.propsShed == inFrustum - kept && counters.propsInFrustum == inFrustum, "prop budget: the shed counter is the props in the frustum less the props kept");
+  check(plan.checksum == kExpectedChecksum, "prop budget: the pose checksum covers every body and does not change under a budget");
+  static float keptDistance[kWitnessBodySlots];
+  const std::uint32_t keptCount = collectDistances(keptDistance);
+  std::uint32_t farthestKeptBin = 0;
+  for (std::uint32_t i = 0; i < keptCount; ++i) farthestKeptBin = std::max(farthestKeptBin, rnd::propBudgetBin(keptDistance[i]));
+  check(settledBins == boundaryBin && farthestKeptBin <= boundaryBin, "prop budget: no kept prop lies in a distance band beyond the band of the last prop a full sort would keep");
+  check(binsBelow(keptDistance, keptCount, boundaryBin) == nearerThanBoundary, "prop budget: every prop in a nearer distance band than the boundary is kept");
+
+  rnd::planProps(scene, camera, plan);
+  check(keptDigest() == settledDigest && rnd::propBudget().bins == settledBins, "prop budget: planning the same frame again keeps the same records and the same cutoff");
+
+  rnd::setPropBudget(kBudgetInBand);
+  rnd::planProps(scene, camera, plan);
+  observe("prop budget kept at a budget 5 percent larger", static_cast<double>(keptTotal()));
+  check(rnd::propBudget().bins == settledBins && keptTotal() >= kBudget && keptTotal() <= kBudgetInBand,
+        "prop budget: a budget 5 percent larger stays inside the hysteresis band, so the cutoff holds and only the boundary band fills");
+
+  rnd::setPropBudget(kBudgetWide);
+  rnd::planProps(scene, camera, plan);
+  const std::uint32_t wideBins = rnd::propBudget().bins;
+  const std::uint32_t wideKept = keptTotal();
+  observe("prop budget carried cutoff band at twice the budget", static_cast<double>(wideBins));
+  observe("prop budget kept at twice the budget", static_cast<double>(wideKept));
+  check(wideBins > settledBins && wideKept <= kBudgetWide && wideKept > kBudgetWide - (kBudgetWide >> rnd::kPropBudgetHeadroomShift),
+        "prop budget: doubling the budget moves the cutoff out and keeps more than seven eighths of the new budget");
+
+  rnd::setPropBudget(kBudget);
+  rnd::planProps(scene, camera, plan);
+  check(rnd::propBudget().bins == settledBins && keptDigest() == settledDigest, "prop budget: back at the first budget the cutoff and the kept records return to the first result");
+
+  std::uint32_t most = 0;
+  std::uint32_t least = kWitnessBodySlots;
+  std::uint32_t cutoffMoves = 0;
+  bool shedAdds = true;
+  std::uint32_t lastBins = rnd::propBudget().bins;
+  for (std::uint32_t frame = 0; frame < kOrbitFrames; ++frame) {
+    buildScene(600 + frame);
+    rnd::planFrame(scene, camera, plan);
+    const std::uint32_t now = keptTotal();
+    most = std::max(most, now);
+    least = std::min(least, now);
+    shedAdds = shedAdds && counters.propsShed + now == counters.propsInFrustum;
+    if (rnd::propBudget().bins != lastBins) cutoffMoves += 1;
+    lastBins = rnd::propBudget().bins;
+  }
+  observe("prop budget most kept over the orbit", static_cast<double>(most));
+  observe("prop budget least kept over the orbit", static_cast<double>(least));
+  observe("prop budget cutoff moves over the orbit", static_cast<double>(cutoffMoves));
+  check(most <= kBudget && least > kBudget - (kBudget >> rnd::kPropBudgetHeadroomShift) && shedAdds,
+        "prop budget: over a 120 frame orbit the kept count never exceeds the budget and never falls to seven eighths of it");
+  check(cutoffMoves <= kOrbitFrames / 8, "prop budget: the carried cutoff moves on fewer than one frame in eight of the orbit");
+  check(engine::arena::carves() == carvesBefore, "prop budget: the budgeted plans carve nothing from the arena");
+
+  rnd::setPropBudget(rnd::kNoPropBudget);
+  buildScene(599);
+  rnd::planFrame(scene, camera, plan);
+  bool restored = plan.checksum == kExpectedChecksum && counters.propsShed == 0;
+  for (std::uint32_t c = 0; c < rnd::kPropClasses; ++c) restored = restored && plan.propCount[c] == kExpectedVisible[c];
+  check(restored && rnd::propBudget().bins == rnd::kPropBudgetBins, "prop budget: clearing the budget restores the recorded visible counts and sheds nothing");
+}
+
 }
 
 void phase10Plan() {
@@ -120,6 +261,7 @@ void phase10Plan() {
   bool counts = true;
   for (std::uint32_t c = 0; c < rnd::kPropClasses; ++c) counts = counts && plan.propCount[c] == kExpectedVisible[c];
   check(counts, "phase 10: the visible count per class matches the recorded values");
+  propBudgetWitness(scene);
 }
 
 }

@@ -15,6 +15,7 @@ constexpr std::uint64_t kFnvPrime = 0x100000001b3ull;
 
 Counters state{};
 ModelSettings settings{kModelPathVisibility, 1u};
+PropBudget budget{kNoPropBudget, kPropBudgetBins};
 
 std::uint32_t bitsOf(float value) {
   std::uint32_t bits;
@@ -52,6 +53,51 @@ bool inFrustum(const float planes[6][4], const float* centre, float radius) {
     if (distance < -radius) return false;
   }
   return true;
+}
+
+bool propInView(const SceneView& scene, const Camera& camera, std::uint32_t i, float* rel) {
+  const Transform& t = scene.transforms[i];
+  const float body[3] = {t.x, t.y, t.z};
+  relativeOfBody(body, scene.bodyOrigin, scene.origin, rel);
+  if (scene.bodyClass[i] >= kPropClasses) return false;
+  if (t.qx == 0.0f && t.qy == 0.0f && t.qz == 0.0f && t.qw == 0.0f) return false;
+  return inFrustum(camera.planes, rel, kPropRadius);
+}
+
+std::uint32_t propBin(const Camera& camera, const float* rel) {
+  const float dx = rel[0] - camera.eye[0];
+  const float dy = rel[1] - camera.eye[1];
+  const float dz = rel[2] - camera.eye[2];
+  return propBudgetBin(dx * dx + dy * dy + dz * dz);
+}
+
+std::uint32_t carryCutoff(const SceneView& scene, const Camera& camera) {
+  std::uint32_t histogram[kPropBudgetBins];
+  std::memset(histogram, 0, sizeof histogram);
+  for (std::uint32_t i = 0; i < scene.bodyCount; ++i) {
+    float rel[3];
+    if (propInView(scene, camera, i, rel)) histogram[propBin(camera, rel)] += 1;
+  }
+  const std::uint32_t grow = budget.limit - (budget.limit >> kPropBudgetHeadroomShift);
+  std::uint32_t within = 0;
+  std::uint32_t fits = 0;
+  std::uint32_t fitsWithHeadroom = 0;
+  std::uint32_t withinCarried = 0;
+  for (std::uint32_t bin = 0; bin < kPropBudgetBins; ++bin) {
+    if (bin == budget.bins) withinCarried = within;
+    within += histogram[bin];
+    if (within <= budget.limit) fits = bin + 1;
+    if (within <= grow) fitsWithHeadroom = bin + 1;
+  }
+  if (budget.bins == kPropBudgetBins) withinCarried = within;
+  if (withinCarried > budget.limit) {
+    budget.bins = fits;
+  } else if (fitsWithHeadroom > budget.bins) {
+    budget.bins = fitsWithHeadroom;
+  }
+  within = 0;
+  for (std::uint32_t bin = 0; bin < budget.bins; ++bin) within += histogram[bin];
+  return budget.limit - within;
 }
 
 std::uint32_t firstFreeLayer(const FramePlan& plan) {
@@ -133,6 +179,21 @@ ModelSettings& modelSettings() {
   return settings;
 }
 
+const PropBudget& propBudget() {
+  return budget;
+}
+
+void setPropBudget(std::uint32_t limit) {
+  budget.limit = limit;
+  if (limit == kNoPropBudget) budget.bins = kPropBudgetBins;
+}
+
+std::uint32_t propBudgetBin(float distanceSquared) {
+  const std::uint32_t bits = bitsOf(distanceSquared) >> kPropBudgetBinShift;
+  if (bits <= kPropBudgetNearBits) return 0;
+  return std::min(bits - kPropBudgetNearBits, kPropBudgetBins - 1);
+}
+
 void countCall() {
   state.apiCalls += 1;
 }
@@ -188,6 +249,10 @@ void resolveMaterials(const MaterialSlot* table, std::uint32_t count, const std:
 
 void planProps(const SceneView& scene, const Camera& camera, FramePlan& plan) {
   for (std::uint32_t c = 0; c < kPropClasses; ++c) plan.propCount[c] = 0;
+  const bool budgeted = budget.limit != kNoPropBudget;
+  std::uint32_t boundaryRoom = budgeted ? carryCutoff(scene, camera) : 0;
+  std::uint32_t inView = 0;
+  std::uint32_t shed = 0;
   std::uint64_t hash = kFnvOffset;
   for (std::uint32_t i = 0; i < scene.bodyCount; ++i) {
     std::uint32_t out[kRecordWords];
@@ -203,6 +268,16 @@ void planProps(const SceneView& scene, const Camera& camera, FramePlan& plan) {
     if (cls >= kPropClasses) continue;
     if (t.qx == 0.0f && t.qy == 0.0f && t.qz == 0.0f && t.qw == 0.0f) continue;
     if (!inFrustum(camera.planes, rel, kPropRadius)) continue;
+    inView += 1;
+    if (budgeted) {
+      const std::uint32_t bin = propBin(camera, rel);
+      const bool boundary = bin == budget.bins && boundaryRoom > 0;
+      if (bin >= budget.bins && !boundary) {
+        shed += 1;
+        continue;
+      }
+      if (boundary) boundaryRoom -= 1;
+    }
     const std::uint32_t index = plan.propCount[cls];
     plan.propCount[cls] = index + 1;
     std::memcpy(plan.propRecords + (cls * plan.bodySlots + index) * kRecordWords, out, kRecordBytes);
@@ -210,6 +285,9 @@ void planProps(const SceneView& scene, const Camera& camera, FramePlan& plan) {
   plan.checksum = hash;
   state.checksum = hash;
   state.propPlans += 1;
+  state.propsInFrustum = inView;
+  state.propsShed = shed;
+  state.propsShedTotal += shed;
   for (std::uint32_t c = 0; c < kPropClasses; ++c) state.visible[c] = plan.propCount[c];
 }
 
