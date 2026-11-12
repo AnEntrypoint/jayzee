@@ -8,7 +8,9 @@ export class SourceClosureError extends Error {
 }
 
 const IDENT = '[A-Za-z_$][\\w$]*'
-const FROM_CLAUSE = new RegExp('(?:^|[\\n;}])[ \\t]*(import|export)\\s+([^\'"`;]*?)\\s*from\\s*([\'"])([^\'"\\n]+)\\3', 'g')
+const SPECIFIER = '\\s*from\\s*([\'"])([^\'"\\n]+)\\2'
+const IMPORT_FROM = new RegExp('(?:^|[\\n;}])[ \\t]*import\\s+((?:' + IDENT + '\\s*,\\s*)?(?:\\*\\s*as\\s+' + IDENT + '|\\{[^}]*\\})|' + IDENT + ')' + SPECIFIER, 'g')
+const EXPORT_FROM = new RegExp('(?:^|[\\n;}])[ \\t]*export\\s*(\\*(?:\\s*as\\s+' + IDENT + ')?|\\{[^}]*\\})' + SPECIFIER, 'g')
 const BARE_IMPORT = /(?:^|[\n;}])[ \t]*import\s*(['"])([^'"\n]+)\1/g
 const DYNAMIC_IMPORT = /\bimport\s*\(\s*(['"])([^'"\n]+)\1\s*\)/g
 const DECLARED_EXPORT = new RegExp('(?:^|[\\n;}])[ \\t]*export\\s+(?:async\\s+)?(?:function\\s*\\*?|class|const|let|var)\\s+(' + IDENT + ')', 'g')
@@ -49,7 +51,8 @@ function clauseNames(kind, clause) {
 export function listImports(text) {
   if (typeof text !== 'string') throw new TypeError('listImports needs source text')
   const found = []
-  for (const m of text.matchAll(FROM_CLAUSE)) found.push({ kind: m[1], specifier: m[4], ...clauseNames(m[1], m[2]) })
+  for (const m of text.matchAll(IMPORT_FROM)) found.push({ kind: 'import', specifier: m[3], ...clauseNames('import', m[1]) })
+  for (const m of text.matchAll(EXPORT_FROM)) found.push({ kind: 'export', specifier: m[3], ...clauseNames('export', m[1]) })
   for (const m of text.matchAll(BARE_IMPORT)) found.push({ kind: 'import', specifier: m[2], star: false, namespace: false, names: [], exported: [] })
   for (const m of text.matchAll(DYNAMIC_IMPORT)) found.push({ kind: 'dynamic', specifier: m[2], star: false, namespace: true, names: [], exported: [] })
   return found
