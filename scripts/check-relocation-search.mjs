@@ -89,7 +89,7 @@ gate('the search stops at the radius and at the sample budget, and reports which
   const capped = searchBookmark('coast', ctxOf({ maxSamples: 100 }))
   assert.deepEqual({ found: capped.found, reason: capped.reason, samples: capped.samples }, { found: false, reason: 'sample-budget', samples: 100 })
   assert.equal(SEARCH_MAX_RADIUS_M, 4096)
-  const fine = searchBookmark('coast', ctxOf({ stepM: 12 }))
+  const fine = searchBookmark('coast', ctxOf({ stepM: 16 }))
   assert.equal(fine.found, true)
   assert.ok(fine.samples > searchBookmark('coast', ctxOf()).samples)
 })
