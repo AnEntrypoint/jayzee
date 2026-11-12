@@ -7,6 +7,7 @@ import { registerPopulation, registerTerrain } from './populationColliders.js'
 import { canEngineHeightInto, createEngineHeightAt, createEngineHeightInto } from './terrainHeight.js'
 import { arenaAllocator, canArenaAllocate } from './arenaAllocate.js'
 import { VEG_GEN_INSTANCES_PER_FRAME, VEG_SPECIES, createVegetationPool, planVegetationPool } from './vegetation.js'
+import { createVegetationDetail } from './vegetationDetail.js'
 
 export const PLANET_ENTITY_COUNT = 1024
 export const PATCH_HEIGHT_MARGIN_M = 100
@@ -21,6 +22,8 @@ export const DEFAULT_SCENE = Object.freeze({
   deviceBufferBytes: 256 * 1024 * 1024,
   radiusM: PLANET_RADIUS_M,
   patchIds: null,
+  instanceBudget: null,
+  fullDetailM: 150,
 })
 
 export const WITNESS_PATCH_CAPACITY = 256
@@ -48,6 +51,8 @@ export const sceneSpec = (overrides = {}) => {
   need(spec.radiusM > 0 && Number.isFinite(spec.radiusM), 'radiusM must be a positive finite number')
   need(spec.patchIds === null || (Array.isArray(spec.patchIds) && spec.patchIds.length >= 1 && spec.patchIds.every((id) => Number.isSafeInteger(id) && id >= 0) && new Set(spec.patchIds).size === spec.patchIds.length), 'patchIds must be null or a list of distinct quadtree leaf patch ids')
   need(spec.deviceBufferBytes > 0 && Number.isFinite(spec.deviceBufferBytes), 'deviceBufferBytes must be a positive finite number, read from the device once')
+  need(spec.instanceBudget === null || (Number.isInteger(spec.instanceBudget) && spec.instanceBudget >= 0), 'instanceBudget must be null or a whole number of shown instances, chosen from the device budget once')
+  need(spec.fullDetailM > 0 && Number.isFinite(spec.fullDetailM), 'fullDetailM must be a positive finite distance in metres')
   return spec
 }
 
@@ -143,10 +148,12 @@ export const buildPlanetScene = ({ spec: overrides = {}, module, now, generate =
     generateMs += now() - t0
     if (gapsBefore !== null) generateHeightCallsOutsidePages += gapQueries() - gapsBefore
   }
-  const streamStep = (patchIdsNow) => {
+  const detail = spec.instanceBudget === null ? null : createVegetationDetail({ pool: vegetation, instanceBudget: spec.instanceBudget, fullDetailM: spec.fullDetailM })
+  const streamStep = (patchIdsNow, eyeX, eyeY, eyeZ) => {
     const gapsBefore = gapQueries()
     if (patchIdsNow !== null) vegetation.sync(patchIdsNow)
     vegetation.step()
+    if (detail !== null && eyeX !== undefined) detail.update(eyeX, eyeY, eyeZ)
     if (gapsBefore !== null) generateHeightCallsOutsidePages += gapQueries() - gapsBefore
   }
   const placementHeightCallsOutsidePages = gapsAtStart === null ? null : gapQueries() - gapsAtStart
@@ -170,8 +177,11 @@ export const buildPlanetScene = ({ spec: overrides = {}, module, now, generate =
       vegetationPlan: plan,
       vegetationBytes: vegetation.bytes(),
       vegetationBound,
+      shownInstances: vegetation.shownTotal(),
+      instanceBudget: spec.instanceBudget,
+      detailBias: detail === null ? null : detail.governor.stats.bias,
     }
   }
 
-  return { spec, area, population, colliders, vegetation, report, generate: generatePending, streamStep }
+  return { spec, area, population, colliders, vegetation, detail, report, generate: generatePending, streamStep }
 }

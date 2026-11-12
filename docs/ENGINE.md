@@ -381,7 +381,7 @@ Vegetation
 - [ ] Collision classes: trunk capsule, rock hull, pass-through: partial
 - [ ] Promotion of touched instances to pooled dynamic bodies: missing
 - [ ] Placement rules (slope caps, snow, footprint exclusion): partial
-- [ ] Vegetation LOD bands with hysteresis: missing
+- [ ] Vegetation LOD bands with hysteresis: partial (src/engine/vegetationDetail.js thins each patch to a prefix of its instances by distance, with a hysteresis band, under a fixed shown-instance budget; `check:display-governor`; the browser draw is not witnessed)
 - [ ] Grass density and wind from one law on CPU and shader: partial (no wind in C++)
 
 Rendering
@@ -445,13 +445,13 @@ Game systems
 Memory and budgets
 
 - [ ] Every region carved at boot, allocations since warm-up stay 0: partial (phase 4 and tier witnesses)
-- [ ] One wasm memory sized from the device budget, no growth in tier builds: supported (artifacts gate)
+- [ ] One wasm memory sized from the device budget, no growth in tier builds: supported (artifacts gate; src/engine/deviceBudget.js chooses the tier from the device's reported memory less a management reserve, `check:device-budget`)
 - [ ] Device tier planner from adapter limits and RAM: supported
 - [ ] VRAM accounting against the tier budget: partial (WebGPU reports no VRAM; planned bytes only)
 - [ ] Per-frame upload budget per tier: supported
 - [ ] Body and vegetation pools with generation ids: partial
 - [ ] Fixed rings for input, snapshot, transform and events: partial
-- [ ] Budget degradation (lower LOD, fewer slots) instead of allocation: partial
+- [ ] Budget degradation (lower LOD, fewer slots) instead of allocation: partial (src/engine/displayGovernor.js holds any set of slots to a fixed cost by coarsening levels, then shedding; wired to vegetation only; props, models and terrain pages are not yet governed)
 - [ ] Jolt heap and caps that fail rather than grow: partial
 
 Landscape dataset decision

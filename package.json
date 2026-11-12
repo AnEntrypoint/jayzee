@@ -369,6 +369,8 @@
     "kaggle:regress": "node scripts/kaggle/regress.mjs",
     "kaggle:install-gate": "node scripts/kaggle/install-gate.mjs",
     "check:glue-tier": "node scripts/check-glue-tier.mjs",
+    "check:device-budget": "node scripts/check-device-budget.mjs",
+    "check:display-governor": "node scripts/check-display-governor.mjs",
     "check:collision-placement-options": "node scripts/check-collision-placement-options.mjs",
     "check:rebase-session": "node scripts/check-rebase-session.mjs",
     "check:follow-misuse": "node scripts/check-follow-misuse.mjs",

@@ -18,6 +18,7 @@ const NO_SLOT = -1
 const FREE = -1
 const DRAWS_PER_INSTANCE = 3
 const POLE_REFERENCE_LIMIT = 0.9
+const HIDDEN_DETAIL = 31
 
 const isCount = (v, name, min) => {
   if (!Number.isInteger(v) || v < min) throw new RangeError(name + ' must be a whole number at least ' + min)
@@ -81,6 +82,8 @@ export const createVegetationPool = ({
   const countsBlock = allocate('u32', species.length * slots)
   const counts = species.map((_, s) => countsBlock.subarray(s * slots, (s + 1) * slots))
   const dirty = allocate('u8', slots)
+  const generatedBlock = new Uint32Array(species.length * slots)
+  const detail = new Uint8Array(slots)
   const ownerLow = new Int32Array(slots)
   const ownerHigh = new Int32Array(slots).fill(FREE)
   const home = new Int32Array(slots)
@@ -228,7 +231,8 @@ export const createVegetationPool = ({
         buf[o + 14] = r * z - radiusM * cz
         buf[o + 15] = 1
       }
-      counts[s][slot] = count
+      generatedBlock[s * slots + slot] = count
+      counts[s][slot] = detail[slot] >= HIDDEN_DETAIL ? 0 : count >>> detail[slot]
       total += count
     }
     dirty[slot] = 1
@@ -250,7 +254,11 @@ export const createVegetationPool = ({
       removeSlot(slot)
       ownerHigh[slot] = FREE
       resident -= 1
-      for (let s = 0; s < counts.length; s++) counts[s][slot] = 0
+      for (let s = 0; s < counts.length; s++) {
+        counts[s][slot] = 0
+        generatedBlock[s * slots + slot] = 0
+      }
+      detail[slot] = 0
       freeStack[freeTop] = slot
       freeTop += 1
       dequeue(slot)
@@ -298,10 +306,32 @@ export const createVegetationPool = ({
 
   const instanceTotal = () => {
     let total = 0
-    for (let s = 0; s < counts.length; s++) {
-      for (let slot = 0; slot < slots; slot++) total += counts[s][slot]
-    }
+    for (let k = 0; k < generatedBlock.length; k++) total += generatedBlock[k]
     return total
+  }
+
+  const shownTotal = () => {
+    let total = 0
+    for (let k = 0; k < countsBlock.length; k++) total += countsBlock[k]
+    return total
+  }
+
+  const generatedAt = (slot) => {
+    let total = 0
+    for (let s = 0; s < counts.length; s++) total += generatedBlock[s * slots + slot]
+    return total
+  }
+
+  const setDetail = (slot, level) => {
+    if (detail[slot] === level) return
+    detail[slot] = level
+    let grew = false
+    for (let s = 0; s < counts.length; s++) {
+      const shown = level >= HIDDEN_DETAIL ? 0 : generatedBlock[s * slots + slot] >>> level
+      if (shown > counts[s][slot]) grew = true
+      counts[s][slot] = shown
+    }
+    if (grew) dirty[slot] = 1
   }
 
   const drawRanges = (speciesIndex, out) => {
@@ -329,6 +359,10 @@ export const createVegetationPool = ({
   return {
     sync,
     step,
+    setDetail,
+    generatedAt,
+    shownTotal,
+    detailOf: (slot) => detail[slot],
     drawRanges,
     readWorld,
     origin: (slot) => [origins[slot * 3], origins[slot * 3 + 1], origins[slot * 3 + 2]],

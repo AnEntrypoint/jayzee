@@ -4893,3 +4893,19 @@ The order and grouping are the owner's. Witness for the stretch: build of every 
 - Planet witness, once, 356 s wall, all four ok with no missed interval: 1024-webgpu work p99 1.48 ms, 1024-webgl2 0.99 ms, 64-webgpu 1.95 ms, 64-webgl2 1.47 ms.
 - Page memory, once, 162 s wall, verdict ok: 1083.3 MB against the 1085.5 MB baseline (541.7 MB window, 539.0 MB worker), as expected for a figure that counts reserved memory.
 - Full test, once: exit 0, 308 checks run, 0 failed, 5899 PASS lines, 126 s wall.
+
+## Phase V, pending (2026-11-12): the budget read from the device, and the display held to it
+
+The task: the extra wiki is the bottom-line featureset; memory stays flat, and what is displayed scales to a budget the device sets. Read of the state: `loadRenderer` defaulted its memory budget to a fixed 64 MiB and no caller derived it from the device (only the model tier read `navigator.deviceMemory`); the baseline list in docs/ENGINE.md had every LOD row missing, so nothing lowered detail to stay inside a budget.
+
+1. `src/engine/deviceBudget.js`: `readDeviceSignals` reads the reported memory, the core count and a host's total and free memory once. `chooseDeviceBudget` takes a quarter of the device memory (or the free memory when that is less), sets aside the management reserve (an eighth, at least 32 MiB), and picks the largest built tier that fits what is left. `loadRendererForDevice` in `src/engine/renderer.js` loads at that tier and steps down through `instantiateWithinBudget` when a reservation fails. Witness: `check:device-budget` (8 lines, run in this pass: PASS).
+2. `src/engine/displayGovernor.js`: a fixed-capacity selector. Each slot has a weight (its full cost) and a continuous level from its distance; a level halves the cost and the last level hides the slot. One bias coarsens every slot until the cost is at or under the budget; a hysteresis band keeps a slot's level while it wavers; when the bias is at its limit the last slots are shed. The bias falls again only when the lower bias fits under 0.95 of the budget. It allocates at construction only. Witness: `check:display-governor` (10 lines, run in this pass: PASS, with the no-hysteresis control flipping 99 times in 100 frames).
+3. `src/engine/vegetation.js` keeps the generated count of each patch apart from the count the engine draws (the bound counts block). `setDetail(slot, level)` shows a prefix of the instances, which is a uniform thinning because the instances are drawn from the seed in order, and marks the patch for upload when the shown count grows. `src/engine/vegetationDetail.js` drives it from the eye position; `buildPlanetScene` takes `instanceBudget` (null keeps every instance, as before) and `streamStep` takes the eye. Witness: `check:display-governor`, `check:vegetation-stream`, `check:vegetation-leaf-patches`, `check:camera-relative`, `check:sphere-population`, `check:hygiene` (all run in this pass: PASS).
+
+Not run in this pass, because this host has no Emscripten and no `engine/out`:
+
+- `check:vegetation-allocations`, `check:vegetation-generate-cost`, `check:planet-witness-scene`, `check:glue-tier`: each imports a glue from `engine/out` (ERR_MODULE_NOT_FOUND here). They must pass unchanged, since `instanceBudget` is null in every existing scene.
+- The planet witness in a browser with `instanceBudget` set from `instanceBudgetFor(chooseDeviceBudget(...), MATRIX_BYTES)`: `vegetationInstances` at or under the budget on every frame, and the page memory figure unchanged.
+- The full `npm test`.
+
+Open after this pass, in rank order: the governor over the model slots (screen-size LOD row), over terrain pages (LOD by altitude row) and over the prop records; the C++ rows still missing in the baseline list (character against the planet shape, the planet-surface ray cast, promotion of touched vegetation, shadows, the spawn terrain store import).

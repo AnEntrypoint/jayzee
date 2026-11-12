@@ -1,4 +1,5 @@
 import { instantiateWithinBudget } from './glueTier.js'
+import { chooseDeviceBudget, readDeviceSignals } from './deviceBudget.js'
 
 export const RENDER_BACKEND = Object.freeze({ WEBGPU: 0, WEBGL2: 1 })
 
@@ -262,6 +263,11 @@ const bindModelPool = (module, device, navigatorLike) => {
 const status = (code, what) => {
   if (code !== 0) throw new Error(what + ' failed with engine status ' + code)
   return code
+}
+
+export const loadRendererForDevice = ({ navigatorLike = globalThis.navigator, osLike = null, ...rest }) => {
+  const budget = chooseDeviceBudget(readDeviceSignals({ navigatorLike, osLike }))
+  return loadRendererWithinBudget({ ...rest, navigatorLike, budgetBytes: budget.budgetBytes }).then((loaded) => ({ ...loaded, deviceBudget: budget }))
 }
 
 export const loadRendererWithinBudget = ({ glueFor, budgetBytes, ...rest }) => {

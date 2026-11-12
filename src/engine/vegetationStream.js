@@ -59,7 +59,7 @@ export const createVegetationFollower = ({ scene, block }) => {
   return (x, y, z, pagesPending) => {
     settled = pagesPending > 0 ? 0 : settled + 1
     const moved = settled >= SETTLED_FRAMES && block.update(x, y, z)
-    scene.streamStep(moved ? block.ids : null)
+    scene.streamStep(moved ? block.ids : null, x, y, z)
     return moved
   }
 }
