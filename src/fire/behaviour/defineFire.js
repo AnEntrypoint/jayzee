@@ -119,6 +119,7 @@ export function defineFire(rawSpec, env) {
 
   function emit(event) {
     if (!authority) throw new Error('[fire] a mirror does not emit fire events: it applies the rows the authority sends, so this call belongs on the authority')
+    if (!started) throw new Error('[fire] emit before start: an event emitted before the fire starts would be dropped by the timeline, so start the fire first')
     const slot = slots.take(simTick + spec.config.leadTicks)
     event.tick = slot.tick
     event.seq = slot.seq
