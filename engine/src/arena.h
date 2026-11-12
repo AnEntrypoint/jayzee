@@ -12,7 +12,6 @@ void* carve(std::size_t bytes, std::size_t alignment);
 std::size_t used();
 std::uint64_t carves();
 void seal();
-std::size_t prefault(std::size_t aheadBytes);
 bool sealed();
 
 }

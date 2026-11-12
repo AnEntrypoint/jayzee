@@ -26,8 +26,6 @@ alignas(kAlignment) std::uint8_t storage[kBytes];
 std::size_t offset = 0;
 std::uint64_t carveCount = 0;
 bool sealedFlag = false;
-std::size_t prefaulted = 0;
-constexpr std::size_t kHostPageBytes = 4096;
 
 }
 
@@ -54,18 +52,6 @@ std::uint64_t carves() {
 
 void seal() {
   sealedFlag = true;
-}
-
-std::size_t prefault(std::size_t aheadBytes) {
-  if (sealedFlag || storage == nullptr) return 0;
-  const std::size_t from = prefaulted > offset ? prefaulted : offset;
-  const std::size_t room = kBytes - offset;
-  const std::size_t target = offset + (aheadBytes < room ? aheadBytes : room);
-  if (target <= from) return 0;
-  volatile std::uint8_t* bytes = storage;
-  for (std::size_t at = from; at < target; at += kHostPageBytes) bytes[at] = 0;
-  prefaulted = target;
-  return target - from;
 }
 
 bool sealed() {

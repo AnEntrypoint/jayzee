@@ -12,27 +12,12 @@ const FIXED_WASM_LIMIT = 700000
 const THREADED_WASM_LIMIT = 800000
 const RESIDENT_LIMIT_MIB = 256
 const WRITTEN_MIB = 512
-const PREFAULT_MIB = 8
 const PLAN = { players: 1024, workers: 4, budgetBytes: 1024 * MIB }
 const self = fileURLToPath(import.meta.url)
 
 const residentMib = () => Number(/VmRSS:\s+(\d+)/.exec(readFileSync('/proc/self/status', 'utf8'))[1]) / 1024
 
-if (process.argv[2] === 'prefault') {
-  const { loadEngineModule } = await import('../src/engine/EngineWorld.js')
-  const module = await loadEngineModule(glueUrl(FIXED))
-  const before = residentMib()
-  const first = module._engine_arena_prefault(PREFAULT_MIB * MIB)
-  const after = residentMib()
-  const again = module._engine_arena_prefault(PREFAULT_MIB * MIB)
-  const usedBefore = module._engine_arena_used()
-  const configured = module._engine_world_configure(2048, 60, -9.8, 0, 0.5, 0, 8)
-  const grown = Number(module._engine_arena_used() - usedBefore)
-  const toppedUp = module._engine_arena_prefault(PREFAULT_MIB * MIB)
-  module._engine_arena_seal()
-  const sealed = module._engine_arena_prefault(2 * PREFAULT_MIB * MIB)
-  process.stdout.write(JSON.stringify({ first, again, configured, grown, toppedUp, sealed, addedMib: after - before }), () => process.exit(0))
-} else if (process.argv[2] === 'child') {
+if (process.argv[2] === 'child') {
   const { loadEngineModule, releaseEngineModule, resolvePlan } = await import('../src/engine/EngineWorld.js')
   const before = residentMib()
   const started = performance.now()
@@ -60,17 +45,6 @@ if (process.argv[2] === 'prefault') {
   gate('control: the same instance with ' + WRITTEN_MIB + ' MiB of its memory written adds over ' + WRITTEN_MIB + ' MiB, so the measurement sees written pages', () => {
     const run = child('write')
     assert.ok(run.after - run.before > WRITTEN_MIB, 'a written instance added only ' + Math.round(run.after - run.before) + ' MiB')
-  })
-
-  gate('the arena prefault writes ' + PREFAULT_MIB + ' MiB ahead of the cursor once, nothing on a second call, only what configuring a world carved after it, and nothing once the arena is sealed', () => {
-    const run = JSON.parse(execFileSync(process.execPath, [self, 'prefault'], { encoding: 'utf8' }))
-    assert.equal(run.first, PREFAULT_MIB * MIB)
-    assert.ok(run.addedMib > PREFAULT_MIB * 0.75 && run.addedMib < PREFAULT_MIB * 2, 'the prefault added ' + run.addedMib + ' MiB of resident memory')
-    assert.equal(run.again, 0)
-    assert.equal(run.configured, 0)
-    assert.ok(run.grown > 0, 'configuring a world carved nothing')
-    assert.equal(run.toppedUp, Math.min(run.grown, PREFAULT_MIB * MIB))
-    assert.equal(run.sealed, 0)
   })
 
   finish()

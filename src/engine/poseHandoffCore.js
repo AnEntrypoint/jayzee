@@ -60,14 +60,6 @@ const SCRATCH_VIEW_TARGET = 4
 const SCRATCH_VIEW_COS = 7
 const SCRATCH_VIEW_RANGE = 8
 
-export const ARENA_PREFAULT_AHEAD_BYTES = 4 * 1024 * 1024
-const prefaultNothing = () => 0
-
-export const createArenaPrefault = (module) => {
-  if (typeof module._engine_arena_prefault !== 'function') return prefaultNothing
-  return () => module._engine_arena_prefault(ARENA_PREFAULT_AHEAD_BYTES)
-}
-
 export const createPoseStepper = ({ module, streamer, region, reserve }) => {
   const heapPose = new Uint8Array(module.HEAPU8.buffer, reserve, region.poseBytes)
   const { poseBytes } = region

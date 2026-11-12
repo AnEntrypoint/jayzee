@@ -190,10 +190,6 @@ EMSCRIPTEN_KEEPALIVE std::uint64_t engine_arena_used() {
   return static_cast<std::uint64_t>(engine::arena::used());
 }
 
-EMSCRIPTEN_KEEPALIVE std::uint32_t engine_arena_prefault(std::uint32_t aheadBytes) {
-  return static_cast<std::uint32_t>(engine::arena::prefault(aheadBytes));
-}
-
 EMSCRIPTEN_KEEPALIVE void engine_arena_seal() {
   engine::arena::seal();
 }

@@ -242,7 +242,6 @@ set(ENGINE_EXPORTS
   _engine_codec_counts
   _engine_allocation_failures
   _engine_arena_seal
-  _engine_arena_prefault
   _engine_arena_used
   _engine_interest_configure
   _engine_interest_outside

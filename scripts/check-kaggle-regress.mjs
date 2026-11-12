@@ -6,7 +6,7 @@ import { finish, gate } from './lib/gate.mjs'
 import { classRecord, judge } from './kaggle/regress.mjs'
 import { decide } from './kaggle/push-gate.mjs'
 import { repeatedSpikes } from './kaggle/spikes.mjs'
-import { BASELINE, PREFAULT_OFF, PREFAULT_REPEATS, PROFILE_COMPACT_REPEATS, PROFILE_REPEATS, PROFILE_UNRECLAIMED_REPEATS, PROFILE_VARIANT, RECLAIM_OFF, RELEASE_ORDER_REPEATS, TUNE_DEFAULT, TUNE_DEFAULT_BY_SLOT, buildPlan } from './kaggle/plan.mjs'
+import { BASELINE, PROFILE_COMPACT_REPEATS, PROFILE_REPEATS, PROFILE_UNRECLAIMED_REPEATS, PROFILE_VARIANT, RECLAIM_OFF, RELEASE_ORDER_REPEATS, TUNE_DEFAULT, TUNE_DEFAULT_BY_SLOT, buildPlan } from './kaggle/plan.mjs'
 import { describeSlowTick } from './kaggle/tickProfile.mjs'
 import { canaryStalls, densestPhase, nearPhase, overBudgetTimes, periodFit, phaseShare, slowTickTimes } from './kaggle/slowTickClock.mjs'
 import { PIPE_BYTES, distinctDryRows, judgePreflight } from './kaggle/preflight.mjs'
@@ -423,13 +423,6 @@ gate('the regress plan carries the profile build at the top tier as rows the gat
   for (const row of rows) assert.ok(row.args[0].includes('/variants/' + PROFILE_VARIANT + '/'))
   assert.equal(rows.filter((row) => Number(row.args[1]) === top.bodies).length, PROFILE_REPEATS + PROFILE_UNRECLAIMED_REPEATS)
   assert.ok(PROFILE_REPEATS >= 5 && PROFILE_COMPACT_REPEATS >= 3)
-})
-
-gate('the arena prefault is judged against its control, the same build with the prefault off, on six alternated pairs at the top tier', () => {
-  const knobs = buildPlan('regress').runs.filter((run) => run.role === 'prefault').map((row) => row.args[9])
-  assert.equal(knobs.length, 2 * PREFAULT_REPEATS)
-  assert.ok(PREFAULT_REPEATS >= 6)
-  knobs.forEach((knob, i) => assert.equal(knob, i % 2 === 0 ? 'none' : PREFAULT_OFF))
 })
 
 gate('release by view is judged against release in slot order on eight alternated pairs at the top tier, not on rows run in one block', () => {
