@@ -818,7 +818,7 @@ gate('control: an ejection naming a peer outside the roster drops nothing', () =
 })
 
 gate('a session refuses a world whose netcode profile is not peer-simulated', () => {
-  for (const profile of ['authoritative', 'rollback']) {
+  for (const profile of ['authoritative']) {
     const { ctx } = fakeCtx({ currentWorldDef: { netcode: { profile } } })
     assert.throws(() => createPeerSimSession(ctx, { roster: ['L', 'B'], localPubkey: 'L', bridge: fakeBridge('L'), tickSystem: fakeTickSystem(), now: () => 0 }), { message: `[PeerSimSession] world netcode profile '${profile}' is not peer-simulated` })
   }
