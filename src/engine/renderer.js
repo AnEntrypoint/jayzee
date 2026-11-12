@@ -1,5 +1,7 @@
 import { instantiateWithinBudget } from './glueTier.js'
-import { chooseDeviceBudget, readDeviceSignals } from './deviceBudget.js'
+import { chooseDeviceBudget, instanceBudgetFor, readDeviceSignals } from './deviceBudget.js'
+
+export const PROP_DISPLAY_BYTES = 256
 
 export const RENDER_BACKEND = Object.freeze({ WEBGPU: 0, WEBGL2: 1 })
 
@@ -164,6 +166,20 @@ export const createRenderer = (module, backend, { modelTier = -1, device = null,
       status(module._engine_render_set_model_path(mode), 'set model path')
     },
 
+    setPropBudget(limit) {
+      if (!Number.isInteger(limit) || limit < 0) throw new RangeError('the prop budget is a whole number of shown props, or 0 for no limit')
+      status(module._engine_render_set_prop_budget(limit), 'set prop budget')
+    },
+
+    propBudget() {
+      return {
+        budget: module._engine_render_prop_budget(),
+        inFrustum: module._engine_render_props_in_frustum(),
+        shed: module._engine_render_props_shed(),
+        cutoffBands: module._engine_render_prop_cutoff_bins(),
+      }
+    },
+
     setOcclusion(on) {
       if (typeof on !== 'boolean') throw new TypeError('occlusion takes a boolean')
       status(module._engine_render_set_occlusion(on ? 1 : 0), 'set occlusion')
@@ -267,7 +283,11 @@ const status = (code, what) => {
 
 export const loadRendererForDevice = ({ navigatorLike = globalThis.navigator, osLike = null, ...rest }) => {
   const budget = chooseDeviceBudget(readDeviceSignals({ navigatorLike, osLike }))
-  return loadRendererWithinBudget({ ...rest, navigatorLike, budgetBytes: budget.budgetBytes }).then((loaded) => ({ ...loaded, deviceBudget: budget }))
+  return loadRendererWithinBudget({ ...rest, navigatorLike, budgetBytes: budget.budgetBytes }).then((loaded) => {
+    const propBudget = instanceBudgetFor(budget, PROP_DISPLAY_BYTES)
+    loaded.value.setPropBudget(propBudget)
+    return { ...loaded, deviceBudget: budget, propBudget }
+  })
 }
 
 export const loadRendererWithinBudget = ({ glueFor, budgetBytes, ...rest }) => {

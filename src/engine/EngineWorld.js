@@ -536,6 +536,23 @@ export class EngineWorld {
     this.#write(this.#module._engine_veg_attach(), 'vegetation body')
   }
 
+  setVegetationPromotion(cap) {
+    if (!Number.isInteger(cap) || cap < 0) throw new RangeError('the promotion cap is a whole number of instances, or 0 for none')
+    this.#write(this.#module._engine_veg_set_promotion(cap), 'vegetation promotion')
+  }
+
+  vegetationPromotion() {
+    return {
+      cap: Number(this.#module._engine_veg_promotion_cap()),
+      promoted: Number(this.#module._engine_veg_promoted_count()),
+      refusals: Number(this.#module._engine_veg_promotion_refusals()),
+    }
+  }
+
+  restoreVegetation() {
+    this.#write(this.#module._engine_veg_restore(), 'vegetation restore')
+  }
+
   vegetationPlaced() {
     return Number(this.#module._engine_veg_placed())
   }

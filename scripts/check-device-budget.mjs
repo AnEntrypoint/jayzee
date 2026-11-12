@@ -85,4 +85,16 @@ gate('the renderer loads at the tier the device budget chose and steps down when
   assert.deepEqual(asked, [128, 64])
 })
 
+gate('a renderer loaded for the device is given the prop budget its memory budget allows, through the engine export', async () => {
+  globalThis.__engineCalls = []
+  const fake = 'data:text/javascript,' + encodeURIComponent('export default async () => new Proxy({}, { get: (t, k) => (k === "then" ? undefined : k === "HEAPU8" ? new Uint8Array(4096) : (...a) => { globalThis.__engineCalls.push([k, ...a]); return 0 }) })')
+  const loaded = await loadRendererForDevice({ canvas: { id: 'engine-canvas' }, navigatorLike: { deviceMemory: 2, hardwareConcurrency: 4 }, requested: 'webgl2', models: false, glueFor: () => fake })
+  assert.equal(loaded.tierMiB, 256)
+  assert.equal(loaded.deviceBudget.budgetBytes, 256 * MIB)
+  assert.equal(loaded.propBudget, (256 * MIB * DEVICE_BUDGET_RULES.displayShare * DEVICE_BUDGET_RULES.shownShare) / 256)
+  assert.deepEqual(globalThis.__engineCalls.find((c) => c[0] === '_engine_init'), ['_engine_init', 64, 1, 256 * MIB])
+  assert.deepEqual(globalThis.__engineCalls.find((c) => c[0] === '_engine_render_set_prop_budget'), ['_engine_render_set_prop_budget', loaded.propBudget])
+  assert.throws(() => loaded.value.setPropBudget(-1), RangeError)
+})
+
 finish()
