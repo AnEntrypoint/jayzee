@@ -165,6 +165,11 @@ export class AnimationSystem {
     }
   }
 
+  resetFootGrounding() {
+    if (this._grounding) this._grounding.hipOffset = 0
+    return this
+  }
+
   initializeController(options = {}) {
     if (this.controller) {
       if (Object.keys(options).length > 0) {
