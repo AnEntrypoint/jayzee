@@ -1,204 +1,200 @@
-export const PROBE_REFUSAL = Object.freeze({
-  NO_CANVAS: 'canvas-factory-missing',
-  CANVAS_THREW: 'canvas-factory-threw',
-  NO_WEBGL2: 'webgl2-context-unavailable',
-  CONTEXT_THREW: 'webgl2-context-threw',
-  CONTEXT_LOST: 'webgl2-context-lost',
-  NO_OFFSCREEN: 'offscreen-canvas-missing',
-  NO_WORKER: 'worker-missing',
-  NO_TRANSFER: 'transfer-control-missing',
-  NO_GPU: 'webgpu-missing',
-  NO_ADAPTER: 'webgpu-adapter-unavailable',
-  ADAPTER_THREW: 'webgpu-adapter-threw',
-  ADAPTER_TIMEOUT: 'webgpu-adapter-timeout',
-  NO_RENDERER_CLASS: 'renderer-class-missing',
-  RENDERER_THREW: 'renderer-construct-threw',
-  INIT_THREW: 'renderer-init-threw',
-  INIT_TIMEOUT: 'renderer-init-timeout',
-  FELL_BACK: 'webgpu-renderer-fell-back-to-webgl',
-})
+export const NO_WEBGL2 = 'NO_WEBGL2'
+export const NO_WEBGPU = 'NO_WEBGPU'
+export const OFFSCREEN_PROBE_TIMEOUT_MS = 2000
+export const OFFSCREEN_PROBE_CANVAS_PX = 4
 
-export const MAX_PIXEL_RATIO = 2
-export const WEBGPU_ADAPTER_TIMEOUT_MS = 3000
-export const WEBGPU_INIT_TIMEOUT_MS = 8000
-export const MIN_TEXTURE_SIZE = 2048
+export const OFFSCREEN_PROBE_WORKER_SOURCE = `
+      self.onmessage = function (e) {
+        try {
+          const off = e.data.canvas
+          const gl = off.getContext('webgl2')
+          self.postMessage({ ok: !!gl })
+        } catch (err) {
+          self.postMessage({ ok: false, error: String(err && err.message || err) })
+        }
+      }
+    `
 
-const refusal = (reason, detail = null) => ({ ok: false, reason, detail })
-const messageOf = (error) => (error && error.message ? error.message : String(error))
+const messageOf = (error) => (error && error.message) || error
 
-function glInfo(gl) {
-  const ext = typeof gl.getExtension === 'function' ? gl.getExtension('WEBGL_debug_renderer_info') : null
-  return {
-    renderer: gl.getParameter(ext ? ext.UNMASKED_RENDERER_WEBGL : gl.RENDERER),
-    vendor: gl.getParameter(ext ? ext.UNMASKED_VENDOR_WEBGL : gl.VENDOR),
-    maxTextureSize: gl.getParameter(gl.MAX_TEXTURE_SIZE),
-  }
-}
-
-function releaseContext(gl) {
-  const lose = typeof gl.getExtension === 'function' ? gl.getExtension('WEBGL_lose_context') : null
-  if (lose && typeof lose.loseContext === 'function') lose.loseContext()
-}
-
-function probeContext(canvas) {
-  let gl
-  try {
-    gl = canvas.getContext('webgl2', { failIfMajorPerformanceCaveat: false, powerPreference: 'high-performance' })
-  } catch (error) {
-    return refusal(PROBE_REFUSAL.CONTEXT_THREW, messageOf(error))
-  }
-  if (!gl) return refusal(PROBE_REFUSAL.NO_WEBGL2)
-  if (typeof gl.isContextLost === 'function' && gl.isContextLost()) return refusal(PROBE_REFUSAL.CONTEXT_LOST)
-  const info = glInfo(gl)
-  releaseContext(gl)
-  return { ok: true, reason: null, detail: null, ...info, textureSizeOk: Number.isFinite(info.maxTextureSize) && info.maxTextureSize >= MIN_TEXTURE_SIZE }
+function coded(message, code, detail) {
+  const error = new Error(message)
+  error.code = code
+  if (detail !== undefined) error.detail = detail
+  return error
 }
 
 export function probeWebGL2(host) {
-  if (typeof host?.createCanvas !== 'function') return refusal(PROBE_REFUSAL.NO_CANVAS)
-  let canvas
   try {
-    canvas = host.createCanvas()
-  } catch (error) {
-    return refusal(PROBE_REFUSAL.CANVAS_THREW, messageOf(error))
+    const canvas = host.document.createElement('canvas')
+    const gl = canvas.getContext('webgl2')
+    return !!(gl && typeof host.WebGL2RenderingContext !== 'undefined' && gl instanceof host.WebGL2RenderingContext)
+  } catch (_) {
+    return false
   }
-  if (!canvas || typeof canvas.getContext !== 'function') return refusal(PROBE_REFUSAL.NO_CANVAS)
-  return probeContext(canvas)
 }
 
-export function probeOffscreenCanvasWorkerRendering(host) {
-  if (typeof host?.OffscreenCanvas !== 'function') return refusal(PROBE_REFUSAL.NO_OFFSCREEN)
-  if (typeof host.Worker !== 'function') return refusal(PROBE_REFUSAL.NO_WORKER)
-  if (typeof host.createCanvas !== 'function') return refusal(PROBE_REFUSAL.NO_CANVAS)
-  let canvas
+export async function probeOffscreenCanvasWorkerRendering(host) {
+  const detail = { apiSurface: false, workerConstructible: false, webgl2InWorker: false, error: null }
   try {
-    canvas = host.createCanvas()
-  } catch (error) {
-    return refusal(PROBE_REFUSAL.CANVAS_THREW, messageOf(error))
+    if (typeof host.OffscreenCanvas === 'undefined') { detail.error = 'OffscreenCanvas global undefined'; return { supported: false, detail } }
+    if (typeof host.HTMLCanvasElement === 'undefined' || typeof host.HTMLCanvasElement.prototype.transferControlToOffscreen !== 'function') {
+      detail.error = 'transferControlToOffscreen not on HTMLCanvasElement.prototype'
+      return { supported: false, detail }
+    }
+    detail.apiSurface = true
+    if (typeof host.Worker === 'undefined') { detail.error = 'Worker global undefined'; return { supported: false, detail } }
+
+    let worker = null
+    let blobUrl = null
+    try {
+      blobUrl = host.URL.createObjectURL(new host.Blob([OFFSCREEN_PROBE_WORKER_SOURCE], { type: 'application/javascript' }))
+      worker = new host.Worker(blobUrl)
+      detail.workerConstructible = true
+    } catch (e) {
+      detail.error = 'Worker construction failed: ' + messageOf(e)
+      if (blobUrl) host.URL.revokeObjectURL(blobUrl)
+      return { supported: false, detail }
+    }
+
+    const probeCanvas = host.document.createElement('canvas')
+    probeCanvas.width = OFFSCREEN_PROBE_CANVAS_PX
+    probeCanvas.height = OFFSCREEN_PROBE_CANVAS_PX
+    let offscreen
+    try {
+      offscreen = probeCanvas.transferControlToOffscreen()
+    } catch (e) {
+      detail.error = 'transferControlToOffscreen threw: ' + messageOf(e)
+      worker.terminate()
+      host.URL.revokeObjectURL(blobUrl)
+      return { supported: false, detail }
+    }
+
+    const result = await new Promise((resolve) => {
+      let settled = false
+      const timer = host.setTimeout(() => {
+        if (settled) return
+        settled = true
+        resolve({ ok: false, error: 'worker webgl2-in-worker probe timed out (2s)' })
+      }, OFFSCREEN_PROBE_TIMEOUT_MS)
+      const settle = (value) => {
+        if (settled) return
+        settled = true
+        host.clearTimeout(timer)
+        resolve(value)
+      }
+      worker.onmessage = (e) => settle(e.data || { ok: false, error: 'empty worker response' })
+      worker.onerror = (e) => settle({ ok: false, error: 'worker onerror: ' + messageOf(e) })
+      try {
+        worker.postMessage({ canvas: offscreen }, [offscreen])
+      } catch (e) {
+        settle({ ok: false, error: 'postMessage transfer failed: ' + messageOf(e) })
+      }
+    })
+    worker.terminate()
+    host.URL.revokeObjectURL(blobUrl)
+
+    detail.webgl2InWorker = !!result.ok
+    if (!result.ok && result.error) detail.error = result.error
+    return { supported: detail.apiSurface && detail.workerConstructible && detail.webgl2InWorker, detail }
+  } catch (e) {
+    detail.error = 'probe threw: ' + messageOf(e)
+    return { supported: false, detail }
   }
-  if (!canvas || typeof canvas.transferControlToOffscreen !== 'function') return refusal(PROBE_REFUSAL.NO_TRANSFER)
-  let offscreen
-  try {
-    offscreen = new host.OffscreenCanvas(1, 1)
-  } catch (error) {
-    return refusal(PROBE_REFUSAL.CANVAS_THREW, messageOf(error))
-  }
-  return probeContext(offscreen)
 }
 
-function sizeOf(options) {
-  const width = options.width, height = options.height
-  if (!(Number.isFinite(width) && width > 0 && Number.isFinite(height) && height > 0)) throw new RangeError('createRenderer needs a positive finite width and height, got ' + String(width) + ' by ' + String(height))
-  const ratio = Number.isFinite(options.pixelRatio) && options.pixelRatio > 0 ? Math.min(options.pixelRatio, MAX_PIXEL_RATIO) : 1
-  return { width, height, ratio }
+export async function probeWebGPU(host) {
+  const detail = { apiSurface: false, adapter: false, device: false, limits: null, error: null }
+  try {
+    const nav = host.navigator
+    if (typeof nav === 'undefined' || !nav || !nav.gpu) {
+      detail.error = 'navigator.gpu undefined (no WebGPU implementation in this browser)'
+      return { supported: false, detail }
+    }
+    detail.apiSurface = true
+    const adapter = await nav.gpu.requestAdapter({ powerPreference: 'high-performance' })
+    if (!adapter) {
+      detail.error = 'requestAdapter() resolved null (WebGPU present but no usable adapter)'
+      return { supported: false, detail }
+    }
+    detail.adapter = true
+    detail.adapterInfo = adapter.info ? { vendor: adapter.info.vendor, architecture: adapter.info.architecture, device: adapter.info.device, description: adapter.info.description } : null
+    const adapterInfo = adapter.info || {}
+    const software = adapter.isFallbackAdapter === true || adapterInfo.isFallbackAdapter === true || /swiftshader|software/i.test([adapterInfo.vendor, adapterInfo.architecture, adapterInfo.device, adapterInfo.description].join(' '))
+    if (software) {
+      detail.error = 'the adapter is software (' + ([adapterInfo.vendor, adapterInfo.description].filter(Boolean).join(' ') || 'fallback adapter') + '): WebGPU on the CPU is refused, so WebGL2 is used'
+      return { supported: false, detail }
+    }
+    const device = await adapter.requestDevice()
+    if (!device) {
+      detail.error = 'requestDevice() resolved null'
+      return { supported: false, detail }
+    }
+    detail.device = true
+    detail.limits = {
+      maxComputeWorkgroupsPerDimension: device.limits.maxComputeWorkgroupsPerDimension,
+      maxComputeWorkgroupSizeX: device.limits.maxComputeWorkgroupSizeX,
+      maxStorageBufferBindingSize: device.limits.maxStorageBufferBindingSize,
+      maxBufferSize: device.limits.maxBufferSize,
+    }
+    device.destroy()
+    return { supported: true, detail }
+  } catch (e) {
+    detail.error = 'probe threw: ' + messageOf(e)
+    return { supported: false, detail }
+  }
 }
 
-function configure(renderer, size, colorSpace) {
-  renderer.setPixelRatio(size.ratio)
-  renderer.setSize(size.width, size.height, false)
-  if (colorSpace !== undefined) renderer.outputColorSpace = colorSpace
+export function applyCommonRendererSetup(renderer, isMobile, env) {
+  const win = env.host.window
+  renderer.setSize(win.innerWidth, win.innerHeight)
+  renderer.setPixelRatio(isMobile ? Math.min(win.devicePixelRatio * 0.5, 1) : Math.min(win.devicePixelRatio, 2))
+  renderer.shadowMap.enabled = false
+  renderer.shadowMap.type = env.three.PCFShadowMap
+  renderer.shadowMap.autoUpdate = false
+  renderer.shadowMap.needsUpdate = true
+  env.renderControls.bindTonemapping(renderer, env.three)
+  env.renderControls.applyToneMapping()
+  renderer.outputColorSpace = env.three.SRGBColorSpace
+  env.host.document.body.appendChild(renderer.domElement)
+}
+
+function checkEnv(env, who) {
+  if (!env || !env.host || !env.host.window || !env.host.document) throw new TypeError(who + ' needs env.host with window and document')
+  if (!env.three) throw new TypeError(who + ' needs env.three')
+  if (typeof env.renderControls?.bindTonemapping !== 'function' || typeof env.renderControls?.applyToneMapping !== 'function') throw new TypeError(who + ' needs env.renderControls with bindTonemapping and applyToneMapping')
+}
+
+export function createRenderer(isMobile, env) {
+  checkEnv(env, 'createRenderer')
+  const host = env.host
+  if (!probeWebGL2(host)) throw coded('WebGL2 is not available', NO_WEBGL2)
+  const renderer = new env.three.WebGLRenderer({ antialias: !isMobile, powerPreference: 'high-performance' })
+  renderer.debug.checkShaderErrors = host.window.__checkShaderErrors || false
+  applyCommonRendererSetup(renderer, isMobile, env)
+  renderer.xr.enabled = true
+  renderer.domElement.addEventListener('webglcontextlost', (e) => {
+    e.preventDefault()
+    host.console.warn('[renderer] WebGL context lost')
+  }, false)
+  renderer.domElement.addEventListener('webglcontextrestored', () => host.location.reload(), false)
   return renderer
 }
 
-export function createRenderer(options) {
-  if (options === null || typeof options !== 'object') throw new TypeError('createRenderer needs its options: { WebGLRenderer, canvas, width, height }')
-  if (typeof options.WebGLRenderer !== 'function') return refusal(PROBE_REFUSAL.NO_RENDERER_CLASS)
-  if (!options.canvas || typeof options.canvas.getContext !== 'function') return refusal(PROBE_REFUSAL.NO_CANVAS)
-  const size = sizeOf(options)
-  let renderer
-  try {
-    renderer = new options.WebGLRenderer({ canvas: options.canvas, antialias: options.antialias !== false, powerPreference: 'high-performance', alpha: false, stencil: false })
-  } catch (error) {
-    return refusal(PROBE_REFUSAL.RENDERER_THREW, messageOf(error))
+export async function probeAndCreateWebGPURenderer(isMobile, forceWebGL = false, env) {
+  checkEnv(env, 'probeAndCreateWebGPURenderer')
+  if (typeof env.loadWebGPURenderer !== 'function') throw new TypeError('probeAndCreateWebGPURenderer needs env.loadWebGPURenderer, an async function returning the WebGPURenderer class')
+  const host = env.host
+  if (forceWebGL) {
+    if (!probeWebGL2(host)) throw coded('WebGL2 is not available', NO_WEBGL2)
+  } else {
+    const probe = await probeWebGPU(host)
+    if (!probe.supported) throw coded('WebGPU is not available: ' + ((probe.detail && probe.detail.error) || 'unknown'), NO_WEBGPU, probe.detail)
   }
-  configure(renderer, size, options.outputColorSpace)
-  return { ok: true, reason: null, detail: null, renderer, backend: 'webgl2-legacy', pixelRatio: size.ratio }
-}
-
-function withDeadline(promise, ms, timers, reason) {
-  return new Promise((resolve, reject) => {
-    let settled = false
-    const handle = timers.setTimeout(() => {
-      if (settled) return
-      settled = true
-      resolve({ timedOut: true, reason })
-    }, ms)
-    promise.then((value) => {
-      if (settled) return
-      settled = true
-      timers.clearTimeout(handle)
-      resolve({ timedOut: false, value })
-    }, (error) => {
-      if (settled) return
-      settled = true
-      timers.clearTimeout(handle)
-      reject(error)
-    })
-  })
-}
-
-function disposeQuietly(renderer) {
-  try {
-    if (renderer && typeof renderer.dispose === 'function') renderer.dispose()
-  } catch {
-    return false
-  }
-  return true
-}
-
-export async function probeAndCreateWebGPURenderer(options) {
-  if (options === null || typeof options !== 'object') throw new TypeError('probeAndCreateWebGPURenderer needs its options: { gpu, WebGPURenderer, canvas, width, height, timers }')
-  const timers = options.timers
-  if (typeof timers?.setTimeout !== 'function' || typeof timers?.clearTimeout !== 'function') throw new TypeError('probeAndCreateWebGPURenderer needs timers with setTimeout and clearTimeout')
-  const size = sizeOf(options)
-  const gpu = options.gpu
-  if (!gpu || typeof gpu.requestAdapter !== 'function') return refusal(PROBE_REFUSAL.NO_GPU)
-  if (typeof options.WebGPURenderer !== 'function') return refusal(PROBE_REFUSAL.NO_RENDERER_CLASS)
-  if (!options.canvas || typeof options.canvas.getContext !== 'function') return refusal(PROBE_REFUSAL.NO_CANVAS)
-  let adapter
-  try {
-    const waited = await withDeadline(Promise.resolve(gpu.requestAdapter({ powerPreference: 'high-performance' })), options.adapterTimeoutMs ?? WEBGPU_ADAPTER_TIMEOUT_MS, timers, PROBE_REFUSAL.ADAPTER_TIMEOUT)
-    if (waited.timedOut) return refusal(waited.reason)
-    adapter = waited.value
-  } catch (error) {
-    return refusal(PROBE_REFUSAL.ADAPTER_THREW, messageOf(error))
-  }
-  if (!adapter) return refusal(PROBE_REFUSAL.NO_ADAPTER)
-  let renderer
-  try {
-    renderer = new options.WebGPURenderer({ canvas: options.canvas, antialias: options.antialias !== false, powerPreference: 'high-performance' })
-  } catch (error) {
-    return refusal(PROBE_REFUSAL.RENDERER_THREW, messageOf(error))
-  }
-  try {
-    const waited = await withDeadline(Promise.resolve(renderer.init()), options.initTimeoutMs ?? WEBGPU_INIT_TIMEOUT_MS, timers, PROBE_REFUSAL.INIT_TIMEOUT)
-    if (waited.timedOut) {
-      disposeQuietly(renderer)
-      return refusal(waited.reason)
-    }
-  } catch (error) {
-    disposeQuietly(renderer)
-    return refusal(PROBE_REFUSAL.INIT_THREW, messageOf(error))
-  }
-  if (!renderer.backend || renderer.backend.isWebGPUBackend !== true) {
-    disposeQuietly(renderer)
-    return refusal(PROBE_REFUSAL.FELL_BACK)
-  }
-  configure(renderer, size, options.outputColorSpace)
-  return { ok: true, reason: null, detail: null, renderer, backend: 'webgpu', pixelRatio: size.ratio }
-}
-
-export async function chooseRenderer(options) {
-  const attempts = []
-  if (options.preferWebGPU !== false) {
-    const gpu = await probeAndCreateWebGPURenderer(options)
-    attempts.push({ backend: 'webgpu', ok: gpu.ok, reason: gpu.reason })
-    if (gpu.ok) return { ...gpu, attempts }
-  }
-  const probe = probeWebGL2(options.host)
-  attempts.push({ backend: 'webgl2-probe', ok: probe.ok, reason: probe.reason })
-  if (!probe.ok) return { ok: false, reason: probe.reason, detail: probe.detail, attempts }
-  const gl = createRenderer(options)
-  attempts.push({ backend: 'webgl2-legacy', ok: gl.ok, reason: gl.reason })
-  return { ...gl, attempts }
+  const WebGPURenderer = await env.loadWebGPURenderer()
+  const trackTimestamp = typeof host.location !== 'undefined' && /[?&]gputime=1\b/.test(host.location.search)
+  const renderer = new WebGPURenderer({ antialias: !isMobile, powerPreference: 'high-performance', forceWebGL, trackTimestamp })
+  await renderer.init()
+  applyCommonRendererSetup(renderer, isMobile, env)
+  return renderer
 }

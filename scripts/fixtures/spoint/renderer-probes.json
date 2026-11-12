@@ -1,0 +1,485 @@
+{
+  "source": {
+    "commit": "5f43c86",
+    "files": [
+      "client/core/SceneSetup.js",
+      "client/core/WebGPUCullingProbe.js"
+    ],
+    "sha256": {
+      "client/core/SceneSetup.js": "7a119ffcab9296c82ffec5de49c355e9bfb2518d5c9436e862241f243ff13da5",
+      "client/core/WebGPUCullingProbe.js": "c6bb43ad2f9c421307c1c39a737da6c2d5569f5932c416349c146f4cfea20e65"
+    },
+    "note": "spoint probeWebGL2, probeOffscreenCanvasWorkerRendering and probeWebGPU read browser globals, so each case installs the fake host of scripts/lib/rendererProbeScenario.mjs on globalThis for the call."
+  },
+  "rows": [
+    {
+      "probe": "webgl2",
+      "name": "a webgl2 context of the right class",
+      "result": true,
+      "log": [
+        "createElement canvas",
+        "getContext webgl2"
+      ]
+    },
+    {
+      "probe": "webgl2",
+      "name": "no context",
+      "result": false,
+      "log": [
+        "createElement canvas",
+        "getContext webgl2"
+      ]
+    },
+    {
+      "probe": "webgl2",
+      "name": "a context of another class",
+      "result": false,
+      "log": [
+        "createElement canvas",
+        "getContext webgl2"
+      ]
+    },
+    {
+      "probe": "webgl2",
+      "name": "getContext throws",
+      "result": false,
+      "log": [
+        "createElement canvas",
+        "getContext webgl2"
+      ]
+    },
+    {
+      "probe": "webgl2",
+      "name": "createElement throws",
+      "result": false,
+      "log": [
+        "createElement canvas"
+      ]
+    },
+    {
+      "probe": "webgl2",
+      "name": "no WebGL2RenderingContext global",
+      "result": false,
+      "log": [
+        "createElement canvas",
+        "getContext webgl2"
+      ]
+    },
+    {
+      "probe": "offscreen",
+      "name": "the worker gets a context",
+      "result": {
+        "supported": true,
+        "detail": {
+          "apiSurface": true,
+          "workerConstructible": true,
+          "webgl2InWorker": true,
+          "error": null
+        }
+      },
+      "log": [
+        "worker blob:probe",
+        "createElement canvas",
+        "setTimeout 2000",
+        "post canvas transfer 1",
+        "clearTimeout",
+        "terminate",
+        "revoke blob:probe"
+      ]
+    },
+    {
+      "probe": "offscreen",
+      "name": "no OffscreenCanvas",
+      "result": {
+        "supported": false,
+        "detail": {
+          "apiSurface": false,
+          "workerConstructible": false,
+          "webgl2InWorker": false,
+          "error": "OffscreenCanvas global undefined"
+        }
+      },
+      "log": []
+    },
+    {
+      "probe": "offscreen",
+      "name": "no HTMLCanvasElement",
+      "result": {
+        "supported": false,
+        "detail": {
+          "apiSurface": false,
+          "workerConstructible": false,
+          "webgl2InWorker": false,
+          "error": "transferControlToOffscreen not on HTMLCanvasElement.prototype"
+        }
+      },
+      "log": []
+    },
+    {
+      "probe": "offscreen",
+      "name": "no transferControlToOffscreen",
+      "result": {
+        "supported": false,
+        "detail": {
+          "apiSurface": false,
+          "workerConstructible": false,
+          "webgl2InWorker": false,
+          "error": "transferControlToOffscreen not on HTMLCanvasElement.prototype"
+        }
+      },
+      "log": []
+    },
+    {
+      "probe": "offscreen",
+      "name": "no Worker",
+      "result": {
+        "supported": false,
+        "detail": {
+          "apiSurface": true,
+          "workerConstructible": false,
+          "webgl2InWorker": false,
+          "error": "Worker global undefined"
+        }
+      },
+      "log": []
+    },
+    {
+      "probe": "offscreen",
+      "name": "the worker constructor throws",
+      "result": {
+        "supported": false,
+        "detail": {
+          "apiSurface": true,
+          "workerConstructible": false,
+          "webgl2InWorker": false,
+          "error": "Worker construction failed: worker-src blocked"
+        }
+      },
+      "log": [
+        "revoke blob:probe"
+      ]
+    },
+    {
+      "probe": "offscreen",
+      "name": "transferControlToOffscreen throws",
+      "result": {
+        "supported": false,
+        "detail": {
+          "apiSurface": true,
+          "workerConstructible": true,
+          "webgl2InWorker": false,
+          "error": "transferControlToOffscreen threw: already transferred"
+        }
+      },
+      "log": [
+        "worker blob:probe",
+        "createElement canvas",
+        "terminate",
+        "revoke blob:probe"
+      ]
+    },
+    {
+      "probe": "offscreen",
+      "name": "the worker gets no context",
+      "result": {
+        "supported": false,
+        "detail": {
+          "apiSurface": true,
+          "workerConstructible": true,
+          "webgl2InWorker": false,
+          "error": null
+        }
+      },
+      "log": [
+        "worker blob:probe",
+        "createElement canvas",
+        "setTimeout 2000",
+        "post canvas transfer 1",
+        "clearTimeout",
+        "terminate",
+        "revoke blob:probe"
+      ]
+    },
+    {
+      "probe": "offscreen",
+      "name": "the worker reports an error",
+      "result": {
+        "supported": false,
+        "detail": {
+          "apiSurface": true,
+          "workerConstructible": true,
+          "webgl2InWorker": false,
+          "error": "no webgl2 in worker"
+        }
+      },
+      "log": [
+        "worker blob:probe",
+        "createElement canvas",
+        "setTimeout 2000",
+        "post canvas transfer 1",
+        "clearTimeout",
+        "terminate",
+        "revoke blob:probe"
+      ]
+    },
+    {
+      "probe": "offscreen",
+      "name": "the worker answers with no data",
+      "result": {
+        "supported": false,
+        "detail": {
+          "apiSurface": true,
+          "workerConstructible": true,
+          "webgl2InWorker": false,
+          "error": "empty worker response"
+        }
+      },
+      "log": [
+        "worker blob:probe",
+        "createElement canvas",
+        "setTimeout 2000",
+        "post canvas transfer 1",
+        "clearTimeout",
+        "terminate",
+        "revoke blob:probe"
+      ]
+    },
+    {
+      "probe": "offscreen",
+      "name": "the worker raises onerror",
+      "result": {
+        "supported": false,
+        "detail": {
+          "apiSurface": true,
+          "workerConstructible": true,
+          "webgl2InWorker": false,
+          "error": "worker onerror: script error"
+        }
+      },
+      "log": [
+        "worker blob:probe",
+        "createElement canvas",
+        "setTimeout 2000",
+        "post canvas transfer 1",
+        "clearTimeout",
+        "terminate",
+        "revoke blob:probe"
+      ]
+    },
+    {
+      "probe": "offscreen",
+      "name": "postMessage throws",
+      "result": {
+        "supported": false,
+        "detail": {
+          "apiSurface": true,
+          "workerConstructible": true,
+          "webgl2InWorker": false,
+          "error": "postMessage transfer failed: could not be cloned"
+        }
+      },
+      "log": [
+        "worker blob:probe",
+        "createElement canvas",
+        "setTimeout 2000",
+        "post canvas transfer 1",
+        "clearTimeout",
+        "terminate",
+        "revoke blob:probe"
+      ]
+    },
+    {
+      "probe": "offscreen",
+      "name": "the worker never answers",
+      "result": {
+        "supported": false,
+        "detail": {
+          "apiSurface": true,
+          "workerConstructible": true,
+          "webgl2InWorker": false,
+          "error": "worker webgl2-in-worker probe timed out (2s)"
+        }
+      },
+      "log": [
+        "worker blob:probe",
+        "createElement canvas",
+        "setTimeout 2000",
+        "post canvas transfer 1",
+        "terminate",
+        "revoke blob:probe"
+      ]
+    },
+    {
+      "probe": "webgpu",
+      "name": "a hardware adapter and a device",
+      "result": {
+        "supported": true,
+        "detail": {
+          "apiSurface": true,
+          "adapter": true,
+          "device": true,
+          "limits": {
+            "maxComputeWorkgroupsPerDimension": 65535,
+            "maxComputeWorkgroupSizeX": 256,
+            "maxStorageBufferBindingSize": 134217728,
+            "maxBufferSize": 268435456
+          },
+          "error": null,
+          "adapterInfo": {
+            "vendor": "testvendor",
+            "architecture": "arch",
+            "device": "dev",
+            "description": "Test GPU"
+          }
+        }
+      },
+      "log": [
+        "requestAdapter {\"powerPreference\":\"high-performance\"}",
+        "device destroyed"
+      ]
+    },
+    {
+      "probe": "webgpu",
+      "name": "no navigator.gpu",
+      "result": {
+        "supported": false,
+        "detail": {
+          "apiSurface": false,
+          "adapter": false,
+          "device": false,
+          "limits": null,
+          "error": "navigator.gpu undefined (no WebGPU implementation in this browser)"
+        }
+      },
+      "log": []
+    },
+    {
+      "probe": "webgpu",
+      "name": "no adapter",
+      "result": {
+        "supported": false,
+        "detail": {
+          "apiSurface": true,
+          "adapter": false,
+          "device": false,
+          "limits": null,
+          "error": "requestAdapter() resolved null (WebGPU present but no usable adapter)"
+        }
+      },
+      "log": [
+        "requestAdapter {\"powerPreference\":\"high-performance\"}"
+      ]
+    },
+    {
+      "probe": "webgpu",
+      "name": "a swiftshader adapter",
+      "result": {
+        "supported": false,
+        "detail": {
+          "apiSurface": true,
+          "adapter": true,
+          "device": false,
+          "limits": null,
+          "error": "the adapter is software (google SwiftShader Device): WebGPU on the CPU is refused, so WebGL2 is used",
+          "adapterInfo": {
+            "vendor": "google",
+            "architecture": "swiftshader",
+            "device": "",
+            "description": "SwiftShader Device"
+          }
+        }
+      },
+      "log": [
+        "requestAdapter {\"powerPreference\":\"high-performance\"}"
+      ]
+    },
+    {
+      "probe": "webgpu",
+      "name": "a fallback adapter",
+      "result": {
+        "supported": false,
+        "detail": {
+          "apiSurface": true,
+          "adapter": true,
+          "device": false,
+          "limits": null,
+          "error": "the adapter is software (testvendor Test GPU): WebGPU on the CPU is refused, so WebGL2 is used",
+          "adapterInfo": {
+            "vendor": "testvendor",
+            "architecture": "arch",
+            "device": "dev",
+            "description": "Test GPU"
+          }
+        }
+      },
+      "log": [
+        "requestAdapter {\"powerPreference\":\"high-performance\"}"
+      ]
+    },
+    {
+      "probe": "webgpu",
+      "name": "an adapter with no info",
+      "result": {
+        "supported": true,
+        "detail": {
+          "apiSurface": true,
+          "adapter": true,
+          "device": true,
+          "limits": {
+            "maxComputeWorkgroupsPerDimension": 65535,
+            "maxComputeWorkgroupSizeX": 256,
+            "maxStorageBufferBindingSize": 134217728,
+            "maxBufferSize": 268435456
+          },
+          "error": null,
+          "adapterInfo": null
+        }
+      },
+      "log": [
+        "requestAdapter {\"powerPreference\":\"high-performance\"}",
+        "device destroyed"
+      ]
+    },
+    {
+      "probe": "webgpu",
+      "name": "no device",
+      "result": {
+        "supported": false,
+        "detail": {
+          "apiSurface": true,
+          "adapter": true,
+          "device": false,
+          "limits": null,
+          "error": "requestDevice() resolved null",
+          "adapterInfo": {
+            "vendor": "testvendor",
+            "architecture": "arch",
+            "device": "dev",
+            "description": "Test GPU"
+          }
+        }
+      },
+      "log": [
+        "requestAdapter {\"powerPreference\":\"high-performance\"}"
+      ]
+    },
+    {
+      "probe": "webgpu",
+      "name": "requestAdapter throws",
+      "result": {
+        "supported": false,
+        "detail": {
+          "apiSurface": true,
+          "adapter": false,
+          "device": false,
+          "limits": null,
+          "error": "probe threw: gpu process crashed"
+        }
+      },
+      "log": [
+        "requestAdapter {\"powerPreference\":\"high-performance\"}"
+      ]
+    }
+  ],
+  "sha256": "a184724efb6a59cac2ac3db9080fdc612153f4c5efc4108aa1b2337e15571353"
+}
