@@ -2,7 +2,8 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { finish, gate } from './lib/gate.mjs'
 import { makeScenarios, runAll, EXACT_INDEX, COINCIDENT_INDEX } from './lib/playerCollisionScenario.mjs'
-import { CollisionSystem } from '../src/netcode/CollisionSystem.js'
+import { LAG_FRAMES, runLaggedCollisions } from './lib/netPortScenario.mjs'
+import { COLLISION_LAG_INPUTS, CollisionSystem, advancePushQueue, planPlayerCollisions, pushWindowOf, resetPushQueue } from '../src/netcode/CollisionSystem.js'
 import { applyPlayerCollisions } from '../src/netcode/playerCollisions.js'
 
 const fixture = JSON.parse(readFileSync(new URL('./fixtures/spoint/player-collisions.json', import.meta.url), 'utf8'))
@@ -33,7 +34,43 @@ const crowd = (count, spread, seed) => {
 
 const clone = (players) => players.map((p) => ({ id: p.id, state: { position: [...p.state.position], velocity: [...p.state.velocity] } }))
 
-gate('the CollisionSystem class leaves every player at the same position and velocity as spoint, frame by frame, over the 38 recorded scenarios', () => {
+const netPort = JSON.parse(readFileSync(new URL('./fixtures/spoint/net-port.json', import.meta.url), 'utf8')).sections
+const planSystems = new Map()
+const planViaSystem = (players, grid, gridCells, cellSz, minDist2, minDist, dt) => {
+  let system = planSystems.get(grid)
+  if (!system) {
+    system = new CollisionSystem({ capacity: 64, cellSize: cellSz, minDist })
+    planSystems.set(grid, system)
+  }
+  system.plan(players, dt)
+}
+
+gate('planPlayerCollisions, advancePushQueue, pushWindowOf and resetPushQueue match spoint over 38 scenarios of 40 frames: a push lands 16 inputs after it is planned', () => {
+  assert.equal(COLLISION_LAG_INPUTS, 16)
+  assert.equal(netPort.lagInputs, 16)
+  const ran = runLaggedCollisions({ plan: planPlayerCollisions, advance: advancePushQueue, window: pushWindowOf, reset: resetPushQueue })
+  assert.deepEqual(ran, netPort.laggedCollisions)
+  const withCalls = netPort.laggedCollisions.filter((s) => s.frames.some((f) => f.calls > 0)).length
+  assert.ok(withCalls > 20, 'only ' + withCalls + ' scenarios applied a push')
+  assert.ok(netPort.laggedCollisions.every((s) => s.frames.slice(0, COLLISION_LAG_INPUTS).every((f) => f.calls === 0)), 'spoint applied a push before the lag ran out')
+  assert.equal(LAG_FRAMES, 40)
+})
+
+gate('the typed-array class plans the same lagged pushes as spoint: CollisionSystem.plan with advancePushQueue gives the spoint frames', () => {
+  const ran = runLaggedCollisions({ plan: planViaSystem, advance: advancePushQueue, window: pushWindowOf, reset: resetPushQueue })
+  assert.deepEqual(ran, netPort.laggedCollisions)
+})
+
+gate('negative control: applying the pushes at once instead of 16 inputs later does not match the spoint frames', () => {
+  const eager = runLaggedCollisions({
+    plan: planPlayerCollisions,
+    advance: (player, physicsIntegration) => { for (let i = 0; i < COLLISION_LAG_INPUTS; i++) advancePushQueue(player, physicsIntegration) },
+    window: pushWindowOf, reset: resetPushQueue,
+  })
+  assert.notDeepEqual(eager, netPort.laggedCollisions)
+})
+
+gate('the immediate apply path leaves every player at the same position and velocity as the earlier spoint fixture, frame by frame, over the 38 recorded scenarios', () => {
   assert.equal(fixture.scenarios.length, makeScenarios().length)
   const got = ran.map((s) => s.frames.map((f) => f.state))
   const want = fixture.scenarios.map((s) => s.frames.map((f) => f.state))
