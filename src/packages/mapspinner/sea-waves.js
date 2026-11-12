@@ -55,14 +55,29 @@ function octaveMean(choppiness, phase) {
   return sum / (MEAN_GRID_SIDE * MEAN_GRID_SIDE)
 }
 
-function unitAmplitudeMean(oceanChoppiness) {
-  let total = 0
-  let amplitude = BASE_AMPLITUDE_M
+const octaveMeansByChoppiness = new Map()
+
+function octaveMeans(oceanChoppiness) {
+  let means = octaveMeansByChoppiness.get(oceanChoppiness)
+  if (means !== undefined) return means
+  means = new Float64Array(OCTAVE_COUNT)
   let choppiness = oceanChoppiness
   for (let i = 0; i < OCTAVE_COUNT; i++) {
-    total += amplitude * octaveMean(choppiness, PHASE_STEP * i)
-    amplitude *= AMPLITUDE_GAIN
+    means[i] = octaveMean(choppiness, PHASE_STEP * i)
     choppiness += (1 - choppiness) * CHOPPINESS_TO_ONE_RATE
+  }
+  if (octaveMeansByChoppiness.size >= MEAN_CACHE_LIMIT) octaveMeansByChoppiness.clear()
+  octaveMeansByChoppiness.set(oceanChoppiness, means)
+  return means
+}
+
+function unitAmplitudeMean(oceanChoppiness) {
+  const means = octaveMeans(oceanChoppiness)
+  let total = 0
+  let amplitude = BASE_AMPLITUDE_M
+  for (let i = 0; i < OCTAVE_COUNT; i++) {
+    total += amplitude * means[i]
+    amplitude *= AMPLITUDE_GAIN
   }
   return total
 }
@@ -75,4 +90,76 @@ export function seaHeightMean(oceanChoppiness, oceanAmplitude) {
     unitMeanByChoppiness.set(oceanChoppiness, mean)
   }
   return mean * oceanAmplitude
+}
+
+export const SEA_OCTAVE_COUNT = OCTAVE_COUNT
+export const SEA_LF_OCTAVE_COUNT = 3
+export const SEA_BASE_FREQUENCY = 0.16
+export const SEA_FREQUENCY_GAIN = 1.9
+export const SEA_WAVE_SPEED = 0.8
+const SEA_STRETCH_X = 0.75
+const OCTAVE_ROTATE_A = 0.8
+const OCTAVE_ROTATE_B = 0.6
+
+function finiteArg(name, value) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) throw new RangeError(`sea waves: ${name} must be a finite number, got ${value}`)
+  return value
+}
+
+function seaOctaves(x, z, time, oceanChoppiness, octaves) {
+  let ux = x * SEA_STRETCH_X
+  let uy = z
+  let frequency = SEA_BASE_FREQUENCY
+  let amplitude = BASE_AMPLITUDE_M
+  let choppiness = oceanChoppiness
+  let total = 0
+  const drift = time * SEA_WAVE_SPEED
+  for (let i = 0; i < octaves; i++) {
+    const phase = PHASE_STEP * i
+    const forward = waveOctave((ux + drift) * frequency + phase, (uy + drift) * frequency + phase, choppiness)
+    const backward = waveOctave((ux - drift) * frequency + phase, (uy - drift) * frequency + phase, choppiness)
+    total += amplitude * 0.5 * (forward + backward)
+    const rx = OCTAVE_ROTATE_A * ux + OCTAVE_ROTATE_B * uy
+    uy = OCTAVE_ROTATE_A * uy - OCTAVE_ROTATE_B * ux
+    ux = rx
+    frequency *= SEA_FREQUENCY_GAIN
+    amplitude *= AMPLITUDE_GAIN
+    choppiness += (1 - choppiness) * CHOPPINESS_TO_ONE_RATE
+  }
+  return total
+}
+
+function checkedArgs(x, z, time, oceanChoppiness, oceanAmplitude) {
+  finiteArg('x', x)
+  finiteArg('z', z)
+  finiteArg('time', time)
+  finiteArg('oceanAmplitude', oceanAmplitude)
+  if (!(finiteArg('oceanChoppiness', oceanChoppiness) > 0)) throw new RangeError(`sea waves: oceanChoppiness must be positive, got ${oceanChoppiness}`)
+}
+
+export function seaHeight(x, z, time, oceanChoppiness, oceanAmplitude) {
+  checkedArgs(x, z, time, oceanChoppiness, oceanAmplitude)
+  return seaOctaves(x, z, time, oceanChoppiness, OCTAVE_COUNT) * oceanAmplitude
+}
+
+export function seaHeightLF(x, z, time, oceanChoppiness, oceanAmplitude) {
+  checkedArgs(x, z, time, oceanChoppiness, oceanAmplitude)
+  const means = octaveMeans(oceanChoppiness)
+  let tail = 0
+  let amplitude = BASE_AMPLITUDE_M
+  for (let i = 0; i < OCTAVE_COUNT; i++) {
+    if (i >= SEA_LF_OCTAVE_COUNT) tail += amplitude * means[i]
+    amplitude *= AMPLITUDE_GAIN
+  }
+  return (seaOctaves(x, z, time, oceanChoppiness, SEA_LF_OCTAVE_COUNT) + tail) * oceanAmplitude
+}
+
+export function seaHeightLFBound(oceanAmplitude) {
+  let bound = 0
+  let amplitude = BASE_AMPLITUDE_M
+  for (let i = 0; i < OCTAVE_COUNT; i++) {
+    if (i >= SEA_LF_OCTAVE_COUNT) bound += amplitude
+    amplitude *= AMPLITUDE_GAIN
+  }
+  return bound * Math.abs(oceanAmplitude)
 }
