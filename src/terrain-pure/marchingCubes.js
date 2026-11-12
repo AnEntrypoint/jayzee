@@ -5,6 +5,7 @@ const VERTEX_KEY_SCALE = 100
 const VERTEX_KEY_OFFSET = 512
 const VERTEX_KEY_SHIFT = 10
 const VERTEX_KEY_SHIFT_HIGH = 20
+const VERTEX_KEY_WIDE_STEPS = 1000
 const EDGE_CORNERS = [
   [0, 1], [1, 2], [2, 3], [3, 0],
   [4, 5], [5, 6], [6, 7], [7, 4],
@@ -34,11 +35,25 @@ export function marchBox(res, sdf, x0, x1, y0, y1, z0, z1) {
   let ic = 0
 
   const vertexByKey = new Map()
+  const reach = Math.max(Math.abs(x0), Math.abs(x1), Math.abs(y0), Math.abs(y1), Math.abs(z0), Math.abs(z1))
+  const fitsUnitKey = reach * VERTEX_KEY_SCALE < VERTEX_KEY_OFFSET - 1
+  const span = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0), Math.abs(z1 - z0))
+  const wideQuantum = span > 0 ? span / VERTEX_KEY_WIDE_STEPS : 1
+  const lowX = Math.min(x0, x1), lowY = Math.min(y0, y1), lowZ = Math.min(z0, z1)
+  const vertexKey = (x, y, z) => {
+    if (fitsUnitKey) {
+      const ix = (x * VERTEX_KEY_SCALE) | 0
+      const iy = (y * VERTEX_KEY_SCALE) | 0
+      const iz = (z * VERTEX_KEY_SCALE) | 0
+      return ((ix + VERTEX_KEY_OFFSET) << VERTEX_KEY_SHIFT_HIGH) | ((iy + VERTEX_KEY_OFFSET) << VERTEX_KEY_SHIFT) | (iz + VERTEX_KEY_OFFSET)
+    }
+    const ix = Math.floor((x - lowX) / wideQuantum)
+    const iy = Math.floor((y - lowY) / wideQuantum)
+    const iz = Math.floor((z - lowZ) / wideQuantum)
+    return (ix << VERTEX_KEY_SHIFT_HIGH) | (iy << VERTEX_KEY_SHIFT) | iz
+  }
   const vertexIndex = (x, y, z) => {
-    const ix = (x * VERTEX_KEY_SCALE) | 0
-    const iy = (y * VERTEX_KEY_SCALE) | 0
-    const iz = (z * VERTEX_KEY_SCALE) | 0
-    const key = ((ix + VERTEX_KEY_OFFSET) << VERTEX_KEY_SHIFT_HIGH) | ((iy + VERTEX_KEY_OFFSET) << VERTEX_KEY_SHIFT) | (iz + VERTEX_KEY_OFFSET)
+    const key = vertexKey(x, y, z)
     if (vertexByKey.has(key)) return vertexByKey.get(key)
     const idx = vc
     positions[vc * 3] = x
