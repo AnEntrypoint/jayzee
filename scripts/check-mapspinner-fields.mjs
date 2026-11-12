@@ -208,9 +208,10 @@ gate('serialize matches spoint byte for byte, and load v2 and v1 rebuild the sam
   same(jzV1.load(v1), spV1.load(v1), 'load v1 result')
   same(jzV1.serialize(), spV1.serialize(), 'load v1 serialize')
   same(jzV1.totalEdits, 3, 'v1 edits')
-  for (const bad of [null, { version: 3 }, '{"version":0}']) {
-    same(jzField.createAnchorField().load(bad), spField.createAnchorField().load(bad), `load ${JSON.stringify(bad)}`)
-    same(jzField.createAnchorField().load(bad), false, `load ${JSON.stringify(bad)} refused`)
+  for (const bad of [null, { version: 3 }, '{"version":0}', { version: 2, bands: [] }]) {
+    const codeOf = (field) => { try { field.createAnchorField().load(bad); return 'loaded' } catch (error) { return error.code } }
+    same(codeOf(jzField), codeOf(spField), `load ${JSON.stringify(bad)}`)
+    same(/^anchor-field-(unreadable|unknown-version|partial-load)$/.test(codeOf(jzField)), true, `load ${JSON.stringify(bad)} refused with a named code`)
   }
   throwsLike(() => jzField.createAnchorField().load('{nope'), /JSON/, 'malformed JSON throws')
 })
