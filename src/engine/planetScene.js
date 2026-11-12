@@ -6,7 +6,8 @@ import { createColliderSet } from './colliderLayers.js'
 import { registerPopulation, registerTerrain } from './populationColliders.js'
 import { canEngineHeightInto, createEngineHeightAt, createEngineHeightInto } from './terrainHeight.js'
 import { arenaAllocator, canArenaAllocate } from './arenaAllocate.js'
-import { VEG_GEN_INSTANCES_PER_FRAME, VEG_SPECIES, createVegetationPool, planVegetationPool } from './vegetation.js'
+import { MATRIX_BYTES, VEG_GEN_INSTANCES_PER_FRAME, VEG_SPECIES, createVegetationPool, planVegetationPool } from './vegetation.js'
+import { instanceBudgetFor } from './deviceBudget.js'
 import { createVegetationDetail } from './vegetationDetail.js'
 
 export const PLANET_ENTITY_COUNT = 1024
@@ -55,6 +56,8 @@ export const sceneSpec = (overrides = {}) => {
   need(spec.fullDetailM > 0 && Number.isFinite(spec.fullDetailM), 'fullDetailM must be a positive finite distance in metres')
   return spec
 }
+
+export const sceneSpecForDevice = (deviceBudget, overrides = {}) => sceneSpec({ instanceBudget: instanceBudgetFor(deviceBudget, MATRIX_BYTES), ...overrides })
 
 const bindVegetation = (module, vegetation, plan, cullRadiusM) => {
   const memory = vegetation.memory()

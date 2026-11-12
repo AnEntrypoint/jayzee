@@ -3,7 +3,8 @@ import { finish, gate } from './lib/gate.mjs'
 import { LEVEL_UNSET, createDisplayGovernor, lodOf } from '../src/engine/displayGovernor.js'
 import { VEG_HIDDEN, createVegetationDetail } from '../src/engine/vegetationDetail.js'
 import { createVegetationPool, planVegetationPool } from '../src/engine/vegetation.js'
-import { sceneSpec } from '../src/engine/planetScene.js'
+import { sceneSpec, sceneSpecForDevice } from '../src/engine/planetScene.js'
+import { chooseDeviceBudget } from '../src/engine/deviceBudget.js'
 import { PLANET_RADIUS_M } from '../src/engine/sphere.js'
 
 const random = (seed) => () => {
@@ -223,12 +224,17 @@ gate('a patch that leaves its slot takes its detail level with it, and the next 
   assert.ok(pool.shownTotal() <= 100)
 })
 
-gate('a scene takes its shown-instance budget as a whole number chosen once, or none', () => {
+gate('a scene takes its shown-instance budget as a whole number chosen once, from the device budget or by hand, or none', () => {
   assert.equal(sceneSpec().instanceBudget, null)
   assert.equal(sceneSpec({ instanceBudget: 4096 }).instanceBudget, 4096)
   assert.throws(() => sceneSpec({ instanceBudget: 1.5 }), RangeError)
   assert.throws(() => sceneSpec({ instanceBudget: -1 }), RangeError)
   assert.throws(() => sceneSpec({ fullDetailM: 0 }), RangeError)
+  const small = sceneSpecForDevice(chooseDeviceBudget({ deviceMemoryBytes: 536870912 }))
+  const large = sceneSpecForDevice(chooseDeviceBudget({ deviceMemoryBytes: 8589934592 }))
+  assert.equal(small.instanceBudget, 65536)
+  assert.equal(large.instanceBudget, 524288)
+  assert.equal(sceneSpecForDevice(chooseDeviceBudget({ deviceMemoryBytes: 536870912 }), { instanceBudget: 10 }).instanceBudget, 10)
 })
 
 finish()

@@ -19,6 +19,7 @@ const MIB = 1024 * 1024
 const BROWSER_PAGE_WINDOW = 8
 const POLE_FACE = 2
 const OUTSIDE_SHARE_LIMIT = 0.01
+const BUDGET_FULL_DETAIL_M = 60
 
 const sceneOn = async (spec, generateAfterPages) => {
   const module = await loadEngineModule(GLUE, resolvePlan({ players: 1024, workers: 2, budgetBytes: 512 * MIB }))
@@ -56,8 +57,38 @@ const orbit = async (spec) => {
   return { atStart, atEnd, moves: block.moves, firstIds, lastIds: block.ids.slice() }
 }
 
+const budgetedOrbit = async (spec, instanceBudget) => {
+  const module = await loadEngineModule(GLUE, resolvePlan({ players: 1024, workers: 2, budgetBytes: 512 * MIB }))
+  configureWorld(module, solverIterationsFor(readLayout(module).players))
+  const scene = buildPlanetScene({ module, now: () => performance.now(), generate: false, spec: { ...spec, instanceBudget, fullDetailM: BUDGET_FULL_DETAIL_M } })
+  const streamer = createPlanetStreamer(module, { window: BROWSER_PAGE_WINDOW })
+  module._engine_page_apply()
+  scene.generate()
+  const block = createLeafBlock({ level: spec.patchLevel, block: WITNESS_PATCH_BLOCK })
+  block.update(0, PLANET.radius, 0)
+  const follow = createVegetationFollower({ scene, block })
+  const bytesAtStart = module.HEAPU8.buffer.byteLength
+  let worstShown = 0
+  let shownSum = 0
+  for (let frame = 0; frame < PATH_PERIOD_FRAMES; frame++) {
+    module._engine_page_apply()
+    const spot = streamer.step(frame)
+    follow(spot[0], PLANET.radius + spot[1], spot[2], streamer.pending)
+    const shown = scene.vegetation.shownTotal()
+    if (shown > worstShown) worstShown = shown
+    shownSum += shown
+  }
+  const atEnd = scene.report()
+  const bytesAtEnd = module.HEAPU8.buffer.byteLength
+  await releaseModule(module)
+  return { atEnd, worstShown, meanShown: shownSum / PATH_PERIOD_FRAMES, bytesAtStart, bytesAtEnd, moves: block.moves }
+}
+
 const spec = witnessSceneSpec(PLANET.radius)
 const lap = await orbit(spec)
+const INSTANCE_BUDGET = Math.floor((spec.patchIds.length * lap.atEnd.vegetationPlan.capacityPerPatch) / 4)
+const budgeted = await budgetedOrbit(spec, INSTANCE_BUDGET)
+console.log('budgeted orbit ' + JSON.stringify({ budget: INSTANCE_BUDGET, worstShown: budgeted.worstShown, meanShown: Math.round(budgeted.meanShown), bias: budgeted.atEnd.detailBias, moves: budgeted.moves, bytes: budgeted.bytesAtEnd }))
 console.log('orbit ' + JSON.stringify({ moves: lap.moves, generatedAtStart: lap.atStart.generatedInstances, generatedAtEnd: lap.atEnd.generatedInstances, outsideAtEnd: lap.atEnd.generateHeightCallsOutsidePages, patches: lap.atEnd.patches, deferred: lap.atEnd.patchesDeferred }))
 const witness = await sceneOn(spec, true)
 const grid = await sceneOn({}, false)
@@ -99,6 +130,17 @@ gate('one lap of the camera orbit moves the leaf block, streams patches in and o
   assert.equal(lap.atEnd.patches, spec.patchIds.length)
   assert.equal(lap.atEnd.patchesDeferred, 0)
   assert.ok(lap.atEnd.generateHeightCallsOutsidePages <= lap.atEnd.generatedInstances * OUTSIDE_SHARE_LIMIT, lap.atEnd.generateHeightCallsOutsidePages + ' of ' + lap.atEnd.generatedInstances + ' instance heights fell outside the loaded pages')
+})
+
+gate('with a shown-instance budget of a quarter of the scene, every frame of the lap shows at most the budget, the patches still stream with none deferred, and the engine memory keeps its size', () => {
+  assert.ok(budgeted.worstShown <= INSTANCE_BUDGET, 'a frame showed ' + budgeted.worstShown + ' instances against a budget of ' + INSTANCE_BUDGET)
+  assert.ok(budgeted.meanShown > INSTANCE_BUDGET / 4, 'the lap showed a mean of ' + budgeted.meanShown + ', far under the budget')
+  assert.ok(budgeted.moves >= 4)
+  assert.equal(budgeted.atEnd.patches, spec.patchIds.length)
+  assert.equal(budgeted.atEnd.patchesDeferred, 0)
+  assert.equal(budgeted.atEnd.instanceBudget, INSTANCE_BUDGET)
+  assert.equal(budgeted.bytesAtEnd, budgeted.bytesAtStart)
+  assert.equal(lap.atEnd.shownInstances, lap.atEnd.patches * lap.atEnd.vegetationPlan.capacityPerPatch)
 })
 
 finish()
