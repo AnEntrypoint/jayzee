@@ -1,16 +1,51 @@
 import { gate, finish } from './lib/gate.mjs'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { instantiateKernel } from '../src/kernel/load.js'
 import { random, insideBox } from './lib/oracle.mjs'
 
-const kernel = instantiateKernel().exports
-const resolvePairs = (pos, vel, count, radius, restitution, buckets = 64) =>
-  kernel.resolvePairs(pos, vel, count, radius, restitution, new Int32Array(buckets), new Int32Array(count), new Int32Array(count * 3))
+const KERNEL_BYTES_LIMIT = 32768
+
+const load = ({ pos, vel, boxes = [], buckets = 64 }) => {
+  const kernel = instantiateKernel({ capacity: pos.length / 3, boxCount: Math.max(1, boxes.length / 6), buckets, occupancyWords: Math.max(1, buckets / 4) })
+  kernel.positions.set(pos)
+  kernel.velocities.set(vel)
+  kernel.boxes.set(boxes)
+  return { run: kernel.run, pos: kernel.positions, vel: kernel.velocities }
+}
+
+const integrate = (pos, vel, count, gravity, drag, dt) => {
+  const k = load({ pos, vel })
+  k.run.integrate(count, gravity, drag, dt)
+  pos.set(k.pos)
+  vel.set(k.vel)
+}
+
+const resolveGround = (pos, vel, count, radius, restitution) => {
+  const k = load({ pos, vel })
+  k.run.resolveGround(count, radius, restitution)
+  pos.set(k.pos)
+  vel.set(k.vel)
+}
+
+const resolveBoxes = (pos, vel, count, radius, boxes, boxCount, restitution) => {
+  const k = load({ pos, vel, boxes })
+  k.run.resolveBoxes(count, radius, boxCount, restitution)
+  pos.set(k.pos)
+  vel.set(k.vel)
+}
+
+const resolvePairs = (pos, vel, count, radius, restitution, buckets = 64) => {
+  const k = load({ pos, vel, buckets })
+  k.run.resolvePairs(count, radius, restitution)
+  pos.set(k.pos)
+  vel.set(k.vel)
+}
 
 gate('integrate applies gravity then position with semi-implicit Euler', () => {
   const pos = Float64Array.from([0, 10, 0])
   const vel = Float64Array.from([0, 0, 0])
-  kernel.integrate(pos, vel, 1, -10, 0, 0.1)
+  integrate(pos, vel, 1, -10, 0, 0.1)
   assert.ok(Math.abs(vel[1] + 1) < 1e-12)
   assert.ok(Math.abs(pos[1] - 9.9) < 1e-12)
 })
@@ -18,14 +53,14 @@ gate('integrate applies gravity then position with semi-implicit Euler', () => {
 gate('integrate decays horizontal velocity by drag', () => {
   const pos = Float64Array.from([0, 0, 0])
   const vel = Float64Array.from([2, 0, 0])
-  kernel.integrate(pos, vel, 1, 0, 1, 0.25)
+  integrate(pos, vel, 1, 0, 1, 0.25)
   assert.ok(Math.abs(vel[0] - 1.5) < 1e-12)
 })
 
 gate('integrate with full drag stops horizontal motion', () => {
   const pos = Float64Array.from([0, 0, 0])
   const vel = Float64Array.from([3, 0, 0])
-  kernel.integrate(pos, vel, 1, 0, 4, 0.5)
+  integrate(pos, vel, 1, 0, 4, 0.5)
   assert.equal(vel[0], 0)
   assert.equal(pos[0], 0)
 })
@@ -33,7 +68,7 @@ gate('integrate with full drag stops horizontal motion', () => {
 gate('integrate leaves bodies past count untouched', () => {
   const pos = Float64Array.from([0, 0, 0, 5, 5, 5])
   const vel = Float64Array.from([0, 0, 0, 1, 1, 1])
-  kernel.integrate(pos, vel, 1, -10, 0, 0.1)
+  integrate(pos, vel, 1, -10, 0, 0.1)
   assert.deepEqual(Array.from(pos.subarray(3)), [5, 5, 5])
   assert.deepEqual(Array.from(vel.subarray(3)), [1, 1, 1])
 })
@@ -41,7 +76,7 @@ gate('integrate leaves bodies past count untouched', () => {
 gate('resolveGround lifts a sinking body to its radius and reflects it', () => {
   const pos = Float64Array.from([0, 0.1, 0])
   const vel = Float64Array.from([0, -4, 0])
-  kernel.resolveGround(pos, vel, 1, 0.35, 0.2)
+  resolveGround(pos, vel, 1, 0.35, 0.2)
   assert.ok(Math.abs(pos[1] - 0.35) < 1e-12)
   assert.ok(Math.abs(vel[1] - 0.8) < 1e-12)
 })
@@ -49,7 +84,7 @@ gate('resolveGround lifts a sinking body to its radius and reflects it', () => {
 gate('resolveGround ignores bodies above the radius', () => {
   const pos = Float64Array.from([0, 2, 0])
   const vel = Float64Array.from([0, -4, 0])
-  kernel.resolveGround(pos, vel, 1, 0.35, 0.2)
+  resolveGround(pos, vel, 1, 0.35, 0.2)
   assert.equal(pos[1], 2)
   assert.equal(vel[1], -4)
 })
@@ -57,7 +92,7 @@ gate('resolveGround ignores bodies above the radius', () => {
 gate('resolveGround cancels a slow contact instead of bouncing it', () => {
   const pos = Float64Array.from([0, 0.1, 0])
   const vel = Float64Array.from([0, -0.5, 0])
-  kernel.resolveGround(pos, vel, 1, 0.35, 0.9)
+  resolveGround(pos, vel, 1, 0.35, 0.9)
   assert.equal(vel[1], 0)
 })
 
@@ -65,7 +100,7 @@ gate('resolveBoxes lands a body on the top face of a box', () => {
   const pos = Float64Array.from([0, 2.2, 0])
   const vel = Float64Array.from([0, -3, 0])
   const boxes = Float64Array.from([-1, 0, -1, 1, 2, 1])
-  kernel.resolveBoxes(pos, vel, 1, 0.35, boxes, 1, 0)
+  resolveBoxes(pos, vel, 1, 0.35, boxes, 1, 0)
   assert.ok(Math.abs(pos[1] - 2.35) < 1e-12)
   assert.ok(Math.abs(vel[1]) < 1e-12)
 })
@@ -74,7 +109,7 @@ gate('resolveBoxes pushes a body whose centre is inside a box to the nearest fac
   const pos = Float64Array.from([0, 1.9, 0])
   const vel = Float64Array.from([0, 0, 0])
   const boxes = Float64Array.from([-5, 0, -5, 5, 2, 5])
-  kernel.resolveBoxes(pos, vel, 1, 0.35, boxes, 1, 0)
+  resolveBoxes(pos, vel, 1, 0.35, boxes, 1, 0)
   assert.ok(Math.abs(pos[1] - 2.35) < 1e-12)
   assert.equal(pos[0], 0)
   assert.equal(pos[2], 0)
@@ -87,7 +122,7 @@ gate('resolveBoxes leaves every body outside every box it was given', () => {
   const boxes = Float64Array.from([-3, -1, -3, -1, 2, 3, 1, 0, -2, 4, 1.5, 2])
   const pos = Float64Array.from({ length: count * 3 }, () => rand() * 12 - 6)
   const vel = Float64Array.from({ length: count * 3 }, () => rand() * 4 - 2)
-  kernel.resolveBoxes(pos, vel, count, radius, boxes, 2, 0.3)
+  resolveBoxes(pos, vel, count, radius, boxes, 2, 0.3)
   for (let i = 0; i < count; i++) {
     for (let b = 0; b < 2; b++) {
       const p = [pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2]]
@@ -147,8 +182,9 @@ gate('step with more solver iterations separates a stack further than one iterat
   const run = (iterations) => {
     const pos = stack()
     const vel = new Float64Array(15)
-    kernel.step(pos, vel, 5, new Float64Array(6), 0, 0, 0, 1 / 64, 0.35, 0, iterations, new Int32Array(64), new Int32Array(5), new Int32Array(15))
-    return minGap(pos)
+    const k = load({ pos, vel })
+    k.run.step(5, 0, 0, 0, 1 / 64, 0.35, 0, iterations)
+    return minGap(k.pos)
   }
   const one = run(1)
   const eight = run(8)
@@ -180,13 +216,45 @@ gate('bucket collisions do not change which pairs are resolved', () => {
   assert.ok(settle(64) > 0.7 - 1e-3)
 })
 
-gate('integrate and resolvers write through a memory handle without copying', () => {
-  const instance = instantiateKernel()
-  const memory = instance.memory
-  const handle = memory.Float64Array(3)
-  memory.read(handle).set([0, 10, 0])
-  instance.exports.integrate(handle, memory.Float64Array(3), 1, -10, 0, 0.1)
-  assert.ok(Math.abs(memory.read(handle)[1] - 9.9) < 1e-12)
+gate('a pass on one bucket resolves the pairs a pass on 4096 buckets resolves, bit for bit', () => {
+  const rand = random(5)
+  const count = 300
+  const base = Float64Array.from({ length: count * 3 }, () => rand() * 6 - 3)
+  const settle = (buckets) => {
+    const pos = Float64Array.from(base)
+    const vel = Float64Array.from({ length: count * 3 }, (_, i) => Math.sin(i))
+    for (let pass = 0; pass < 8; pass++) resolvePairs(pos, vel, count, 0.35, 0.2, buckets)
+    return [pos, vel]
+  }
+  const [onePos, oneVel] = settle(1)
+  const [manyPos, manyVel] = settle(4096)
+  for (let i = 0; i < count * 3; i++) {
+    assert.ok(Object.is(onePos[i], manyPos[i]), 'position word ' + i + ' differs')
+    assert.ok(Object.is(oneVel[i], manyVel[i]), 'velocity word ' + i + ' differs')
+  }
+})
+
+gate('the views the kernel hands out are its own storage, so a step copies nothing', () => {
+  const k = load({ pos: Float64Array.from([0, 10, 0]), vel: new Float64Array(3) })
+  const buffer = k.pos.buffer
+  k.run.integrate(1, -10, 0, 0.1)
+  assert.ok(Math.abs(k.pos[1] - 9.9) < 1e-12)
+  assert.equal(k.pos.buffer, buffer)
+  assert.equal(k.pos.buffer.byteLength, buffer.byteLength)
+})
+
+gate('the loader refuses a bucket count or an occupancy size that is not a power of two', () => {
+  const sizes = { capacity: 4, boxCount: 1, buckets: 64, occupancyWords: 16 }
+  assert.throws(() => instantiateKernel({ ...sizes, buckets: 48 }), RangeError)
+  assert.throws(() => instantiateKernel({ ...sizes, occupancyWords: 3 }), RangeError)
+  assert.throws(() => instantiateKernel({ ...sizes, capacity: 0 }), RangeError)
+  assert.equal(instantiateKernel(sizes).positions.length, 12)
+})
+
+gate('the kernel imports nothing from the host and stays under ' + KERNEL_BYTES_LIMIT + ' bytes, so no access took the dynamic path', () => {
+  const bytes = readFileSync(new URL('../dist/kernel.wasm', import.meta.url))
+  assert.deepEqual(WebAssembly.Module.imports(new WebAssembly.Module(bytes)), [])
+  assert.ok(bytes.byteLength < KERNEL_BYTES_LIMIT, 'kernel.wasm is ' + bytes.byteLength + ' bytes')
 })
 
 finish()

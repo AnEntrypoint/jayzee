@@ -11,7 +11,7 @@ const plan = planSite().files
 const planned = new Map(plan.map(({ to, bytes }) => [to, bytes]))
 
 gate('the browser closure of the physics page is planned and carries no Node import', () => {
-  for (const name of ['src/world/World.js', 'src/kernel/load.js', 'src/physics-pure/settler.js', 'vendor/jz/interop.js', 'index.html', 'play.js', 'kernel.wasm']) {
+  for (const name of ['src/world/World.js', 'src/kernel/load.js', 'src/physics-pure/settler.js', 'index.html', 'play.js', 'kernel.wasm']) {
     assert(planned.has(name), name + ' is not in the site plan')
   }
 })
@@ -40,13 +40,21 @@ gate('the committed site under docs/play matches the plan byte for byte, so npm 
   }
 })
 
-gate('the import map in the page points only at files in the site', () => {
-  const html = readFileSync(join(SITE_DIR, 'index.html'), 'utf8')
-  const map = JSON.parse(html.match(/<script type="importmap">([\s\S]*?)<\/script>/)[1])
-  for (const target of Object.values(map.imports)) {
-    const name = target.replace(/^\.\//, '')
-    assert(planned.has(name), 'import map target ' + target + ' is not in the site')
+gate('negative control: the planner refuses a bare import, so the site carries no vendored package', () => {
+  const read = (abs) => (abs.endsWith('World.js') ? "import { instantiate } from 'jz/interop'\n" : '')
+  let refused = false
+  try {
+    planSite({ read })
+  } catch (error) {
+    refused = error.message.includes('jz/interop')
   }
+  assert(refused, 'a bare import was accepted into the site plan')
+})
+
+gate('the page has no import map and the plan has no vendor file', () => {
+  const html = readFileSync(join(SITE_DIR, 'index.html'), 'utf8')
+  assert(!html.includes('importmap'), 'index.html still carries an import map')
+  for (const name of planned.keys()) assert(!name.startsWith('vendor/'), name + ' is a vendored file')
 })
 
 gate('the kernel in the site is a WebAssembly module that compiles', () => {

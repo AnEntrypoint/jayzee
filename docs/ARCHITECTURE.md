@@ -8,7 +8,7 @@ jayzee keeps each layer in the language it runs well in.
 | World | `src/world` | Plain JavaScript | Fixed-step clock, body table, wasm memory handles, the hash |
 | Protocol | `src/protocol` | Plain JavaScript | Versioned binary input and snapshot codecs |
 
-Dependencies point one way. The world calls the kernel. The codecs depend on nothing. The kernel imports no host code and allocates nothing in steady state.
+Dependencies point one way. The world calls the kernel. The codecs depend on nothing. The kernel imports no host code and allocates nothing after `reserve`.
 
 ## Why this split
 
@@ -17,8 +17,8 @@ jz compiles numeric code over typed arrays with no runtime. Its own documentatio
 ## Build and runtime
 
 - `scripts/build-kernel.mjs` compiles `src/kernel/kernel.js` and its modules into `dist/kernel.wasm` through `jz`. It runs on install, pack and test.
-- `src/kernel/load.js` compiles the bytes to a `WebAssembly.Module` once per process and instantiates it through `jz/interop` for each world. The compiler never runs at runtime.
-- Each `World` owns its instance and therefore its linear memory. Its arrays are created with `memory.Float64Array(n)` and `memory.Int32Array(n)`, which return pinned handles. The kernel reads and writes them in place, so a tick copies nothing across the JavaScript boundary.
+- `src/kernel/load.js` compiles the bytes to a `WebAssembly.Module` once per process and instantiates it for each world with the plain WebAssembly API. The module has no imports, so neither the compiler nor its interop runtime is loaded at runtime.
+- Each `World` owns its instance and therefore its linear memory. The kernel owns the buffers: `reserve` allocates positions, velocities, boxes and the pair grid once, as module bindings whose types jz knows statically, and the world holds views of the first three. A tick copies nothing across the JavaScript boundary, and nothing is allocated after `reserve`.
 - One call to `step` runs a full tick: integrate, then `solverIterations` passes of ground, boxes and pairs.
 
 ## Determinism
@@ -31,20 +31,22 @@ jz compiles numeric code over typed arrays with no runtime. Its own documentatio
 
 - Bodies are spheres of one radius. Static geometry is the ground plane at y = 0 and axis-aligned boxes.
 - Restitution applies only to impacts faster than 1 m/s. Slower contacts remove the normal velocity, so a resting body settles instead of micro-bouncing.
-- Body pairs use a spatial hash grid. Cells are as wide as the contact diameter. Each body records its cell at the start of the pass. A candidate is accepted only when its recorded cell is the one being searched, so a bucket collision never duplicates or drops a pair. The bucket table holds two buckets per body, with a minimum of 64.
+- Body pairs use a spatial hash grid. Cells are as wide as the contact diameter. Each body records its cell at the start of the pass. A candidate is accepted only when its recorded cell is the one being searched, so a bucket collision never duplicates or drops a pair. The bucket table is the power of two at or above two buckets per body, with a minimum of 64. The hash is an integer mix masked to the table, and a bitset of eight bits per bucket answers a probe of an empty cell without reading the table. Neither changes which pairs are resolved: a chain is in descending body index whatever the hash.
 - The solver runs `solverIterations` passes per tick (default 8). In the stack gate, a chain of five overlapping bodies has a 0.19 m overlap after one pass, about 0.014 m after eight, and 0.0005 m after sixteen. Sixteen or more passes are needed when exact stacking matters.
 
 ## Measured cost
 
-Measured with `npm run bench` on Node 24, 8 solver iterations, 200 measured ticks after 30 warm-up ticks, bodies falling in a 60 m square above a box floor. Numbers are from one development machine; rerun them on the target before relying on them.
+Measured with `npm run bench` on Node 22, 8 solver iterations, 200 measured ticks after 30 warm-up ticks, bodies falling in a 60 m square above a box floor. Numbers are from one 4-CPU container; rerun them on the target before relying on them.
 
-| Bodies | Mean tick | Ticks per second |
-|---|---|---|
-| 500 | 5.8 ms | 173 |
-| 2000 | 27 ms | 37 |
-| 5000 | 71 ms | 14 |
+| Bodies | Mean tick | Ticks per second | Before the typed kernel |
+|---|---|---|---|
+| 500 | 0.42 ms | 2400 | 7.8 ms |
+| 2000 | 3.1 ms | 320 | 27 ms |
+| 5000 | 10 ms | 97 | 71 ms |
 
-The budget at 64 Hz is 15.6 ms per tick, so this kernel fits it up to roughly 1000 bodies with eight iterations. Four iterations roughly halves the pair cost. The cost is per typed-array access in the compiled wasm, not warm-up: `--no-liftoff` changes nothing.
+The budget at 64 Hz is 15.6 ms per tick, so this kernel fits it to about 5000 bodies with eight iterations. The state hash after every tick is the same as before the change, bit for bit.
+
+What the earlier figures were: every buffer was a parameter, and jz compiles an array parameter of a function that another kernel function calls on its dynamic path, a hash lookup per access. The kernel now holds its buffers as module bindings, which jz types statically. The pair search took most of what was left: its bucket hash was a float multiply, divide and floor for each of the 27 neighbour cells of each body on every solver pass, and most probes walked a chain of bodies from other cells. The integer hash and the occupancy bitset removed both. A world of 500 bodies holds 65 KiB of wasm memory against 1090 KiB, and `kernel.wasm` is 16,460 bytes against 131,666.
 
 ## Netcode
 
