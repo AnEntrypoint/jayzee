@@ -10,3 +10,4 @@ export { HPF_CHANNELS, HPF_FACES, hpfLatticeDenom, hpfQuintic, hpfPoolFloats, as
 export { resolvePoolParams, resolveWetness } from './pool-params.js'
 export { createAnchorField, dirToFaceUV, PARAM_KEYS, AnchorFieldError } from './anchor-field.js'
 export { createPlanetOrchestrator, PlanetOrchestratorError, PLANET_FRAME_OK, PLANET_FRAME_LEVEL_CAPPED, PLANET_FRAME_OVER_BUDGET } from './planet-orchestrator.js'
+export { VERSION, createPlanet, createRenderer, createRecordingBackend, cameraViewProjRel, MapspinnerSdkError } from './planet-sdk.js'
