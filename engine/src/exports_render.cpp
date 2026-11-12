@@ -141,6 +141,7 @@ EMSCRIPTEN_KEEPALIVE int engine_render_init(std::uint32_t backend) {
     rnd::initState(*state, propRecords, bodyClass, bodySlots);
     rnd::renderState = state;
   }
+  if (bodySlots > rnd::renderState->bodySlots) return engine::kRange;
   int width = 0;
   int height = 0;
   emscripten_get_canvas_element_size(rnd::kCanvasSelector, &width, &height);
@@ -166,7 +167,7 @@ namespace {
 SceneView sceneOf(RenderState& state) {
   SceneView scene{};
   scene.transforms = engine::world().transforms();
-  scene.bodyCount = engine::world().bodyCapacity();
+  scene.bodyCount = engine::world().bodyCapacity() < state.bodySlots ? engine::world().bodyCapacity() : state.bodySlots;
   scene.bodyClass = state.bodyClass;
   scene.pages = &engine::planet::state().pages;
   scene.placements = state.placements;

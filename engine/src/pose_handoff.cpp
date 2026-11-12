@@ -21,7 +21,7 @@ std::uint8_t* reserve() {
   if (reserved == nullptr) {
     World& world = engine::world();
     if (world.transforms() == nullptr) return nullptr;
-    reserved = static_cast<std::uint8_t*>(arena::carve(bytesFor(world.bodyCapacity()), alignof(Header)));
+    reserved = static_cast<std::uint8_t*>(arena::carve(bytesFor(world.planBodies()), alignof(Header)));
   }
   return reserved;
 }

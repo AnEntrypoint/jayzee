@@ -274,7 +274,13 @@ Status World::configure(const Config& config) {
   if (raw == nullptr) return kFull;
   runtime_ = new (raw) Runtime(limits_.tempBytes, limits_.workers);
   runtime_->jobs.CreateJob("warm", JPH::Color::sGreen, [] {}, 0);
+  const std::uint32_t rowsToClear = std::max(capacity_, config.capacity);
   capacity_ = config.capacity;
+  awakeDesign_ = nextAwakeDesign_;
+  budget::Capacity sized = limits_;
+  sized.bodies = config.capacity;
+  budget::Capacity contactSized = limits_;
+  contactSized.bodies = std::min(config.capacity, awakeDesign_);
   statics_ = 0;
   live_ = 0;
   retired_ = 0;
@@ -289,10 +295,10 @@ Status World::configure(const Config& config) {
   planetBody_ = kNoBody;
   vegetationBody_ = kNoBody;
   trunkBodies_ = 0;
-  std::fill(generations_, generations_ + limits_.bodies, static_cast<std::uint16_t>(0));
-  std::fill(alive_, alive_ + limits_.bodies, static_cast<std::uint8_t>(0));
-  std::fill(air_, air_ + limits_.bodies, static_cast<std::uint8_t>(0));
-  std::fill(ceiling_, ceiling_ + limits_.bodies, std::numeric_limits<float>::quiet_NaN());
+  std::fill(generations_, generations_ + rowsToClear, static_cast<std::uint16_t>(0));
+  std::fill(alive_, alive_ + rowsToClear, static_cast<std::uint8_t>(0));
+  std::fill(air_, air_ + rowsToClear, static_cast<std::uint8_t>(0));
+  std::fill(ceiling_, ceiling_ + rowsToClear, std::numeric_limits<float>::quiet_NaN());
   radius_ = config.radius;
   heldCount_ = 0;
   updateErrors_ = 0;
@@ -304,7 +310,7 @@ Status World::configure(const Config& config) {
   releaseRefills_ = 0;
   viewSet_ = false;
 
-  runtime_->physics.Init(joltBodyCapacity(limits_), 0, joltPairCapacity(limits_), joltContactCapacity(limits_), runtime_->broadPhase,
+  runtime_->physics.Init(joltBodyCapacity(sized), 0, joltPairCapacity(contactSized), joltContactCapacity(contactSized), runtime_->broadPhase,
                          runtime_->objectVsBroadPhase, runtime_->objectPairs);
   runtime_->physics.SetGravity(JPH::Vec3(0.0f, config.gravity, 0.0f));
   JPH::PhysicsSettings settings = runtime_->physics.GetPhysicsSettings();
@@ -312,7 +318,7 @@ Status World::configure(const Config& config) {
   settings.mNumPositionSteps = config.iterations;
   settings.mPenetrationSlop = 0.0f;
   runtime_->physics.SetPhysicsSettings(settings);
-  runtime_->rebaseIds.reserve(joltBodyCapacity(limits_));
+  runtime_->rebaseIds.reserve(joltBodyCapacity(sized));
   tuning_ = 0;
   if (applyTuning(kDefaultTuning) != kOk) return kRange;
 
@@ -971,9 +977,9 @@ void World::applyRadialGravity(JPH::PhysicsSystem& system, float dt) {
 }
 
 std::uint32_t World::awakeLimit() const {
-  const bool bounded = limits_.bodies > kAwakeDesignBodies;
-  if (awakeBudget_ == 0) return bounded ? kAwakeDesignBodies : 0;
-  return bounded ? std::min(awakeBudget_, kAwakeDesignBodies) : awakeBudget_;
+  const bool bounded = capacity_ > awakeDesign_;
+  if (awakeBudget_ == 0) return bounded ? awakeDesign_ : 0;
+  return bounded ? std::min(awakeBudget_, awakeDesign_) : awakeBudget_;
 }
 
 std::uint32_t World::wakeCount(std::uint32_t count) const {
@@ -1144,6 +1150,12 @@ void World::releaseHeld() {
   }
 }
 
+Status World::setAwakeDesign(std::uint32_t bodies) {
+  if (bodies < kAwakeDesignLeast || bodies > kAwakeDesignBodies) return kRange;
+  nextAwakeDesign_ = bodies;
+  return kOk;
+}
+
 Status World::setAwakeBudget(std::uint32_t bodies) {
   if (runtime_ == nullptr) return kNotConfigured;
   awakeBudget_ = bodies;
@@ -1268,7 +1280,7 @@ void World::step(std::uint32_t steps) {
 }
 
 Status World::applyPoses(const Transform* rows, std::uint32_t count, std::uint32_t epoch) {
-  if (transforms_ == nullptr || count != limits_.bodies) return kRange;
+  if (transforms_ == nullptr || count != bodyCapacity()) return kRange;
   std::memcpy(transforms_, rows, static_cast<std::size_t>(count) * sizeof(Transform));
   poseEpoch_ = epoch;
   posesTouched_ = false;

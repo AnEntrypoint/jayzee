@@ -63,6 +63,7 @@ constexpr std::uint32_t joltQuadNodePages(const budget::Capacity& c) {
 }
 
 constexpr std::uint32_t kAwakeDesignBodies = 16384;
+constexpr std::uint32_t kAwakeDesignLeast = 1024;
 constexpr double kReleaseViewMarginCos = 0.15;
 
 constexpr std::uint32_t contactBodies(const budget::Capacity& c) {
@@ -196,7 +197,9 @@ class World {
   std::uint32_t physicsBodies() const;
   std::uint32_t activeBodies() const;
   std::uint64_t tick() const { return tick_; }
-  std::uint32_t bodyCapacity() const { return limits_.bodies; }
+  std::uint32_t bodyCapacity() const { return capacity_ != 0 ? capacity_ : limits_.bodies; }
+  std::uint32_t planBodies() const { return limits_.bodies; }
+  Status setAwakeDesign(std::uint32_t bodies);
   const double* positions() const { return positions_; }
   const double* velocities() const { return velocities_; }
   const Transform* transforms() const { return transforms_; }
@@ -227,6 +230,8 @@ class World {
   std::uint32_t live_ = 0;
   std::uint32_t retired_ = 0;
   std::uint32_t awakeBudget_ = 0;
+  std::uint32_t awakeDesign_ = kAwakeDesignBodies;
+  std::uint32_t nextAwakeDesign_ = kAwakeDesignBodies;
   std::uint32_t heldCount_ = 0;
   std::uint32_t poseEpoch_ = 0;
   bool posesTouched_ = true;
