@@ -1,4 +1,4 @@
-import { pos as statePos, vel as stateVel, head as stateHead, next as stateNext, cells as stateCells, occupied as stateOccupied } from './state.js'
+import { pos as statePos, vel as stateVel, head as stateHead, next as stateNext, cells as stateCells, occupied as stateOccupied, grid as stateGrid } from './state.js'
 import { bounceFor } from './respond.js'
 
 const HASH_X = 73856093
@@ -19,21 +19,29 @@ export const resolvePairs = (count, radius, restitution) => {
   const slots = occupied.length
   const wordMask = slots - 1
   const words = (count * 3) | 0
-  for (let c = 0; c < buckets; c++) head[c] = -1
-  for (let w = 0; w < slots; w++) occupied[w] = 0
-  for (let o = 0, i = 0; o < words; o += 3, i++) {
-    cells[o] = Math.floor(pos[o] / reach)
-    cells[o + 1] = Math.floor(pos[o + 1] / reach)
-    cells[o + 2] = Math.floor(pos[o + 2] / reach)
-    const cx = cells[o] | 0
-    const cy = cells[o + 1] | 0
-    const cz = cells[o + 2] | 0
-    const h = Math.imul(cx, HASH_X) ^ Math.imul(cy, HASH_Y) ^ Math.imul(cz, HASH_Z)
-    const b = h & mask
-    const w = (h >>> 5) & wordMask
-    occupied[w] = occupied[w] | (1 << (h & 31))
-    next[i] = head[b] | 0
-    head[b] = i
+  const grid = stateGrid
+  let stale = grid[0] === count ? 0 : 1
+  for (let o = 0; o < words; o += 3) {
+    const cx = Math.floor(pos[o] / reach) | 0
+    const cy = Math.floor(pos[o + 1] / reach) | 0
+    const cz = Math.floor(pos[o + 2] / reach) | 0
+    if (cells[o] !== cx || cells[o + 1] !== cy || cells[o + 2] !== cz) stale = 1
+    cells[o] = cx
+    cells[o + 1] = cy
+    cells[o + 2] = cz
+  }
+  if (stale === 1) {
+    for (let c = 0; c < buckets; c++) head[c] = -1
+    for (let w = 0; w < slots; w++) occupied[w] = 0
+    for (let o = 0, i = 0; o < words; o += 3, i++) {
+      const h = Math.imul(cells[o] | 0, HASH_X) ^ Math.imul(cells[o + 1] | 0, HASH_Y) ^ Math.imul(cells[o + 2] | 0, HASH_Z)
+      const b = h & mask
+      const w = (h >>> 5) & wordMask
+      occupied[w] = occupied[w] | (1 << (h & 31))
+      next[i] = head[b] | 0
+      head[b] = i
+    }
+    grid[0] = count
   }
   for (let oi = 0, i = 0; oi < words; oi += 3, i++) {
     const cx = cells[oi] | 0
