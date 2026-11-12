@@ -4,7 +4,7 @@ import { createHeightSampler } from './height-cpu.js'
 import { buildGridGeometry } from './patch-grid-geometry.js'
 import { Mat4 } from './mat4.js'
 
-export const VERSION = '0.2.0'
+export const VERSION = '0.1.0'
 
 const DEFAULT_GRID_SIZE = 32
 const ORIGIN = [0, 0, 0]

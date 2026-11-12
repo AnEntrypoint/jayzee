@@ -20,8 +20,10 @@ gate('the barrel exports createRenderer, createPlanet, VERSION and createAnchorF
   assert.equal(typeof sdk.createRenderer, 'function')
   assert.equal(typeof sdk.createPlanet, 'function')
   assert.equal(sdk.createAnchorField, createAnchorField)
-  assert.match(sdk.VERSION, /^\d+\.\d+\.\d+$/)
+  assert.equal(sdk.VERSION, '0.1.0')
   assert.equal(typeof sdk.createPlanetOrchestrator, 'function')
+  assert.equal(sdk.createHeightSampler, createHeightSampler)
+  for (const name of ['Quadtree', 'HEIGHT_UNIFORM_DEFAULTS', 'TERRAIN_DEFAULTS', 'SHAPE_UNIFORM_DEFAULTS']) assert.ok(sdk[name] !== undefined, `the barrel lacks spoint export ${name}`)
 })
 
 gate('createRenderer refuses a missing or incomplete backend, naming why', () => {
