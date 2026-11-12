@@ -268,6 +268,27 @@ bool restore(Field& field, std::uint32_t instance) {
   return true;
 }
 
+const Instance* instanceRow(const Field& field, std::uint32_t instance) {
+  const std::size_t cells = static_cast<std::size_t>(field.cellsPerSide) * field.cellsPerSide;
+  if (field.instancesPerCell == 0) return nullptr;
+  const std::size_t cell = instance / field.instancesPerCell;
+  const std::uint32_t k = instance % field.instancesPerCell;
+  if (cell >= cells || k >= field.counts[cell]) return nullptr;
+  return field.instances + instance;
+}
+
+bool anchorOf(const Field& field, std::uint32_t instance, float out[3]) {
+  const Instance* inst = instanceRow(field, instance);
+  if (inst == nullptr) return false;
+  const std::uint32_t cls = inst->cls & ~kPromotedBit;
+  if (cls >= kClassPass) return false;
+  const float lift = (cls == kClassTrunk ? kTrunkHalfHeight : kRockHalf) * inst->scale;
+  out[0] = inst->x;
+  out[1] = inst->y + lift;
+  out[2] = inst->z;
+  return true;
+}
+
 void registerCollisions() {
   JPH::CollisionDispatch::sRegisterCollideShape(JPH::EShapeSubType::User2, JPH::EShapeSubType::Sphere, collideFieldSphere);
   JPH::CollisionDispatch::sRegisterCollideShape(JPH::EShapeSubType::Sphere, JPH::EShapeSubType::User2, collideSphereField);

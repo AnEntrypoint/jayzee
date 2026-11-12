@@ -233,6 +233,8 @@ set(ENGINE_EXPORTS
   _engine_veg_promotion_refusals
   _engine_veg_promoted_rows
   _engine_veg_restore
+  _engine_veg_promote
+  _engine_veg_instance
   _engine_codec_bytes
   _engine_codec_values
   _engine_codec_encode_entity

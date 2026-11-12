@@ -669,6 +669,15 @@ EMSCRIPTEN_KEEPALIVE int engine_veg_restore() {
   return engine::world().restoreVegetation();
 }
 
+EMSCRIPTEN_KEEPALIVE double engine_veg_promote(std::uint32_t instance) {
+  return static_cast<double>(engine::world().promoteVegetation(instance));
+}
+
+EMSCRIPTEN_KEEPALIVE const engine::vegetation::Instance* engine_veg_instance(std::uint32_t instance) {
+  if (!engine::vegetation::isBound()) return nullptr;
+  return engine::vegetation::instanceRow(engine::vegetation::state(), instance);
+}
+
 EMSCRIPTEN_KEEPALIVE std::uint8_t* engine_codec_bytes() {
   return codecScratch->bytes;
 }

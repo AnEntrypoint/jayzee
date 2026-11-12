@@ -59,6 +59,8 @@ std::uint32_t drainTouches(const Touch*& rows);
 std::uint32_t droppedTouches();
 bool promote(Field& field, std::uint32_t instance);
 bool restore(Field& field, std::uint32_t instance);
+const Instance* instanceRow(const Field& field, std::uint32_t instance);
+bool anchorOf(const Field& field, std::uint32_t instance, float out[3]);
 void registerCollisions();
 
 class VegetationShape final : public SurfaceShape {

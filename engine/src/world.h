@@ -161,6 +161,7 @@ class World {
   Status addTrunk(const double* trunk);
   Status setVegetationPromotion(std::uint32_t cap);
   Status restoreVegetation();
+  std::int64_t promoteVegetation(std::uint32_t instance);
   std::uint32_t promotionCap() const { return promoteCap_; }
   std::uint32_t promotedInstances() const { return promotedCount_; }
   std::uint32_t promotionRefusals() const { return promotionRefusals_; }
@@ -235,6 +236,7 @@ class World {
   void rebase(double x, double y, double z);
   void removeBody(std::uint32_t index);
   void promoteTouched();
+  int promoteAt(std::uint32_t instance, float x, float y, float z);
   void forgetPromotions();
   void releaseRuntime();
   void classify(std::uint32_t joltBody, QueryHit& out) const;

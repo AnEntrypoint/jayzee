@@ -454,37 +454,55 @@ Status World::restoreVegetation() {
   return kOk;
 }
 
+int World::promoteAt(std::uint32_t instance, float x, float y, float z) {
+  vegetation::Field& field = vegetation::state();
+  if (!vegetation::promote(field, instance)) return kBadId;
+  const int slot = allocateSlot();
+  if (slot < 0) {
+    vegetation::restore(field, instance);
+    return kFull;
+  }
+  JPH::BodyInterface& bodies = runtime_->physics.GetBodyInterface();
+  const JPH::BodyID id(bodyIds_[slot]);
+  bodies.SetPositionAndRotation(id, JPH::RVec3(x, y, z), JPH::Quat::sIdentity(), JPH::EActivation::DontActivate);
+  if ((air_[slot] & kAirNow) != 0) bodies.SetObjectLayer(id, movingLayerOf(static_cast<std::uint32_t>(slot)));
+  air_[slot] = 0;
+  ceiling_[slot] = std::numeric_limits<float>::quiet_NaN();
+  bodies.AddBody(id, JPH::EActivation::Activate);
+  bodies.SetLinearAndAngularVelocity(id, JPH::Vec3::sZero(), JPH::Vec3::sZero());
+  alive_[slot] = kSlotAlive;
+  live_ += 1;
+  promoted_[promotedCount_] = PromotedRow{instance, (static_cast<std::uint32_t>(generations_[slot]) << kSlotBits) | static_cast<std::uint32_t>(slot)};
+  promotedCount_ += 1;
+  sync(static_cast<std::uint32_t>(slot));
+  return slot;
+}
+
 void World::promoteTouched() {
   const vegetation::Touch* touches = nullptr;
   const std::uint32_t count = vegetation::drainTouches(touches);
-  vegetation::Field& field = vegetation::state();
-  JPH::BodyInterface& bodies = runtime_->physics.GetBodyInterface();
   for (std::uint32_t i = 0; i < count; ++i) {
     const vegetation::Touch& touch = touches[i];
     if (promotedCount_ >= promoteCap_ || capacity_ - live_ - retired_ == 0) {
       promotionRefusals_ += 1;
       continue;
     }
-    if (!vegetation::promote(field, touch.instance)) continue;
-    const int slot = allocateSlot();
-    if (slot < 0) {
-      vegetation::restore(field, touch.instance);
-      promotionRefusals_ += 1;
-      continue;
-    }
-    const JPH::BodyID id(bodyIds_[slot]);
-    bodies.SetPositionAndRotation(id, JPH::RVec3(touch.x, touch.y, touch.z), JPH::Quat::sIdentity(), JPH::EActivation::DontActivate);
-    if ((air_[slot] & kAirNow) != 0) bodies.SetObjectLayer(id, movingLayerOf(static_cast<std::uint32_t>(slot)));
-    air_[slot] = 0;
-    ceiling_[slot] = std::numeric_limits<float>::quiet_NaN();
-    bodies.AddBody(id, JPH::EActivation::Activate);
-    bodies.SetLinearAndAngularVelocity(id, JPH::Vec3::sZero(), JPH::Vec3::sZero());
-    alive_[slot] = kSlotAlive;
-    live_ += 1;
-    promoted_[promotedCount_] = PromotedRow{touch.instance, (static_cast<std::uint32_t>(generations_[slot]) << kSlotBits) | static_cast<std::uint32_t>(slot)};
-    promotedCount_ += 1;
-    sync(static_cast<std::uint32_t>(slot));
+    if (promoteAt(touch.instance, touch.x, touch.y, touch.z) == kFull) promotionRefusals_ += 1;
   }
+}
+
+std::int64_t World::promoteVegetation(std::uint32_t instance) {
+  if (runtime_ == nullptr || vegetationBody_ == kNoBody) return kNotConfigured;
+  if (promotedCount_ >= kMaxPromotedInstances || capacity_ - live_ - retired_ == 0) return kFull;
+  const vegetation::Field& field = vegetation::state();
+  const vegetation::Instance* row = vegetation::instanceRow(field, instance);
+  if (row == nullptr || (row->cls & vegetation::kPromotedBit) != 0) return kBadId;
+  float anchor[3];
+  if (!vegetation::anchorOf(field, instance, anchor)) return kBadId;
+  const PhysicsOrigin& o = physicsOrigin();
+  const int slot = promoteAt(instance, static_cast<float>(anchor[0] - o.x), static_cast<float>(anchor[1] - o.y), static_cast<float>(anchor[2] - o.z));
+  if (slot < 0) return slot;
+  return static_cast<std::int64_t>(promoted_[promotedCount_ - 1].handle);
 }
 
 namespace {

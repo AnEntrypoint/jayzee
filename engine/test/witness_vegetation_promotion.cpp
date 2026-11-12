@@ -202,6 +202,39 @@ void rockPromotion() {
   check(pass.promoted == 0 && pass.refusals == 0 && pass.spheres[0][0] >= kPassClearance, "promotion: a pass-through instance is never promoted");
 }
 
+void explicitPromotion() {
+  plantTrunks(vegetation::kClassTrunk);
+  std::unique_ptr<World> w = makeWorld(kCapacity);
+  const std::uint32_t first = instanceOf(0.0f, trunkZ(0));
+  const std::uint32_t second = instanceOf(0.0f, trunkZ(1));
+  const std::uint64_t carvesBefore = engine::arena::carves();
+  const std::int64_t handle = w->promoteVegetation(second);
+  check(w->promotionCap() == 0 && handle >= 0 && w->promotedInstances() == 1 && w->promotedRows()[0].instance == second &&
+            w->promotedRows()[0].handle == static_cast<std::uint32_t>(handle) && w->count() == 1,
+        "promotion: an instance promoted by index takes one pooled body and one row, with the touch policy off");
+  const std::uint32_t slot = static_cast<std::uint32_t>(handle) & kSlotMask;
+  check(std::abs(w->positions()[slot * 3]) <= kAnchorTolerance && std::abs(w->positions()[slot * 3 + 1] - 3.0) <= kAnchorTolerance &&
+            std::abs(w->positions()[slot * 3 + 2] - trunkZ(1)) <= kAnchorTolerance,
+        "promotion: a trunk promoted by index starts its body at the middle of the trunk axis");
+  check(w->promoteVegetation(second) == kBadId && w->promoteVegetation(first + 1) == kBadId && w->promotedInstances() == 1,
+        "promotion: promoting an instance twice, or an index that holds no instance, is refused and takes no body");
+  const vegetation::Instance* row = vegetation::instanceRow(vegetation::state(), second);
+  check(row != nullptr && (row->cls & vegetation::kPromotedBit) != 0 && vegetation::instanceRow(vegetation::state(), first + 1) == nullptr,
+        "promotion: the instance row is readable by index and carries the mark");
+  const std::int64_t through = fire(*w, kHighHeight, trunkZ(1));
+  const std::int64_t stopped = fire(*w, kHighHeight, trunkZ(0));
+  w->step(kFireTicks);
+  check(xOf(*w, through) >= kPassClearance && xOf(*w, stopped) >= kStopMin && xOf(*w, stopped) <= kStopMax,
+        "promotion: the instance promoted by index no longer stops a sphere, and its unpromoted neighbour still does");
+  check(engine::arena::carves() == carvesBefore, "promotion: promoting by index carves nothing from the arena");
+  w->restoreVegetation();
+  check(w->promotedInstances() == 0 && (row->cls & vegetation::kPromotedBit) == 0, "promotion: restore clears an instance promoted by index");
+  bool filled = true;
+  for (std::uint32_t i = 0; i < kTrunks; ++i) filled = filled && w->promoteVegetation(instanceOf(0.0f, trunkZ(i))) >= 0;
+  check(filled && w->promotedInstances() == kTrunks, "promotion: three instances promoted by index hold three rows in call order");
+  w->restoreVegetation();
+}
+
 }
 
 void vegetationPromotion() {
@@ -210,6 +243,7 @@ void vegetationPromotion() {
   staticShapeIgnoresPromoted();
   poolExhaustion();
   rockPromotion();
+  explicitPromotion();
   vegetation::configure(vegetation::state(), kFieldOrigin, kFieldCellSize);
 }
 
