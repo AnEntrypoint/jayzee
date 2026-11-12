@@ -4692,3 +4692,28 @@ The Kaggle CLI was signed in again. Order: build, narrow gates, gate run, planet
 
 
 - Full test on the final tree: 306 checks run, 0 failed, 5874 PASS lines, 104 s.
+
+## Phase O (2026-11-12): memory footprint, kernel speed, binary and package size
+
+Done on one 4-CPU cloud container, Node 22.23 for the measurements and Node 24.22 for the allocation gates, emsdk 4.0.10 at the pinned commit. No Kaggle sign-in and no browser in this session.
+
+Measured here, each with its gate or its command.
+
+- Kernel (`src/kernel`, commit 3d5e718). `kernel.wasm` 131,666 to 16,460 bytes, with no import. `npm run bench -- 500 200`: 7.78 to 0.42 ms a tick; 2000 bodies 27 to 3.1 ms; 5000 bodies 71 to 10 ms (the old figures at 2000 and 5000 are the ones recorded in ARCHITECTURE.md, not taken again). `World#hash` every 50 ticks for 400 ticks in four scenes (300, 1500, 64 and 900 bodies, with boxes, restitution 0.9 and a 30 Hz tick among them) is the same as at commit 5f8e497, compared by `cmp`. A 500-body world holds 65 KiB of wasm memory against 1090 KiB and 67 KiB resident against 526 KiB, over 200 worlds. Gates: `check:kernel` (no import, under 32,768 bytes, one bucket against 4096 bit for bit), `check:world`, `check:netcode`, `check:site`.
+- Engine memory (commit 81ddcb1). Resident after instantiation, 1024 MiB threaded SIMD glue: 1118 to 92 MiB, instantiation 528 to 48 ms. 64 MiB threaded: 156 to 92 MiB. Fixed 512 MiB: 56 to 50 MiB. Peak of the bench process at 131072 bodies, 4 workers, warmed, by `scripts/measure-memory.mjs`: 1723.3 to 198.1 MB. Gate: `check:engine-footprint`.
+- Engine size (same commit). Fixed glue 1,408,976 to 559,648 bytes; threaded SIMD 1024 MiB glue 1,698,311 to 662,564; brotli 398,811 to 173,253 and 336,353 to 166,134. The JavaScript glue is unchanged (84 and 98 kB).
+- Engine tick, `scripts/kaggle/bench.mjs` at 131072 bodies, 4096 awake, 4 workers, 900 ticks, warmed, old and new glue alternated on this host. Mean awake tick: 3.725 3.622 3.687 against 3.598 3.738 3.853; a second set 3.602 3.707 3.690 against 3.687 3.749 3.740; a third of four 3.743 3.835 4.087 3.995 against 3.978 4.166 3.836 3.845. Visual settle tick 684, 78224 held at the end, solver peak 34,806,512 bytes and zero update errors in every run of both. Load 681 to 112 ms and the warm run 700 to 210 ms.
+- Package (commit 0b0f9b8). Tarball 675.6 to 38.0 kB, 610 to 43 files; a consumer install's `node_modules` 2.7 MB with the tarball installed in an empty project, where the eight moved packages are about 126 MB of this repo's `node_modules`. `World`, `jayzee-create-app` and `jayzee-serve` ran from that install. Gate: `check:package-surface`.
+
+Not validated, and what each needs.
+
+- The Kaggle regression gate has not run on the engine payload. `engine/src/arena.cpp`, `engine/src/world.cpp` and `engine/CMakeLists.txt` changed, so `scripts/kaggle/push-gate.mjs` refuses this tree where the pre-push hook is installed. It was not installed in the session's clone, and the commits were pushed to the session branch only. `npm run kaggle:regress` must pass before the branch is merged. What it has to settle that this host cannot: the tick is equal within this host's 8 percent spread and no finer; and with the arena no longer written at load, a threaded instance takes its first-touch page faults during the ticks in which the arena use grows (21 MB over 151 ticks in the bench), where before every page was faulted in at instantiation. The fixed glues always did this.
+- No browser witness ran: the playwriter server did not connect and no planet witness was started. The render pages, the physics worker, the warm worker and `performance.measureUserAgentSpecificMemory` figures in AGENTS.md (1035 MB, 1086 MB, 516 MB saved by the warm release) were taken with the arena in BSS. They should be lower now and are not measured. `npm run planet-witness` on the four configurations is the check.
+- `-Os` for the engine and Jolt: 608,674 bytes for the threaded SIMD glue against 662,564, brotli 156,051 against 166,134. Mean awake tick in four alternated repeats 3.894 3.877 3.855 3.846 against 3.978 4.166 3.836 3.845 at `-O2`, and with one worker at 12288 bodies 4.37 against 4.52 ms at the median of six, inside the spread. Not adopted: a Kaggle run with `ENGINE_OPT_LEVEL=-Os` as the candidate is what would adopt it.
+- CI runs Node 22 and 24. `check:pose-allocations` and `check:scenario-allocations` fail on Node 22.23.4 here on the tree before this phase as well. Whether CI's Node 22 fails them is not known from here.
+
+Left as a proposal, not started.
+
+- One binary per feature set, with the memory size chosen at instantiation. The tiers differ only in `INITIAL_MEMORY` and `ENGINE_ARENA_BYTES`: the 64 and 128 MiB fixed glues are the same size to the byte, and the plan already takes its budget at run time. With the arena taken by `sbrk`, its size no longer has to be a compile-time constant; what is left is for the host to create the `WebAssembly.Memory` and for the module to import it. That would replace the fourteen glues CI builds with four or five and remove `glueTier`'s download of a second glue after a failed reservation. It touches every loader, the pins, the CI list and about forty scripts that name a glue, so it wants its own phase with the browser witnesses available.
+
+- Full test on the final tree under Node 24.22.1: 308 checks run, 0 failed, 5886 PASS lines, 99 s. Under Node 22.23.4 the same tree fails the two allocation gates named above and passes the rest.

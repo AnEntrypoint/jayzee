@@ -2,317 +2,319 @@
 
 Written by `npm test -- --write-times` from `build/checks/timings.json`, the last wall time of each check on this host. A check over 2 s carries its reason from `scripts/test-slow-reasons.json`.
 
-Sum of the checks: 180.9 s across 307 entries. The checks run four at a time, so the wall time of a full run is lower; the runner prints it.
+Sum of the checks: 168.8 s across 309 entries. The checks run four at a time, so the wall time of a full run is lower; the runner prints it.
 
 | check | wall ms | serial | reason when over 2 s |
 |---|---|---|---|
-| `check:engine-state-hash-1024` | 14477 | yes | Five isolated 1024-tier runs of 120 ticks (fixed, and 2, 4, 7, 8 workers). They now run at the same time; before, they ran one after another and the 4-worker run was done twice (29 s). |
-| `check:scenario-determinism` | 14463 | yes | 64 child runs: eight scenarios on the fixed build and the threaded build at 2 and 4 workers, for two build pairs. |
-| `check:scenario-marble-bowl` | 14266 | yes | 512 marbles for 600 ticks, twice, on four tiers. Containment, settling and bit-for-bit agreement are the claims, with a bound of 25 ms of main-thread CPU time per tick on the single-threaded tiers. The 16.7 ms budget and the threaded tier are judged in the Kaggle regression run (scripts/kaggle/marble.mjs): wall time failed here under host load, and on a threaded tier the main thread spins while starved workers catch up, so its CPU time rose to 29.5 ms in a loaded full run. |
-| `check:gc-witness` | 11971 |  | 20000 measured ticks and 20000 control ticks under a GC observer. The count is the claim, so the ticks stay. |
-| `check:engine-tiers` | 10165 |  | The settle row spawns 10240 bodies at the scene spacing (1.2 m, above the 1.0 m diameter) and steps 360 ticks, so the counted window covers the fall and the sleep. At 0.6 m spacing the bodies overlapped and the same row took 62 s, and that overlap case is no longer covered by this gate. |
-| `check:engine-job-wait` | 7308 | yes | Five runs of 300 ticks of 1200 bodies in 100 piles: fixed, and 2 and 4 workers twice each. |
-| `check:elevation-ab` | 6591 |  | Runs spoint A/B elevation script at the fixture N and compares its output line for line. |
-| `check:pose-allocations` | 5168 |  | 2000 warm-up frames of the 1024-player threaded tick on the planet-surface scene, the spawn the render witness uses, at about 4 ms a frame. On the flat scene the bodies fall off the ground box under planet gravity and never sleep, so each frame costs about 20 ms and the same warm-up takes 88 s. With 300 or 700 warm-up frames the sampler still sees one-off function-level allocations (10128 B and 1224 B) from V8 tier-up, so the warm-up cannot be shortened without a false failure. Counted frames are sampled per allocation. |
-| `check:app-watch` | 4576 |  | Waits on real file-watch events. |
-| `check:height-cpu` | 4210 |  | Evaluates every spoint height fixture sample to 1e-12. |
-| `check:alloc-audit` | 4136 |  | Sixteen rows of 50,000 calls each under a 1 MiB semi-space. |
-| `check:sphere-population` | 4101 |  | Places the full sphere population and checks every member. |
-| `check:engine-release` | 3419 |  | Loads seven threaded 512 MiB instances in turn and waits for the collector after each. |
-| `check:vegetation-allocations` | 3400 | yes | 6000 warm-up frames before the sampled window; at 2000 the compile of the gate function landed inside the window. |
-| `check:heightmap-cli` | 2896 |  | Runs the heightmap CLI once per fixture case. |
-| `check:scenario-lockstep-rts` | 2790 | yes | Six peers per tier on four tiers. |
-| `check:scenario-deathrun` | 2767 | yes | Six runs per tier on four tiers. |
-| `check:scenario-boss-fight` | 2602 | yes | Six runs per tier on four tiers. |
-| `check:scenario-combat-bots` | 2445 | yes | Two runs on four tiers, with the duel and its wall and ridge controls. |
-| `check:scenario-allocations` | 2089 | yes | 30000 warm-up ticks per loop, one loop per process. |
-| `check:engine-threads` | 2055 | yes | Runs the threaded scenario at several worker counts. |
-| `check:thread-sampler` | 2046 | yes | Samples real threads over a timed window. |
-| `check:vegetation-generate-cost` | 1909 |  |  |
-| `check:own-display` | 1837 |  |  |
-| `check:mapspinner-atmosphere` | 1765 |  |  |
-| `check:scenario-character-terrain` | 1523 | yes |  |
-| `check:snapshots` | 1462 |  |  |
-| `check:planet-witness-scene` | 1447 |  |  |
-| `check:scenario-projectile-volley` | 1223 | yes |  |
-| `check:scenario-settle` | 1110 | yes |  |
-| `check:scenario-planet-landing` | 1089 | yes |  |
-| `check:types` | 1045 |  |  |
-| `check:engine-raycast` | 1019 |  |  |
-| `check:engine-shapecast` | 981 |  |  |
-| `check:gc-reuse-rows` | 965 |  |  |
-| `check:engine-seal` | 959 |  |  |
-| `check:planet-scene-counts` | 958 |  |  |
-| `check:scenario-character` | 892 | yes |  |
-| `check:wireweave-relay` | 830 |  |  |
-| `check:engine-host-witness` | 812 |  |  |
-| `check:upload-writes` | 790 |  |  |
-| `check:create-app` | 774 |  |  |
-| `check:netcode` | 756 |  |  |
-| `check:upload-handler` | 692 |  |  |
-| `check:engine-awake-budget` | 668 |  |  |
-| `check:crowd-dot-buffer` | 656 |  |  |
-| `check:terrain-agreement` | 606 |  |  |
-| `check:pose-replay` | 605 |  |  |
-| `build:kernel` | 591 |  |  |
-| `check:transport` | 567 |  |  |
-| `check:planet-witness` | 553 |  |  |
-| `check:engine-warm` | 528 |  |  |
-| `check:socket-server` | 459 |  |  |
-| `check:engine-airborne` | 451 |  |  |
-| `check:engine-pools` | 410 |  |  |
-| `check:ci-engine-glue` | 373 |  |  |
-| `check:stall-attribution` | 356 |  |  |
-| `check:project-naming` | 314 |  |  |
-| `check:physics-pure` | 305 |  |  |
-| `check:sharding` | 294 |  |  |
-| `check:kernel` | 292 |  |  |
-| `check:engine-world` | 290 |  |  |
-| `check:engine-materials` | 280 |  |  |
-| `check:engine-vegetation` | 279 |  |  |
-| `check:collision-placement-options` | 278 |  |  |
-| `check:world-config` | 259 |  |  |
-| `check:world-query` | 258 |  |  |
-| `check:world` | 253 |  |  |
-| `check:ccd` | 247 |  |  |
-| `check:physics-integration-vehicles` | 232 |  |  |
-| `check:packages` | 220 |  |  |
-| `check:webgpu-profile` | 214 |  |  |
-| `check:collision-mirror` | 213 |  |  |
-| `check:vehicles-spoint` | 207 |  |  |
-| `check:sdk-surfaces` | 203 |  |  |
-| `check:collision-tile-streamer` | 195 |  |  |
-| `check:engine-planet` | 192 |  |  |
-| `check:player-vat-spoint` | 189 |  |  |
-| `check:site-world` | 187 |  |  |
-| `check:raycast-spoint` | 187 |  |  |
+| `check:scenario-marble-bowl` | 15965 | yes | 512 marbles for 600 ticks, twice, on four tiers. Containment, settling and bit-for-bit agreement are the claims, with a bound of 25 ms of main-thread CPU time per tick on the single-threaded tiers. The 16.7 ms budget and the threaded tier are judged in the Kaggle regression run (scripts/kaggle/marble.mjs): wall time failed here under host load, and on a threaded tier the main thread spins while starved workers catch up, so its CPU time rose to 29.5 ms in a loaded full run. |
+| `check:engine-state-hash-1024` | 14222 | yes | Five isolated 1024-tier runs of 120 ticks (fixed, and 2, 4, 7, 8 workers). They now run at the same time; before, they ran one after another and the 4-worker run was done twice (29 s). |
+| `check:scenario-determinism` | 12552 | yes | 64 child runs: eight scenarios on the fixed build and the threaded build at 2 and 4 workers, for two build pairs. |
+| `check:engine-tiers` | 8017 |  | The settle row spawns 10240 bodies at the scene spacing (1.2 m, above the 1.0 m diameter) and steps 360 ticks, so the counted window covers the fall and the sleep. At 0.6 m spacing the bodies overlapped and the same row took 62 s, and that overlap case is no longer covered by this gate. |
+| `check:elevation-ab` | 7785 |  | Runs spoint A/B elevation script at the fixture N and compares its output line for line. |
+| `check:engine-job-wait` | 7732 | yes | Five runs of 300 ticks of 1200 bodies in 100 piles: fixed, and 2 and 4 workers twice each. |
+| `build:kernel` | 5549 |  | Compiles the kernel with jz. It is skipped when src/kernel and the jz package are unchanged. |
+| `check:height-cpu` | 4760 |  | Evaluates every spoint height fixture sample to 1e-12. |
+| `check:alloc-audit` | 4591 |  | Sixteen rows of 50,000 calls each under a 1 MiB semi-space. |
+| `check:app-watch` | 4578 |  | Waits on real file-watch events. |
+| `check:sphere-population` | 4303 |  | Places the full sphere population and checks every member. |
+| `check:vegetation-allocations` | 3697 | yes | 6000 warm-up frames before the sampled window; at 2000 the compile of the gate function landed inside the window. |
+| `check:heightmap-cli` | 3542 |  | Runs the heightmap CLI once per fixture case. |
+| `check:pose-allocations` | 3271 |  | 2000 warm-up frames of the 1024-player threaded tick on the planet-surface scene, the spawn the render witness uses, at about 4 ms a frame. On the flat scene the bodies fall off the ground box under planet gravity and never sleep, so each frame costs about 20 ms and the same warm-up takes 88 s. With 300 or 700 warm-up frames the sampler still sees one-off function-level allocations (10128 B and 1224 B) from V8 tier-up, so the warm-up cannot be shortened without a false failure. Counted frames are sampled per allocation. |
+| `check:own-display` | 3251 |  | NO REASON RECORDED |
+| `check:engine-release` | 2803 |  | Loads seven threaded 512 MiB instances in turn and waits for the collector after each. |
+| `check:engine-threads` | 2611 | yes | Runs the threaded scenario at several worker counts. |
+| `check:scenario-allocations` | 2581 | yes | 30000 warm-up ticks per loop, one loop per process. |
+| `check:mapspinner-atmosphere` | 2135 |  | Integrates the atmosphere tables against spoint values. |
+| `check:thread-sampler` | 2056 | yes | Samples real threads over a timed window. |
+| `check:vegetation-generate-cost` | 1624 |  |  |
+| `check:types` | 1474 |  |  |
+| `check:gc-witness` | 1412 |  |  |
+| `check:scenario-lockstep-rts` | 1301 | yes |  |
+| `check:gc-reuse-rows` | 1284 |  |  |
+| `check:engine-host-witness` | 1242 |  |  |
+| `check:scenario-deathrun` | 1161 | yes |  |
+| `check:scenario-boss-fight` | 1086 | yes |  |
+| `check:engine-footprint` | 1045 |  |  |
+| `check:scenario-combat-bots` | 1028 | yes |  |
+| `check:scenario-character-terrain` | 977 | yes |  |
+| `check:wireweave-relay` | 868 |  |  |
+| `check:engine-awake-budget` | 866 |  |  |
+| `check:planet-witness-scene` | 851 |  |  |
+| `check:create-app` | 838 |  |  |
+| `check:engine-warm` | 831 |  |  |
+| `check:upload-writes` | 813 |  |  |
+| `check:pose-replay` | 797 |  |  |
+| `check:transport` | 783 |  |  |
+| `check:scenario-projectile-volley` | 767 | yes |  |
+| `check:crowd-dot-buffer` | 737 |  |  |
+| `check:scenario-planet-landing` | 727 | yes |  |
+| `check:upload-handler` | 717 |  |  |
+| `check:package-surface` | 641 |  |  |
+| `check:engine-airborne` | 638 |  |  |
+| `check:scenario-settle` | 611 | yes |  |
+| `check:planet-witness` | 574 |  |  |
+| `check:engine-raycast` | 559 |  |  |
+| `check:terrain-agreement` | 516 |  |  |
+| `check:socket-server` | 511 |  |  |
+| `check:planet-scene-counts` | 490 |  |  |
+| `check:engine-pools` | 487 |  |  |
+| `check:engine-shapecast` | 456 |  |  |
+| `check:engine-seal` | 422 |  |  |
+| `check:collision-placement-options` | 418 |  |  |
+| `check:engine-vegetation` | 414 |  |  |
+| `check:scenario-character` | 406 | yes |  |
+| `check:stall-attribution` | 377 |  |  |
+| `check:engine-world` | 365 |  |  |
+| `check:sharding` | 312 |  |  |
+| `check:packages` | 295 |  |  |
+| `check:fire` | 286 |  |  |
+| `check:vehicles-spoint` | 286 |  |  |
+| `check:physics-integration-vehicles` | 281 |  |  |
+| `check:rebase-session` | 258 |  |  |
+| `check:engine-materials` | 251 |  |  |
+| `check:collision-mirror` | 245 |  |  |
+| `check:recast-bake-spoint` | 236 |  |  |
+| `check:dormant-spoint` | 231 |  |  |
+| `check:raycast-spoint` | 230 |  |  |
+| `check:engine-sleep` | 226 |  |  |
+| `check:engine-planet` | 223 |  |  |
+| `check:webgpu-profile` | 218 |  |  |
+| `check:project-naming` | 213 |  |  |
+| `check:engine-bridge` | 213 |  |  |
+| `check:sdk-surfaces` | 201 |  |  |
+| `check:snapshots` | 197 |  |  |
+| `check:engine-budget-floor` | 190 |  |  |
+| `check:site-world` | 189 |  |  |
+| `check:decode-path` | 189 |  |  |
+| `check:camera-relative` | 188 |  |  |
+| `check:upstream-builtin-nav` | 186 |  |  |
 | `check:dormant-budget-spoint` | 186 |  |  |
-| `check:engine-budget-floor` | 186 |  |  |
-| `check:dormant-spoint` | 185 |  |  |
-| `check:engine-bridge` | 184 |  |  |
-| `check:overlap-spoint` | 183 |  |  |
-| `check:collision-host` | 182 |  |  |
-| `check:vehicle-refusal-spoint` | 182 |  |  |
-| `check:vehicle-remove-spoint` | 178 |  |  |
-| `check:chart-state-live` | 175 |  |  |
-| `check:fire` | 168 |  |  |
-| `check:player-lod-renderer` | 168 |  |  |
-| `check:recast-bake-spoint` | 167 |  |  |
-| `check:engine-sleep` | 163 |  |  |
-| `check:rebase-session` | 158 |  |  |
-| `check:player-lod-renderer-webgpu` | 156 |  |  |
-| `check:bloom-spoint` | 153 |  |  |
-| `check:decode-path` | 153 |  |  |
-| `check:player-dot-shader-spoint` | 152 |  |  |
-| `check:player-dot-material-spoint` | 151 |  |  |
-| `check:camera-relative` | 147 |  |  |
-| `check:streaming-gltf-mesh` | 140 |  |  |
-| `check:scene-setup-spoint` | 134 |  |  |
-| `check:engine-leak` | 134 |  |  |
-| `check:streamer-p99` | 132 |  |  |
-| `check:terrain-static` | 128 |  |  |
-| `check:fire-modules` | 127 |  |  |
-| `check:cluster-lod-spoint` | 127 |  |  |
-| `check:vegetation-leaf-patches` | 124 |  |  |
-| `check:upstream-builtin-nav` | 122 |  |  |
-| `check:terrain-pure` | 118 |  |  |
-| `check:kaggle-regress` | 116 |  |  |
-| `check:sample-order` | 112 |  |  |
-| `check:vat-spoint` | 109 |  |  |
-| `check:engine-interest` | 109 |  |  |
-| `check:lockstep` | 108 |  |  |
-| `check:engine-codecs` | 108 |  |  |
-| `check:timed-result` | 106 |  |  |
-| `check:engine-core` | 103 |  |  |
-| `check:follow-misuse` | 100 |  |  |
-| `check:spline-erosion-witness` | 98 |  |  |
-| `check:ssr-spoint` | 98 |  |  |
-| `check:fsr1-spoint` | 97 |  |  |
-| `check:glue-tier` | 97 |  |  |
-| `check:sessions` | 93 |  |  |
-| `check:script-limits` | 93 |  |  |
-| `check:socket-upgrade` | 93 |  |  |
-| `check:bin-snapshot` | 90 |  |  |
-| `check:chart-anchor` | 89 |  |  |
-| `check:procgen` | 84 |  |  |
-| `check:import-scene` | 84 |  |  |
-| `check:client-resource-pools` | 84 |  |  |
-| `check:client-pure` | 83 |  |  |
-| `check:upstream-skill-registry` | 79 |  |  |
-| `check:lag-compensation` | 78 |  |  |
-| `check:spoint-core-rust` | 78 |  |  |
-| `check:replay-file` | 77 |  |  |
-| `check:replay-player` | 76 |  |  |
-| `check:player-collisions` | 76 |  |  |
-| `check:tick-governor` | 73 | yes |  |
-| `check:frame-stall-cause` | 72 |  |  |
-| `check:behaviours` | 71 |  |  |
-| `check:msgpack-packer` | 71 |  |  |
-| `check:vegetation-stream` | 71 |  |  |
-| `check:lod-tiers` | 69 |  |  |
-| `check:spawn` | 68 |  |  |
-| `check:collider-streamer` | 68 |  |  |
-| `check:chart-reanchor` | 67 |  |  |
-| `check:client-message-handler` | 67 |  |  |
+| `check:netcode` | 181 |  |  |
+| `check:player-lod-renderer` | 178 |  |  |
+| `check:vehicle-remove-spoint` | 176 |  |  |
+| `check:chart-state-live` | 176 |  |  |
+| `check:collision-host` | 175 |  |  |
+| `check:collision-tile-streamer` | 174 |  |  |
+| `check:player-lod-renderer-webgpu` | 170 |  |  |
+| `check:vegetation-leaf-patches` | 170 |  |  |
+| `check:overlap-spoint` | 169 |  |  |
+| `check:vehicle-refusal-spoint` | 168 |  |  |
+| `check:cluster-lod-spoint` | 168 |  |  |
+| `check:player-dot-shader-spoint` | 165 |  |  |
+| `check:player-vat-spoint` | 163 |  |  |
+| `check:streamer-p99` | 157 |  |  |
+| `check:terrain-pure` | 153 |  |  |
+| `check:terrain-static` | 149 |  |  |
+| `check:streaming-gltf-mesh` | 144 |  |  |
+| `check:player-dot-material-spoint` | 144 |  |  |
+| `check:bloom-spoint` | 144 |  |  |
+| `check:sample-order` | 144 |  |  |
+| `check:engine-leak` | 140 |  |  |
+| `check:bin-snapshot` | 137 |  |  |
+| `check:fire-modules` | 136 |  |  |
+| `check:lockstep` | 135 |  |  |
+| `check:engine-interest` | 134 |  |  |
+| `check:chart-anchor` | 133 |  |  |
+| `check:spline-erosion-witness` | 127 |  |  |
+| `check:engine-codecs` | 121 |  |  |
+| `check:kernel` | 116 |  |  |
+| `check:scene-setup-spoint` | 113 |  |  |
+| `check:ssr-spoint` | 112 |  |  |
+| `check:vat-spoint` | 108 |  |  |
+| `check:kaggle-regress` | 108 |  |  |
+| `check:follow-misuse` | 105 |  |  |
+| `check:engine-core` | 105 |  |  |
+| `check:client-resource-pools` | 104 |  |  |
+| `check:sessions` | 103 |  |  |
+| `check:lag-compensation` | 101 |  |  |
+| `check:replay-file` | 99 |  |  |
+| `check:collider-streamer` | 99 |  |  |
+| `check:procgen` | 98 |  |  |
+| `check:ci-engine-glue` | 95 |  |  |
+| `check:sdk-misc` | 94 |  |  |
+| `check:fsr1-spoint` | 94 |  |  |
+| `check:client-pure` | 93 |  |  |
+| `check:socket-upgrade` | 91 |  |  |
+| `check:physics-pure` | 88 |  |  |
+| `check:glue-tier` | 86 |  |  |
+| `check:tick-governor` | 85 | yes |  |
+| `check:world` | 83 |  |  |
+| `check:import-scene` | 83 |  |  |
+| `check:reduced-pose` | 83 |  |  |
+| `check:snapshot-lod` | 82 |  |  |
+| `check:apps-b` | 81 |  |  |
+| `check:frame-stall-cause` | 81 |  |  |
+| `check:anticheat-spoint` | 80 |  |  |
+| `check:replay-player` | 78 |  |  |
+| `check:client-message-handler` | 78 |  |  |
+| `check:snapshot-packer` | 78 |  |  |
+| `check:mat4-spoint` | 78 |  |  |
+| `check:octree` | 77 |  |  |
+| `check:player-collisions` | 77 |  |  |
+| `check:vegetation-stream` | 77 |  |  |
+| `check:behaviours` | 76 |  |  |
+| `check:upstream-door-routes` | 76 |  |  |
+| `check:netcode-small` | 75 |  |  |
+| `check:negative-zero` | 74 |  |  |
+| `check:spawn` | 73 |  |  |
+| `check:upstream-builtins` | 73 |  |  |
+| `check:upstream-skill-registry` | 73 |  |  |
+| `check:protocol-codecs` | 72 |  |  |
+| `check:rollback` | 72 |  |  |
+| `check:behaviour-health-destructible` | 71 |  |  |
+| `check:lod-tiers` | 71 |  |  |
+| `check:spoint-core-rust` | 71 |  |  |
+| `check:engine-render` | 71 |  |  |
+| `check:stage` | 70 |  |  |
+| `check:event-log` | 70 |  |  |
+| `check:animation-control` | 70 |  |  |
+| `check:chart-reanchor` | 70 |  |  |
+| `check:game-systems-spoint` | 70 |  |  |
+| `check:render` | 69 |  |  |
+| `check:client-loops` | 69 |  |  |
+| `check:chart-transfer` | 69 |  |  |
+| `check:replay-dialect` | 69 |  |  |
+| `check:paint-store` | 68 |  |  |
+| `check:cluster-handoff` | 68 |  |  |
+| `check:upstream-doors` | 68 |  |  |
+| `check:upload-route` | 68 |  |  |
+| `check:streaming-gltf-queues` | 67 |  |  |
+| `check:upstream-skill-bodies` | 67 |  |  |
+| `check:upstream-builtin-ballistics` | 67 |  |  |
+| `check:engine-artifacts` | 67 |  |  |
+| `check:game-systems` | 66 |  |  |
 | `check:prediction-engine` | 66 |  |  |
-| `check:engine-render` | 66 |  |  |
-| `check:snapshot-lod` | 65 |  |  |
-| `check:netcode-small` | 65 |  |  |
-| `check:player-lod-plan` | 65 |  |  |
-| `check:controlled-run` | 65 |  |  |
-| `check:protocol` | 64 |  |  |
-| `check:streaming-gltf-queues` | 64 |  |  |
-| `check:hot-reload-spoint` | 64 |  |  |
-| `check:protocol-codecs` | 63 |  |  |
+| `check:shared-pure` | 66 |  |  |
+| `check:protocol` | 65 |  |  |
+| `check:upstream-builtin-bodies` | 65 |  |  |
+| `check:msgpack-packer` | 65 |  |  |
+| `check:cluster-slice` | 65 |  |  |
+| `check:world-config` | 64 |  |  |
+| `check:paired-report` | 64 |  |  |
+| `check:msgpackr-compat` | 63 |  |  |
+| `check:behaviours-c` | 63 |  |  |
 | `check:chart-migrators` | 63 |  |  |
-| `check:entity-host` | 63 |  |  |
-| `check:snapshot-packer` | 62 |  |  |
+| `check:client-machines` | 62 |  |  |
 | `check:wireweave-frame-spoint` | 62 |  |  |
-| `check:rollback` | 61 |  |  |
-| `check:sdk-misc` | 61 |  |  |
-| `check:game-systems` | 60 |  |  |
-| `check:behaviour-health-destructible` | 60 |  |  |
-| `check:animation-control` | 60 |  |  |
-| `check:upstream-skill-bodies` | 60 |  |  |
-| `check:behaviours-c` | 60 |  |  |
-| `check:upload-route` | 60 |  |  |
-| `check:replay-dialect` | 60 |  |  |
-| `check:hygiene` | 60 |  |  |
-| `check:msgpackr-compat` | 59 |  |  |
-| `check:cluster-handoff` | 59 |  |  |
-| `check:shared-pure` | 59 |  |  |
-| `check:pathfinding` | 58 |  |  |
-| `check:negative-zero` | 58 |  |  |
-| `check:world-persistence` | 57 |  |  |
+| `check:hygiene` | 62 |  |  |
+| `check:hot-reload-spoint` | 61 |  |  |
+| `check:aoi` | 60 |  |  |
+| `check:upstream-door-dispatch` | 60 |  |  |
+| `check:network-state` | 60 |  |  |
+| `check:physics-integration` | 60 |  |  |
+| `check:app-loader` | 60 |  |  |
+| `check:player-lod-plan` | 60 |  |  |
+| `check:controlled-run` | 60 |  |  |
+| `check:pathfinding` | 59 |  |  |
+| `check:upstream-builtin-env` | 59 |  |  |
+| `check:client-tier-split` | 59 |  |  |
+| `check:behaviours-a` | 58 |  |  |
+| `check:chart-state-server` | 58 |  |  |
+| `check:tick-authority` | 57 |  |  |
+| `check:snapshot-processor` | 57 |  |  |
 | `check:telemetry` | 57 |  |  |
-| `check:reduced-pose` | 57 |  |  |
-| `check:engine-artifacts` | 57 |  |  |
-| `check:paint-store` | 56 |  |  |
-| `check:octree` | 56 |  |  |
-| `check:aoi` | 56 |  |  |
-| `check:event-log` | 56 |  |  |
-| `check:apps-a` | 56 |  |  |
-| `check:client-machines` | 56 |  |  |
-| `check:app-loader` | 56 |  |  |
-| `check:mat4-spoint` | 56 |  |  |
-| `check:sdk-editor` | 55 |  |  |
-| `check:paired-report` | 55 |  |  |
-| `check:frequency-runs` | 55 |  |  |
-| `check:snapshot-processor` | 54 |  |  |
-| `check:upstream-builtin-noise` | 54 |  |  |
-| `check:chart-state-server` | 54 |  |  |
-| `check:game-systems-spoint` | 54 |  |  |
-| `check:collision-placement` | 54 |  |  |
-| `check:stage` | 53 |  |  |
-| `check:tick-authority` | 53 |  |  |
-| `check:client-pure-rows` | 53 |  |  |
-| `check:cluster-slice` | 53 |  |  |
-| `check:render` | 52 |  |  |
-| `check:upstream-door-routes` | 52 |  |  |
-| `check:upstream-builtin-water` | 52 |  |  |
-| `check:behaviours-a` | 52 |  |  |
-| `check:apps-b` | 52 |  |  |
-| `check:client-tier-split` | 52 |  |  |
-| `check:upstream-builtin-bodies` | 51 |  |  |
+| `check:world-query` | 57 |  |  |
+| `check:world-persistence` | 56 |  |  |
+| `check:upstream-tome-bodies` | 56 |  |  |
+| `check:upstream-builtin-easing` | 56 |  |  |
+| `check:behaviours-b` | 56 |  |  |
+| `check:client-pure-rows` | 56 |  |  |
+| `check:asset-pipeline` | 56 |  |  |
+| `check:feature-gap` | 55 |  |  |
+| `check:relocation-solve` | 55 |  |  |
+| `check:upstream-builtin-physics` | 55 |  |  |
+| `check:upstream-builtin-room-routing` | 55 |  |  |
+| `check:bundle-freshness-jayzee` | 54 |  |  |
+| `check:upstream-builtin-fx` | 54 |  |  |
+| `check:frequency-runs` | 54 |  |  |
+| `check:upstream-tome-lookup` | 53 |  |  |
+| `check:sdk-editor` | 53 |  |  |
+| `check:upstream-builtin-lighting` | 52 |  |  |
+| `check:material-tier-swap-spoint` | 52 |  |  |
+| `check:sandbox` | 51 |  |  |
+| `check:anticheat` | 51 |  |  |
+| `check:transport-framing` | 50 |  |  |
+| `check:constraint-limits` | 50 |  |  |
+| `check:clusters` | 50 |  |  |
 | `check:row16-client-decoder` | 50 |  |  |
-| `check:chart-transfer` | 50 |  |  |
-| `check:upstream-tome-bodies` | 50 |  |  |
-| `check:upstream-builtin-physics` | 50 |  |  |
+| `check:heightfield-physics` | 50 |  |  |
 | `check:app-behaviours` | 50 |  |  |
-| `check:upstream-builtin-lighting` | 49 |  |  |
-| `check:behaviours-b` | 49 |  |  |
-| `check:editor-serialize` | 49 |  |  |
-| `check:physics-integration` | 49 |  |  |
-| `check:spawn-named-errors` | 48 |  |  |
-| `check:client-loops` | 48 |  |  |
-| `check:feature-gap` | 48 |  |  |
-| `check:bundle-freshness-jayzee` | 48 |  |  |
-| `check:rollback-bridge` | 48 |  |  |
-| `check:clusters` | 48 |  |  |
-| `check:material-tier-swap-spoint` | 48 |  |  |
-| `check:asset-pipeline` | 48 |  |  |
-| `check:planet-gap-class` | 48 |  |  |
-| `check:sandbox` | 47 |  |  |
-| `check:upstream-endpoints` | 47 |  |  |
-| `check:transport-framing` | 47 |  |  |
-| `check:anticheat-spoint` | 47 |  |  |
-| `check:animation` | 47 |  |  |
-| `check:physics-extras` | 47 |  |  |
-| `check:consensus` | 47 |  |  |
-| `check:navmesh-query-spoint` | 47 |  |  |
+| `check:cube-sphere-cell-key-spoint` | 50 |  |  |
+| `check:navmesh-query-spoint` | 50 |  |  |
+| `check:stall-off-cpu` | 50 |  |  |
+| `check:render-1024-visible` | 50 |  |  |
+| `check:apps-a` | 49 |  |  |
+| `check:player-id` | 49 |  |  |
+| `check:camera-rig` | 49 |  |  |
+| `check:crowd-dot-cells-spoint` | 49 |  |  |
+| `check:timed-result` | 49 |  |  |
+| `check:upstream-builtin-math` | 48 |  |  |
+| `check:upstream-builtin-noise` | 48 |  |  |
+| `check:app-runtime-state` | 48 |  |  |
+| `check:client-pure-spoint` | 48 |  |  |
+| `check:spawn-captured-names` | 48 |  |  |
+| `check:spawn-captured-bodies` | 48 |  |  |
+| `check:messages` | 47 |  |  |
+| `check:editor-serialize` | 47 |  |  |
+| `check:world-def-clusters` | 47 |  |  |
+| `check:pool-params-spoint` | 47 |  |  |
 | `check:stall-probe` | 47 |  |  |
-| `check:site` | 46 |  |  |
-| `check:upstream-builtin-easing` | 46 |  |  |
-| `check:upstream-builtin-room-routing` | 46 |  |  |
-| `check:network-state` | 46 |  |  |
-| `check:camera-rig` | 46 |  |  |
-| `check:stall-off-cpu` | 46 |  |  |
-| `check:rollback-peer` | 45 |  |  |
-| `check:upstream-door-dispatch` | 45 |  |  |
-| `check:upstream-builtin-env` | 45 |  |  |
-| `check:app-runtime-state` | 45 |  |  |
-| `check:player-id` | 45 |  |  |
-| `check:world-def-clusters` | 45 |  |  |
-| `check:upstream-builtins` | 44 |  |  |
-| `check:upstream-builtin-path` | 44 |  |  |
-| `check:sampler-gap-attribution` | 44 |  |  |
-| `check:minidump` | 44 |  |  |
+| `check:sampler-gap-attribution` | 47 |  |  |
+| `check:engine-solver-tier` | 47 |  |  |
+| `check:upstream-endpoints` | 46 |  |  |
+| `check:vehicle-tuning` | 46 |  |  |
+| `check:ccd` | 46 |  |  |
+| `check:relative-residuals` | 46 |  |  |
+| `check:animation` | 45 |  |  |
+| `check:consensus` | 45 |  |  |
+| `check:character-step` | 45 |  |  |
+| `check:site` | 44 |  |  |
+| `check:upstream-builtin-three` | 44 |  |  |
 | `check:engine-visibility` | 44 |  |  |
-| `check:engine-solver-tier` | 44 |  |  |
-| `check:relative-residuals` | 44 |  |  |
-| `check:engine-isolation` | 44 |  |  |
-| `check:tick-scheduler` | 43 |  |  |
-| `check:heightfield-physics` | 43 |  |  |
-| `check:upstream-builtin-three` | 43 |  |  |
-| `check:upstream-builtin-tsl` | 43 |  |  |
-| `check:vec3-read` | 43 |  |  |
-| `check:world-resolver` | 43 |  |  |
-| `check:tail-report` | 43 |  |  |
-| `check:flight-model` | 42 |  |  |
-| `check:upstream-tome-lookup` | 42 |  |  |
-| `check:upstream-reference` | 42 |  |  |
-| `check:hook-order` | 42 |  |  |
-| `check:upstream-builtin-postfx` | 42 |  |  |
-| `check:upstream-builtin-terrain` | 42 |  |  |
-| `check:upstream-builtin-voxels` | 42 |  |  |
-| `check:crowd-dot-cells-spoint` | 42 |  |  |
-| `check:blend-tree-spoint` | 42 |  |  |
-| `check:client-pure-spoint` | 42 |  |  |
-| `check:spawn-captured-names` | 42 |  |  |
-| `check:spawn-captured-bodies` | 42 |  |  |
-| `check:pool-params-spoint` | 42 |  |  |
-| `check:content` | 41 |  |  |
-| `check:upstream-tome` | 41 |  |  |
-| `check:upstream-builtin-tween` | 41 |  |  |
-| `check:reexpress-records` | 41 |  |  |
-| `check:hot-reload` | 40 |  |  |
-| `check:anticheat` | 40 |  |  |
-| `check:character-step` | 40 |  |  |
-| `check:constraint-limits` | 40 |  |  |
-| `check:jolt-limits` | 40 |  |  |
-| `check:tick-order` | 40 |  |  |
-| `check:relocation-solve` | 40 |  |  |
-| `check:upstream-builtin-math` | 40 |  |  |
+| `check:planet-gap-class` | 44 |  |  |
+| `check:flight-model` | 43 |  |  |
+| `check:minidump` | 43 |  |  |
+| `check:hot-reload` | 42 |  |  |
+| `check:physics-extras` | 42 |  |  |
+| `check:jolt-limits` | 42 |  |  |
+| `check:movement` | 42 |  |  |
+| `check:worker-dispatch` | 42 |  |  |
+| `check:upstream-tome` | 42 |  |  |
+| `check:upstream-builtin-spline` | 42 |  |  |
+| `check:world-resolver` | 42 |  |  |
+| `check:entity-host` | 42 |  |  |
+| `check:spawn-named-errors` | 41 |  |  |
+| `check:upstream-skills` | 41 |  |  |
+| `check:upstream-builtin-terrain` | 41 |  |  |
+| `check:upstream-builtin-voxels` | 41 |  |  |
+| `check:upstream-builtin-water` | 41 |  |  |
+| `check:blend-tree-spoint` | 41 |  |  |
+| `check:worker-bridge` | 40 |  |  |
 | `check:upstream-builtin-vec3` | 40 |  |  |
-| `check:component-pool` | 40 |  |  |
-| `check:postfx-shaders-spoint` | 40 |  |  |
-| `check:chromium-launcher` | 40 |  |  |
-| `check:upstream-doors` | 39 |  |  |
-| `check:named-asset-redirect` | 39 |  |  |
-| `check:upstream-builtin-ballistics` | 39 |  |  |
-| `check:upstream-builtin-fx` | 39 |  |  |
-| `check:upstream-builtin-vibe` | 39 |  |  |
-| `check:cube-sphere-cell-key-spoint` | 39 |  |  |
+| `check:upstream-reference` | 40 |  |  |
+| `check:hook-order` | 40 |  |  |
+| `check:named-asset-redirect` | 40 |  |  |
+| `check:upstream-builtin-tsl` | 40 |  |  |
+| `check:content` | 39 |  |  |
+| `check:upstream-builtin-path` | 39 |  |  |
+| `check:upstream-builtin-tween` | 39 |  |  |
+| `check:vec3-read` | 39 |  |  |
+| `check:postfx-shaders-spoint` | 39 |  |  |
 | `check:browser-heap` | 39 |  |  |
-| `check:worker-dispatch` | 38 |  |  |
-| `check:upstream-skills` | 38 |  |  |
-| `check:upstream-builtin-spline` | 38 |  |  |
-| `check:collider-layers` | 38 |  |  |
-| `check:render-1024-visible` | 37 |  |  |
-| `check:messages` | 36 |  |  |
-| `check:movement` | 36 |  |  |
-| `check:vehicle-tuning` | 35 |  |  |
-| `check:worker-bridge` | 35 |  |  |
+| `check:rollback-bridge` | 38 |  |  |
+| `check:tick-order` | 38 |  |  |
+| `check:script-limits` | 38 |  |  |
+| `check:collision-placement` | 38 |  |  |
+| `check:tick-scheduler` | 37 |  |  |
+| `check:upstream-builtin-postfx` | 37 |  |  |
+| `check:reexpress-records` | 37 |  |  |
+| `check:chromium-launcher` | 37 |  |  |
+| `check:engine-isolation` | 37 |  |  |
+| `check:component-pool` | 36 |  |  |
+| `check:rollback-peer` | 35 |  |  |
+| `check:upstream-builtin-vibe` | 34 |  |  |
+| `check:tail-report` | 34 |  |  |
+| `check:collider-layers` | 34 |  |  |
 
 ## Kaggle physics run
 
