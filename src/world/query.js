@@ -1,3 +1,5 @@
+import { rayCapsule } from './rayShapes.js'
+
 const isVector = (value) => Array.isArray(value) && value.length === 3 && value.every((x) => typeof x === 'number' && Number.isFinite(x))
 
 const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
@@ -85,9 +87,21 @@ const checkBox = (box, index) => {
   if (box[0] > box[3] || box[1] > box[4] || box[2] > box[5]) throw new RangeError('box ' + index + ' has min above max')
 }
 
-export const createQueries = (world, { radius, boxes = [] }) => {
+const checkCapsule = (capsule, index) => {
+  if (!capsule || !isVector(capsule.a) || !isVector(capsule.b) || !(typeof capsule.radius === 'number' && capsule.radius > 0)) {
+    throw new TypeError('capsule ' + index + ' needs finite end points a and b and a positive radius')
+  }
+}
+
+const checkMesh = (mesh, index) => {
+  if (!mesh || typeof mesh.raycast !== 'function') throw new TypeError('mesh ' + index + ' must be a triangle mesh with raycast')
+}
+
+export const createQueries = (world, { radius, boxes = [], capsules = [], meshes = [] }) => {
   if (!(typeof radius === 'number' && radius > 0)) throw new RangeError('radius must be a positive number, the body radius')
   boxes.forEach(checkBox)
+  capsules.forEach(checkCapsule)
+  meshes.forEach(checkMesh)
   const admits = (id, options) => {
     if (options.exclude && options.exclude.includes(id)) return false
     if (options.filter && !options.filter(id)) return false
@@ -156,6 +170,21 @@ export const createQueries = (world, { radius, boxes = [] }) => {
         if (hit.distance < best.distance) best = hitAt('box', index, origin, unit, hit.distance, hit.normal)
       }
       if (hidden < best.distance) return migrating(maxDistance)
+    }
+    if (options.capsules !== false) {
+      for (let index = 0; index < capsules.length; index++) {
+        const capsule = capsules[index]
+        const hit = rayCapsule(origin, unit, capsule.a, capsule.b, capsule.radius, maxDistance)
+        if (hit && hit.distance < best.distance) best = hitAt('capsule', index, origin, unit, hit.distance, hit.normal)
+      }
+    }
+    if (options.meshes !== false) {
+      for (let index = 0; index < meshes.length; index++) {
+        const hit = meshes[index].raycast(origin, unit, Math.min(maxDistance, best.distance), options.backFaces !== false)
+        if (!hit || !(hit.distance < best.distance)) continue
+        best = hitAt('mesh', index, origin, unit, hit.distance, [hit.normal[0], hit.normal[1], hit.normal[2]])
+        best.triangle = hit.triangle
+      }
     }
     return best
   }
