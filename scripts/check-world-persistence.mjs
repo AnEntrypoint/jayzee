@@ -274,6 +274,40 @@ gate('worldDefFingerprint equals a direct checksum fold over canonicalJSON text'
   assert.equal(fpA, 'def-' + foldOf(canonicalJSON(defA)))
 })
 
+const defStore = memoryStorage()
+await saveWorldSnapshot(ctxFor({ runtime: runtimeWith(), storage: defStore, currentWorldDef: { name: 'arena', ...defA } }))
+const defStored = defStore.data.get(WORLD_SNAPSHOT_KEY)
+const defSameRuntime = runtimeWith({ tick: 0, elapsed: 0 })
+const defSameResult = await restoreWorldSnapshot(ctxFor({ runtime: defSameRuntime, storage: defStore, currentWorldDef: { ...defAReordered, name: 'arena' } }))
+const defChangedLogger = captureLogger()
+const defChangedRuntime = runtimeWith({ tick: 0, elapsed: 0 })
+const defChangedResult = await restoreWorldSnapshot(ctxFor({ runtime: defChangedRuntime, storage: defStore, currentWorldDef: { name: 'arena', ...defB }, logger: defChangedLogger }))
+const defLegacyResult = await restoreWorldSnapshot(ctxFor({ runtime: runtimeWith(), storage: saveStore, currentWorldDef: { name: 'arena', ...defB } }))
+const defAbsentResult = await restoreWorldSnapshot(ctxFor({ runtime: runtimeWith(), storage: defStore }))
+
+gate('a save under a world definition stores its fingerprint, and a save with no definition stores null', () => {
+  assert.equal(defStored.defFingerprint, worldDefFingerprint({ name: 'arena', ...defA }))
+  SHAPE_CHECK(defStored.defFingerprint)
+  assert.equal(stored.defFingerprint, null)
+})
+
+gate('a restore compares the fingerprint: the same definition in another key order restores', () => {
+  assert.equal(defSameResult.restored, true)
+  assert.equal(defSameRuntime.restored.length, 1)
+})
+
+gate('a restore under a changed definition with the same world name is refused with def-mismatch, the runtime is untouched and both fingerprints are logged', () => {
+  assert.deepEqual(defChangedResult, { restored: false, reason: 'def-mismatch' })
+  assert.equal(defChangedRuntime.restored.length, 0)
+  const text = logText(defChangedLogger, 'warn')
+  assert.ok(text.includes('saved=' + defStored.defFingerprint) && text.includes('current=' + worldDefFingerprint({ name: 'arena', ...defB })), text)
+})
+
+gate('negative control: a snapshot with no stored fingerprint, or a host with no definition, is not refused on the fingerprint', () => {
+  assert.equal(defLegacyResult.restored, true)
+  assert.equal(defAbsentResult.restored, true)
+})
+
 gate('the format version is 1 and the storage key is world-snapshot', () => {
   assert.equal(WORLD_SNAPSHOT_FORMAT_VERSION, 1)
   assert.equal(WORLD_SNAPSHOT_KEY, 'world-snapshot')
@@ -354,7 +388,7 @@ gate('negative control: a save with no runtime writes nothing and resolves false
 })
 
 gate('the snapshot keeps its key order and survives a JSON round trip unchanged', () => {
-  assert.deepEqual(Object.keys(stored), ['version', 'world', 'chart', 'tick', 'elapsed', 'savedAt', 'entities', 'respawnTimers', 'timers', 'interactCooldowns'])
+  assert.deepEqual(Object.keys(stored), ['version', 'world', 'defFingerprint', 'chart', 'tick', 'elapsed', 'savedAt', 'entities', 'respawnTimers', 'timers', 'interactCooldowns'])
   assert.deepEqual(jsonRoundTrip(stored), stored)
 })
 
