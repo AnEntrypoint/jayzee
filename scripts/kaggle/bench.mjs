@@ -86,6 +86,7 @@ const activeOf = exported('_engine_world_active_bodies')
 const heldOf = exported('_engine_world_held_bodies')
 const unsettledOf = exported('_engine_world_unsettled_in_view')
 const airborneOf = exported('_engine_world_airborne_bodies')
+const refillsOf = exported('_engine_world_release_refills')
 const active = new Int32Array(ticks)
 const held = new Int32Array(ticks + 1)
 const unsettled = new Int32Array(ticks)
@@ -185,6 +186,7 @@ emit({
   visualSettleTick: unsettledOf ? lastTickWith(unsettled) + 1 : null,
   unsettledViewBodyTicks: unsettledOf ? unsettled.reduce((sum, count) => sum + count, 0) : null,
   viewer: knobs.still !== undefined ? 'still' : 'path',
+  releaseRefills: refillsOf ? refillsOf() : null,
   heldAtEnd: heldOf ? held[ticks] : null,
   peakAirborne: airborneOf ? Math.max(...airborne) : null,
   profile: profile ? profile.summarise() : null,

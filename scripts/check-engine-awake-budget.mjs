@@ -300,6 +300,37 @@ gate('with the block tuning the held bodies of the nearest block of 64 slots are
   assert.ok(nearest.includes(BODIES - 1), 'control: the view alone did not start at the nearest body')
 })
 
+const DRIFT_REFILL_STEPS = 16
+const DRIFT_TICKS = 48
+const DRIFT_METRES_A_TICK = 2
+const JUMP_METRES = 100
+const tickWithRoomForOne = (module) => {
+  assert.equal(module._engine_world_set_awake_budget(module._engine_world_active_bodies() + 1), 0)
+  module._engine_tick(1)
+}
+const driftingRefills = async (tuning) => {
+  const module = await boot({ budget: BUDGET })
+  assert.equal(module._engine_world_set_tuning(tuning), 0)
+  const eye = eyeAt(module, BODIES - 1, 3)
+  for (let tick = 0; tick < DRIFT_TICKS; tick++) {
+    assert.equal(module._engine_world_set_release_view(eye[0] + tick * DRIFT_METRES_A_TICK, eye[1], eye[2], 0, 0, 0, 1, 1000), 0)
+    tickWithRoomForOne(module)
+  }
+  assert.ok(module._engine_world_held_bodies() > 0, 'no body is still held, so no refill could be seen')
+  return { module, eye, refills: module._engine_world_release_refills() }
+}
+
+gate('a view that drifts ' + DRIFT_METRES_A_TICK + ' m a tick reorders the release queue once in ' + DRIFT_REFILL_STEPS + ' steps and not on every step, a view that jumps ' + JUMP_METRES + ' m reorders it on the next step, and the slot-order tuning never reorders for the view', async () => {
+  const drifted = await driftingRefills(TUNE_DEFAULT)
+  assert.equal(drifted.refills, DRIFT_TICKS / DRIFT_REFILL_STEPS, 'the drifting view refilled ' + drifted.refills + ' times in ' + DRIFT_TICKS + ' ticks')
+  const { module, eye } = drifted
+  assert.equal(module._engine_world_set_release_view(eye[0] + DRIFT_TICKS * DRIFT_METRES_A_TICK + JUMP_METRES, eye[1], eye[2], 0, 0, 0, 1, 1000), 0)
+  tickWithRoomForOne(module)
+  assert.equal(module._engine_world_release_refills(), drifted.refills + 1)
+  const bySlot = await driftingRefills(TUNE_DEFAULT | TUNE_RELEASE_BY_SLOT)
+  assert.equal(bySlot.refills, 1, 'slot order refilled ' + bySlot.refills + ' times')
+})
+
 gate('the release view refuses a value that is not finite, a cone outside -1 to 1 and a range that is not above zero', async () => {
   const module = await boot({ budget: BUDGET })
   for (const bad of [[NaN, 0, 0, 1, 0, 0, 0.5, 10], [0, 0, 0, Infinity, 0, 0, 0.5, 10], [0, 0, 0, 1, 0, 0, 1.5, 10], [0, 0, 0, 1, 0, 0, 0.5, 0], [0, 0, 0, 1, 0, 0, 0.5, NaN]]) {
