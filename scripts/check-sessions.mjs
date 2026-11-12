@@ -679,7 +679,7 @@ gate('exported constants match the spoint values read from source', () => {
 gate('sessions-pure source carries no comments, no timers, no fs or socket calls, and no direct wall-clock reads', () => {
   const dir = new URL('../src/sessions-pure/', import.meta.url)
   const files = readdirSync(dir).filter(f => f.endsWith('.js'))
-  strictEqual(files.length, 7)
+  strictEqual(files.length, 8)
   const violations = []
   const rules = [
     [/\/\/|\/\*/, 'comment'],
