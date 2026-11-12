@@ -16,5 +16,7 @@
   "check:scenario-determinism",
   "check:scenario-allocations",
   "check:scenario-character-terrain",
-  "check:scenario-marble-bowl"
+  "check:scenario-marble-bowl",
+  "check:collision-system",
+  "check:cell-index-3d"
 ]
