@@ -185,13 +185,67 @@ export function createHeightFieldStreamer({ frame, fieldCount, nodes, spacing, d
   }
 }
 
-export function createHeightFieldPhysics(streamer) {
+const RAY_BISECT_ROUNDS = 28
+const NORMAL_PROBE_M = 0.25
+
+export function createHeightFieldPhysics(streamer, { marchStep = streamer.spacing / 2 } = {}) {
+  if (!(Number.isFinite(marchStep) && marchStep > 0)) throw new RangeError('[height-field-physics] marchStep ' + String(marchStep) + ' is not a positive length in metres')
   const bodyMeta = new Map([[HEIGHTFIELD_BODY_ID, { shape: 'heightfield' }]])
-  function raycast(origin, direction, range) {
-    if (!(direction[1] < 0) || direction[0] !== 0 || direction[2] !== 0) throw new TypeError('[height-field-physics] raycast got direction ' + JSON.stringify(direction) + ': this probe answers straight-down rays only')
-    const y = streamer.surfaceY(origin[0], origin[2])
-    if (y === null || y > origin[1] || origin[1] - y > range) return { hit: false }
-    return { hit: true, bodyId: HEIGHTFIELD_BODY_ID, position: [origin[0], y, origin[2]], distance: origin[1] - y }
+  const stats = { rays: 0, downRays: 0, marchedRays: 0, marchSteps: 0, hits: 0 }
+
+  function normalAt(x, z) {
+    const xa = streamer.surfaceY(x - NORMAL_PROBE_M, z), xb = streamer.surfaceY(x + NORMAL_PROBE_M, z)
+    const za = streamer.surfaceY(x, z - NORMAL_PROBE_M), zb = streamer.surfaceY(x, z + NORMAL_PROBE_M)
+    if (xa === null || xb === null || za === null || zb === null) return [0, 1, 0]
+    const nx = (xa - xb) / (2 * NORMAL_PROBE_M), nz = (za - zb) / (2 * NORMAL_PROBE_M)
+    const length = Math.hypot(nx, 1, nz)
+    return [nx / length, 1 / length, nz / length]
   }
-  return { raycast, bodyMeta }
+
+  function raycast(origin, direction, range) {
+    for (const [name, v] of [['origin', origin], ['direction', direction]]) {
+      if (!v || !Number.isFinite(v[0]) || !Number.isFinite(v[1]) || !Number.isFinite(v[2])) throw new TypeError('[height-field-physics] raycast got ' + name + ' ' + JSON.stringify(v) + ': a ray needs three finite numbers for each')
+    }
+    if (!(range > 0)) throw new RangeError('[height-field-physics] raycast got range ' + String(range) + ': a ray needs a reach above zero')
+    const length = Math.hypot(direction[0], direction[1], direction[2])
+    if (!(length > 0)) throw new RangeError('[height-field-physics] raycast got a zero direction')
+    stats.rays++
+    if (direction[0] === 0 && direction[2] === 0) {
+      stats.downRays++
+      if (direction[1] > 0) return { hit: false }
+      const y = streamer.surfaceY(origin[0], origin[2])
+      if (y === null || y > origin[1] || origin[1] - y > range) return { hit: false }
+      stats.hits++
+      return { hit: true, bodyId: HEIGHTFIELD_BODY_ID, position: [origin[0], y, origin[2]], distance: origin[1] - y, normal: normalAt(origin[0], origin[2]) }
+    }
+    stats.marchedRays++
+    const dx = direction[0] / length, dy = direction[1] / length, dz = direction[2] / length
+    const gapAt = (t) => {
+      const y = streamer.surfaceY(origin[0] + dx * t, origin[2] + dz * t)
+      return y === null ? null : origin[1] + dy * t - y
+    }
+    let previous = 0
+    let previousGap = gapAt(0)
+    for (let t = Math.min(marchStep, range); ; t = Math.min(t + marchStep, range)) {
+      stats.marchSteps++
+      const gap = gapAt(t)
+      if (previousGap !== null && gap !== null && previousGap >= 0 && gap < 0) {
+        let lo = previous, hi = t
+        for (let i = 0; i < RAY_BISECT_ROUNDS; i++) {
+          const mid = (lo + hi) / 2
+          const midGap = gapAt(mid)
+          if (midGap !== null && midGap >= 0) lo = mid
+          else hi = mid
+        }
+        const x = origin[0] + dx * hi, z = origin[2] + dz * hi
+        stats.hits++
+        return { hit: true, bodyId: HEIGHTFIELD_BODY_ID, position: [x, origin[1] + dy * hi, z], distance: hi, normal: normalAt(x, z) }
+      }
+      previous = t
+      previousGap = gap
+      if (t >= range) return { hit: false }
+    }
+  }
+
+  return { raycast, bodyMeta, stats }
 }
