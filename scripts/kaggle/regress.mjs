@@ -1,6 +1,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { coldStartOf, describeColdStart, rowsOfResults } from './stream.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 const MODES = Object.freeze({ regress: 'build/kaggle/verdict.json', control: 'build/kaggle/control-verdict.json' })
@@ -131,6 +132,8 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   mkdirSync(dirname(verdictPath), { recursive: true })
   writeFileSync(verdictPath, JSON.stringify(verdict, null, 1) + '\n')
   console.log(JSON.stringify(verdict))
+  if (meta.stream) console.log('log stream: ' + meta.stream.path + ', ' + meta.stream.bytes + ' bytes, ' + meta.stream.liveRows + ' live rows, sizes at the polls ' + meta.stream.bytesAtPolls.join(' ') + ', stream pid ' + meta.stream.pid + ' started ' + meta.stream.starts + ' time' + (meta.stream.starts === 1 ? '' : 's') + ' and stopped')
+  console.log('session cold start: ' + describeColdStart(coldStartOf(rowsOfResults(results), BASELINE.topTier)))
   const settle = results.configs.filter((c) => c.role === 'settle' && Number.isFinite(c.maxMs))
   const worstOf = (variant) => settle.filter((c) => c.variant === variant).map((c) => c.maxMs.toFixed(1)).join(' ')
   if (settle.length > 0) console.log('settle rows, run first and not judged: worst tick of each, reference ' + worstOf('reference') + ' ms; candidate ' + worstOf('base') + ' ms')

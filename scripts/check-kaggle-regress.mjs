@@ -12,6 +12,9 @@ import { canaryStalls, densestPhase, nearPhase, overBudgetTimes, periodFit, phas
 import { PIPE_BYTES, distinctDryRows, judgePreflight } from './kaggle/preflight.mjs'
 import { spawnSync } from 'node:child_process'
 import { referenceGlue } from './kaggle/reference.mjs'
+import { COLD_START_S, coldStartOf, describeColdStart, rowsOfResults, startLogStream, streamRows } from './kaggle/stream.mjs'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const BUDGET_MS = 16.7
@@ -441,6 +444,58 @@ gate('the gate rows run after ' + 2 * SETTLE_REPEATS + ' settle rows of the same
   const judged = judge(BASELINE, { configs, machine: { class: 'none-0-0-0' } })
   assert.equal(judged.topTier.candidateOverBudget, 0)
   assert.equal(judged.topTier.candidateUnmarkedOverTicks.length, 0)
+})
+
+const alive = (pid) => {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch {
+    return false
+  }
+}
+
+gate('the log stream fills its file while its command runs, restarts a command that ended early, and stop leaves neither the command nor its guard behind', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'kaggle-stream-'))
+  try {
+    const path = join(dir, 'stream.log')
+    const stream = startLogStream({ command: 'sh', args: ['-c', 'i=0; while [ $i -lt 4 ]; do echo "line $i"; i=$((i+1)); sleep 0.05; done'], path })
+    const first = stream.pid()
+    await new Promise((done) => setTimeout(done, 600))
+    const early = stream.bytes()
+    assert.ok(early > 0, 'the stream file is empty while the command runs')
+    assert.equal(alive(first), false, 'the short command is still alive')
+    stream.keepRunning()
+    assert.equal(stream.starts(), 2)
+    assert.notEqual(stream.pid(), first)
+    await new Promise((done) => setTimeout(done, 600))
+    assert.ok(stream.bytes() > early, 'the restarted command appended nothing')
+    const long = startLogStream({ command: 'sh', args: ['-c', 'while true; do echo tick; sleep 0.05; done'], path: join(dir, 'long.log') })
+    await new Promise((done) => setTimeout(done, 300))
+    const longPid = long.pid()
+    assert.equal(alive(longPid), true)
+    const stoppedLong = await long.stop()
+    assert.equal(stoppedLong.pid, longPid)
+    assert.ok(stoppedLong.bytes > 0)
+    assert.equal(alive(longPid), false, 'the stream command outlived stop')
+    assert.equal(alive(stoppedLong.guardPid), false, 'the guard outlived stop')
+    const stopped = await stream.stop()
+    assert.equal(alive(stopped.guardPid), false)
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+gate('live rows are read out of a streamed log whatever wraps them, and the cold-start comparison splits them at ' + COLD_START_S + ' s', () => {
+  const live = (atS, variant, maxMs, overBudget, overBudgetHost) => ({ index: 0, atS, role: 'gate', kind: 'tick', variant, bodies: top.bodies, workers: top.workers, warm: true, activeMeanMs: 6, maxMs, overBudget, overBudgetHost })
+  const text = ['noise', 'ROW ' + JSON.stringify(live(8, 'reference', 54.8, 1, 1)), '{"stream_name":"stdout","time":1.5,"data":"ROW ' + JSON.stringify(live(19, 'base', 25.9, 2, 1)).replaceAll('"', '\\"') + '\\n"}', 'ROW ' + JSON.stringify(live(180, 'base', 12.5, 0, 0)), 'ROW {broken'].join('\n')
+  const rows = streamRows(text)
+  assert.deepEqual(rows.map((row) => row.maxMs), [54.8, 25.9, 12.5])
+  const cold = coldStartOf(rows, top)
+  assert.deepEqual([cold.earlyRows, cold.lateRows, cold.earlyWorstMs, cold.lateWorstMs, cold.earlyCounted, cold.lateCounted], [2, 1, 54.8, 12.5, 1, 0])
+  assert.match(describeColdStart(cold), /first 100 s of the session: 2, worst tick 54.8 ms/)
+  const fromResults = rowsOfResults({ startedAtEpochS: 1000, configs: [{ kind: 'tick', startedAtEpochS: 1008, role: 'gate', variant: 'base', bodies: top.bodies, workers: top.workers, warm: true, maxMs: 30, overBudget: 1, overBudgetHost: 0 }, { kind: 'calibrate', startedAtEpochS: 1001 }] })
+  assert.deepEqual(fromResults.map((row) => [row.atS, row.maxMs]), [[8, 30]])
 })
 
 gate('release by view is judged against release in slot order on eight alternated pairs at the top tier, not on rows run in one block', () => {

@@ -11,6 +11,7 @@ ONLY = os.environ.get("JAYZEE_BENCH_ONLY")
 DRY = os.environ.get("JAYZEE_BENCH_DRY") == "1"
 NODE = os.environ.get("JAYZEE_BENCH_NODE")
 TAIL_BYTES = 400
+LIVE_OVER_TICKS = 16
 
 
 def node_ok(path):
@@ -133,6 +134,17 @@ def run_one(node, run):
     return entry
 
 
+def live_row(index, entry, started):
+    line = {"index": index, "atS": round(entry["startedAtEpochS"] - started, 1), "runS": entry.get("runS"), "role": entry.get("role")}
+    for name in ("kind", "variant", "knobs", "bodies", "workers", "warm", "activeMeanMs", "p99QuietMs", "maxMs", "overBudget", "overBudgetHost", "error", "refused"):
+        if entry.get(name) is not None:
+            line[name] = entry.get(name)
+    over = entry.get("overTicks") or []
+    if entry.get("kind") == "tick" and len(over) <= LIVE_OVER_TICKS:
+        line["over"] = [[tick.get("tick"), tick.get("ms"), bool(tick.get("host")), tick.get("waitMaxMs")] for tick in over]
+    return line
+
+
 def median(values):
     ordered = sorted(values)
     return ordered[len(ordered) // 2]
@@ -194,10 +206,11 @@ def main():
         for run in runs:
             distinct.setdefault(json.dumps([run["script"], run["dryArgs"], run["nodeFlags"]]), run)
         runs = list(distinct.values())
-    for run in runs:
+    for index, run in enumerate(runs):
         entry = run_one(node, run)
         results["configs"].append(entry)
         save(results)
+        print("ROW " + json.dumps(live_row(index, entry, started)), flush=True)
         if entry.get("error") or entry.get("refused"):
             print("ROW FAILED " + json.dumps({name: entry.get(name) for name in ("script", "args", "error", "refused", "exit", "resultBytes")}), flush=True)
     results["totalS"] = round(time.time() - started, 1)
