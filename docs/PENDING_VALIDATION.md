@@ -4656,3 +4656,13 @@ Gate: mean 6.367 ms against the reference 7.771 ms (limit 8.548), quiet-tick p99
 The layout does not need to change: four workers beside the main thread is the fastest count measured, and the time that is left is in finding collisions (about 30 percent) and the position solve (about 19 percent), not in the hand-off. The awake budget stays 4096: all 12288 awake is 7.45 ms at the mean with a p99 of 14.86 ms.
 
 Next, in order of measured or bounded gain: the page's two per-body loops; the airborne skip settled on more repeats; collision finding against the planet.
+
+## Phase M, pending (2026-11-12): page loops, the airborne skip on more repeats, collision finding
+
+Phase A commits, each with the witness it needs in Phase B:
+
+- 5684433 pose epoch, page skips: the two per-body passes of a frame run only when a pose or a class changed. Witness: `check:engine-render`, `check:pose-replay` (two new lines), the 1024-webgpu witness with and without `bodyWork=always`. Done on this host: frame work 1.19 ms to 0.505 ms at the median, counters identical.
+- df4e009 gate plan: ten alternated pairs of the default tuning against the same without the airborne skip at the top tier, five pairs with every body awake, five rows of slot-order release, profile rows at 12288 and 131072. Witness: the Kaggle gate run. The default stays unless the pairs say otherwise.
+- e05eef6 profile build samples hot scopes one call in sixteen and times the sphere against the planet. Witness: the profile rows of the gate run, which must split collision finding into tree queries, pairs and the planet contact. No collision code is changed yet: on this host every scope of the step is 30 to 50 percent slower at 131072 bodies than at 12288 with the same awake count and a tree of the same size, so the cost follows where the awake bodies lie in memory and not one phase, and the cut should follow the measured split.
+
+Blocked in Phase B: the Kaggle CLI is no longer signed in ("kaggle auth login"), so the gate run could not start and nothing is pushed.
