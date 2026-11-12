@@ -243,7 +243,30 @@ const nearestViewerDist2 = (entry, viewers) => {
   return best
 }
 
-const applyEntry = (id, entry, nextMap, entities, prevEntityMap, viewers, snapshotSeq, propModCap) => {
+const BASELINE_LENGTH = 7
+
+const copyBaseline = (enc, pool) => {
+  let base = pool !== null && pool.length > 0 ? pool.pop() : null
+  if (base === null) {
+    base = [0, '', new Uint8Array(ENTITY_RECORD_BYTES), '', null, 0]
+    if (pool !== null) base.push(true)
+  }
+  base[0] = enc[0]
+  base[1] = enc[1]
+  base[2].set(enc[2])
+  base[3] = enc[3]
+  base[4] = enc[4]
+  base[5] = enc[5]
+  return base
+}
+
+const releaseBaseline = (prev, pool) => {
+  if (pool === null || !prev) return
+  const base = prev[3]
+  if (base && base.length === BASELINE_LENGTH) pool.push(base)
+}
+
+const applyEntry = (id, entry, nextMap, entities, prevEntityMap, viewers, snapshotSeq, propModCap, pool = null) => {
   const k = resolveKey(entry)
   let enc = entry.enc
   let farTier = false
@@ -272,19 +295,19 @@ const applyEntry = (id, entry, nextMap, entities, prevEntityMap, viewers, snapsh
     nextMap.set(id, prev)
     return
   }
-  if (farTier) enc = stripVelocityForFar(enc)
-  nextMap.set(id, [k, entry.cust, entry.custStr, enc])
-  if (!prev || prev[0] !== k) {
-    if (prev && prev[3]) {
-      const fd = computeFieldDelta(prev[3], enc)
-      if (fd) {
-        if (farTier && fd[1] === FIELD_ROT) return
-        entities.push(fd)
-        return
-      }
-    }
-    entities.push(enc)
+  if (prev && prev[0] === k) {
+    nextMap.set(id, prev)
+    return
   }
+  if (farTier) enc = stripVelocityForFar(enc)
+  const fd = prev && prev[3] ? computeFieldDelta(prev[3], enc) : null
+  if (fd !== null && farTier && fd[1] === FIELD_ROT) {
+    nextMap.set(id, prev)
+    return
+  }
+  nextMap.set(id, [k, entry.cust, entry.custStr, copyBaseline(enc, pool)])
+  releaseBaseline(prev, pool)
+  entities.push(fd !== null ? fd : enc)
 }
 
 export const propTickMod = (snapHz) => {

@@ -198,22 +198,23 @@ export class SnapshotEncoder {
     const viewers = (seqNum !== undefined && viewerPos && viewerPos.length >= 3) ? viewerPos : null
     const seq = seqNum || 0
     const propModCap = propTickMod(snapHz)
+    const pool = scratch ? (scratch.baselines || (scratch.baselines = [])) : null
     const relevantCount = Array.isArray(relevantIds) ? relevantIds.length : (relevantIds ? relevantIds.size : 0)
     const iterIds = (relevantIds && dynCache.size > relevantCount) ? relevantIds : null
     const relevantLookup = (!iterIds && Array.isArray(relevantIds)) ? new Set(relevantIds) : null
     if (iterIds) {
       for (const id of iterIds) {
         const entry = dynCache.get(id)
-        if (entry) applyEntry(id, entry, nextMap, entities, prevEntityMap, viewers, seq, propModCap)
+        if (entry) applyEntry(id, entry, nextMap, entities, prevEntityMap, viewers, seq, propModCap, pool)
       }
       for (const id of (dynCache._envIds || [])) {
         const entry = dynCache.get(id)
-        if (entry) applyEntry(id, entry, nextMap, entities, prevEntityMap, null, seq, propModCap)
+        if (entry) applyEntry(id, entry, nextMap, entities, prevEntityMap, null, seq, propModCap, pool)
       }
     } else {
       for (const [id, entry] of dynCache) {
         if (!entry.isEnv && relevantIds && (relevantLookup ? !relevantLookup.has(id) : !relevantIds.has(id))) continue
-        applyEntry(id, entry, nextMap, entities, prevEntityMap, viewers, seq, propModCap)
+        applyEntry(id, entry, nextMap, entities, prevEntityMap, viewers, seq, propModCap, pool)
       }
     }
     const removed = scratch ? scratch.removed : []

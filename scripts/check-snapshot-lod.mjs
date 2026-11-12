@@ -291,8 +291,9 @@ const DELTA1 = [
 ]
 claim('first delta sends all six entities in full, far ones without velocity', delta1Out, DELTA1)
 rejects('first delta sends all six entities in full', delta1Out, DELTA1.slice(0, 5))
-claim('delta at seq 1 sends only the near entity 101, as a full record', delta2Out, [[101, 'rock', '580200000000000000000000000000000000fffdf7df64006400640000', 'dynamic', null, 0]])
-rejects('delta at seq 1 sends only the near entity 101', delta2Out, [[101, 'rock', '580200000000000000000000000000000000fffdf7df64006400640000', 'dynamic', null, 0], [102, 'rock', 'b80b00000000000000000000000000000000fffdf7df64006400640000', 'dynamic', null, 0]])
+claim('delta at seq 1 sends only the near entity 101, as a position delta against the baseline the viewer holds', delta2Out, [[101, 1, '580200000000000000000000000000000000fffdf7df64006400640000']])
+rejects('delta at seq 1 no longer sends the near entity 101 as a full record, which spoint does because its baseline aliases the live record', delta2Out, [[101, 'rock', '580200000000000000000000000000000000fffdf7df64006400640000', 'dynamic', null, 0]])
+rejects('delta at seq 1 sends only the near entity 101', delta2Out, [[101, 1, '580200000000000000000000000000000000fffdf7df64006400640000'], [102, 'rock', 'b80b00000000000000000000000000000000fffdf7df64006400640000', 'dynamic', null, 0]])
 claim('delta at seq 16 sends far entity 103 as a position delta with velocity stripped', delta3Out, [[103, 1, '742700000000000000000000000000000000fffdf7df64006400640000']])
 rejects('delta at seq 16 sends far entity 103 as a position delta', delta3Out, [[103, 2, '742700000000000000000000000000000000fffdf7df64006400640000']])
 claim('a removed entity is tombstoned into removed', { removed: delta4.encoded.removed, entities: serialize(delta4.encoded.entities) }, { removed: [106], entities: [] })
@@ -318,8 +319,8 @@ const cadenceSeq1 = SnapshotEncoder.encodeDeltaFromCache(2, 0, cadenceRunCache, 
 const cadenceSeq2 = SnapshotEncoder.encodeDeltaFromCache(3, 0, cadenceRunCache, null, cadencePrev, [], null, null, null, 2, ORIGIN, null, null, 1, 20)
 const cadenceSeq1Out = serialize(cadenceSeq1.encoded.entities)
 const cadenceSeq2Out = serialize(cadenceSeq2.encoded.entities)
-claim('a simulated entity at 20 Hz is held to even sequence numbers', [cadenceSeq1Out, cadenceSeq2Out], [[], [[201, 'rock', 'bc0200000000000000000000000000000000fffdf7df64006400640000', 'dynamic', null, 0]]])
-rejects('a simulated entity at 20 Hz is held to even sequence numbers', [cadenceSeq1Out, cadenceSeq2Out], [[[201, 'rock', 'bc0200000000000000000000000000000000fffdf7df64006400640000', 'dynamic', null, 0]], [[201, 'rock', 'bc0200000000000000000000000000000000fffdf7df64006400640000', 'dynamic', null, 0]]])
+claim('a simulated entity at 20 Hz is held to even sequence numbers', [cadenceSeq1Out, cadenceSeq2Out], [[], [[201, 1, 'bc0200000000000000000000000000000000fffdf7df64006400640000']]])
+rejects('a simulated entity at 20 Hz is held to even sequence numbers', [cadenceSeq1Out, cadenceSeq2Out], [[[201, 1, 'bc0200000000000000000000000000000000fffdf7df64006400640000']], [[201, 1, 'bc0200000000000000000000000000000000fffdf7df64006400640000']]])
 
 claim('the module reuses the aoi-pure binary decoders', [unpackBinRecord === aoiUnpackBinRecord, primeEntryDecode === aoiPrimeEntryDecode], [true, true])
 rejects('the module reuses the aoi-pure binary decoders', [unpackBinRecord === aoiUnpackBinRecord, primeEntryDecode === aoiPrimeEntryDecode], [false, true])
