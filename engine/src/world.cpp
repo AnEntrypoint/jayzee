@@ -156,6 +156,16 @@ class ObjectPairs final : public JPH::ObjectLayerPairFilter {
   }
 };
 
+class StandListener final : public JPH::CharacterContactListener {
+ public:
+  void OnContactSolve(const JPH::CharacterVirtual* character, const JPH::BodyID&, const JPH::SubShapeID&, JPH::RVec3Arg, JPH::Vec3Arg contactNormal,
+                      JPH::Vec3Arg contactVelocity, const JPH::PhysicsMaterial*, JPH::Vec3Arg, JPH::Vec3& ioNewCharacterVelocity) override {
+    if (standing && contactVelocity.IsNearZero() && !character->IsSlopeTooSteep(contactNormal)) ioNewCharacterVelocity = JPH::Vec3::sZero();
+  }
+
+  bool standing = false;
+};
+
 }
 
 struct World::Runtime {
@@ -184,6 +194,7 @@ struct World::Runtime {
   JPH::Ref<JPH::CharacterVirtual> characters[kMaxCharacters];
   JPH::Vec3 characterCommand[kMaxCharacters];
   JPH::Vec3 characterFall[kMaxCharacters];
+  StandListener stand;
   std::uint32_t characterCount = 0;
   float characterRadius = 0.0f;
   float characterHalfHeight = 0.0f;
@@ -526,6 +537,7 @@ int World::addCharacter(const double* spec) {
   const std::uint32_t index = r.characterCount;
   follow(spec[0], spec[1], spec[2]);
   r.characters[index] = new JPH::CharacterVirtual(&r.characterSettings, toBody(spec), JPH::Quat::sIdentity(), &r.physics);
+  r.characters[index]->SetListener(&r.stand);
   if (!reserveContactBlocks(index + 1)) return kFull;
   r.characterCount += 1;
   return static_cast<int>(index);
@@ -588,6 +600,7 @@ void World::updateCharacters(float dt) {
     JPH::CharacterVirtual::ExtendedUpdateSettings extended;
     extended.mStickToFloorStepDown = up * -characterStickDown_;
     extended.mWalkStairsStepUp = up * characterStepUp_;
+    r.stand.standing = r.characterCommand[i] == JPH::Vec3::sZero();
     c->SetLinearVelocity(r.characterCommand[i] + r.characterFall[i]);
     c->ExtendedUpdate(dt, gravity, extended, broad, object, JPH::BodyFilter(), JPH::ShapeFilter(), r.temp);
   }

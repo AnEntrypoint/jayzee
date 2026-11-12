@@ -21,6 +21,7 @@ void vegetationPlan();
 void vegetationPromotion();
 void modelsAndTiers();
 void visibilityAndOcclusion();
+void characterPlanet();
 
 }
 
@@ -58,6 +59,7 @@ int main() {
   engine::witness::vegetationPromotion();
   engine::witness::modelsAndTiers();
   engine::witness::visibilityAndOcclusion();
+  engine::witness::characterPlanet();
 
   check(engine::pool::failures() == 0, "no pool allocation failed during the run");
   return engine::test::finish();
