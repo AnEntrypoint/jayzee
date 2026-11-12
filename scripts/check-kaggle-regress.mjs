@@ -6,7 +6,7 @@ import { finish, gate } from './lib/gate.mjs'
 import { classRecord, judge } from './kaggle/regress.mjs'
 import { decide } from './kaggle/push-gate.mjs'
 import { repeatedSpikes } from './kaggle/spikes.mjs'
-import { BASELINE, PROFILE_COMPACT_REPEATS, PROFILE_REPEATS, PROFILE_UNRECLAIMED_REPEATS, PROFILE_VARIANT, RECLAIM_OFF, RELEASE_ORDER_REPEATS, TUNE_DEFAULT, TUNE_DEFAULT_BY_SLOT, buildPlan } from './kaggle/plan.mjs'
+import { BASELINE, PROFILE_COMPACT_REPEATS, PROFILE_REPEATS, PROFILE_UNRECLAIMED_REPEATS, PROFILE_VARIANT, RECLAIM_OFF, FOOTPRINT_REPEATS, FOOTPRINT_VARIANTS, PREPARE_OFF, PREPARE_REPEATS, PROFILE_ORDER_REPEATS, TUNE_DEFAULT, TUNE_DEFAULT_BY_SLOT, buildPlan } from './kaggle/plan.mjs'
 import { describeSlowTick } from './kaggle/tickProfile.mjs'
 import { canaryStalls, densestPhase, nearPhase, overBudgetTimes, periodFit, phaseShare, slowTickTimes } from './kaggle/slowTickClock.mjs'
 import { PIPE_BYTES, distinctDryRows, judgePreflight } from './kaggle/preflight.mjs'
@@ -425,14 +425,28 @@ gate('the regress plan carries the profile build at the top tier as rows the gat
   assert.ok(PROFILE_REPEATS >= 5 && PROFILE_COMPACT_REPEATS >= 3)
 })
 
-gate('release by view is judged against release in slot order on eight alternated pairs at the top tier, not on rows run in one block', () => {
-  const rows = buildPlan('regress').runs.filter((run) => run.role === 'release order')
-  const knobs = rows.map((row) => row.args[9])
-  assert.equal(knobs.length, 2 * RELEASE_ORDER_REPEATS)
-  assert.ok(RELEASE_ORDER_REPEATS >= 8)
+gate('the release prepare is judged against its control, and the arena in BSS and the -Os build against the candidate, each on six alternated repeats at the top tier inside one run', () => {
+  const runs = buildPlan('regress').runs
+  const prepare = runs.filter((run) => run.role === 'prepare').map((row) => row.args[9])
+  assert.equal(prepare.length, 2 * PREPARE_REPEATS)
+  prepare.forEach((knob, i) => assert.equal(knob, i % 2 === 0 ? 'none' : PREPARE_OFF))
+  const footprint = runs.filter((run) => run.role === 'footprint')
+  const group = 1 + FOOTPRINT_VARIANTS.length
+  assert.equal(footprint.length, group * FOOTPRINT_REPEATS)
+  footprint.forEach((row, i) => {
+    const variant = i % group === 0 ? null : FOOTPRINT_VARIANTS[(i % group) - 1]
+    assert.equal(row.args[0].includes('/variants/'), variant !== null)
+    if (variant !== null) assert.ok(row.args[0].includes('/variants/' + variant + '/'))
+    assert.equal(row.args[1], String(BASELINE.topTier.bodies))
+  })
+  assert.ok(PREPARE_REPEATS >= 6 && FOOTPRINT_REPEATS >= 6)
+})
+
+gate('the slot-order gap is read from profile rows of both release orders, alternated', () => {
+  const knobs = buildPlan('regress').runs.filter((run) => run.role === 'profile order').map((row) => row.args[9])
+  assert.equal(knobs.length, 2 * PROFILE_ORDER_REPEATS)
   knobs.forEach((knob, i) => assert.equal(knob, 'tune=' + (i % 2 === 0 ? TUNE_DEFAULT : TUNE_DEFAULT_BY_SLOT)))
   assert.equal(TUNE_DEFAULT_BY_SLOT - TUNE_DEFAULT, 16)
-  assert.ok(rows.every((row) => row.args[1] === String(BASELINE.topTier.bodies)))
 })
 
 gate('the baseline names a full commit, margins above one and the hook runs the push gate', () => {
