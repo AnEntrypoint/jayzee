@@ -2,17 +2,19 @@ import { decodeCustomFields, encodeCustomFields, getComponentSchema } from '../p
 import { primeEntryDecode, unpackBinRecord } from '../aoi-pure/binRecord.js'
 import { HALF_PI, MIN_FULL_ENTITY_RECORD_LEN, PLAYER_RECORD_FIELDS, TAU } from './constants.js'
 import { decodeSelfBlock } from './selfBlock.js'
-import { packQuat, PLAYER_TIER_FULL, PLAYER_TIER_REDUCED, unpackQuat } from './records.js'
+import { packRotationWord, PLAYER_TIER_FULL, PLAYER_TIER_REDUCED, unpackRotationWord } from './records.js'
 import {
   buildCrowdDots,
   classifyPlayerTiers,
   encodePlayer,
   encodePlayersOnce,
   filterEncodedPlayers,
+  filterEncodedPlayersAtRate,
   filterEncodedPlayersTiered,
   filterEncodedPlayersWithSelf,
   reducedTickModFor
 } from './playerLod.js'
+import { reducedPoseDue } from './cadence.js'
 import {
   applyEntry,
   buildEntityKey,
@@ -283,7 +285,7 @@ export class SnapshotEncoder {
       if (!Array.isArray(p)) return p
       if (p.length < PLAYER_RECORD_FIELDS) return null
       unpackBinRecord(p[1], bin)
-      const rot = unpackQuat(bin.qrot, [0, 0, 0, 0])
+      const rot = unpackRotationWord(bin.qrot, [0, 0, 0, 0])
       return {
         id: p[0],
         position: [bin.px, bin.py, bin.pz],
@@ -302,7 +304,7 @@ export class SnapshotEncoder {
       if (!Array.isArray(e)) return e
       if (e.length < MIN_FULL_ENTITY_RECORD_LEN) return null
       unpackBinRecord(e[2], bin)
-      const rot = unpackQuat(bin.qrot, [0, 0, 0, 0])
+      const rot = unpackRotationWord(bin.qrot, [0, 0, 0, 0])
       return {
         id: e[0],
         model: e[1],
@@ -330,14 +332,16 @@ export class SnapshotEncoder {
 export {
   PLAYER_TIER_FULL,
   PLAYER_TIER_REDUCED,
-  packQuat,
+  packRotationWord,
   unpackBinRecord,
-  unpackQuat,
+  unpackRotationWord,
   decodeSelfBlock,
   encodePlayer,
   buildCrowdDots,
   classifyPlayerTiers,
   filterEncodedPlayersTiered,
+  filterEncodedPlayersAtRate,
+  reducedPoseDue,
   reducedTickModFor,
   encodeEntity,
   propTickMod,

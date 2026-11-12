@@ -1,16 +1,7 @@
-const FNV1A_32_OFFSET_BASIS = 0x811c9dc5
-const FNV1A_32_PRIME = 0x01000193
-const SECOND_LANE_SEED = 0x1000193
+import { FNV1A_32_OFFSET_BASIS, FNV1A_32_PRIME, fnv1aStepFloat64 } from '../shared/fnv1a.js'
+
+const SECOND_LANE_SEED = FNV1A_32_PRIME
 const SECOND_LANE_BYTE_OFFSET = 1
-
-const floatScratch = new DataView(new ArrayBuffer(8))
-
-const fnv1aStepFloat64 = (hash, n, byteOffset = 0) => {
-  floatScratch.setFloat64(0, n)
-  let next = hash
-  for (let i = 0; i < 8; i++) next = Math.imul(next ^ (floatScratch.getUint8(i) + byteOffset), FNV1A_32_PRIME)
-  return next
-}
 
 const canonicalFloat64 = (n) => (n === 0 ? 0 : n)
 

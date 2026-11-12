@@ -8,7 +8,8 @@ import {
   PLAYER_RECORD_FIELDS,
   TAU
 } from './constants.js'
-import { packQuat, packReducedPlayerPose } from './records.js'
+import { packRotationWord, packReducedPlayerPose } from './records.js'
+import { reducedPoseDue } from './cadence.js'
 
 const pitchNOf = (lookPitch) => Math.max(0, Math.min(255, Math.round(((lookPitch || 0) + HALF_PI) / Math.PI * 255)))
 
@@ -18,7 +19,7 @@ export const encodePlayer = (p) => {
   const [px, py, pz] = p.position, [rx, ry, rz, rw] = p.rotation, [vx, vy, vz] = p.velocity
   const bin = encodePlayerRecord({
     position: [px, py, pz],
-    rotationWord: packQuat(rx, ry, rz, rw),
+    rotationWord: packRotationWord(rx, ry, rz, rw),
     velocity: [vx, vy, vz]
   })
   return [p.id, bin, p.onGround ? 1 : 0, Math.round(p.health || 0), p.crouch || 0, (pitchNOf(p.lookPitch) << 8) | yawNOf(p.lookYaw), p.expr || 0, p.weapon || 0]
@@ -31,7 +32,7 @@ export const encodePlayerInto = (p, rec) => {
   rec.flip ^= 1
   const bin = encodePlayerRecord({
     position: [px, py, pz],
-    rotationWord: packQuat(rx, ry, rz, rw),
+    rotationWord: packRotationWord(rx, ry, rz, rw),
     velocity: [vx, vy, vz]
   }, rec.bins[rec.flip])
   const a = rec.arr
@@ -154,7 +155,7 @@ export const classifyPlayerTiers = (playersById, nearbyIds, viewerPos, selfId) =
 
 export const reducedTickModFor = (snapshotHz) => Math.max(1, Math.round(snapshotHz / PLAYER_LOD_REDUCED_HZ))
 
-export const filterEncodedPlayersTiered = (encodedMap, playersById, nearbyIds, selfId, viewerPos, tick, reducedTickMod) => {
+const tieredRecords = (encodedMap, playersById, nearbyIds, selfId, viewerPos, reducedDue) => {
   const { full, reduced, dotPlayers } = classifyPlayerTiers(playersById, nearbyIds, viewerPos, selfId)
   const out = []
   const selfEnc = encodedMap.get(selfId)
@@ -163,11 +164,19 @@ export const filterEncodedPlayersTiered = (encodedMap, playersById, nearbyIds, s
     const enc = encodedMap.get(id)
     if (enc) out.push(enc)
   }
-  const mod = Math.max(1, reducedTickMod || 1)
-  for (const id of reduced) {
-    if (mod > 1 && (tick % mod) !== 0) continue
-    const p = playersById.get(id)
-    if (p) out.push(encodeReducedPlayer(p))
+  if (reducedDue) {
+    for (const id of reduced) {
+      const p = playersById.get(id)
+      if (p) out.push(encodeReducedPlayer(p))
+    }
   }
   return { players: out, dots: buildCrowdDots(dotPlayers, viewerPos) }
 }
+
+export const filterEncodedPlayersTiered = (encodedMap, playersById, nearbyIds, selfId, viewerPos, tick, reducedTickMod) => {
+  const mod = Math.max(1, reducedTickMod || 1)
+  return tieredRecords(encodedMap, playersById, nearbyIds, selfId, viewerPos, mod === 1 || (tick % mod) === 0)
+}
+
+export const filterEncodedPlayersAtRate = (encodedMap, playersById, nearbyIds, selfId, viewerPos, tick, snapshotHz) =>
+  tieredRecords(encodedMap, playersById, nearbyIds, selfId, viewerPos, reducedPoseDue(tick, snapshotHz))

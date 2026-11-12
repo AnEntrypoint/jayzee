@@ -13,7 +13,7 @@ import {
   encodeEntity,
   encodeSelfBlock,
   filterEncodedPlayersTiered,
-  packQuat,
+  packRotationWord,
   PLAYER_LOD_FULL_COUNT,
   PLAYER_LOD_REDUCED2,
   PLAYER_LOD_REDUCED_HZ,
@@ -27,7 +27,7 @@ import {
   SnapshotEncoder,
   TombstoneLog,
   unpackBinRecord,
-  unpackQuat
+  unpackRotationWord
 } from '../src/snapshot-lod-pure/snapshotEncoder.js'
 import { fnv1aStepString, FNV1A_32_OFFSET_BASIS } from '../src/snapshot-lod-pure/fnv1a.js'
 
@@ -205,16 +205,16 @@ rejects('encodeEntity of entity 8 velocity', encodeEntity(entity8)[2], ENTITY8_H
 claim('the entity record equals the src/wire 29-byte record', hex(encodeEntity(entity7)[2]), hex(encodeEntityRecord({ position: [1.5, -2, 0.25], rotationWord: 3757571583, velocity: [0, 0, 0], scale: [1, 2, 0.5], flags: 0 })))
 rejects('the entity record carries flags', hex(encodeEntity(entity7)[2]), hex(encodeEntityRecord({ position: [1.5, -2, 0.25], rotationWord: 3757571583, velocity: [0, 0, 0], scale: [1, 2, 0.5], flags: 1 })))
 
-claim('packQuat of the identity is spoint word 3757571583', packQuat(0, 0, 0, 1), 3757571583)
-rejects('packQuat of the identity', packQuat(0, 0, 0, 1), 3757571582)
-claim('packQuat of (0.6, 0, 0.8, 0) is spoint word 3138911743', packQuat(0.6, 0, 0.8, 0), 3138911743)
-rejects('packQuat of (0.6, 0, 0.8, 0)', packQuat(0.6, 0, 0.8, 0), 3138911742)
-claim('packQuat of (0, -s, 0, s) is spoint word 1610087424', packQuat(0, -0.7071067811865476, 0, 0.7071067811865476), 1610087424)
-rejects('packQuat of (0, -s, 0, s)', packQuat(0, -0.7071067811865476, 0, 0.7071067811865476), 1610087425)
-claim('unpackQuat of 3138911743 matches spoint components', unpackQuat(3138911743, [0, 0, 0, 0]), [0.6005564442954238, -1.1102230246251565e-16, 0.7995823642472598, -1.1102230246251565e-16])
-rejects('unpackQuat of 3138911743', unpackQuat(3138911743, [0, 0, 0, 0]), [0.6, 0, 0.8, 0])
-claim('encodeSmallestThree is the word packQuat returns', encodeSmallestThree([0, 0, 0, 1]), 3757571583)
-rejects('encodeSmallestThree is the word packQuat returns', encodeSmallestThree([0, 0, 0, 1]), 3757571582)
+claim('packRotationWord of the identity is spoint word 3757571583', packRotationWord(0, 0, 0, 1), 3757571583)
+rejects('packRotationWord of the identity', packRotationWord(0, 0, 0, 1), 3757571582)
+claim('packRotationWord of (0.6, 0, 0.8, 0) is spoint word 3138911743', packRotationWord(0.6, 0, 0.8, 0), 3138911743)
+rejects('packRotationWord of (0.6, 0, 0.8, 0)', packRotationWord(0.6, 0, 0.8, 0), 3138911742)
+claim('packRotationWord of (0, -s, 0, s) is spoint word 1610087424', packRotationWord(0, -0.7071067811865476, 0, 0.7071067811865476), 1610087424)
+rejects('packRotationWord of (0, -s, 0, s)', packRotationWord(0, -0.7071067811865476, 0, 0.7071067811865476), 1610087425)
+claim('unpackRotationWord of 3138911743 matches spoint components', unpackRotationWord(3138911743, [0, 0, 0, 0]), [0.6005564442954238, -1.1102230246251565e-16, 0.7995823642472598, -1.1102230246251565e-16])
+rejects('unpackRotationWord of 3138911743', unpackRotationWord(3138911743, [0, 0, 0, 0]), [0.6, 0, 0.8, 0])
+claim('encodeSmallestThree is the word packRotationWord returns', encodeSmallestThree([0, 0, 0, 1]), 3757571583)
+rejects('encodeSmallestThree is the word packRotationWord returns', encodeSmallestThree([0, 0, 0, 1]), 3757571582)
 
 const selfInput = { inputSequence: 5, inputBuffer: 3, groundNormal: [0.3, 0.9, -0.2], wallNormals: [1, 0, 0, 1], position: [10, 0, 20] }
 claim('encodeSelfBlock packs input, ground normal and wall planes as spoint does', encodeSelfBlock(selfInput), [5, 3, 9959, [32512, 10000, 127, 20000]])

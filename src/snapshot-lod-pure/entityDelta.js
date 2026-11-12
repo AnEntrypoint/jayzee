@@ -16,7 +16,7 @@ import {
   SNAPSHOT_ENTITY_ENC_CODE_VERSION
 } from './constants.js'
 import { FNV1A_32_OFFSET_BASIS, fnv1aStepBytes, fnv1aStepFloat32, fnv1aStepString } from './fnv1a.js'
-import { packQuat } from './records.js'
+import { packRotationWord } from './records.js'
 
 const VEL_ZERO = [0, 0, 0]
 const SCALE_ONE = [1, 1, 1]
@@ -28,7 +28,7 @@ const packEntityBin = (e, into) => {
   const pos = e.position, rot = e.rotation, v = e.velocity || VEL_ZERO, s = e.scale || SCALE_ONE
   return encodeEntityRecord({
     position: [pos[0], pos[1], pos[2]],
-    rotationWord: packQuat(rot[0], rot[1], rot[2], rot[3]),
+    rotationWord: packRotationWord(rot[0], rot[1], rot[2], rot[3]),
     velocity: [v[0] || 0, v[1] || 0, v[2] || 0],
     scale: [s[0] || 1, s[1] || 1, s[2] || 1],
     flags: 0
