@@ -1,5 +1,5 @@
-export const BRIDGE_BROADCAST = 'PEER_BROADCAST'
-export const BRIDGE_SEND = 'PEER_SEND_FRAME'
+export const BRIDGE_BROADCAST = 'BRIDGE_BROADCAST'
+export const BRIDGE_SEND = 'BRIDGE_SEND'
 export const BRIDGE_REFUSAL = Object.freeze({
   PEER_ID: 'peer-id-not-string',
   SELF: 'peer-is-self',
@@ -39,7 +39,7 @@ export class WorkerBridgeProxy {
         if (!peers.has(peerId)) return proxy._refuse(BRIDGE_REFUSAL.UNKNOWN_PEER)
         if (!isFrame(frame)) return proxy._refuse(BRIDGE_REFUSAL.FRAME)
         proxy.stats.sends++
-        post({ type: BRIDGE_SEND, peerId, data: frame })
+        post({ type: BRIDGE_SEND, to: peerId, data: frame })
         return true
       },
     })
@@ -88,6 +88,14 @@ export class WorkerBridgeProxy {
     return true
   }
 
+  deliver(from, frame) {
+    return this.onPeerFrame({ peerId: from, data: frame })
+  }
+
+  peerLeft(pubkey) {
+    return this.onPeerLeft({ peerId: pubkey })
+  }
+
   handlers() {
     return {
       PEER_CONNECT: (message) => this.onPeerConnect(message),
@@ -102,4 +110,11 @@ export class WorkerBridgeProxy {
     this.closed = true
     return true
   }
+}
+
+export function createWorkerBridgeProxy({ localPubkey, roster, post }) {
+  if (!Array.isArray(roster)) throw new TypeError('createWorkerBridgeProxy needs the roster as an array of peer pubkeys')
+  const proxy = new WorkerBridgeProxy({ post, pubkey: localPubkey })
+  for (const pubkey of roster) if (pubkey !== localPubkey) proxy.onPeerConnect({ peerId: pubkey })
+  return proxy
 }

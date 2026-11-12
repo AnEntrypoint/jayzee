@@ -3,7 +3,9 @@ import { finish, gate } from './lib/gate.mjs'
 import { buildLockstepPeerLoop } from '../src/lockstep-pure/peerLoops.js'
 import { LOCKSTEP_DEFAULTS } from '../src/lockstep-pure/lockstepGameLoop.js'
 import { createRollbackBridgeTransport } from '../src/rollback-pure/rollbackInputTransport.js'
-import { BRIDGE_BROADCAST, BRIDGE_REFUSAL, BRIDGE_SEND, WorkerBridgeProxy } from '../src/transport/workerBridgeProxy.js'
+import { readFileSync } from 'node:fs'
+import { runBridgeProxy } from './lib/netPortScenario.mjs'
+import { BRIDGE_BROADCAST, BRIDGE_REFUSAL, BRIDGE_SEND, WorkerBridgeProxy, createWorkerBridgeProxy } from '../src/transport/workerBridgeProxy.js'
 import { NETCODE_OPCODES, createNetcodeDispatch } from '../src/worker-dispatch-pure/workerDispatch.js'
 
 const makeTickSystem = () => {
@@ -65,13 +67,32 @@ const makePair = ({ connect = true, checksumB = () => 'abc' } = {}) => {
   return { a, b, run }
 }
 
+const fixture = JSON.parse(readFileSync(new URL('./fixtures/spoint/net-port.json', import.meta.url), 'utf8')).sections.bridgeProxy
+
+gate('createWorkerBridgeProxy posts the same BRIDGE_BROADCAST and BRIDGE_SEND messages and raises the same data and peer-close events as spoint on one scripted session', () => {
+  const ran = runBridgeProxy(createWorkerBridgeProxy)
+  assert.deepEqual(ran.posts, fixture.posts)
+  assert.deepEqual(ran.events, fixture.events)
+  const stated = ['peers after c left', 'broadcast after c left']
+  assert.deepEqual(ran.steps.filter(([label]) => !stated.includes(label)), fixture.steps.filter(([label]) => !stated.includes(label)))
+})
+
+gate('stated difference: spoint keeps a departed peer in the table as closed and still counts it in broadcast; jayzee removes it, so broadcast reports the peers that can hear', () => {
+  const ran = Object.fromEntries(runBridgeProxy(createWorkerBridgeProxy).steps)
+  const spoint = Object.fromEntries(fixture.steps)
+  assert.deepEqual(spoint['peers after c left'], [['b', 'open'], ['c', 'closed']])
+  assert.equal(spoint['broadcast after c left'], 2)
+  assert.deepEqual(ran['peers after c left'], [['b', 'open']])
+  assert.equal(ran['broadcast after c left'], 1)
+})
+
 gate('the proxy is a bridge: it carries the local pubkey, an event target with broadcast and a peer table, and refuses a missing post or pubkey', () => {
   const { proxy, outbox } = makeWorker('A')
   assert.equal(proxy.pubkey, 'A')
   assert.ok(proxy.data instanceof EventTarget)
   assert.equal(proxy.data.broadcast('wwlockstep:{}'), 0)
-  assert.deepEqual(outbox, [{ type: 'PEER_BROADCAST', data: 'wwlockstep:{}' }])
-  assert.equal(BRIDGE_BROADCAST, 'PEER_BROADCAST')
+  assert.deepEqual(outbox, [{ type: 'BRIDGE_BROADCAST', data: 'wwlockstep:{}' }])
+  assert.equal(BRIDGE_BROADCAST, 'BRIDGE_BROADCAST')
   assert.throws(() => new WorkerBridgeProxy({ pubkey: 'A' }), /only through post/)
   assert.throws(() => new WorkerBridgeProxy({ post: () => {}, pubkey: '' }), /local pubkey/)
 })
@@ -110,7 +131,7 @@ gate('a frame from a peer that never connected, a frame that is not text or byte
   assert.equal(proxy.data.send('Z', 'x'), false)
   assert.equal(proxy.data.send('B', 'direct'), true)
   assert.equal(proxy.data.broadcast({}), 0)
-  assert.deepEqual(outbox, [{ type: BRIDGE_SEND, peerId: 'B', data: 'direct' }])
+  assert.deepEqual(outbox, [{ type: BRIDGE_SEND, to: 'B', data: 'direct' }])
   assert.equal(heard, 0)
   assert.equal(proxy.stats.refused, 6)
 })
