@@ -2,6 +2,7 @@
   "build:kernel",
   "check:kernel",
   "check:site",
+  "check:package-surface",
   "check:world",
   "check:protocol",
   "check:messages",
