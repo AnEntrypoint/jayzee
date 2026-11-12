@@ -227,6 +227,12 @@ set(ENGINE_EXPORTS
   _engine_veg_place
   _engine_veg_attach
   _engine_veg_placed
+  _engine_veg_set_promotion
+  _engine_veg_promotion_cap
+  _engine_veg_promoted_count
+  _engine_veg_promotion_refusals
+  _engine_veg_promoted_rows
+  _engine_veg_restore
   _engine_codec_bytes
   _engine_codec_values
   _engine_codec_encode_entity

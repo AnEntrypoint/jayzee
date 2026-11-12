@@ -628,6 +628,7 @@ EMSCRIPTEN_KEEPALIVE void engine_page_apply() {
 EMSCRIPTEN_KEEPALIVE double engine_world_rebase_count() { return static_cast<double>(engine::world().rebases()); }
 
 EMSCRIPTEN_KEEPALIVE int engine_veg_configure(double origin, double cellSize) {
+  engine::world().restoreVegetation();
   const bool ok = engine::vegetation::configure(engine::vegetation::state(), origin, static_cast<float>(cellSize));
   return ok ? engine::kOk : engine::kRange;
 }
@@ -642,6 +643,30 @@ EMSCRIPTEN_KEEPALIVE int engine_veg_attach() {
 
 EMSCRIPTEN_KEEPALIVE std::uint64_t engine_veg_placed() {
   return engine::vegetation::state().placed;
+}
+
+EMSCRIPTEN_KEEPALIVE int engine_veg_set_promotion(std::uint32_t cap) {
+  return engine::world().setVegetationPromotion(cap);
+}
+
+EMSCRIPTEN_KEEPALIVE std::uint32_t engine_veg_promotion_cap() {
+  return engine::world().promotionCap();
+}
+
+EMSCRIPTEN_KEEPALIVE std::uint32_t engine_veg_promoted_count() {
+  return engine::world().promotedInstances();
+}
+
+EMSCRIPTEN_KEEPALIVE std::uint32_t engine_veg_promotion_refusals() {
+  return engine::world().promotionRefusals();
+}
+
+EMSCRIPTEN_KEEPALIVE const engine::PromotedRow* engine_veg_promoted_rows() {
+  return engine::world().promotedRows();
+}
+
+EMSCRIPTEN_KEEPALIVE int engine_veg_restore() {
+  return engine::world().restoreVegetation();
 }
 
 EMSCRIPTEN_KEEPALIVE std::uint8_t* engine_codec_bytes() {

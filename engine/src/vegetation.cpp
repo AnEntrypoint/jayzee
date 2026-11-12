@@ -1,6 +1,7 @@
 #include "vegetation.h"
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <cstring>
 #include <new>
@@ -22,6 +23,23 @@ constexpr float kRockHalf = 0.6f;
 constexpr std::size_t kAlign = 16;
 
 Field* bound = nullptr;
+std::atomic<std::uint32_t> touchesArmed{0};
+std::atomic<std::uint32_t> touchCount{0};
+std::uint32_t touchesDropped = 0;
+Touch touches[kMaxTouches];
+
+void recordTouch(std::uint32_t instance, JPH::Vec3Arg anchor) {
+  const std::uint32_t at = touchCount.fetch_add(1, std::memory_order_relaxed);
+  if (at >= kMaxTouches) return;
+  touches[at] = Touch{instance, anchor.GetX(), anchor.GetY(), anchor.GetZ()};
+}
+
+bool touchBefore(const Touch& a, const Touch& b) {
+  if (a.instance != b.instance) return a.instance < b.instance;
+  if (a.y != b.y) return a.y < b.y;
+  if (a.x != b.x) return a.x < b.x;
+  return a.z < b.z;
+}
 
 std::size_t alignUp(std::size_t value) {
   return (value + kAlign - 1) / kAlign * kAlign;
@@ -36,7 +54,7 @@ int cellCoordinate(double value, double origin, float cellSize, std::uint32_t ce
 }
 
 bool instanceContact(const Instance& inst, JPH::Vec3Arg center, float radius, float maxSeparation, JPH::Vec3& surface,
-                     JPH::Vec3& axis, float& depth) {
+                     JPH::Vec3& axis, float& depth, JPH::Vec3& anchor) {
   float reach = 0.0f;
   JPH::Vec3 closest;
   if (inst.cls == kClassTrunk) {
@@ -63,6 +81,7 @@ bool instanceContact(const Instance& inst, JPH::Vec3Arg center, float radius, fl
   depth = radius + reach - distance;
   if (depth < -maxSeparation) return false;
   surface = closest + axis * reach;
+  anchor = inst.cls == kClassRock ? JPH::Vec3(inst.x, inst.y + kRockHalf * inst.scale, inst.z) : closest;
   return true;
 }
 
@@ -86,8 +105,12 @@ void collideField(const Field& field, JPH::Mat44Arg fieldToWorld, JPH::Vec3Arg c
         if (ioCollector.ShouldEarlyOut()) return;
         JPH::Vec3 surface;
         JPH::Vec3 axis;
+        JPH::Vec3 anchor;
         float depth = 0.0f;
-        if (!instanceContact(row[k], center, radius, maxSeparation, surface, axis, depth)) continue;
+        if (!instanceContact(row[k], center, radius, maxSeparation, surface, axis, depth, anchor)) continue;
+        if (touchesArmed.load(std::memory_order_relaxed) != 0) {
+          recordTouch(static_cast<std::uint32_t>(index * field.instancesPerCell + k), anchor);
+        }
         reportSphereContact(fieldToWorld, surface, axis, depth, fieldSub, sphereSub, fieldFirst, ioCollector);
       }
     }
@@ -181,6 +204,68 @@ void clear(Field& field) {
   const std::size_t cells = static_cast<std::size_t>(field.cellsPerSide) * field.cellsPerSide;
   for (std::size_t index = 0; index < cells; ++index) field.counts[index] = 0;
   field.placed = 0;
+  touchCount.store(0, std::memory_order_relaxed);
+}
+
+bool isBound() {
+  return bound != nullptr;
+}
+
+void armTouches(bool on) {
+  touchesArmed.store(on ? 1u : 0u, std::memory_order_relaxed);
+}
+
+std::uint32_t drainTouches(const Touch*& rows) {
+  const std::uint32_t recorded = touchCount.exchange(0, std::memory_order_relaxed);
+  const std::uint32_t held = std::min(recorded, kMaxTouches);
+  touchesDropped += recorded - held;
+  for (std::uint32_t i = 1; i < held; ++i) {
+    const Touch moving = touches[i];
+    std::uint32_t at = i;
+    while (at > 0 && touchBefore(moving, touches[at - 1])) {
+      touches[at] = touches[at - 1];
+      at -= 1;
+    }
+    touches[at] = moving;
+  }
+  std::uint32_t unique = 0;
+  for (std::uint32_t i = 0; i < held; ++i) {
+    if (unique > 0 && touches[unique - 1].instance == touches[i].instance) continue;
+    touches[unique] = touches[i];
+    unique += 1;
+  }
+  rows = touches;
+  return unique;
+}
+
+std::uint32_t droppedTouches() {
+  return touchesDropped;
+}
+
+namespace {
+
+Instance* instanceAt(Field& field, std::uint32_t instance) {
+  const std::size_t cells = static_cast<std::size_t>(field.cellsPerSide) * field.cellsPerSide;
+  const std::size_t cell = instance / field.instancesPerCell;
+  const std::uint32_t k = instance % field.instancesPerCell;
+  if (cell >= cells || k >= field.counts[cell]) return nullptr;
+  return field.instances + instance;
+}
+
+}
+
+bool promote(Field& field, std::uint32_t instance) {
+  Instance* inst = instanceAt(field, instance);
+  if (inst == nullptr || inst->cls >= kClassPass) return false;
+  inst->cls |= kPromotedBit;
+  return true;
+}
+
+bool restore(Field& field, std::uint32_t instance) {
+  Instance* inst = instanceAt(field, instance);
+  if (inst == nullptr || (inst->cls & kPromotedBit) == 0) return false;
+  inst->cls &= ~kPromotedBit;
+  return true;
 }
 
 void registerCollisions() {

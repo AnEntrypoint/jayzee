@@ -15,6 +15,8 @@ constexpr std::uint32_t kClassPass = 2;
 constexpr float kMaxScale = 2.0f;
 constexpr float kMaxReach = 2.0f;
 constexpr float kBoundHeight = 100.0f;
+constexpr std::uint32_t kPromotedBit = 0x80000000u;
+constexpr std::uint32_t kMaxTouches = 256;
 
 struct Instance {
   float x;
@@ -24,6 +26,15 @@ struct Instance {
   float scale;
   std::uint32_t cls;
 };
+
+struct Touch {
+  std::uint32_t instance;
+  float x;
+  float y;
+  float z;
+};
+
+static_assert(sizeof(Touch) == 16);
 
 struct Field {
   double origin = 0.0;
@@ -42,6 +53,12 @@ Field& state();
 bool configure(Field& field, double origin, float cellSize);
 int place(Field& field, float x, float y, float z, float yaw, float scale, std::uint32_t cls);
 void clear(Field& field);
+bool isBound();
+void armTouches(bool on);
+std::uint32_t drainTouches(const Touch*& rows);
+std::uint32_t droppedTouches();
+bool promote(Field& field, std::uint32_t instance);
+bool restore(Field& field, std::uint32_t instance);
 void registerCollisions();
 
 class VegetationShape final : public SurfaceShape {
