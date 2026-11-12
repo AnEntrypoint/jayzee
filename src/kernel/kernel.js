@@ -1,3 +1,4 @@
+export { reserve, positions, velocities, boxTable } from './state.js'
 export { integrate } from './integrate.js'
 export { resolveGround, resolveBoxes } from './collide.js'
 export { resolvePairs } from './pairs.js'

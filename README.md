@@ -8,7 +8,7 @@ Deterministic physics for multiplayer games. Numeric kernels are written in plai
 npm install jayzee
 ```
 
-Installing runs the kernel build once (about 10 to 20 seconds) and writes `dist/kernel.wasm`. At runtime nothing compiles: each `World` instantiates the cached module with its own memory.
+The package ships `dist/kernel.wasm` prebuilt (16 KB). jz is a build-time dependency only: at runtime nothing compiles and nothing is imported, and each `World` instantiates the cached module with its own memory through the plain WebAssembly API. A checkout builds the kernel on `npm install` (about 5 seconds).
 
 ## Use
 

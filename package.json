@@ -357,7 +357,6 @@
     "@pixiv/three-vrm": "3.5.5",
     "@three.ez/instanced-mesh": "0.3.16",
     "jolt-physics": "1.1.0",
-    "jz": "1.0.2",
     "meshoptimizer": "1.2.0",
     "msgpackr": "2.0.4",
     "nostr-tools": "^2.26.0",
@@ -371,6 +370,7 @@
     "@gltf-transform/extensions": "4.5.1",
     "@gltf-transform/functions": "4.5.1",
     "basisu": "1.16.3",
+    "jz": "1.0.2",
     "typescript": "^5.9.3"
   },
   "license": "UNLICENSED",
