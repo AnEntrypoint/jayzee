@@ -18,6 +18,9 @@ const DEFAULT_CMD_CAPACITY = 64
 const DEFAULT_MAX_BODY_BYTES = 16384
 const MAX_PAGE = 256
 const JSON_TYPE = 'application/json; charset=utf-8'
+const NDJSON_TYPE = 'application/x-ndjson; charset=utf-8'
+const DEFAULT_TAIL_LINES = 30
+export const JS_COMMAND = 'js'
 
 export class DevChannelError extends Error {
   constructor(code, message) {
@@ -163,7 +166,11 @@ export function createDevChannel(opts = {}) {
     }
     if (method !== 'POST') return refuse(405, 'method-not-allowed', '/diag takes GET and POST')
     const { value, error } = parsed(body, oversize)
-    if (error) return error
+    if (error) {
+      const line = typeof body === 'string' ? body.trim() : ''
+      if (error.status !== 400 || line === '' || line.length > maxBodyBytes) return error
+      return reply(200, { ok: true, seq: diag('info', line), recorded: 1 })
+    }
     const batch = Array.isArray(value) ? value : [value]
     if (batch.length === 0) return refuse(400, 'body-empty', 'an empty batch records nothing')
     for (const entry of batch) {
@@ -183,7 +190,27 @@ export function createDevChannel(opts = {}) {
     if (method !== 'POST') return refuse(405, 'method-not-allowed', '/cmd takes GET and POST')
     const { value, error } = parsed(body, oversize)
     if (error) return error
-    return guarded(() => reply(200, { ok: true, id: send(value.cmd, value.args ?? null) }))
+    const js = typeof value.js === 'string' && value.cmd === undefined
+    return guarded(() => reply(200, { ok: true, id: send(js ? JS_COMMAND : value.cmd, js ? value.js : value.args ?? null) }))
+  }
+
+  function handleTail(query) {
+    const n = wholeQuery(query, 'n', DEFAULT_TAIL_LINES)
+    if (n === null || n < 1) return refuse(400, 'query-not-whole', 'n must be a positive whole number')
+    const count = Math.min(n, diagCapacity, diagSeq)
+    const lines = diagSince(diagSeq - count, count).entries.map((entry) => JSON.stringify(entry))
+    return { status: 200, headers: { ...ISOLATION_HEADERS, 'Content-Type': NDJSON_TYPE, 'Cache-Control': 'no-store' }, body: lines.join('\n') + '\n' }
+  }
+
+  function clearDiag() {
+    diagRing.fill(null)
+    diagSeq = 0
+    return { status: 204, headers: { ...ISOLATION_HEADERS, 'Cache-Control': 'no-store' }, body: '' }
+  }
+
+  function handleNext() {
+    const taken = take(1)
+    return reply(200, taken.length === 1 ? { id: taken[0].id, js: taken[0].cmd === JS_COMMAND ? taken[0].args : undefined, cmd: taken[0].cmd, args: taken[0].args } : null)
   }
 
   function handleResult(method, query, body, oversize) {
@@ -207,6 +234,9 @@ export function createDevChannel(opts = {}) {
     const method = request && typeof request.method === 'string' ? request.method.toUpperCase() : ''
     const { path, query } = splitTarget(request ? request.path : '')
     if (path === '/diag') return handleDiag(method, query, request.body, request.oversize)
+    if (path === '/diag/tail') return handleTail(query)
+    if (path === '/diag/clear') return clearDiag()
+    if (path === '/cmd/next') return handleNext()
     if (path === '/cmd') return handleCmd(method, query, request.body, request.oversize)
     if (path === '/cmd/result') return handleResult(method, query, request.body, request.oversize)
     return null

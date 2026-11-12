@@ -27,7 +27,7 @@ gate('every channel reply carries COOP same-origin, COEP require-corp and no-sto
   const channel = createDevChannel({ now: clock() })
   assert.equal(COOP_VALUE, 'same-origin')
   assert.equal(COEP_VALUE, 'require-corp')
-  for (const out of [get(channel, '/diag'), post(channel, '/diag', 'not json'), get(channel, '/cmd'), channel.handle({ method: 'DELETE', path: '/cmd' }), get(channel, '/cmd/result?id=9')]) {
+  for (const out of [get(channel, '/diag'), post(channel, '/cmd', 'not json'), get(channel, '/cmd'), channel.handle({ method: 'DELETE', path: '/cmd' }), get(channel, '/cmd/result?id=9')]) {
     assert.equal(out.headers['Cross-Origin-Opener-Policy'], 'same-origin')
     assert.equal(out.headers['Cross-Origin-Embedder-Policy'], 'require-corp')
     assert.equal(out.headers['Cache-Control'], 'no-store')
@@ -96,8 +96,8 @@ gate('the command queue is bounded: a full queue answers 429 and frees a slot wh
 gate('malformed requests are refused with a status and a code, and record nothing', () => {
   const channel = createDevChannel({ now: clock(), maxBodyBytes: 64 })
   const cases = [
-    [post(channel, '/diag', 'nope'), 400, 'body-not-json'],
-    [post(channel, '/diag', '7'), 400, 'body-not-object'],
+    [post(channel, '/cmd', 'nope'), 400, 'body-not-json'],
+    [post(channel, '/cmd', '7'), 400, 'body-not-object'],
     [post(channel, '/diag', []), 400, 'body-empty'],
     [post(channel, '/diag', { level: 'loud', msg: 'x' }), 400, 'diag-entry-malformed'],
     [post(channel, '/diag', [{ msg: 'fine' }, { msg: '' }]), 400, 'diag-entry-malformed'],
@@ -120,6 +120,30 @@ gate('malformed requests are refused with a status and a code, and record nothin
   assert.equal(code(() => createDevChannel({})), 'TypeError')
   assert.equal(code(() => createDevChannel({ now: clock(), diagCapacity: 0 })), 'dev-channel-capacity-not-whole')
   assert.ok(new DevChannelError('a', 'b') instanceof Error)
+})
+
+gate('the spoint routes answer too: a raw /diag line, /diag/tail as ndjson, /diag/clear, and /cmd/next handing out one {id, js} at a time', () => {
+  const channel = createDevChannel({ now: clock(), diagCapacity: 8 })
+  assert.equal(post(channel, '/diag', '  frame 12 took 40 ms \n').status, 200)
+  for (let i = 0; i < 40; i++) post(channel, '/diag', { msg: 'line ' + i })
+  const tail = get(channel, '/diag/tail?n=3')
+  assert.equal(tail.headers['Content-Type'], 'application/x-ndjson; charset=utf-8')
+  assert.equal(tail.headers['Cross-Origin-Embedder-Policy'], 'require-corp')
+  assert.deepEqual(tail.body.trim().split('\n').map((line) => JSON.parse(line).msg), ['line 37', 'line 38', 'line 39'])
+  assert.equal(get(channel, '/diag/tail').body.trim().split('\n').length, 8, 'the default of 30 lines is capped by the ring')
+  const first = createDevChannel({ now: clock() })
+  post(first, '/diag', 'frame 12 took 40 ms')
+  assert.deepEqual(json(get(first, '/diag')).entries.map((e) => [e.level, e.msg]), [['info', 'frame 12 took 40 ms']])
+  assert.equal(get(channel, '/diag/clear').status, 204)
+  assert.deepEqual(json(get(channel, '/diag')).entries, [])
+  assert.equal(get(channel, '/diag/tail').body, '\n')
+  assert.equal(get(channel, '/cmd/next').body, 'null')
+  const a = json(post(channel, '/cmd', { js: 'location.reload()' })).id
+  post(channel, '/cmd', { js: '1 + 1' })
+  assert.deepEqual(json(get(channel, '/cmd/next')), { id: a, js: 'location.reload()', cmd: 'js', args: 'location.reload()' })
+  assert.equal(json(get(channel, '/cmd/next')).js, '1 + 1')
+  assert.equal(get(channel, '/cmd/next').body, 'null', 'a command is handed out once')
+  assert.equal(get(channel, '/diag/tail?n=0').status, 400)
 })
 
 const fixtureRoot = mkdtempSync(join(tmpdir(), 'jz-dev-'))
