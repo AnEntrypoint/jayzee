@@ -47,16 +47,16 @@
       "cores": "2",
       "siblings": "4",
       "cache": "56320 KB",
-      "kaggleRun": 35,
-      "referenceCommit": "091d59be46a9463383565be923fde7fb055547a7",
+      "kaggleRun": 52,
+      "referenceCommit": "c1f0bac39a555e10a5d66b381ae4586793d38012",
       "bodies": 131072,
       "workers": 4,
-      "singleMs": 570.8,
-      "referenceActiveMeanMs": 7.221,
-      "referenceP99Ms": 8.982,
-      "candidateP99Ms": 8.946,
+      "singleMs": 577.3,
+      "referenceActiveMeanMs": 6.535,
+      "referenceP99Ms": 8.893,
+      "candidateP99Ms": 8.729,
       "candidateOverBudget": 0,
-      "holds": true
+      "holds": false
     }
   }
 }

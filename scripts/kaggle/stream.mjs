@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process'
-import { closeSync, mkdirSync, openSync, readFileSync, statSync } from 'node:fs'
+import { closeSync, copyFileSync, existsSync, mkdirSync, openSync, readFileSync, rmSync, statSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -14,12 +14,23 @@ export const startLogStream = ({ command, args, path, env = process.env, cwd = p
   let child = null
   let starts = 0
   let stopped = false
+  const partOf = (n) => path + '.' + n
+  const sizeOf = (file) => (existsSync(file) ? statSync(file).size : 0)
+  const fullest = () => {
+    let best = 1
+    for (let n = 2; n <= starts; n++) if (sizeOf(partOf(n)) > sizeOf(partOf(best))) best = n
+    return partOf(best)
+  }
+  const publish = () => {
+    if (sizeOf(fullest()) >= sizeOf(path)) copyFileSync(fullest(), path)
+    return sizeOf(path)
+  }
   const guard = spawn('sh', ['-c', 'while read -r pid; do last=$pid; done; kill "$last" 2>/dev/null'], { stdio: ['pipe', 'ignore', 'ignore'] })
   const start = () => {
-    const out = openSync(path, 'w')
+    starts += 1
+    const out = openSync(partOf(starts), 'w')
     child = spawn(command, args, { cwd, env, stdio: ['ignore', out, out] })
     closeSync(out)
-    starts += 1
     guard.stdin.write(child.pid + '\n')
   }
   start()
@@ -28,7 +39,7 @@ export const startLogStream = ({ command, args, path, env = process.env, cwd = p
     pid: () => child.pid,
     guardPid: guard.pid,
     starts: () => starts,
-    bytes: () => statSync(path).size,
+    bytes: publish,
     keepRunning: () => {
       if (!stopped && !running()) start()
     },
@@ -41,7 +52,9 @@ export const startLogStream = ({ command, args, path, env = process.env, cwd = p
       clearTimeout(timer)
       guard.stdin.end()
       await exitOf(guard)
-      return { pid, guardPid: guard.pid, starts, bytes: statSync(path).size }
+      const bytes = publish()
+      for (let n = 1; n <= starts; n++) rmSync(partOf(n), { force: true })
+      return { pid, guardPid: guard.pid, starts, bytes }
     },
   }
 }
