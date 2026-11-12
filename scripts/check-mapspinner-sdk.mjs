@@ -95,7 +95,7 @@ gate('a planet carries its seed into the anchor field and its height matches cre
   for (const dir of dirs) assert.equal(planet.heightAt(dir), sampler.heightAt(dir))
   const p = planet.surfacePoint(dirs[1])
   assert.ok(Math.abs(Math.hypot(...p) - (6360 + planet.heightAt(dirs[1]))) < 1e-2, `${Math.hypot(...p)} ${planet.heightAt(dirs[1])}`)
-  assert.equal(planet.anchorField.serialize().seed, 77)
+  assert.equal(JSON.parse(planet.anchorField.serialize()).seed, 77)
   const other = sdk.createPlanet({ radiusM: 6360, seed: 78, hpfTexRes: 16 })
   assert.ok(dirs.some((dir) => other.heightAt(dir) !== planet.heightAt(dir)), 'negative control: another seed gives another ground')
 })
