@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-#if defined(__EMSCRIPTEN__)
+#if defined(__EMSCRIPTEN__) && !defined(ENGINE_ARENA_BSS)
 #include <unistd.h>
 #endif
 
@@ -12,7 +12,7 @@ namespace {
 
 constexpr std::size_t kAlignment = 64;
 
-#if defined(__EMSCRIPTEN__)
+#if defined(__EMSCRIPTEN__) && !defined(ENGINE_ARENA_BSS)
 std::uint8_t* reserve() {
   void* raw = sbrk(static_cast<std::intptr_t>(kBytes + kAlignment));
   if (raw == reinterpret_cast<void*>(-1)) return nullptr;
