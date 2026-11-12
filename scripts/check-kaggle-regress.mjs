@@ -6,7 +6,7 @@ import { finish, gate } from './lib/gate.mjs'
 import { classRecord, judge } from './kaggle/regress.mjs'
 import { decide } from './kaggle/push-gate.mjs'
 import { repeatedSpikes } from './kaggle/spikes.mjs'
-import { BASELINE, PROFILE_REPEATS, PROFILE_UNRECLAIMED_REPEATS, PROFILE_VARIANT, RECLAIM_OFF, buildPlan } from './kaggle/plan.mjs'
+import { AIRBORNE_AWAKE_REPEATS, AIRBORNE_REPEATS, BASELINE, PROFILE_COMPACT_REPEATS, PROFILE_REPEATS, PROFILE_UNRECLAIMED_REPEATS, PROFILE_VARIANT, RECLAIM_OFF, TUNE_DEFAULT, TUNE_WITHOUT_AIRBORNE, buildPlan } from './kaggle/plan.mjs'
 import { describeSlowTick } from './kaggle/tickProfile.mjs'
 import { canaryStalls, densestPhase, nearPhase, overBudgetTimes, periodFit, phaseShare, slowTickTimes } from './kaggle/slowTickClock.mjs'
 import { PIPE_BYTES, distinctDryRows, judgePreflight } from './kaggle/preflight.mjs'
@@ -418,13 +418,22 @@ gate('canary stalls and stamped slow ticks are placed on one clock, and their sh
 
 gate('the regress plan carries the profile build at the top tier as rows the gate does not judge', () => {
   const rows = buildPlan('regress').runs.filter((run) => run.role === 'profile')
-  assert.equal(rows.length, PROFILE_REPEATS + PROFILE_UNRECLAIMED_REPEATS)
+  assert.equal(rows.length, PROFILE_REPEATS + PROFILE_UNRECLAIMED_REPEATS + PROFILE_COMPACT_REPEATS)
   assert.equal(rows.filter((row) => row.args[9] === RECLAIM_OFF).length, PROFILE_UNRECLAIMED_REPEATS)
-  for (const row of rows) {
-    assert.ok(row.args[0].includes('/variants/' + PROFILE_VARIANT + '/'))
-    assert.equal(Number(row.args[1]), top.bodies)
-  }
-  assert.ok(PROFILE_REPEATS >= 10, 'the unexplained tick shows in about one repeat of ten')
+  for (const row of rows) assert.ok(row.args[0].includes('/variants/' + PROFILE_VARIANT + '/'))
+  assert.equal(rows.filter((row) => Number(row.args[1]) === top.bodies).length, PROFILE_REPEATS + PROFILE_UNRECLAIMED_REPEATS)
+  assert.ok(PROFILE_REPEATS >= 5 && PROFILE_COMPACT_REPEATS >= 3)
+})
+
+gate('the airborne skip is judged on ten alternated pairs at the top tier and five with every body awake, not on three repeats', () => {
+  const rows = buildPlan('regress').runs.filter((run) => run.role === 'airborne')
+  const knobs = rows.map((row) => row.args[9])
+  const top10 = knobs.filter((knob) => !knob.includes('awake=0'))
+  assert.equal(top10.length, 2 * AIRBORNE_REPEATS)
+  assert.ok(AIRBORNE_REPEATS >= 10 && AIRBORNE_AWAKE_REPEATS >= 5)
+  top10.forEach((knob, i) => assert.equal(knob, 'tune=' + (i % 2 === 0 ? TUNE_WITHOUT_AIRBORNE : TUNE_DEFAULT)))
+  assert.equal(knobs.filter((knob) => knob.includes('awake=0')).length, 2 * AIRBORNE_AWAKE_REPEATS)
+  assert.equal(TUNE_DEFAULT - TUNE_WITHOUT_AIRBORNE, 4)
 })
 
 gate('the baseline names a full commit, margins above one and the hook runs the push gate', () => {
