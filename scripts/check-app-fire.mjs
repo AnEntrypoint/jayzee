@@ -218,6 +218,13 @@ gate('negative control: a fire that is defined but whose runtime never ticks bur
   if (!(runtime.sent.length > 0 && burntTrunks(runtime) > 0)) fail('the same fire did not burn once its runtime ticked')
 })
 
+let colliderQueue = Promise.resolve()
+const inTurn = (run) => {
+  const turn = colliderQueue.then(() => new Promise((resolve) => setImmediate(resolve))).then(run)
+  colliderQueue = turn.then(() => {}, () => {})
+  return turn
+}
+
 const makeColliderWorld = async (specOverrides = {}) => {
   const frame = createPlanetFrame({ sampler, anchorDir: [0, 1, 0], offsetY: 0 })
   const state = { tick: 0 }
@@ -262,7 +269,7 @@ const makeColliderWorld = async (specOverrides = {}) => {
   return { frame, fire, holder, streamer, bodies, removed, trunkPlacements, warnings, step, restore, spot: [SPOT_XZ[0], frame.groundHeightLocal(SPOT_XZ[0], SPOT_XZ[1]), SPOT_XZ[1]] }
 }
 
-gate('with the real trunk collider streamer the fire follows spoint: it installs isTrunkCharred as the exclusion and sweeps the collider of each trunk whose cell has burnt out', async () => {
+gate('with the real trunk collider streamer the fire follows spoint: it installs isTrunkCharred as the exclusion and sweeps the collider of each trunk whose cell has burnt out', () => inTurn(async () => {
   const w = await makeColliderWorld()
   try {
     const before = w.streamer.liveCount
@@ -288,9 +295,9 @@ gate('with the real trunk collider streamer the fire follows spoint: it installs
     w.restore()
     w.streamer.stop()
   }
-})
+}))
 
-gate('negative control: a fire with no trunk collider streamer burns the same cells and removes no collider', async () => {
+gate('negative control: a fire with no trunk collider streamer burns the same cells and removes no collider', () => inTurn(async () => {
   const w = await makeColliderWorld()
   try {
     w.step(0)
@@ -302,9 +309,9 @@ gate('negative control: a fire with no trunk collider streamer burns the same ce
     w.restore()
     w.streamer.stop()
   }
-})
+}))
 
-gate('a trunk collider streamer that lacks sweepExcluded or refresh is refused when the fire first meets it, and trunkStreamerOf must be a function', async () => {
+gate('a trunk collider streamer that lacks sweepExcluded or refresh is refused when the fire first meets it, and trunkStreamerOf must be a function', () => {
   const frame = createPlanetFrame({ sampler, anchorDir: [0, 1, 0], offsetY: 0 })
   const hooks = createHookRunner({ tickDt: TICK_DT })
   const fires = createAppFires({ hooks, tickOf: () => 0, tickDt: TICK_DT })
