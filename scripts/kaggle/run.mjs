@@ -54,7 +54,7 @@ export const runOnKaggle = async (mode, note) => {
   } finally {
     streamed = await stream.stop()
   }
-  const liveRows = streamRows(readFileSync(join(root, STREAM_LOG), 'utf8')).length
+  const liveRows = new Set(streamRows(readFileSync(join(root, STREAM_LOG), 'utf8')).map((row) => row.index)).size
   const outDir = join(root, 'build/kaggle/out-v' + version[1])
   rmSync(outDir, { recursive: true, force: true })
   mkdirSync(outDir, { recursive: true })

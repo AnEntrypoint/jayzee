@@ -6,13 +6,13 @@ import { finish, gate } from './lib/gate.mjs'
 import { classRecord, judge } from './kaggle/regress.mjs'
 import { decide } from './kaggle/push-gate.mjs'
 import { repeatedSpikes } from './kaggle/spikes.mjs'
-import { BASELINE, PROFILE_COMPACT_REPEATS, PROFILE_REPEATS, PROFILE_UNRECLAIMED_REPEATS, PROFILE_VARIANT, RECLAIM_OFF, RELEASE_ORDER_REPEATS, SETTLE_REPEATS, TUNE_DEFAULT, TUNE_DEFAULT_BY_SLOT, buildPlan } from './kaggle/plan.mjs'
+import { BASELINE, PROFILE_COMPACT_REPEATS, PROFILE_REPEATS, PROFILE_UNRECLAIMED_REPEATS, PROFILE_VARIANT, RECLAIM_OFF, RELEASE_ORDER_REPEATS, TUNE_DEFAULT, TUNE_DEFAULT_BY_SLOT, buildPlan } from './kaggle/plan.mjs'
 import { describeSlowTick } from './kaggle/tickProfile.mjs'
 import { canaryStalls, densestPhase, nearPhase, overBudgetTimes, periodFit, phaseShare, slowTickTimes } from './kaggle/slowTickClock.mjs'
 import { PIPE_BYTES, distinctDryRows, judgePreflight } from './kaggle/preflight.mjs'
 import { spawnSync } from 'node:child_process'
 import { referenceGlue } from './kaggle/reference.mjs'
-import { COLD_START_S, coldStartOf, describeColdStart, rowsOfResults, startLogStream, streamRows } from './kaggle/stream.mjs'
+import { COLD_START_S, coldStartOf, describeColdStart, describeFollows, followsOf, rowsOfResults, startLogStream, streamRows } from './kaggle/stream.mjs'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 
@@ -428,24 +428,6 @@ gate('the regress plan carries the profile build at the top tier as rows the gat
   assert.ok(PROFILE_REPEATS >= 5 && PROFILE_COMPACT_REPEATS >= 3)
 })
 
-gate('the gate rows run after ' + 2 * SETTLE_REPEATS + ' settle rows of the same two builds and arguments, which the judge does not read', () => {
-  const runs = buildPlan('regress').runs
-  const settle = runs.filter((run) => run.role === 'settle')
-  const gated = runs.filter((run) => run.role === 'gate')
-  assert.equal(settle.length, 2 * SETTLE_REPEATS)
-  assert.ok(SETTLE_REPEATS >= 5)
-  assert.ok(runs.indexOf(settle.at(-1)) < runs.indexOf(gated[0]), 'a gate row runs before the last settle row')
-  settle.forEach((row, i) => assert.deepEqual(row.args, gated[i % 2].args))
-  const row = (variant, role, overTicks) => ({ kind: 'tick', variant, role, bodies: BASELINE.topTier.bodies, workers: BASELINE.topTier.workers, warm: true, ticks: 900, p99Ms: 9, p99QuietMs: 9, quietTicks: 800, maxMs: 12, activeMeanMs: 6, overBudget: overTicks.length, overBudgetHost: 0, overTicks })
-  const stalled = [{ tick: 150, ms: 40, host: false }]
-  const configs = []
-  for (let i = 0; i < SETTLE_REPEATS; i++) configs.push(row('reference', 'settle', stalled), row('base', 'settle', stalled))
-  for (let i = 0; i < BASELINE.topTier.repeats; i++) configs.push(row('reference', 'gate', []), row('base', 'gate', []))
-  const judged = judge(BASELINE, { configs, machine: { class: 'none-0-0-0' } })
-  assert.equal(judged.topTier.candidateOverBudget, 0)
-  assert.equal(judged.topTier.candidateUnmarkedOverTicks.length, 0)
-})
-
 const alive = (pid) => {
   try {
     process.kill(pid, 0)
@@ -457,31 +439,34 @@ const alive = (pid) => {
 
 gate('the log stream fills its file while its command runs, restarts a command that ended early, and stop leaves neither the command nor its guard behind', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'kaggle-stream-'))
+  const path = join(dir, 'stream.log')
+  const stream = startLogStream({ command: 'sh', args: ['-c', 'i=0; while [ $i -lt 4 ]; do echo "line $i"; i=$((i+1)); sleep 0.05; done'], path })
+  const long = startLogStream({ command: 'sh', args: ['-c', 'while true; do echo tick; sleep 0.05; done'], path: join(dir, 'long.log') })
   try {
-    const path = join(dir, 'stream.log')
-    const stream = startLogStream({ command: 'sh', args: ['-c', 'i=0; while [ $i -lt 4 ]; do echo "line $i"; i=$((i+1)); sleep 0.05; done'], path })
     const first = stream.pid()
     await new Promise((done) => setTimeout(done, 600))
-    const early = stream.bytes()
-    assert.ok(early > 0, 'the stream file is empty while the command runs')
+    const whole = stream.bytes()
+    assert.ok(whole > 0, 'the stream file is empty after the command ran')
     assert.equal(alive(first), false, 'the short command is still alive')
     stream.keepRunning()
     assert.equal(stream.starts(), 2)
     assert.notEqual(stream.pid(), first)
     await new Promise((done) => setTimeout(done, 600))
-    assert.ok(stream.bytes() > early, 'the restarted command appended nothing')
-    const long = startLogStream({ command: 'sh', args: ['-c', 'while true; do echo tick; sleep 0.05; done'], path: join(dir, 'long.log') })
-    await new Promise((done) => setTimeout(done, 300))
+    assert.equal(stream.bytes(), whole, 'a restarted stream replays the log from its start, so the file holds it once and not twice')
     const longPid = long.pid()
     assert.equal(alive(longPid), true)
+    const growing = long.bytes()
+    await new Promise((done) => setTimeout(done, 300))
+    assert.ok(long.bytes() > growing, 'the stream file did not grow while its command ran')
     const stoppedLong = await long.stop()
     assert.equal(stoppedLong.pid, longPid)
-    assert.ok(stoppedLong.bytes > 0)
     assert.equal(alive(longPid), false, 'the stream command outlived stop')
     assert.equal(alive(stoppedLong.guardPid), false, 'the guard outlived stop')
     const stopped = await stream.stop()
     assert.equal(alive(stopped.guardPid), false)
   } finally {
+    await long.stop()
+    await stream.stop()
     rmSync(dir, { recursive: true, force: true })
   }
 })
@@ -496,6 +481,14 @@ gate('live rows are read out of a streamed log whatever wraps them, and the cold
   assert.match(describeColdStart(cold), /first 100 s of the session: 2, worst tick 54.8 ms/)
   const fromResults = rowsOfResults({ startedAtEpochS: 1000, configs: [{ kind: 'tick', startedAtEpochS: 1008, role: 'gate', variant: 'base', bodies: top.bodies, workers: top.workers, warm: true, maxMs: 30, overBudget: 1, overBudgetHost: 0 }, { kind: 'calibrate', startedAtEpochS: 1001 }] })
   assert.deepEqual(fromResults.map((row) => [row.atS, row.maxMs]), [[8, 30]])
+})
+
+gate('rows are split by whether the row before them ran the other build, which is where runs 42 to 51 had their counted ticks', () => {
+  const row = (variant, maxMs, overBudget, overBudgetHost, extra = {}) => ({ variant, bodies: top.bodies, workers: top.workers, warm: true, maxMs, overBudget, overBudgetHost, ...extra })
+  const groups = followsOf([row('reference', 12, 0, 0), row('base', 40, 2, 1), row('reference', 30, 1, 1), row('base', 20, 1, 0), row('base', 12, 0, 0), { kind: 'calibrate' }, row('base', 55, 3, 0), row('base', 9, 0, 0, { workers: 1 }), row('base', 14, 0, 0)], top)
+  assert.deepEqual(groups.afterOtherBuild, { rows: 3, counted: 2, worstMs: 40, rowsWithCounted: 2 })
+  assert.deepEqual(groups.afterSameBuild, { rows: 2, counted: 0, worstMs: 14, rowsWithCounted: 0 })
+  assert.match(describeFollows(groups), /after a row of the other build: 3, 2 with a counted tick/)
 })
 
 gate('release by view is judged against release in slot order on eight alternated pairs at the top tier, not on rows run in one block', () => {

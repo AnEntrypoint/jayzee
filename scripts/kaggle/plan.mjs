@@ -76,7 +76,6 @@ export const PROFILE_UNRECLAIMED_REPEATS = 0
 export const CANARY_THREADS = Object.freeze([1, 4])
 export const TUNE_DEFAULT = 12
 export const RELEASE_ORDER_REPEATS = 8
-export const SETTLE_REPEATS = 5
 export const PROFILE_COMPACT_REPEATS = 3
 export const RECLAIM_OFF = 'reclaim=off'
 export const SETTLE_TICKS = 3000
@@ -88,7 +87,6 @@ const regressWith = (candidate) => () => {
   const runs = []
   const { bodies, workers, repeats } = BASELINE.topTier
   runs.push(calibrate())
-  for (let repeat = 0; repeat < SETTLE_REPEATS; repeat++) for (const glue of [referenceGlue(BASELINE.referenceCommit), candidate]) runs.push(tick(glue, bodies, workers, { role: 'settle' }))
   for (let repeat = 0; repeat < repeats; repeat++) for (const glue of [referenceGlue(BASELINE.referenceCommit), candidate]) runs.push(tick(glue, bodies, workers, { role: 'gate' }))
   for (let tier = 0; tier < MARBLE_TIERS; tier++) runs.push(marble(tier, BASELINE.marble.runs, BASELINE.marble.warmRuns))
   for (let repeat = 0; repeat < RELEASE_ORDER_REPEATS; repeat++) {

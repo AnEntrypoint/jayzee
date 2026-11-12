@@ -16,7 +16,7 @@ export const startLogStream = ({ command, args, path, env = process.env, cwd = p
   let stopped = false
   const guard = spawn('sh', ['-c', 'while read -r pid; do last=$pid; done; kill "$last" 2>/dev/null'], { stdio: ['pipe', 'ignore', 'ignore'] })
   const start = () => {
-    const out = openSync(path, 'a')
+    const out = openSync(path, 'w')
     child = spawn(command, args, { cwd, env, stdio: ['ignore', out, out] })
     closeSync(out)
     starts += 1
@@ -75,6 +75,26 @@ export const coldStartOf = (rows, { bodies, workers }) => {
   return { coldStartS: COLD_START_S, earlyRows: early.length, lateRows: late.length, earlyWorstMs: most(early), lateWorstMs: most(late), earlyMedianWorstMs: median(early), lateMedianWorstMs: median(late), earlyCounted: early.reduce((sum, row) => sum + (row.overBudget - (row.overBudgetHost ?? 0)), 0), lateCounted: late.reduce((sum, row) => sum + (row.overBudget - (row.overBudgetHost ?? 0)), 0) }
 }
 
+export const followsOf = (rows, { bodies, workers }) => {
+  const groups = { afterOtherBuild: { rows: 0, counted: 0, worstMs: 0, rowsWithCounted: 0 }, afterSameBuild: { rows: 0, counted: 0, worstMs: 0, rowsWithCounted: 0 } }
+  let before = null
+  for (const row of rows) {
+    const judged = Number.isFinite(row.maxMs) && row.bodies === bodies && row.workers === workers && row.warm !== false && (row.variant === 'base' || row.variant === 'reference')
+    if (judged && before !== null) {
+      const group = before === row.variant ? groups.afterSameBuild : groups.afterOtherBuild
+      const counted = row.overBudget - (row.overBudgetHost ?? 0)
+      group.rows += 1
+      group.counted += counted
+      group.rowsWithCounted += counted > 0 ? 1 : 0
+      group.worstMs = Math.max(group.worstMs, row.maxMs)
+    }
+    before = row.variant === 'base' || row.variant === 'reference' ? row.variant : null
+  }
+  return groups
+}
+
+export const describeFollows = (groups) => 'rows of the gate configuration that ran straight after a row of the other build: ' + groups.afterOtherBuild.rows + ', ' + groups.afterOtherBuild.rowsWithCounted + ' with a counted tick over budget (' + groups.afterOtherBuild.counted + ' ticks, worst tick ' + groups.afterOtherBuild.worstMs + ' ms); straight after a row of the same build: ' + groups.afterSameBuild.rows + ', ' + groups.afterSameBuild.rowsWithCounted + ' with a counted tick (' + groups.afterSameBuild.counted + ' ticks, worst tick ' + groups.afterSameBuild.worstMs + ' ms)'
+
 export const rowsOfResults = (results) => results.configs.filter((c) => c.kind === 'tick').map((c) => ({ atS: Number((c.startedAtEpochS - results.startedAtEpochS).toFixed(1)), role: c.role, variant: c.variant, knobs: c.knobs, bodies: c.bodies, workers: c.workers, warm: c.warm, activeMeanMs: c.activeMeanMs, maxMs: c.maxMs, overBudget: c.overBudget, overBudgetHost: c.overBudgetHost }))
 
 export const describeColdStart = (cold) => 'rows of the gate configuration started in the first ' + cold.coldStartS + ' s of the session: ' + cold.earlyRows + ', worst tick ' + cold.earlyWorstMs + ' ms, median worst ' + cold.earlyMedianWorstMs + ' ms, ' + cold.earlyCounted + ' counted over budget; later rows: ' + cold.lateRows + ', worst tick ' + cold.lateWorstMs + ' ms, median worst ' + cold.lateMedianWorstMs + ' ms, ' + cold.lateCounted + ' counted over budget'
@@ -86,4 +106,5 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   for (const row of rows) console.log(String(row.atS).padStart(7) + ' s  ' + String(row.role).padEnd(14) + String(row.variant ?? row.kind).padEnd(10) + String(row.knobs ?? '').padEnd(16) + ' mean ' + row.activeMeanMs + ' worst ' + row.maxMs + ' over ' + row.overBudget + ' host ' + row.overBudgetHost + (row.over && row.over.length ? ' ticks ' + row.over.map((tick) => tick[0] + ':' + tick[1] + (tick[2] ? 'h' : '')).join(' ') : ''))
   console.log('ROWS ' + rows.length)
   console.log('COLD ' + describeColdStart(coldStartOf(rows, { bodies: Number(bodiesArg), workers: Number(workersArg) })))
+  console.log('FOLLOWS ' + describeFollows(followsOf(rows, { bodies: Number(bodiesArg), workers: Number(workersArg) })))
 }
