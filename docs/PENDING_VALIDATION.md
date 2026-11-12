@@ -4733,3 +4733,21 @@ Left as a proposal, not started.
 
 - Full test on the final tree under Node 24.22.1: 308 checks run, 0 failed, 5886 PASS lines, 99 s. Under Node 22.23.4 the same tree fails the two allocation gates named above and passes the rest.
 - Consolidated into main on 2026-11-12 with the Kaggle regression gate still not run and no browser witness; both remain required before release.
+
+### Phase B of Phase P (2026-11-12): the branch rebased onto main, built, gated and witnessed
+
+Authors of the commits picked from `claude/youthful-edison-j2c463` onto f516422, by `git log --format='%h %an <%ae> %cn'`. Every one is authored and committed by lanmower <almagestfraternite@gmail.com>; no commit by another author was in the branch, and none was dropped.
+
+- 3d5e718, now 3ea59be, lanmower: kernel on jz's typed path.
+- 81ddcb1, now d6d9776, lanmower: engine arena out of BSS, shapes in use only, Jolt's profiler and debug renderer compiled out.
+- 0b0f9b8, now 71d5195, lanmower: package holds its reachable surface.
+- fdbbf10, now fcd8841, lanmower: the Phase P ledger above. It conflicted in `docs/PENDING_VALIDATION.md` and `docs/CHECK_TIMES.md`. Both sides of the ledger are kept, and its section is renamed from Phase O to Phase P because main already had a Phase O; `CHECK_TIMES.md` took main's side and is regenerated from this tree's full test.
+- b87c7e2 and 68c1276, lanmower, made in this Phase B: the package gate fix and the pins.
+
+Witnesses, each with its wall time.
+
+- Build: 25 glues in 549 s, none failed, 4 pins changed (68c1276), profile variant in 19 s. Twenty-five narrow gates in about 75 s of check wall time. One defect: `check:package-surface` crashed on `packed.files` of undefined, because npm 12.2.0 writes the `npm pack --json` report as an object keyed by package name and the gate read a list. It now reads either form and passes with 5 lines (b87c7e2).
+- Gate: Kaggle run 43, payload 9ea7d3de…, preflight 22 rows in 24.4 s, 55 configurations in 506 s, `npm run kaggle:regress` 584 s wall. RESULT: PASS. Mean awake tick 6.19 ms against the reference 7.45 ms (limit 8.195); quiet p99 7.939 ms against 9.484 ms (limit 11.855); no tick over budget in any candidate repeat (0,0,0,0,0 against 0,4,1,0,1).
+- What the run says about the arena out of BSS, which the ledger left for Kaggle: the candidate to reference ratio is 0.83 where run 42 had 0.79, the candidate repeats are 6.19 6.45 6.21 6.04 6.05 ms against 5.83 5.92 6.23 6.03 5.88 ms in run 42 with the reference the same in both (7.45 and 7.46 ms), and the minor faults of a run went from about 907 to about 7545. So the first-touch faults cost about 0.25 ms a tick at the mean while the arena grows, with no tick over budget. Load went from 1143 to 182 ms and the warm run from 1323 to 447 ms. Release order pairs: by view 5.96 to 6.14 ms, median 6.01; slot order 5.56 to 5.79 ms, median 5.73.
+- Planet witness, 900 frames each, own display. The one full run (398 s wall) passed both 64 configurations (work p99 1.81 and 1.95 ms, widest interval 17.53 and 17.91 ms) and failed both 1024 configurations with one missed interval each (26.28 ms and 34.75 ms, both classified renderer-main-thread-idle-in-gap with 0.73 ms of page work in the frame; work p99 6.88 and 3.17 ms). The host load was 5.2 to 10.8 and 14.7 to 16.0 in those two runs, from other sessions (an `npm ci` at 158 percent and an fx process among the top processes). The two failed configurations were rerun alone, as the working loop says: 1024-webgpu 97 s wall, work p99 2.17 ms, widest interval 17.77 ms, no miss, load 4.3 to 4.5; 1024-webgl2 94 s wall, work p99 1.44 ms, widest interval 17.67 ms, no miss, load 5.2 to 5.4. Every browser and display group was stopped with nothing left. The page memory figures in AGENTS.md were not taken again.
+- Full test on the final tree: 308 checks run, 0 failed, 5887 PASS lines, 103 s wall.

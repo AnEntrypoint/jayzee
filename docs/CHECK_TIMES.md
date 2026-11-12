@@ -2,383 +2,385 @@
 
 Written by `npm test -- --write-times` from `build/checks/timings.json`, the last wall time of each check on this host. A check over 2 s carries its reason from `scripts/test-slow-reasons.json`.
 
-Sum of the checks: 169.8 s across 307 entries. The checks run four at a time, so the wall time of a full run is lower; the runner prints it.
+Sum of the checks: 186.7 s across 309 entries. The checks run four at a time, so the wall time of a full run is lower; the runner prints it.
 
 | check | wall ms | serial | reason when over 2 s |
 |---|---|---|---|
-| `check:engine-state-hash-1024` | 14082 | yes | Five isolated 1024-tier runs of 120 ticks (fixed, and 2, 4, 7, 8 workers). They now run at the same time; before, they ran one after another and the 4-worker run was done twice (29 s). |
-| `check:scenario-determinism` | 14002 | yes | 64 child runs: eight scenarios on the fixed build and the threaded build at 2 and 4 workers, for two build pairs. |
-| `check:scenario-marble-bowl` | 13766 | yes | 512 marbles for 600 ticks, twice, on four tiers. Containment, settling and bit-for-bit agreement are the claims, with a bound of 25 ms of main-thread CPU time per tick on the single-threaded tiers. The 16.7 ms budget and the threaded tier are judged in the Kaggle regression run (scripts/kaggle/marble.mjs): wall time failed here under host load, and on a threaded tier the main thread spins while starved workers catch up, so its CPU time rose to 29.5 ms in a loaded full run. |
-| `check:gc-witness` | 10961 |  | 20000 measured ticks and 20000 control ticks under a GC observer. The count is the claim, so the ticks stay. |
-| `check:engine-tiers` | 8455 |  | The settle row spawns 10240 bodies at the scene spacing (1.2 m, above the 1.0 m diameter) and steps 360 ticks, so the counted window covers the fall and the sleep. At 0.6 m spacing the bodies overlapped and the same row took 62 s, and that overlap case is no longer covered by this gate. |
-| `check:engine-job-wait` | 7332 | yes | Five runs of 300 ticks of 1200 bodies in 100 piles: fixed, and 2 and 4 workers twice each. |
-| `check:elevation-ab` | 5847 |  | Runs spoint A/B elevation script at the fixture N and compares its output line for line. |
-| `check:app-watch` | 4566 |  | Waits on real file-watch events. |
-| `check:pose-allocations` | 4484 |  | 2000 warm-up frames of the 1024-player threaded tick on the planet-surface scene, the spawn the render witness uses, at about 4 ms a frame. On the flat scene the bodies fall off the ground box under planet gravity and never sleep, so each frame costs about 20 ms and the same warm-up takes 88 s. With 300 or 700 warm-up frames the sampler still sees one-off function-level allocations (10128 B and 1224 B) from V8 tier-up, so the warm-up cannot be shortened without a false failure. Counted frames are sampled per allocation. |
-| `check:sphere-population` | 3915 |  | Places the full sphere population and checks every member. |
-| `check:height-cpu` | 3887 |  | Evaluates every spoint height fixture sample to 1e-12. |
-| `check:alloc-audit` | 3464 |  | Sixteen rows of 50,000 calls each under a 1 MiB semi-space. |
-| `check:engine-release` | 3375 |  | Loads seven threaded 512 MiB instances in turn and waits for the collector after each. |
-| `check:vegetation-allocations` | 3329 | yes | 6000 warm-up frames before the sampled window; at 2000 the compile of the gate function landed inside the window. |
-| `check:scenario-lockstep-rts` | 2728 | yes | Six peers per tier on four tiers. |
-| `check:heightmap-cli` | 2725 |  | Runs the heightmap CLI once per fixture case. |
-| `check:scenario-deathrun` | 2711 | yes | Six runs per tier on four tiers. |
-| `check:scenario-boss-fight` | 2592 | yes | Six runs per tier on four tiers. |
-| `check:scenario-combat-bots` | 2516 | yes | Two runs on four tiers, with the duel and its wall and ridge controls. |
-| `check:scenario-allocations` | 2169 | yes | 30000 warm-up ticks per loop, one loop per process. |
-| `check:engine-threads` | 2064 | yes | Runs the threaded scenario at several worker counts. |
-| `check:thread-sampler` | 2053 | yes | Samples real threads over a timed window. |
-| `check:vegetation-generate-cost` | 1847 |  |  |
-| `check:own-display` | 1825 |  |  |
-| `check:mapspinner-atmosphere` | 1787 |  |  |
-| `check:planet-witness-scene` | 1487 |  |  |
-| `check:scenario-character-terrain` | 1450 | yes |  |
-| `check:snapshots` | 1302 |  |  |
-| `check:scenario-projectile-volley` | 1185 | yes |  |
-| `check:scenario-planet-landing` | 1119 | yes |  |
-| `check:scenario-settle` | 1097 | yes |  |
-| `check:types` | 1077 |  |  |
-| `check:scenario-character` | 934 | yes |  |
-| `check:gc-reuse-rows` | 922 |  |  |
-| `check:planet-scene-counts` | 897 |  |  |
-| `check:engine-raycast` | 873 |  |  |
-| `check:engine-shapecast` | 871 |  |  |
-| `check:engine-seal` | 836 |  |  |
-| `check:wireweave-relay` | 757 |  |  |
-| `check:netcode` | 718 |  |  |
-| `check:create-app` | 692 |  |  |
-| `check:crowd-dot-buffer` | 678 |  |  |
-| `check:engine-host-witness` | 668 |  |  |
-| `check:upload-handler` | 653 |  |  |
-| `check:upload-writes` | 642 |  |  |
-| `check:engine-awake-budget` | 617 |  |  |
-| `check:pose-replay` | 579 |  |  |
-| `check:terrain-agreement` | 544 |  |  |
-| `check:transport` | 527 |  |  |
-| `check:planet-witness` | 504 |  |  |
-| `check:engine-warm` | 484 |  |  |
-| `check:socket-server` | 449 |  |  |
-| `check:engine-pools` | 371 |  |  |
-| `check:stall-attribution` | 359 |  |  |
-| `check:engine-airborne` | 359 |  |  |
-| `build:kernel` | 353 |  |  |
-| `check:project-naming` | 283 |  |  |
-| `check:collision-placement-options` | 277 |  |  |
-| `check:kernel` | 262 |  |  |
-| `check:world-query` | 254 |  |  |
-| `check:engine-world` | 252 |  |  |
-| `check:engine-vegetation` | 250 |  |  |
-| `check:sharding` | 248 |  |  |
-| `check:world` | 243 |  |  |
-| `check:engine-materials` | 240 |  |  |
-| `check:world-config` | 238 |  |  |
-| `check:physics-pure` | 227 |  |  |
-| `check:ccd` | 221 |  |  |
-| `check:vehicles-spoint` | 214 |  |  |
-| `check:collision-mirror` | 196 |  |  |
-| `check:physics-integration-vehicles` | 193 |  |  |
-| `check:sdk-surfaces` | 192 |  |  |
-| `check:packages` | 191 |  |  |
-| `check:webgpu-profile` | 189 |  |  |
-| `check:collision-tile-streamer` | 185 |  |  |
-| `check:engine-planet` | 173 |  |  |
-| `check:overlap-spoint` | 171 |  |  |
-| `check:raycast-spoint` | 170 |  |  |
-| `check:site-world` | 167 |  |  |
-| `check:vehicle-remove-spoint` | 167 |  |  |
-| `check:collision-host` | 165 |  |  |
-| `check:dormant-spoint` | 165 |  |  |
-| `check:player-vat-spoint` | 165 |  |  |
-| `check:dormant-budget-spoint` | 163 |  |  |
-| `check:vehicle-refusal-spoint` | 160 |  |  |
-| `check:player-lod-renderer` | 157 |  |  |
-| `check:engine-bridge` | 155 |  |  |
-| `check:recast-bake-spoint` | 152 |  |  |
-| `check:rebase-session` | 152 |  |  |
-| `check:chart-state-live` | 151 |  |  |
-| `check:engine-budget-floor` | 148 |  |  |
-| `check:fire` | 145 |  |  |
-| `check:player-lod-renderer-webgpu` | 143 |  |  |
-| `check:engine-sleep` | 143 |  |  |
-| `check:bloom-spoint` | 135 |  |  |
-| `check:player-dot-material-spoint` | 132 |  |  |
-| `check:player-dot-shader-spoint` | 130 |  |  |
-| `check:decode-path` | 130 |  |  |
-| `check:scene-setup-spoint` | 129 |  |  |
-| `check:engine-leak` | 126 |  |  |
-| `check:terrain-static` | 123 |  |  |
-| `check:streaming-gltf-mesh` | 120 |  |  |
-| `check:upstream-builtin-nav` | 120 |  |  |
-| `check:streamer-p99` | 120 |  |  |
-| `check:camera-relative` | 120 |  |  |
-| `check:vegetation-leaf-patches` | 115 |  |  |
-| `check:cluster-lod-spoint` | 109 |  |  |
-| `check:terrain-pure` | 106 |  |  |
-| `check:engine-interest` | 105 |  |  |
-| `check:engine-codecs` | 102 |  |  |
-| `check:lockstep` | 101 |  |  |
-| `check:engine-core` | 99 |  |  |
-| `check:kaggle-regress` | 99 |  |  |
-| `check:follow-misuse` | 98 |  |  |
-| `check:timed-result` | 97 |  |  |
-| `check:vat-spoint` | 96 |  |  |
-| `check:fire-modules` | 94 |  |  |
-| `check:sample-order` | 94 |  |  |
-| `check:chart-anchor` | 89 |  |  |
-| `check:fsr1-spoint` | 89 |  |  |
-| `check:ssr-spoint` | 88 |  |  |
-| `check:spline-erosion-witness` | 87 |  |  |
-| `check:sessions` | 86 |  |  |
-| `check:script-limits` | 86 |  |  |
-| `check:ci-engine-glue` | 85 |  |  |
-| `check:socket-upgrade` | 84 |  |  |
-| `check:bin-snapshot` | 83 |  |  |
-| `check:client-resource-pools` | 81 |  |  |
-| `check:glue-tier` | 80 |  |  |
-| `check:procgen` | 79 |  |  |
-| `check:import-scene` | 78 |  |  |
-| `check:client-pure` | 77 |  |  |
-| `check:tick-governor` | 76 | yes |  |
-| `check:replay-file` | 72 |  |  |
-| `check:behaviours` | 72 |  |  |
-| `check:player-collisions` | 72 |  |  |
-| `check:spoint-core-rust` | 68 |  |  |
-| `check:rollback` | 67 |  |  |
-| `check:msgpack-packer` | 67 |  |  |
-| `check:lod-tiers` | 67 |  |  |
-| `check:lag-compensation` | 66 |  |  |
-| `check:upstream-skill-registry` | 66 |  |  |
-| `check:collider-streamer` | 66 |  |  |
-| `check:vegetation-stream` | 64 |  |  |
-| `check:engine-render` | 63 |  |  |
-| `check:spawn` | 61 |  |  |
-| `check:replay-player` | 61 |  |  |
-| `check:upstream-skill-bodies` | 61 |  |  |
-| `check:client-message-handler` | 61 |  |  |
-| `check:sdk-misc` | 60 |  |  |
-| `check:replay-dialect` | 60 |  |  |
-| `check:snapshot-lod` | 59 |  |  |
-| `check:chart-migrators` | 59 |  |  |
-| `check:reduced-pose` | 59 |  |  |
-| `check:snapshot-packer` | 59 |  |  |
-| `check:hot-reload-spoint` | 59 |  |  |
-| `check:protocol` | 58 |  |  |
-| `check:protocol-codecs` | 58 |  |  |
-| `check:netcode-small` | 58 |  |  |
-| `check:animation-control` | 57 |  |  |
-| `check:frame-stall-cause` | 57 |  |  |
-| `check:paint-store` | 56 |  |  |
-| `check:behaviour-health-destructible` | 56 |  |  |
-| `check:streaming-gltf-queues` | 56 |  |  |
-| `check:prediction-engine` | 56 |  |  |
-| `check:msgpackr-compat` | 54 |  |  |
-| `check:game-systems` | 54 |  |  |
-| `check:aoi` | 54 |  |  |
-| `check:cluster-handoff` | 54 |  |  |
-| `check:chart-reanchor` | 54 |  |  |
-| `check:sdk-editor` | 54 |  |  |
-| `check:shared-pure` | 54 |  |  |
-| `check:player-lod-plan` | 54 |  |  |
-| `check:wireweave-frame-spoint` | 54 |  |  |
-| `check:upload-route` | 53 |  |  |
-| `check:entity-host` | 53 |  |  |
-| `check:controlled-run` | 53 |  |  |
-| `check:pathfinding` | 52 |  |  |
-| `check:world-persistence` | 52 |  |  |
-| `check:upstream-builtin-bodies` | 52 |  |  |
-| `check:behaviours-a` | 52 |  |  |
-| `check:behaviours-c` | 52 |  |  |
-| `check:octree` | 51 |  |  |
-| `check:editor-serialize` | 51 |  |  |
-| `check:game-systems-spoint` | 51 |  |  |
-| `check:mat4-spoint` | 51 |  |  |
-| `check:event-log` | 50 |  |  |
-| `check:tick-authority` | 50 |  |  |
-| `check:client-pure-rows` | 50 |  |  |
-| `check:negative-zero` | 50 |  |  |
-| `check:apps-a` | 49 |  |  |
-| `check:apps-b` | 49 |  |  |
-| `check:client-machines` | 49 |  |  |
-| `check:app-loader` | 49 |  |  |
-| `check:paired-report` | 49 |  |  |
-| `check:sandbox` | 48 |  |  |
-| `check:render` | 48 |  |  |
-| `check:snapshot-processor` | 48 |  |  |
-| `check:chart-transfer` | 48 |  |  |
-| `check:client-tier-split` | 48 |  |  |
-| `check:hygiene` | 48 |  |  |
-| `check:engine-artifacts` | 48 |  |  |
-| `check:feature-gap` | 47 |  |  |
-| `check:physics-extras` | 47 |  |  |
-| `check:row16-client-decoder` | 47 |  |  |
-| `check:telemetry` | 47 |  |  |
-| `check:upstream-door-routes` | 47 |  |  |
-| `check:chart-state-server` | 47 |  |  |
-| `check:sampler-gap-attribution` | 47 |  |  |
-| `check:physics-integration` | 46 |  |  |
-| `check:upstream-tome-bodies` | 45 |  |  |
-| `check:behaviours-b` | 45 |  |  |
-| `check:cluster-slice` | 45 |  |  |
-| `check:anticheat-spoint` | 44 |  |  |
-| `check:stage` | 44 |  |  |
-| `check:upstream-builtin-lighting` | 44 |  |  |
-| `check:network-state` | 44 |  |  |
-| `check:frequency-runs` | 44 |  |  |
-| `check:spawn-named-errors` | 43 |  |  |
-| `check:client-loops` | 43 |  |  |
-| `check:app-behaviours` | 43 |  |  |
-| `check:navmesh-query-spoint` | 43 |  |  |
-| `check:minidump` | 43 |  |  |
-| `check:engine-visibility` | 43 |  |  |
-| `check:upstream-endpoints` | 42 |  |  |
-| `check:bundle-freshness-jayzee` | 42 |  |  |
-| `check:consensus` | 42 |  |  |
-| `check:upstream-builtin-physics` | 42 |  |  |
-| `check:upstream-builtin-noise` | 42 |  |  |
-| `check:client-pure-spoint` | 42 |  |  |
-| `check:spawn-captured-names` | 42 |  |  |
-| `check:engine-isolation` | 42 |  |  |
-| `check:site` | 41 |  |  |
-| `check:transport-framing` | 41 |  |  |
-| `check:rollback-peer` | 41 |  |  |
-| `check:clusters` | 41 |  |  |
-| `check:upstream-doors` | 41 |  |  |
-| `check:upstream-builtin-fx` | 41 |  |  |
-| `check:upstream-builtin-postfx` | 41 |  |  |
-| `check:world-def-clusters` | 41 |  |  |
-| `check:camera-rig` | 41 |  |  |
-| `check:stall-off-cpu` | 41 |  |  |
-| `check:browser-heap` | 41 |  |  |
-| `check:upstream-tome-lookup` | 40 |  |  |
-| `check:upstream-builtins` | 40 |  |  |
-| `check:upstream-builtin-easing` | 40 |  |  |
-| `check:named-asset-redirect` | 40 |  |  |
-| `check:upstream-builtin-path` | 40 |  |  |
-| `check:app-runtime-state` | 40 |  |  |
-| `check:crowd-dot-cells-spoint` | 40 |  |  |
-| `check:material-tier-swap-spoint` | 40 |  |  |
-| `check:stall-probe` | 40 |  |  |
-| `check:chromium-launcher` | 40 |  |  |
-| `check:tail-report` | 40 |  |  |
-| `check:hot-reload` | 39 |  |  |
-| `check:anticheat` | 39 |  |  |
-| `check:relocation-solve` | 39 |  |  |
-| `check:upstream-reference` | 39 |  |  |
-| `check:relative-residuals` | 39 |  |  |
-| `check:upstream-door-dispatch` | 38 |  |  |
-| `check:upstream-builtin-spline` | 38 |  |  |
-| `check:upstream-builtin-water` | 38 |  |  |
-| `check:reexpress-records` | 38 |  |  |
-| `check:world-resolver` | 38 |  |  |
-| `check:asset-pipeline` | 38 |  |  |
-| `check:engine-solver-tier` | 38 |  |  |
-| `check:collision-placement` | 38 |  |  |
-| `check:worker-dispatch` | 37 |  |  |
-| `check:upstream-builtin-ballistics` | 37 |  |  |
-| `check:upstream-builtin-env` | 37 |  |  |
-| `check:upstream-builtin-voxels` | 37 |  |  |
-| `check:postfx-shaders-spoint` | 37 |  |  |
-| `check:blend-tree-spoint` | 37 |  |  |
-| `check:pool-params-spoint` | 37 |  |  |
-| `check:animation` | 36 |  |  |
-| `check:movement` | 36 |  |  |
-| `check:upstream-skills` | 36 |  |  |
-| `check:upstream-builtin-terrain` | 36 |  |  |
-| `check:upstream-builtin-tsl` | 36 |  |  |
-| `check:vec3-read` | 36 |  |  |
-| `check:player-id` | 36 |  |  |
-| `check:messages` | 35 |  |  |
-| `check:content` | 35 |  |  |
-| `check:flight-model` | 35 |  |  |
-| `check:rollback-bridge` | 35 |  |  |
-| `check:tick-scheduler` | 35 |  |  |
-| `check:upstream-tome` | 35 |  |  |
-| `check:upstream-builtin-math` | 35 |  |  |
-| `check:heightfield-physics` | 35 |  |  |
-| `check:hook-order` | 35 |  |  |
-| `check:upstream-builtin-tween` | 35 |  |  |
-| `check:component-pool` | 35 |  |  |
-| `check:cube-sphere-cell-key-spoint` | 35 |  |  |
-| `check:spawn-captured-bodies` | 35 |  |  |
-| `check:render-1024-visible` | 35 |  |  |
-| `check:planet-gap-class` | 35 |  |  |
-| `check:worker-bridge` | 34 |  |  |
-| `check:upstream-builtin-vec3` | 34 |  |  |
-| `check:upstream-builtin-room-routing` | 34 |  |  |
-| `check:upstream-builtin-three` | 34 |  |  |
-| `check:upstream-builtin-vibe` | 34 |  |  |
-| `check:collider-layers` | 34 |  |  |
-| `check:character-step` | 33 |  |  |
-| `check:constraint-limits` | 33 |  |  |
-| `check:vehicle-tuning` | 33 |  |  |
-| `check:tick-order` | 32 |  |  |
-| `check:jolt-limits` | 31 |  |  |
+| `check:engine-state-hash-1024` | 18130 | yes | Five isolated 1024-tier runs of 120 ticks (fixed, and 2, 4, 7, 8 workers). They now run at the same time; before, they ran one after another and the 4-worker run was done twice (29 s). |
+| `check:scenario-marble-bowl` | 17019 | yes | 512 marbles for 600 ticks, twice, on four tiers. Containment, settling and bit-for-bit agreement are the claims, with a bound of 25 ms of main-thread CPU time per tick on the single-threaded tiers. The 16.7 ms budget and the threaded tier are judged in the Kaggle regression run (scripts/kaggle/marble.mjs): wall time failed here under host load, and on a threaded tier the main thread spins while starved workers catch up, so its CPU time rose to 29.5 ms in a loaded full run. |
+| `check:engine-tiers` | 12318 |  | The settle row spawns 10240 bodies at the scene spacing (1.2 m, above the 1.0 m diameter) and steps 360 ticks, so the counted window covers the fall and the sleep. At 0.6 m spacing the bodies overlapped and the same row took 62 s, and that overlap case is no longer covered by this gate. |
+| `check:scenario-determinism` | 11098 | yes | 64 child runs: eight scenarios on the fixed build and the threaded build at 2 and 4 workers, for two build pairs. |
+| `check:elevation-ab` | 9175 |  | Runs spoint A/B elevation script at the fixture N and compares its output line for line. |
+| `check:pose-allocations` | 8749 |  | 2000 warm-up frames of the 1024-player threaded tick on the planet-surface scene, the spawn the render witness uses, at about 4 ms a frame. On the flat scene the bodies fall off the ground box under planet gravity and never sleep, so each frame costs about 20 ms and the same warm-up takes 88 s. With 300 or 700 warm-up frames the sampler still sees one-off function-level allocations (10128 B and 1224 B) from V8 tier-up, so the warm-up cannot be shortened without a false failure. Counted frames are sampled per allocation. |
+| `check:engine-job-wait` | 7953 | yes | Five runs of 300 ticks of 1200 bodies in 100 piles: fixed, and 2 and 4 workers twice each. |
+| `check:height-cpu` | 6354 |  | Evaluates every spoint height fixture sample to 1e-12. |
+| `check:alloc-audit` | 6027 |  | Sixteen rows of 50,000 calls each under a 1 MiB semi-space. |
+| `check:sphere-population` | 5135 |  | Places the full sphere population and checks every member. |
+| `check:app-watch` | 4597 |  | Waits on real file-watch events. |
+| `check:heightmap-cli` | 4311 |  | Runs the heightmap CLI once per fixture case. |
+| `check:vegetation-allocations` | 3529 | yes | 6000 warm-up frames before the sampled window; at 2000 the compile of the gate function landed inside the window. |
+| `check:engine-release` | 3156 |  | Loads seven threaded 512 MiB instances in turn and waits for the collector after each. |
+| `check:mapspinner-atmosphere` | 2630 |  | Integrates the atmosphere tables against spoint values. |
+| `check:engine-threads` | 2513 | yes | Runs the threaded scenario at several worker counts. |
+| `check:scenario-allocations` | 2430 | yes | 30000 warm-up ticks per loop, one loop per process. |
+| `check:thread-sampler` | 2059 | yes | Samples real threads over a timed window. |
+| `check:own-display` | 1872 |  |  |
+| `check:vegetation-generate-cost` | 1684 |  |  |
+| `check:types` | 1407 |  |  |
+| `check:gc-witness` | 1380 |  |  |
+| `check:scenario-lockstep-rts` | 1364 | yes |  |
+| `check:scenario-deathrun` | 1312 | yes |  |
+| `check:gc-reuse-rows` | 1201 |  |  |
+| `check:scenario-boss-fight` | 1153 | yes |  |
+| `check:engine-footprint` | 1005 |  |  |
+| `check:scenario-combat-bots` | 998 | yes |  |
+| `check:create-app` | 987 |  |  |
+| `check:engine-host-witness` | 983 |  |  |
+| `check:package-surface` | 972 |  |  |
+| `check:upload-writes` | 967 |  |  |
+| `check:wireweave-relay` | 961 |  |  |
+| `check:pose-replay` | 888 |  |  |
+| `check:upload-handler` | 840 |  |  |
+| `check:scenario-character-terrain` | 833 | yes |  |
+| `check:transport` | 829 |  |  |
+| `check:planet-witness-scene` | 810 |  |  |
+| `check:crowd-dot-buffer` | 803 |  |  |
+| `check:scenario-projectile-volley` | 796 | yes |  |
+| `check:planet-witness` | 751 |  |  |
+| `check:engine-awake-budget` | 719 |  |  |
+| `build:kernel` | 681 |  |  |
+| `check:scenario-settle` | 665 | yes |  |
+| `check:scenario-planet-landing` | 663 | yes |  |
+| `check:engine-warm` | 645 |  |  |
+| `check:socket-server` | 577 |  |  |
+| `check:engine-pools` | 511 |  |  |
+| `check:engine-airborne` | 511 |  |  |
+| `check:planet-scene-counts` | 481 |  |  |
+| `check:scenario-character` | 462 | yes |  |
+| `check:project-naming` | 448 |  |  |
+| `check:engine-raycast` | 422 |  |  |
+| `check:engine-seal` | 400 |  |  |
+| `check:engine-shapecast` | 383 |  |  |
+| `check:stall-attribution` | 377 |  |  |
+| `check:sharding` | 359 |  |  |
+| `check:collision-placement-options` | 348 |  |  |
+| `check:terrain-agreement` | 346 |  |  |
+| `check:overlap-spoint` | 311 |  |  |
+| `check:packages` | 292 |  |  |
+| `check:physics-integration-vehicles` | 284 |  |  |
+| `check:engine-vegetation` | 284 |  |  |
+| `check:raycast-spoint` | 283 |  |  |
+| `check:collision-mirror` | 283 |  |  |
+| `check:sdk-surfaces` | 281 |  |  |
+| `check:vehicles-spoint` | 279 |  |  |
+| `check:vehicle-remove-spoint` | 275 |  |  |
+| `check:snapshots` | 268 |  |  |
+| `check:webgpu-profile` | 268 |  |  |
+| `check:collision-host` | 267 |  |  |
+| `check:site-world` | 266 |  |  |
+| `check:ci-engine-glue` | 259 |  |  |
+| `check:collision-tile-streamer` | 253 |  |  |
+| `check:engine-world` | 253 |  |  |
+| `check:chart-state-live` | 248 |  |  |
+| `check:dormant-spoint` | 231 |  |  |
+| `check:camera-relative` | 229 |  |  |
+| `check:dormant-budget-spoint` | 226 |  |  |
+| `check:vehicle-refusal-spoint` | 225 |  |  |
+| `check:player-vat-spoint` | 225 |  |  |
+| `check:engine-materials` | 224 |  |  |
+| `check:player-lod-renderer-webgpu` | 211 |  |  |
+| `check:player-lod-renderer` | 210 |  |  |
+| `check:fire` | 207 |  |  |
+| `check:engine-planet` | 203 |  |  |
+| `check:player-dot-material-spoint` | 198 |  |  |
+| `check:cluster-lod-spoint` | 196 |  |  |
+| `check:recast-bake-spoint` | 195 |  |  |
+| `check:engine-bridge` | 195 |  |  |
+| `check:rebase-session` | 195 |  |  |
+| `check:netcode` | 187 |  |  |
+| `check:bloom-spoint` | 187 |  |  |
+| `check:streaming-gltf-mesh` | 185 |  |  |
+| `check:player-dot-shader-spoint` | 185 |  |  |
+| `check:engine-sleep` | 180 |  |  |
+| `check:upstream-builtin-nav` | 172 |  |  |
+| `check:lockstep` | 167 |  |  |
+| `check:terrain-static` | 167 |  |  |
+| `check:engine-budget-floor` | 164 |  |  |
+| `check:client-resource-pools` | 164 |  |  |
+| `check:scene-setup-spoint` | 163 |  |  |
+| `check:vegetation-leaf-patches` | 161 |  |  |
+| `check:bin-snapshot` | 160 |  |  |
+| `check:decode-path` | 160 |  |  |
+| `check:streamer-p99` | 155 |  |  |
+| `check:vat-spoint` | 153 |  |  |
+| `check:socket-upgrade` | 153 |  |  |
+| `check:kaggle-regress` | 152 |  |  |
+| `check:fsr1-spoint` | 150 |  |  |
+| `check:engine-codecs` | 150 |  |  |
+| `check:ssr-spoint` | 148 |  |  |
+| `check:fire-modules` | 147 |  |  |
+| `check:sessions` | 145 |  |  |
+| `check:kernel` | 144 |  |  |
+| `check:engine-interest` | 144 |  |  |
+| `check:terrain-pure` | 143 |  |  |
+| `check:sample-order` | 143 |  |  |
+| `check:engine-leak` | 142 |  |  |
+| `check:procgen` | 140 |  |  |
+| `check:spline-erosion-witness` | 138 |  |  |
+| `check:engine-core` | 137 |  |  |
+| `check:chart-anchor` | 132 |  |  |
+| `check:client-pure` | 127 |  |  |
+| `check:glue-tier` | 126 |  |  |
+| `check:import-scene` | 122 |  |  |
+| `check:player-collisions` | 122 |  |  |
+| `check:replay-file` | 119 |  |  |
+| `check:rollback` | 117 |  |  |
+| `check:lag-compensation` | 116 |  |  |
+| `check:lod-tiers` | 116 |  |  |
+| `check:spoint-core-rust` | 114 |  |  |
+| `check:follow-misuse` | 113 |  |  |
+| `check:msgpack-packer` | 112 |  |  |
+| `check:behaviours` | 111 |  |  |
+| `check:timed-result` | 109 |  |  |
+| `check:vegetation-stream` | 103 |  |  |
+| `check:physics-pure` | 102 |  |  |
+| `check:upstream-skill-registry` | 101 |  |  |
+| `check:collider-streamer` | 101 |  |  |
+| `check:netcode-small` | 100 |  |  |
+| `check:replay-player` | 99 |  |  |
+| `check:engine-render` | 98 |  |  |
+| `check:protocol-codecs` | 95 |  |  |
+| `check:client-message-handler` | 94 |  |  |
+| `check:spawn` | 93 |  |  |
+| `check:tick-governor` | 92 | yes |  |
+| `check:snapshot-lod` | 90 |  |  |
+| `check:sdk-misc` | 90 |  |  |
+| `check:snapshot-packer` | 89 |  |  |
+| `check:event-log` | 87 |  |  |
+| `check:behaviour-health-destructible` | 86 |  |  |
+| `check:replay-dialect` | 85 |  |  |
+| `check:reduced-pose` | 84 |  |  |
+| `check:game-systems-spoint` | 84 |  |  |
+| `check:protocol` | 83 |  |  |
+| `check:animation-control` | 83 |  |  |
+| `check:prediction-engine` | 83 |  |  |
+| `check:upstream-skill-bodies` | 82 |  |  |
+| `check:negative-zero` | 82 |  |  |
+| `check:wireweave-frame-spoint` | 82 |  |  |
+| `check:msgpackr-compat` | 81 |  |  |
+| `check:tick-authority` | 81 |  |  |
+| `check:behaviours-c` | 81 |  |  |
+| `check:streaming-gltf-queues` | 80 |  |  |
+| `check:upload-route` | 80 |  |  |
+| `check:player-lod-plan` | 80 |  |  |
+| `check:mat4-spoint` | 80 |  |  |
+| `check:paint-store` | 79 |  |  |
+| `check:chart-reanchor` | 79 |  |  |
+| `check:shared-pure` | 79 |  |  |
+| `check:hot-reload-spoint` | 79 |  |  |
+| `check:game-systems` | 78 |  |  |
+| `check:controlled-run` | 78 |  |  |
+| `check:frame-stall-cause` | 78 |  |  |
+| `check:pathfinding` | 77 |  |  |
+| `check:aoi` | 77 |  |  |
+| `check:cluster-handoff` | 77 |  |  |
+| `check:hygiene` | 77 |  |  |
+| `check:world` | 76 |  |  |
+| `check:bundle-freshness-jayzee` | 75 |  |  |
+| `check:upstream-builtin-bodies` | 75 |  |  |
+| `check:behaviours-a` | 75 |  |  |
+| `check:editor-serialize` | 75 |  |  |
+| `check:chart-migrators` | 73 |  |  |
+| `check:client-pure-rows` | 72 |  |  |
+| `check:sdk-editor` | 70 |  |  |
+| `check:clusters` | 69 |  |  |
+| `check:telemetry` | 69 |  |  |
+| `check:world-persistence` | 68 |  |  |
+| `check:apps-b` | 68 |  |  |
+| `check:app-loader` | 68 |  |  |
+| `check:engine-artifacts` | 68 |  |  |
+| `check:octree` | 67 |  |  |
+| `check:snapshot-processor` | 67 |  |  |
+| `check:upstream-builtin-easing` | 67 |  |  |
+| `check:row16-client-decoder` | 66 |  |  |
+| `check:upstream-builtin-noise` | 66 |  |  |
+| `check:apps-a` | 66 |  |  |
+| `check:client-machines` | 66 |  |  |
+| `check:world-config` | 66 |  |  |
+| `check:frequency-runs` | 66 |  |  |
+| `check:anticheat-spoint` | 65 |  |  |
+| `check:chart-state-server` | 65 |  |  |
+| `check:client-tier-split` | 65 |  |  |
+| `check:planet-gap-class` | 65 |  |  |
+| `check:chart-transfer` | 64 |  |  |
+| `check:camera-rig` | 64 |  |  |
+| `check:paired-report` | 64 |  |  |
+| `check:render` | 63 |  |  |
+| `check:client-loops` | 63 |  |  |
+| `check:upstream-door-routes` | 63 |  |  |
+| `check:upstream-tome-lookup` | 63 |  |  |
+| `check:spawn-captured-names` | 63 |  |  |
+| `check:material-tier-swap-spoint` | 63 |  |  |
+| `check:feature-gap` | 62 |  |  |
+| `check:physics-extras` | 62 |  |  |
+| `check:stage` | 62 |  |  |
+| `check:upstream-builtin-vec3` | 62 |  |  |
+| `check:cluster-slice` | 62 |  |  |
+| `check:stall-off-cpu` | 62 |  |  |
+| `check:browser-heap` | 62 |  |  |
+| `check:spawn-named-errors` | 61 |  |  |
+| `check:sandbox` | 61 |  |  |
+| `check:ccd` | 61 |  |  |
+| `check:upstream-builtin-physics` | 61 |  |  |
+| `check:behaviours-b` | 61 |  |  |
+| `check:app-behaviours` | 61 |  |  |
+| `check:app-runtime-state` | 61 |  |  |
+| `check:entity-host` | 61 |  |  |
+| `check:upstream-door-dispatch` | 60 |  |  |
+| `check:script-limits` | 60 |  |  |
+| `check:physics-integration` | 60 |  |  |
+| `check:client-pure-spoint` | 60 |  |  |
+| `check:upstream-tome-bodies` | 59 |  |  |
+| `check:upstream-reference` | 59 |  |  |
+| `check:world-query` | 59 |  |  |
+| `check:upstream-builtin-env` | 59 |  |  |
+| `check:network-state` | 59 |  |  |
+| `check:pool-params-spoint` | 59 |  |  |
+| `check:stall-probe` | 59 |  |  |
+| `check:transport-framing` | 58 |  |  |
+| `check:consensus` | 58 |  |  |
+| `check:upstream-tome` | 58 |  |  |
+| `check:upstream-builtin-voxels` | 58 |  |  |
+| `check:crowd-dot-cells-spoint` | 58 |  |  |
+| `check:engine-solver-tier` | 58 |  |  |
+| `check:anticheat` | 57 |  |  |
+| `check:rollback-peer` | 57 |  |  |
+| `check:upstream-builtins` | 57 |  |  |
+| `check:upstream-builtin-lighting` | 57 |  |  |
+| `check:vec3-read` | 57 |  |  |
+| `check:postfx-shaders-spoint` | 57 |  |  |
+| `check:blend-tree-spoint` | 57 |  |  |
+| `check:asset-pipeline` | 57 |  |  |
+| `check:sampler-gap-attribution` | 57 |  |  |
+| `check:tail-report` | 57 |  |  |
+| `check:site` | 56 |  |  |
+| `check:rollback-bridge` | 56 |  |  |
+| `check:upstream-builtin-fx` | 56 |  |  |
+| `check:upstream-builtin-three` | 56 |  |  |
+| `check:upstream-builtin-tsl` | 56 |  |  |
+| `check:upstream-builtin-tween` | 56 |  |  |
+| `check:component-pool` | 56 |  |  |
+| `check:messages` | 55 |  |  |
+| `check:upstream-endpoints` | 55 |  |  |
+| `check:hot-reload` | 55 |  |  |
+| `check:animation` | 55 |  |  |
+| `check:tick-scheduler` | 55 |  |  |
+| `check:upstream-doors` | 55 |  |  |
+| `check:named-asset-redirect` | 55 |  |  |
+| `check:upstream-builtin-postfx` | 55 |  |  |
+| `check:upstream-builtin-path` | 55 |  |  |
+| `check:upstream-builtin-water` | 55 |  |  |
+| `check:player-id` | 55 |  |  |
+| `check:navmesh-query-spoint` | 55 |  |  |
+| `check:minidump` | 55 |  |  |
+| `check:collision-placement` | 55 |  |  |
+| `check:relative-residuals` | 55 |  |  |
+| `check:engine-isolation` | 55 |  |  |
+| `check:movement` | 54 |  |  |
+| `check:relocation-solve` | 54 |  |  |
+| `check:worker-dispatch` | 54 |  |  |
+| `check:hook-order` | 54 |  |  |
+| `check:reexpress-records` | 54 |  |  |
+| `check:cube-sphere-cell-key-spoint` | 54 |  |  |
+| `check:spawn-captured-bodies` | 54 |  |  |
+| `check:render-1024-visible` | 54 |  |  |
+| `check:upstream-skills` | 53 |  |  |
+| `check:heightfield-physics` | 53 |  |  |
+| `check:upstream-builtin-room-routing` | 53 |  |  |
+| `check:upstream-builtin-spline` | 53 |  |  |
+| `check:engine-visibility` | 53 |  |  |
+| `check:character-step` | 52 |  |  |
+| `check:upstream-builtin-ballistics` | 52 |  |  |
+| `check:upstream-builtin-vibe` | 52 |  |  |
+| `check:collider-layers` | 52 |  |  |
+| `check:content` | 51 |  |  |
+| `check:flight-model` | 51 |  |  |
+| `check:constraint-limits` | 51 |  |  |
+| `check:jolt-limits` | 51 |  |  |
+| `check:worker-bridge` | 51 |  |  |
+| `check:upstream-builtin-math` | 51 |  |  |
+| `check:upstream-builtin-terrain` | 51 |  |  |
+| `check:world-def-clusters` | 51 |  |  |
+| `check:chromium-launcher` | 51 |  |  |
+| `check:world-resolver` | 50 |  |  |
+| `check:vehicle-tuning` | 49 |  |  |
+| `check:tick-order` | 49 |  |  |
 
 ## Kaggle physics run
 
-Written by `node scripts/kaggle/record.mjs` from one `kaggle kernels output` read of `heclgang/jayzee-physics-goalpost` version 42. One JSON result per configuration; the table is that file.
+Written by `node scripts/kaggle/record.mjs` from one `kaggle kernels output` read of `heclgang/jayzee-physics-goalpost` version 43. One JSON result per configuration; the table is that file.
 
 - Budget: 16.7 ms per tick, 900 ticks per configuration. Ticks 0 and 1 are the boot ticks, ticks 2 to 299 the settle window, and ticks from 300 the steady window. The timed call is the whole worker tick: page streaming, follow, `engine_tick` and the pose export.
 - Arena plan: 1024 players under a 1073741824 byte budget.
 - Machine: Intel(R) Xeon(R) CPU @ 2.20GHz, 4 CPUs, Node v22.23.4, machine class GenuineIntel-6-79-0 (2 cores, 4 threads).
-- Pushed 2026-11-12T08:41:05.241Z. Queue wait 13 s from the push to the first line of the script. Run time 546.3 s for 55 of 55 planned runs.
-- reference build of engine-core-1024mib-threads-simd.mjs, warmed: 131072 bodies hold the budget at p99 with zero ticks over budget (workers 4, 4, 4, 4); in the steady window alone 131072 bodies hold it (workers 4, 4, 4, 4).
-- engine-core-1024mib-threads-simd.mjs, warmed: 131072 bodies hold the budget at p99 with zero ticks over budget (workers 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 2, 3, 6, 4); in the steady window alone 131072 bodies hold it (workers 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 2, 3, 6, 4).
+- Pushed 2026-11-12T09:20:34.493Z. Queue wait 9 s from the push to the first line of the script. Run time 505.5 s for 55 of 55 planned runs.
+- reference build of engine-core-1024mib-threads-simd.mjs, warmed: 131072 bodies hold the budget at p99 with zero ticks over budget (workers 4, 4); in the steady window alone 131072 bodies hold it (workers 4, 4).
+- engine-core-1024mib-threads-simd.mjs, warmed: 131072 bodies hold the budget at p99 with zero ticks over budget (workers 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 2, 3, 6, 4); in the steady window alone 131072 bodies hold it (workers 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 2, 3, 6, 4).
 - engine-core-1024mib-threads.mjs, warmed: 131072 bodies hold the budget at p99 with zero ticks over budget (workers 4); in the steady window alone 131072 bodies hold it (workers 4).
 - engine-core-1024mib-threads-simd.mjs, cold: no body count holds the budget at p99 with zero ticks over budget; in the steady window alone 131072 bodies hold it (workers 4).
-- profile build of engine-core-1024mib-threads-simd.mjs, warmed: 131072 bodies hold the budget at p99 with zero ticks over budget (workers 4, 4, 4); in the steady window alone 131072 bodies hold it (workers 4, 4, 4, 4, 4, 4).
+- profile build of engine-core-1024mib-threads-simd.mjs, warmed: 131072 bodies hold the budget at p99 with zero ticks over budget (workers 4, 4, 4); in the steady window alone 131072 bodies hold it (workers 4, 4, 4).
 - Refused by the arena plan: none.
 - Runs that gave no result: none.
 
 | glue | bodies | workers | solver iterations | node flags | median ms | p99 ms | max ms | ticks over budget | ticks 0 and 1 ms | settle p99 ms | settle max ms | settle over budget | steady median ms | steady p99 ms | steady over budget | arena used bytes | arena bytes | warm-up ms | load ms | run s |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| reference 1024mib-threads-simd, warmed | 131072 | 4 | 4 |  | 7.227 | 11.154 | 13.558 | 0 | 8.48 / 4.86 | 11.846 | 13.558 | 0 | 7.262 | 10.845 | 0 | 278248248 | 668400144 | 1220.5 | 1040.4 | 10.2 |
-| 1024mib-threads-simd, warmed | 131072 | 4 | 4 |  | 5.684 | 9.907 | 12.808 | 0 | 7.3 / 3.85 | 7.906 | 8.912 | 0 | 5.758 | 10.802 | 0 | 278246392 | 668400144 | 1090 | 1035.7 | 8.6 |
-| reference 1024mib-threads-simd, warmed | 131072 | 4 | 4 |  | 7.218 | 11.667 | 27.534 | 2 | 8 / 5.01 | 9.943 | 11.667 | 0 | 7.288 | 13.21 | 2 | 278248248 | 668400144 | 1134.5 | 980.7 | 10 |
-| 1024mib-threads-simd, warmed | 131072 | 4 | 4 |  | 5.745 | 10.263 | 12.382 | 0 | 6.57 / 3.9 | 7.698 | 10.072 | 0 | 5.893 | 11.012 | 0 | 278246392 | 668400144 | 1115.7 | 1024 | 8.7 |
-| reference 1024mib-threads-simd, warmed | 131072 | 4 | 4 |  | 7.209 | 12.843 | 15.954 | 0 | 7.59 / 4.95 | 9.689 | 13.036 | 0 | 7.341 | 13.575 | 0 | 278248248 | 668400144 | 1195.5 | 1000.7 | 10.1 |
-| 1024mib-threads-simd, warmed | 131072 | 4 | 4 |  | 6.056 | 10.996 | 16.094 | 0 | 7.18 / 3.89 | 8.796 | 10.996 | 0 | 6.174 | 11.307 | 0 | 278246392 | 668400144 | 1081.6 | 1060.5 | 9 |
-| reference 1024mib-threads-simd, warmed | 131072 | 4 | 4 |  | 7.31 | 10.824 | 15.494 | 0 | 7.87 / 5.03 | 9.87 | 10.399 | 0 | 7.444 | 12.735 | 0 | 278248248 | 668400144 | 1178.5 | 1039.3 | 10.2 |
-| 1024mib-threads-simd, warmed | 131072 | 4 | 4 |  | 5.862 | 10.706 | 15.364 | 0 | 6.78 / 4.21 | 7.721 | 8.986 | 0 | 5.981 | 11.887 | 0 | 278246392 | 668400144 | 1120.3 | 1031.1 | 8.8 |
-| reference 1024mib-threads-simd, warmed | 131072 | 4 | 4 |  | 7.253 | 11.973 | 14.876 | 0 | 7.8 / 4.93 | 9.944 | 10.846 | 0 | 7.365 | 12.489 | 0 | 278248248 | 668400144 | 1092 | 1072.2 | 10.1 |
-| 1024mib-threads-simd, warmed | 131072 | 4 | 4 |  | 5.82 | 7.919 | 8.999 | 0 | 6.89 / 3.77 | 8.397 | 8.999 | 0 | 5.895 | 7.869 | 0 | 278246392 | 668400144 | 1104.2 | 929.9 | 8.5 |
-| 1024mib-threads-simd, warmed | 131072 | 4 | 4 |  | 6.023 | 8.739 | 11.936 | 0 | 7.16 / 3.8 | 7.776 | 8.52 | 0 | 6.216 | 8.825 | 0 | 278246392 | 668400144 | 1171.9 | 933 | 8.8 |
-| 1024mib-threads-simd, warmed | 131072 | 4 | 4 |  | 5.639 | 7.229 | 9.463 | 0 | 6.79 / 4 | 7.45 | 9.463 | 0 | 5.635 | 7.125 | 0 | 278227272 | 668400144 | 1099.5 | 1139.8 | 8.5 |
-| 1024mib-threads-simd, warmed | 131072 | 4 | 4 |  | 6.019 | 10.373 | 12.781 | 0 | 6.76 / 3.87 | 11.825 | 12.781 | 0 | 6.07 | 7.981 | 0 | 278246392 | 668400144 | 1105.5 | 1042.8 | 8.9 |
-| 1024mib-threads-simd, warmed | 131072 | 4 | 4 |  | 5.582 | 9.84 | 13.115 | 0 | 7.02 / 3.93 | 6.873 | 7.681 | 0 | 5.697 | 9.889 | 0 | 278227272 | 668400144 | 1138.5 | 962.3 | 8.5 |
-| 1024mib-threads-simd, warmed | 131072 | 4 | 4 |  | 5.769 | 10.252 | 14.271 | 0 | 7.57 / 4.03 | 8.153 | 8.63 | 0 | 5.916 | 11.312 | 0 | 278246392 | 668400144 | 1129 | 1066.5 | 8.7 |
-| 1024mib-threads-simd, warmed | 131072 | 4 | 4 |  | 5.459 | 9.488 | 13.829 | 0 | 6.93 / 3.91 | 6.838 | 6.942 | 0 | 5.526 | 11.257 | 0 | 278227272 | 668400144 | 1112.7 | 1038.6 | 8.4 |
-| 1024mib-threads-simd, warmed | 131072 | 4 | 4 |  | 5.88 | 7.847 | 9.053 | 0 | 7.4 / 4.03 | 8.774 | 9.053 | 0 | 5.932 | 7.713 | 0 | 278246392 | 668400144 | 1098.3 | 976.1 | 8.6 |
-| 1024mib-threads-simd, warmed | 131072 | 4 | 4 |  | 5.611 | 7.441 | 10.239 | 0 | 7.31 / 3.8 | 6.785 | 7.409 | 0 | 5.696 | 7.747 | 0 | 278227272 | 668400144 | 1135.5 | 1046.6 | 8.4 |
-| 1024mib-threads-simd, warmed | 131072 | 4 | 4 |  | 5.827 | 8.127 | 9.761 | 0 | 6.62 / 3.82 | 8.524 | 9.761 | 0 | 5.865 | 7.592 | 0 | 278246392 | 668400144 | 1099.1 | 861.8 | 8.5 |
-| 1024mib-threads-simd, warmed | 131072 | 4 | 4 |  | 5.552 | 9.132 | 14.735 | 0 | 6.74 / 3.95 | 11.56 | 14.735 | 0 | 5.586 | 7.161 | 0 | 278227272 | 668400144 | 1108.3 | 993.8 | 8.4 |
-| 1024mib-threads-simd, warmed | 131072 | 4 | 4 |  | 5.78 | 9.988 | 14.947 | 0 | 7.05 / 3.94 | 7.783 | 11.769 | 0 | 5.846 | 11.745 | 0 | 278246392 | 668400144 | 1107.6 | 1102.4 | 8.8 |
-| 1024mib-threads-simd, warmed | 131072 | 4 | 4 |  | 5.547 | 10.264 | 15.882 | 0 | 7.32 / 4.16 | 6.877 | 7.067 | 0 | 5.594 | 10.508 | 0 | 278227272 | 668400144 | 1115 | 1090.5 | 8.5 |
-| 1024mib-threads-simd, warmed | 131072 | 4 | 4 |  | 5.794 | 10.28 | 13.719 | 0 | 7.08 / 3.94 | 7.758 | 8.53 | 0 | 5.864 | 10.578 | 0 | 278246392 | 668400144 | 1105.8 | 982.4 | 8.6 |
-| 1024mib-threads-simd, warmed | 131072 | 4 | 4 |  | 5.464 | 6.957 | 7.569 | 0 | 6.85 / 3.78 | 6.972 | 7.569 | 0 | 5.527 | 6.957 | 0 | 278227272 | 668400144 | 1111.9 | 1099.6 | 8.3 |
-| 1024mib-threads-simd, warmed | 131072 | 4 | 4 |  | 5.733 | 7.782 | 9.961 | 0 | 7.26 / 3.89 | 8.317 | 9.961 | 0 | 5.824 | 7.782 | 0 | 278246392 | 668400144 | 1125.9 | 949.9 | 8.5 |
-| 1024mib-threads-simd, warmed | 131072 | 4 | 4 |  | 5.519 | 7.236 | 9.206 | 0 | 6.74 / 3.86 | 7.962 | 9.206 | 0 | 5.593 | 7.012 | 0 | 278227272 | 668400144 | 1121 | 971.2 | 8.3 |
-| 1024mib-threads-simd, warmed | 131072 | 1 | 4 |  | 11.17 | 15.405 | 19.065 | 7 | 9.14 / 5.68 | 17.738 | 19.065 | 4 | 11.43 | 14.796 | 3 | 278246392 | 668203536 | 1107.4 | 1012.6 | 13.4 |
-| 1024mib-threads-simd, warmed | 131072 | 2 | 4 |  | 7.733 | 10.513 | 14.649 | 0 | 8.29 / 4.67 | 10.295 | 11.688 | 0 | 7.894 | 10.616 | 0 | 278246392 | 668269072 | 1153.1 | 1073.7 | 10.5 |
-| 1024mib-threads-simd, warmed | 131072 | 3 | 4 |  | 6.662 | 8.459 | 9.952 | 0 | 7.06 / 4.47 | 8.702 | 9.952 | 0 | 6.815 | 8.441 | 0 | 278246392 | 668334608 | 1110.8 | 955.6 | 9.3 |
-| 1024mib-threads-simd, warmed | 131072 | 6 | 4 |  | 6.053 | 8.546 | 9.608 | 0 | 7.74 / 4.24 | 7.905 | 9.174 | 0 | 6.176 | 8.675 | 0 | 278246392 | 668531216 | 1145 | 940.8 | 8.9 |
-| 1024mib-threads, warmed | 131072 | 4 | 4 |  | 7.325 | 10.54 | 12.593 | 0 | 7.44 / 4.39 | 8.914 | 10.976 | 0 | 7.607 | 10.631 | 0 | 278246392 | 668400144 | 1161.2 | 996.4 | 10.1 |
-| 1024mib-threads-simd, cold | 131072 | 4 | 4 |  | 6.041 | 10.392 | 27.654 | 2 | 27.65 / 7.08 | 13.695 | 22.624 | 1 | 6.105 | 7.965 | 0 | 278246392 | 668400144 |  | 828.9 | 7.7 |
-| 1024mib-threads-simd, warmed | 12288 | 4 | 4 |  | 0.517 | 6.372 | 7.075 | 0 | 7.06 / 3.99 | 6.824 | 7.075 | 0 | 0.449 | 0.838 | 0 | 196055280 | 668400144 | 1213.8 | 981 | 4 |
-| 1024mib-threads-simd, warmed | 131072 | 4 | 4 |  | 5.852 | 8.756 | 14.107 | 0 | 6.59 / 4.02 | 8.44 | 10.268 | 0 | 5.87 | 8.931 | 0 | 405644800 | 668400144 | 1122.1 | 1115.5 | 19.5 |
-| 1024mib-threads-simd, warmed | 40960 | 4 | 4 |  | 5.339 | 6.755 | 8.069 | 0 | 6.6 / 3.54 | 7.034 | 8.069 | 0 | 5.342 | 6.666 | 0 | 222469344 | 668400144 | 1128 | 917.7 | 6.7 |
-| 1024mib-threads-simd, warmed | 40960 | 4 | 4 |  | 5.156 | 9.365 | 12.918 | 0 | 6.73 / 3.66 | 11.895 | 12.918 | 0 | 5.122 | 6.415 | 0 | 222620160 | 668400144 | 1100.8 | 972.1 | 6.7 |
-| 1024mib-threads-simd, warmed | 40960 | 4 | 4 |  | 5.357 | 6.873 | 8.71 | 0 | 6.46 / 3.65 | 6.873 | 7.588 | 0 | 5.407 | 6.907 | 0 | 222423696 | 668400144 | 1104.6 | 916.7 | 6.7 |
-| 1024mib-threads-simd, warmed | 40960 | 4 | 4 |  | 5.119 | 6.602 | 8.01 | 0 | 7.11 / 3.91 | 6.205 | 7.364 | 0 | 5.101 | 6.68 | 0 | 222580688 | 668400144 | 1101.6 | 966 | 6.6 |
-| profile 1024mib-threads-simd, warmed | 131072 | 4 | 4 |  | 6.997 | 10.288 | 15.348 | 0 | 8.91 / 6.33 | 12.623 | 15.348 | 0 | 7 | 8.677 | 0 | 278246392 | 668400144 | 1179.4 | 1075.1 | 9.9 |
-| profile 1024mib-threads-simd, warmed | 131072 | 4 | 4 |  | 7.024 | 11.474 | 17.86 | 1 | 9.73 / 5.38 | 15.534 | 17.86 | 1 | 7.106 | 8.736 | 0 | 278246392 | 668400144 | 1187.8 | 946.4 | 9.8 |
-| profile 1024mib-threads-simd, warmed | 131072 | 4 | 4 |  | 6.957 | 13.037 | 17.705 | 3 | 8.34 / 4.95 | 16.804 | 17.705 | 3 | 7.03 | 9.061 | 0 | 278246392 | 668400144 | 1192.8 | 953.6 | 9.8 |
-| profile 1024mib-threads-simd, warmed | 131072 | 4 | 4 |  | 6.989 | 10.535 | 15.387 | 0 | 8.43 / 4.83 | 14.234 | 15.387 | 0 | 7.044 | 8.79 | 0 | 278246392 | 668400144 | 1225.1 | 938.8 | 9.8 |
-| profile 1024mib-threads-simd, warmed | 131072 | 4 | 4 |  | 6.902 | 12.304 | 17.425 | 1 | 9.33 / 6.58 | 14.293 | 17.425 | 1 | 6.935 | 8.747 | 0 | 278246392 | 668400144 | 1203.5 | 928.8 | 9.7 |
-| profile 1024mib-threads-simd, warmed | 131072 | 4 | 4 |  | 6.852 | 11.787 | 15.31 | 0 | 9.48 / 7.25 | 13.68 | 15.31 | 0 | 6.928 | 8.768 | 0 | 278246392 | 668400144 | 1168.4 | 931.5 | 9.6 |
-| profile 1024mib-threads-simd, warmed | 12288 | 4 | 4 |  | 0.422 | 7.873 | 10.257 | 0 | 9.4 / 5.07 | 8.208 | 10.257 | 0 | 0.409 | 0.576 | 0 | 196055280 | 668400144 | 1200.6 | 963 | 4.2 |
-| profile 1024mib-threads-simd, warmed | 12288 | 4 | 4 |  | 0.394 | 7.479 | 9.256 | 0 | 9.26 / 6.34 | 8.211 | 8.525 | 0 | 0.382 | 0.693 | 0 | 196055280 | 668400144 | 1199.2 | 1001.4 | 4.2 |
-| profile 1024mib-threads-simd, warmed | 12288 | 4 | 4 |  | 0.426 | 7.701 | 9.103 | 0 | 9.1 / 6.32 | 8.047 | 8.067 | 0 | 0.409 | 0.542 | 0 | 196055280 | 668400144 | 1164.6 | 984.9 | 4.2 |
+| reference 1024mib-threads-simd, warmed | 131072 | 4 | 4 |  | 6.903 | 9.6 | 12.347 | 0 | 7.79 / 4.72 | 10.673 | 12.347 | 0 | 6.943 | 8.939 | 0 | 278248248 | 668400144 | 1345.2 | 1106.2 | 10.2 |
+| 1024mib-threads-simd, warmed | 131072 | 4 | 4 |  | 6.055 | 9.891 | 13.528 | 0 | 6.88 / 3.79 | 11.947 | 13.528 | 0 | 6.126 | 7.868 | 0 | 278230008 | 668400144 | 422 | 171.8 | 7.5 |
+| reference 1024mib-threads-simd, warmed | 131072 | 4 | 4 |  | 7.304 | 11.769 | 23.952 | 4 | 7.83 / 4.73 | 17.214 | 18.584 | 3 | 7.399 | 9.521 | 1 | 278248248 | 668400144 | 1336.6 | 1142.9 | 10.6 |
+| 1024mib-threads-simd, warmed | 131072 | 4 | 4 |  | 6.25 | 11.031 | 15.254 | 0 | 6.92 / 3.94 | 9.089 | 10.072 | 0 | 6.358 | 11.88 | 0 | 278230008 | 668400144 | 472.9 | 181.8 | 7.9 |
+| reference 1024mib-threads-simd, warmed | 131072 | 4 | 4 |  | 7.217 | 12.696 | 19.725 | 1 | 8.37 / 4.82 | 9.639 | 13.062 | 0 | 7.405 | 12.878 | 1 | 278248248 | 668400144 | 1312 | 1145.9 | 10.6 |
+| 1024mib-threads-simd, warmed | 131072 | 4 | 4 |  | 5.988 | 10.069 | 14.097 | 0 | 6.91 / 3.85 | 8.771 | 12.065 | 0 | 6.09 | 10.625 | 0 | 278230008 | 668400144 | 456.9 | 196.9 | 7.6 |
+| reference 1024mib-threads-simd, warmed | 131072 | 4 | 4 |  | 7.158 | 12.241 | 14.107 | 0 | 8.14 / 4.84 | 9.133 | 10.484 | 0 | 7.286 | 13.06 | 0 | 278248248 | 668400144 | 1322.8 | 1160.1 | 10.6 |
+| 1024mib-threads-simd, warmed | 131072 | 4 | 4 |  | 5.958 | 7.81 | 10.233 | 0 | 7.05 / 3.74 | 8.97 | 10.233 | 0 | 6.026 | 7.716 | 0 | 278230008 | 668400144 | 446.9 | 181.9 | 7.4 |
+| reference 1024mib-threads-simd, warmed | 131072 | 4 | 4 |  | 7.19 | 12.916 | 18.848 | 1 | 8.03 / 4.69 | 9.339 | 10.021 | 0 | 7.395 | 13.527 | 1 | 278248248 | 668400144 | 1304.7 | 1124.2 | 10.5 |
+| 1024mib-threads-simd, warmed | 131072 | 4 | 4 |  | 5.974 | 7.965 | 9.754 | 0 | 6.92 / 3.84 | 8.713 | 9.686 | 0 | 6.079 | 7.965 | 0 | 278230008 | 668400144 | 433.6 | 177.3 | 7.4 |
+| 1024mib-threads-simd, warmed | 131072 | 4 | 4 |  | 5.941 | 11.513 | 14.073 | 0 | 6.84 / 3.77 | 8.17 | 8.794 | 0 | 6.046 | 12.279 | 0 | 278230008 | 668400144 | 439.1 | 175.1 | 7.5 |
+| 1024mib-threads-simd, warmed | 131072 | 4 | 4 |  | 5.694 | 7.017 | 8.197 | 0 | 6.83 / 3.88 | 6.938 | 7.32 | 0 | 5.764 | 7.049 | 0 | 278210888 | 668400144 | 443.3 | 176.7 | 7.1 |
+| 1024mib-threads-simd, warmed | 131072 | 4 | 4 |  | 5.866 | 9.421 | 12.967 | 0 | 6.82 / 4.08 | 11.496 | 12.967 | 0 | 5.975 | 7.518 | 0 | 278230008 | 668400144 | 446.4 | 184.1 | 7.4 |
+| 1024mib-threads-simd, warmed | 131072 | 4 | 4 |  | 5.599 | 9.995 | 16.466 | 0 | 7.05 / 3.9 | 6.8 | 7.136 | 0 | 5.686 | 10.523 | 0 | 278210888 | 668400144 | 447.2 | 191.8 | 7.1 |
+| 1024mib-threads-simd, warmed | 131072 | 4 | 4 |  | 5.925 | 7.719 | 9.709 | 0 | 8.01 / 4.24 | 7.984 | 9.709 | 0 | 6.019 | 7.587 | 0 | 278230008 | 668400144 | 442.4 | 204.9 | 7.4 |
+| 1024mib-threads-simd, warmed | 131072 | 4 | 4 |  | 5.577 | 6.895 | 7.472 | 0 | 7 / 3.74 | 6.732 | 7.406 | 0 | 5.661 | 6.895 | 0 | 278210888 | 668400144 | 459.2 | 316.9 | 7.1 |
+| 1024mib-threads-simd, warmed | 131072 | 4 | 4 |  | 5.898 | 10.491 | 14.549 | 0 | 7.28 / 3.92 | 7.832 | 10.084 | 0 | 6.032 | 11.175 | 0 | 278230008 | 668400144 | 428.9 | 221.4 | 7.5 |
+| 1024mib-threads-simd, warmed | 131072 | 4 | 4 |  | 5.601 | 9.236 | 16.197 | 0 | 6.62 / 3.73 | 6.97 | 7.495 | 0 | 5.708 | 9.962 | 0 | 278210888 | 668400144 | 441.6 | 176.7 | 7.1 |
+| 1024mib-threads-simd, warmed | 131072 | 4 | 4 |  | 5.916 | 7.661 | 9.949 | 0 | 6.94 / 3.91 | 7.686 | 9.949 | 0 | 6.013 | 7.611 | 0 | 278230008 | 668400144 | 439.1 | 252.9 | 7.4 |
+| 1024mib-threads-simd, warmed | 131072 | 4 | 4 |  | 5.616 | 9.312 | 16.949 | 1 | 6.82 / 3.78 | 11.909 | 16.949 | 1 | 5.652 | 6.799 | 0 | 278210888 | 668400144 | 426.2 | 172.8 | 7.1 |
+| 1024mib-threads-simd, warmed | 131072 | 4 | 4 |  | 5.799 | 10.512 | 13.615 | 0 | 6.88 / 3.82 | 8.119 | 9.517 | 0 | 5.871 | 11.647 | 0 | 278230008 | 668400144 | 442.2 | 173.9 | 7.4 |
+| 1024mib-threads-simd, warmed | 131072 | 4 | 4 |  | 5.582 | 10.199 | 14.449 | 0 | 6.7 / 3.63 | 7.082 | 7.937 | 0 | 5.632 | 11.459 | 0 | 278210888 | 668400144 | 435.3 | 215.2 | 7.1 |
+| 1024mib-threads-simd, warmed | 131072 | 4 | 4 |  | 5.91 | 7.686 | 9.929 | 0 | 6.92 / 3.84 | 7.667 | 9.887 | 0 | 6.008 | 7.687 | 0 | 278230008 | 668400144 | 444 | 172.9 | 7.3 |
+| 1024mib-threads-simd, warmed | 131072 | 4 | 4 |  | 5.655 | 9.289 | 13.599 | 0 | 6.82 / 3.9 | 12.265 | 13.599 | 0 | 5.688 | 6.965 | 0 | 278210888 | 668400144 | 444.7 | 207.3 | 7.2 |
+| 1024mib-threads-simd, warmed | 131072 | 4 | 4 |  | 5.905 | 10.174 | 16.407 | 0 | 6.75 / 3.7 | 8.414 | 9.602 | 0 | 5.994 | 10.461 | 0 | 278230008 | 668400144 | 452.6 | 214.9 | 7.5 |
+| 1024mib-threads-simd, warmed | 131072 | 4 | 4 |  | 5.543 | 6.875 | 8.225 | 0 | 6.9 / 3.8 | 6.682 | 7.224 | 0 | 5.592 | 6.903 | 0 | 278210888 | 668400144 | 445.6 | 174.6 | 6.9 |
+| 1024mib-threads-simd, warmed | 131072 | 1 | 4 |  | 11.256 | 15.691 | 18.895 | 5 | 8.95 / 5.56 | 13.871 | 14.228 | 0 | 11.473 | 16.547 | 5 | 278230008 | 668203536 | 522.6 | 176.4 | 12.3 |
+| 1024mib-threads-simd, warmed | 131072 | 2 | 4 |  | 7.632 | 11.869 | 13.584 | 0 | 7.62 / 4.39 | 9.88 | 10.279 | 0 | 7.831 | 12.147 | 0 | 278230008 | 668269072 | 437.3 | 227.8 | 9 |
+| 1024mib-threads-simd, warmed | 131072 | 3 | 4 |  | 6.824 | 8.854 | 9.244 | 0 | 7.16 / 4.28 | 8.841 | 9.244 | 0 | 6.959 | 8.856 | 0 | 278230008 | 668334608 | 446.9 | 175.2 | 8.1 |
+| 1024mib-threads-simd, warmed | 131072 | 6 | 4 |  | 5.955 | 8.08 | 8.82 | 0 | 6.88 / 3.8 | 7.877 | 8.82 | 0 | 6.107 | 8.115 | 0 | 278230008 | 668531216 | 448.6 | 283.6 | 7.7 |
+| 1024mib-threads, warmed | 131072 | 4 | 4 |  | 7.004 | 11.947 | 15.675 | 0 | 7.43 / 4.21 | 14.483 | 15.675 | 0 | 7.107 | 9.096 | 0 | 278230008 | 668400144 | 500.5 | 197 | 8.5 |
+| 1024mib-threads-simd, cold | 131072 | 4 | 4 |  | 5.855 | 10.486 | 26.027 | 2 | 26.03 / 7.57 | 9.115 | 21.332 | 1 | 5.969 | 10.486 | 0 | 278230008 | 668400144 |  | 120.3 | 7 |
+| 1024mib-threads-simd, warmed | 12288 | 4 | 4 |  | 0.323 | 5.934 | 8.328 | 0 | 8.33 / 3.59 | 6.447 | 7.15 | 0 | 0.317 | 0.383 | 0 | 196038896 | 668400144 | 428.5 | 186.9 | 2.2 |
+| 1024mib-threads-simd, warmed | 131072 | 4 | 4 |  | 5.888 | 8.742 | 14.656 | 0 | 6.68 / 3.81 | 7.864 | 9.092 | 0 | 5.92 | 8.915 | 0 | 405628416 | 668400144 | 433.4 | 176.8 | 18.2 |
+| 1024mib-threads-simd, warmed | 40960 | 4 | 4 |  | 5.318 | 7.158 | 8.755 | 0 | 8.13 / 3.84 | 7.08 | 8.755 | 0 | 5.369 | 7.158 | 0 | 222452960 | 668400144 | 442.1 | 178.4 | 5.3 |
+| 1024mib-threads-simd, warmed | 40960 | 4 | 4 |  | 5.168 | 9.392 | 12.534 | 0 | 7.72 / 3.45 | 11.583 | 12.534 | 0 | 5.141 | 6.341 | 0 | 222603776 | 668400144 | 439.6 | 168.9 | 5.2 |
+| 1024mib-threads-simd, warmed | 40960 | 4 | 4 |  | 5.449 | 6.888 | 10.598 | 0 | 7.7 / 3.61 | 7.743 | 10.598 | 0 | 5.523 | 6.871 | 0 | 222407312 | 668400144 | 439.4 | 255.7 | 5.4 |
+| 1024mib-threads-simd, warmed | 40960 | 4 | 4 |  | 5.198 | 6.547 | 7.76 | 0 | 7.76 / 3.37 | 6.729 | 6.894 | 0 | 5.183 | 6.441 | 0 | 222564304 | 668400144 | 453.8 | 226.7 | 5.2 |
+| profile 1024mib-threads-simd, warmed | 131072 | 4 | 4 |  | 7.191 | 13.243 | 18.993 | 3 | 9.3 / 6.06 | 11.543 | 14.588 | 0 | 7.282 | 14.17 | 3 | 278246392 | 668400144 | 542 | 198.8 | 8.8 |
+| profile 1024mib-threads-simd, warmed | 131072 | 4 | 4 |  | 7.186 | 13.116 | 17.853 | 1 | 9.47 / 7.68 | 10.646 | 10.881 | 0 | 7.303 | 14.139 | 1 | 278246392 | 668400144 | 533.6 | 356.4 | 8.9 |
+| profile 1024mib-threads-simd, warmed | 131072 | 4 | 4 |  | 7.205 | 12.379 | 18.115 | 1 | 9.27 / 5.5 | 10.578 | 12.323 | 0 | 7.308 | 14.567 | 1 | 278246392 | 668400144 | 539.1 | 188.9 | 8.8 |
+| profile 1024mib-threads-simd, warmed | 131072 | 4 | 4 |  | 7.16 | 11.885 | 15.709 | 0 | 9.83 / 5.51 | 9.675 | 11.997 | 0 | 7.218 | 13.032 | 0 | 278246392 | 668400144 | 539.5 | 180.6 | 8.7 |
+| profile 1024mib-threads-simd, warmed | 131072 | 4 | 4 |  | 7.213 | 9.136 | 11.808 | 0 | 9 / 7.63 | 9.829 | 10.838 | 0 | 7.283 | 8.945 | 0 | 278246392 | 668400144 | 514 | 253.5 | 8.7 |
+| profile 1024mib-threads-simd, warmed | 131072 | 4 | 4 |  | 7.23 | 9.413 | 15.528 | 0 | 12.94 / 6.22 | 10.603 | 15.528 | 0 | 7.32 | 9.139 | 0 | 278246392 | 668400144 | 526.7 | 178.3 | 8.7 |
+| profile 1024mib-threads-simd, warmed | 12288 | 4 | 4 |  | 0.331 | 9.341 | 14.034 | 0 | 11.21 / 5.29 | 11.087 | 14.034 | 0 | 0.324 | 0.507 | 0 | 196055280 | 668400144 | 538.9 | 180.6 | 2.9 |
+| profile 1024mib-threads-simd, warmed | 12288 | 4 | 4 |  | 0.334 | 7.742 | 11.118 | 0 | 11.12 / 5.3 | 8.436 | 8.799 | 0 | 0.323 | 0.438 | 0 | 196055280 | 668400144 | 539.5 | 176.6 | 2.7 |
+| profile 1024mib-threads-simd, warmed | 12288 | 4 | 4 |  | 0.337 | 7.662 | 11.185 | 0 | 11.19 / 5 | 8.093 | 10.151 | 0 | 0.328 | 0.429 | 0 | 196055280 | 668400144 | 549.5 | 189.9 | 2.7 |
 
 Probes on one configuration:
 
@@ -389,10 +391,10 @@ Marble bowl (512 marbles, 600 ticks, 4 timed runs per tier after 1 warm run). CP
 
 | tier | workers | clock | CPU p99 ms | CPU max ms | CPU ticks over 16.7 ms | CPU ticks over 25 ms | wall p99 ms | wall max ms | wall ticks over 16.7 ms | run s |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 64 MiB fixed | 1 | schedstat | 10.939 | 11.003 | 0 | 0 | 10.474 | 11.157 | 0 | 19.7 |
-| 128 MiB fixed | 1 | schedstat | 10.969 | 11.958 | 0 | 0 | 10.753 | 12.02 | 0 | 19.8 |
-| 512 MiB fixed | 1 | schedstat | 10.001 | 11.004 | 0 | 0 | 10.028 | 11.446 | 0 | 15.7 |
-| 512 MiB threaded, 2 workers | 2 | schedstat | 6.999 | 8.836 | 0 | 0 | 7.01 | 9.448 | 0 | 14.3 |
+| 64 MiB fixed | 1 | schedstat | 12.001 | 13 | 0 | 0 | 12.3 | 13.348 | 0 | 22 |
+| 128 MiB fixed | 1 | schedstat | 14.794 | 17.802 | 3 | 0 | 14.616 | 17.485 | 3 | 22.1 |
+| 512 MiB fixed | 1 | schedstat | 12.933 | 14.944 | 0 | 0 | 12.501 | 15.402 | 0 | 17.7 |
+| 512 MiB threaded, 2 workers | 2 | schedstat | 7 | 9.999 | 0 | 0 | 7.109 | 11.129 | 0 | 13.1 |
 
 ## Physics claim per Kaggle machine class
 
