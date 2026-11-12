@@ -363,7 +363,7 @@ Terrain and landscape
 - [ ] Ground height and normal query for physics and gameplay: partial
 - [ ] One height source read by physics and renderer: partial (see "Landscape dataset decision")
 - [ ] Collision and visual sharing from the same samples: partial
-- [ ] Terrain LOD by altitude with geomorph seams: missing
+- [ ] Terrain LOD by altitude with geomorph seams: partial (engine/src/terrain_lod.cpp: level by altitude with hysteresis under a page budget, morph factor, parent layer and quadrant in the page record; `check:engine-terrain-lod`; the vertex-shader blend and coarse-page streaming are not built)
 - [ ] Page streaming: workers decode into free slots and commit by epoch at the tick: partial
 - [ ] Bounded request queues with low-priority drop: partial
 - [ ] Chart re-anchor at face boundaries with hysteresis: partial
@@ -379,7 +379,7 @@ Vegetation
 - [ ] One body for all vegetation through a custom shape: partial
 - [ ] Placement streaming with no allocation as the player moves: partial
 - [ ] Collision classes: trunk capsule, rock hull, pass-through: partial
-- [ ] Promotion of touched instances to pooled dynamic bodies: partial (off by default, cap 64, refusals counted; `check:engine-veg-promotion` and the host witness; the promoted body is the pool sphere, the draw does not yet hide a promoted instance, and saved state does not carry promoted bodies)
+- [ ] Promotion of touched instances to pooled dynamic bodies: partial (off by default, cap 64, refusals counted; `check:engine-veg-promotion` and the host witness; `check:engine-veg-promotion-state`: saved state and the hash carry promoted bodies and a round trip is bit-equal; the vegetation pool can hide a promoted instance but no scene wires it; the promoted body is the pool sphere)
 - [ ] Placement rules (slope caps, snow, footprint exclusion): partial
 - [ ] Vegetation LOD bands with hysteresis: partial (src/engine/vegetationDetail.js thins each patch to a prefix of its instances by distance, with a hysteresis band, under a fixed shown-instance budget; `check:display-governor`; the browser draw is not witnessed)
 - [ ] Grass density and wind from one law on CPU and shader: partial (no wind in C++)
@@ -392,11 +392,11 @@ Rendering
 - [ ] Every pipeline built before the seal, creates-after-seal stays 0: supported
 - [ ] CPU frustum culling on both backends: supported
 - [ ] Occlusion culling with an HZB: supported on WebGPU (see "Phase C: occlusion efficiency, measured"); missing on WebGL2
-- [ ] Shadows: missing in C++ (JS only)
+- [ ] Shadows: partial (a tier-fixed cascade plan and a texel-stable per-frame fit, off by default, `check:engine-shadow-cascades`; no depth texture or pass on either backend)
 - [ ] Materials as slots: partial
 - [ ] Device-loss recovery: partial (witnessed for destroy and reload)
 - [ ] Model pool and per-frame upload budget: supported
-- [ ] Screen-size LOD with hysteresis: missing
+- [ ] Screen-size LOD with hysteresis: partial (model slots hold up to 4 LOD ranges selected by screen size under an index budget set from the device budget; `check:engine-model-lod`; WebGL2 witnessed in a browser, the WebGPU cull window is not)
 
 Assets
 
@@ -451,7 +451,7 @@ Memory and budgets
 - [ ] Per-frame upload budget per tier: supported
 - [ ] Body and vegetation pools with generation ids: partial
 - [ ] Fixed rings for input, snapshot, transform and events: partial
-- [ ] Budget degradation (lower LOD, fewer slots) instead of allocation: partial (src/engine/displayGovernor.js holds any set of slots to a fixed cost by coarsening levels, then shedding; wired to vegetation; the render plan keeps the nearest props under a prop budget set from the device budget, `check:engine-prop-budget`, which does not yet reduce the WebGPU draw; models and terrain pages are not yet governed)
+- [ ] Budget degradation (lower LOD, fewer slots) instead of allocation: partial (src/engine/displayGovernor.js holds any set of slots to a fixed cost by coarsening levels, then shedding; wired to vegetation; the render plan keeps the nearest props under a prop budget set from the device budget, `check:engine-prop-budget`, with the cutoff in the WebGPU cull shader too (`check:engine-prop-cutoff`; WebGL2 witnessed in a browser, WebGPU not); model slots and terrain pages are governed by their own budgets)
 - [ ] Jolt heap and caps that fail rather than grow: partial
 
 Landscape dataset decision

@@ -4938,3 +4938,19 @@ Full test on the combined tree, once: "checks: 328 run, 0 already passed on this
 Not run: any browser witness (the prop budget on WebGPU, the vegetation draw under a budget, hiding a promoted instance), the Kaggle gate on the new wasm, `scripts/check-game-fsm-xstate-live.mjs` (needs xstate installed).
 
 Open after this pass: terrain LOD by altitude with geomorph seams; screen-size LOD for models; shadows in C++; HZB on WebGL2; the spawn terrain store import; the prop cutoff in the WebGPU cull shader; promoted instances hidden in the draw and carried in saved state; the governor over model slots and terrain pages; the 7 partial gap rows; the owner-decision rows (25 in the gap register), which need a browser, a GPU, a real socket or a licence.
+
+## Phase X (2026-11-12): the rest of the ledger worked in parallel against the spoint checkout, the engine LODs
+
+Six workers on disjoint rows. spoint was cloned mid-pass (AnEntrypoint/spoint at 5f43c86, linked at /workspace/spoint); the ledger's readings are pinned at d5e3860.
+
+- docs/IDEAL.md: 56 rows moved from partial to built in this phase (gap register 39 built and 3 partial; partial rows in the whole file 97 before, 41 after). Each row's proof column carries its gates and a "Phase X" sentence with the residue. 54 gates were added to the chain.
+- Engine: promoted vegetation is carried in saved state and the hash; model slots hold up to 4 LOD ranges chosen by screen size under an index budget; terrain LOD by altitude on the CPU side; the prop cutoff reaches the WebGPU cull shader; a shadow cascade planner. All twelve glues rebuilt, four pins updated, `check:engine-state-hash-1024` and `check:scenario-determinism` unchanged.
+- The 37 spoint comparison gates were run against the checkout: 36 passed; `check-mapspinner-fields` failed because spoint's anchor-field load now throws named errors, which was ported (the height bake pin regenerated).
+
+Behaviour changes to review: cached entities go out as field deltas, not full records; the fire message carries a chart epoch and a bad epoch is refused; `PEER_SIMULATED_PROFILES` includes rollback; the world snapshot carries a definition fingerprint and restore can refuse with def-mismatch; `decodeName` reads the UTF-8 escapes `encodeName` writes; `loadRendererForDevice` sets a model index budget and a model with no LOD ranges is hidden when over it; spoint's 16-input push lag is ported in `CollisionSystem.js` but the tick host and the prediction engine still use the immediate push (owner decision).
+
+Duplicates to settle: two progressive bakes (`src/static/progressiveBake.js`, `src/packages/streaming-gltf/progressive-bake.js`); two worker server hosts (`src/transport/workerEntryHost.js`, `src/transport/browserServer.js`).
+
+Not run: any WebGPU draw witness (this host's headless Chrome cannot read back WebGPU output once the engine holds the device), the Kaggle gate on the new wasm.
+
+Open: the 41 partial rows; the terrain LOD shader blend and coarse-page streaming; the shadow depth pass; HZB on WebGL2; the spawn terrain store import; shaped promoted bodies; the owner-decision rows.
