@@ -45,9 +45,15 @@ try {
   client.transport.send(pack({ type: MSG.HANDSHAKE, payload: { name: 'player' } }))
   addEventListener('keydown', (event) => keys.add(event.code))
   addEventListener('keyup', (event) => keys.delete(event.code))
+  const stepMs = 1000 / info.tickRate
+  let due = performance.now()
   const frame = () => {
-    sequence += 1
-    client.transport.send(pack({ type: MSG.INPUT, payload: { seq: sequence, input: { forward: keys.has('KeyW'), backward: keys.has('KeyS'), left: keys.has('KeyA'), right: keys.has('KeyD'), jump: keys.has('Space'), yaw: 0 } } }))
+    const now = performance.now()
+    if (now >= due) {
+      due = Math.max(due + stepMs, now)
+      sequence += 1
+      client.transport.send(pack({ type: MSG.INPUT, payload: { seq: sequence, input: { forward: keys.has('KeyW'), backward: keys.has('KeyS'), left: keys.has('KeyA'), right: keys.has('KeyD'), jump: keys.has('Space'), yaw: 0 } } }))
+    }
     draw()
     requestAnimationFrame(frame)
   }

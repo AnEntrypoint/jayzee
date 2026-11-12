@@ -149,6 +149,86 @@ gate('the written export runs with nothing but its own files: its server worker 
   }
 })
 
+gate('the exported page script runs end to end against stubbed page globals: it starts the server worker from the export, joins, shows live ticks in the status line, draws the player and the entities, and a held W key moves the player', async () => {
+  const outDir = join(work, 'out-page')
+  await writeExport({ appsDir, outDir, target: 'itch', zip: false })
+  const bootstrap = join(work, 'page-worker-bootstrap.mjs')
+  writeFileSync(bootstrap, [
+    "import { parentPort, workerData } from 'node:worker_threads'",
+    "import { readFile } from 'node:fs/promises'",
+    "import { fileURLToPath } from 'node:url'",
+    "globalThis.self = { postMessage: (message, transfer) => parentPort.postMessage(message, transfer), set onmessage(handler) { parentPort.on('message', (data) => handler({ data })) } }",
+    'globalThis.fetch = async (url) => { const bytes = await readFile(fileURLToPath(url)); return { ok: true, status: 200, arrayBuffer: async () => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) } }',
+    'await import(workerData.entry)',
+    '',
+  ].join('\n'))
+  const threads = []
+  const positions = []
+  const drawn = { rects: 0, arcs: 0 }
+  const listeners = {}
+  const status = { textContent: '' }
+  const canvas = { width: 640, height: 480, getContext: () => ({ clearRect() {}, fillRect() { drawn.rects += 1 }, beginPath() {}, arc() { drawn.arcs += 1 }, fill() {}, fillStyle: '' }) }
+  let running = true
+  const names = ['document', 'location', 'fetch', 'Worker', 'addEventListener', 'requestAnimationFrame']
+  const saved = names.map((name) => [name, Object.getOwnPropertyDescriptor(globalThis, name)])
+  const define = (name, value) => Object.defineProperty(globalThis, name, { value, configurable: true, writable: true })
+  define('document', { getElementById: (id) => (id === 'status' ? status : canvas) })
+  define('location', { href: pathToFileURL(join(outDir, 'index.html')).href })
+  define('fetch', async (url) => {
+    const bytes = readFileSync(new URL(url, globalThis.location.href))
+    return { ok: true, status: 200, json: async () => JSON.parse(bytes.toString('utf8')), arrayBuffer: async () => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) }
+  })
+  define('Worker', class {
+    constructor(url, options) {
+      assert.equal(options.type, 'module')
+      this.thread = new Worker(bootstrap, { workerData: { entry: url.href } })
+      threads.push(this.thread)
+    }
+    postMessage(message, transfer) { this.thread.postMessage(message, transfer) }
+    set onmessage(handler) {
+      this.thread.on('message', (data) => {
+        if (data.type === 'SEND_CLIENT') {
+          const message = unpack(new Uint8Array(data.data.slice(0)))
+          if (message.type === MSG.SNAPSHOT) {
+            const snap = SnapshotEncoder.decode(message.payload)
+            if (snap.players.length > 0) positions.push(snap.players[0].position)
+          }
+        }
+        handler({ data })
+      })
+    }
+  })
+  define('addEventListener', (type, handler) => { listeners[type] = handler })
+  define('requestAnimationFrame', (callback) => { if (running) setTimeout(callback, 8) })
+  try {
+    await import(pathToFileURL(join(outDir, 'boot.js')).href)
+    const until = async (test, label) => {
+      for (let i = 0; i < 600; i++) {
+        if (test()) return
+        await new Promise((resolve) => setTimeout(resolve, 10))
+      }
+      throw new Error('timed out waiting for ' + label + '; status is ' + JSON.stringify(status.textContent))
+    }
+    await until(() => /^tick \d+ {2}players 1 {2}entities 3$/.test(status.textContent), 'a live status line')
+    await until(() => drawn.arcs > 0 && drawn.rects >= 3, 'a drawn frame')
+    await until(() => positions.length > 40, 'the player to settle')
+    const before = positions.at(-1)
+    listeners.keydown({ code: 'KeyW' })
+    const count = positions.length
+    await until(() => positions.length > count + 30, 'snapshots after the key press')
+    const after = positions.at(-1)
+    assert.ok(Math.hypot(after[0] - before[0], after[2] - before[2]) > 0.5, 'holding W moved the player ' + Math.hypot(after[0] - before[0], after[2] - before[2]) + ' m')
+  } finally {
+    running = false
+    for (const thread of threads) await thread.terminate()
+    for (const [name, descriptor] of saved) {
+      if (name === 'requestAnimationFrame') continue
+      if (descriptor) Object.defineProperty(globalThis, name, descriptor)
+      else delete globalThis[name]
+    }
+  }
+})
+
 gate('the command line writes the export and reports it, and refuses an unknown argument with a non-zero exit', async () => {
   const { spawnSync } = await import('node:child_process')
   const script = new URL('./static-export.mjs', import.meta.url).pathname
