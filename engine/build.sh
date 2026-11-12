@@ -40,20 +40,10 @@ if [ -z "${JOLT_SOURCE:-}" ]; then
   fi
 fi
 jolt_arg=(-DFETCHCONTENT_SOURCE_DIR_JOLTPHYSICS="$JOLT_SOURCE")
-measure="${ENGINE_MEASURE:-}"
-measure_dir=""
-if [ -n "$measure" ]; then
-  build_dir="$build_dir-measure-$measure"
-  measure_dir="$root/build/variants/$measure"
-  mkdir -p "$measure_dir"
-  read -r -a measure_options <<< "${ENGINE_MEASURE_OPTIONS:-}"
-  jolt_arg+=(-DENGINE_MEASURE_DIR="$measure_dir" "${measure_options[@]+"${measure_options[@]}"}")
-fi
 emcmake cmake -S "$here" -B "$build_dir" -DENGINE_TIER_MIB="$tier" -DENGINE_LEAK_ON_TICK="$leak" -DENGINE_PHASE_TIMERS="$timers" -DENGINE_THREADS="$threads" -DENGINE_WASM_SIMD="$simd" -DENGINE_TICK_PROFILE="$profile" "${jolt_arg[@]}"
 cmake --build "$build_dir" --parallel "${ENGINE_BUILD_JOBS:-8}"
 out_suffix="$suffix"
 if [ "$simd" = "ON" ]; then out_suffix="$suffix-simd"; fi
 out_dir="$here/out"
 if [ "$profile" = "ON" ]; then out_dir="$root/build/variants/profile"; fi
-if [ -n "$measure_dir" ]; then out_dir="$measure_dir"; fi
 sha256sum "$out_dir/engine-core-${tier}mib$out_suffix.wasm"

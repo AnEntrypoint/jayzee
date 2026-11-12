@@ -249,10 +249,6 @@ EMSCRIPTEN_KEEPALIVE int engine_world_unsettled_in_view() {
   return static_cast<int>(engine::world().unsettledInView());
 }
 
-EMSCRIPTEN_KEEPALIVE int engine_world_prepare_release() {
-  return engine::world().prepareRelease() ? 1 : 0;
-}
-
 EMSCRIPTEN_KEEPALIVE int engine_world_release_refills() {
   return static_cast<int>(engine::world().releaseRefills());
 }

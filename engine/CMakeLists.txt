@@ -35,8 +35,6 @@ set(CMAKE_BUILD_TYPE Release CACHE STRING "" FORCE)
 set(ENGINE_OPT_LEVEL "-O2" CACHE STRING "Optimisation level flag for the engine and Jolt")
 option(ENGINE_LTO "Link-time optimisation across the engine and Jolt" OFF)
 set(ENGINE_MOVING_LAYERS "1" CACHE STRING "Broadphase layers the moving bodies are spread over; Jolt rebuilds one layer tree per step")
-option(ENGINE_ARENA_BSS "Arena as a static array written at load, as before the footprint change, for a measurement build only" OFF)
-set(ENGINE_MEASURE_DIR "" CACHE STRING "Output directory of a measurement build; empty writes to engine/out")
 set(ENGINE_BODY_CAP "" CACHE STRING "Body cap of the 1024-player plan for a measurement build; empty keeps the cap in budget.h")
 add_compile_options(${ENGINE_OPT_LEVEL} -g0 -ffp-contract=off -fno-fast-math -fno-exceptions -fno-rtti)
 if(ENGINE_LTO)
@@ -114,9 +112,6 @@ if(ENGINE_THREADS)
 endif()
 math(EXPR ENGINE_ARENA_BYTES "${ENGINE_TIER_BYTES} - 4 * 1024 * 1024 - ${ENGINE_POOL_STACK_BYTES}")
 target_compile_definitions(engine_core PRIVATE JPH_CROSS_PLATFORM_DETERMINISTIC ENGINE_ARENA_BYTES=${ENGINE_ARENA_BYTES}ull ENGINE_MOVING_LAYERS=${ENGINE_MOVING_LAYERS} ENGINE_BROADPHASE_INTERVAL)
-if(ENGINE_ARENA_BSS)
-  target_compile_definitions(engine_core PRIVATE ENGINE_ARENA_BSS)
-endif()
 if(ENGINE_BODY_CAP)
   target_compile_definitions(engine_core PRIVATE ENGINE_TOP_TIER_BODIES=${ENGINE_BODY_CAP})
 endif()
@@ -140,7 +135,6 @@ set(ENGINE_EXPORTS
   _engine_world_clear_release_view
   _engine_world_unsettled_in_view
   _engine_world_release_refills
-  _engine_world_prepare_release
   _engine_world_active_bodies
   _engine_world_add_box
   _engine_world_add_trunk
@@ -364,9 +358,6 @@ endif()
 set(ENGINE_OUTPUT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/out")
 if(ENGINE_TICK_PROFILE)
   set(ENGINE_OUTPUT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../build/variants/profile")
-endif()
-if(ENGINE_MEASURE_DIR)
-  set(ENGINE_OUTPUT_DIR "${ENGINE_MEASURE_DIR}")
 endif()
 set_target_properties(engine_core PROPERTIES
   OUTPUT_NAME ${ENGINE_NAME}

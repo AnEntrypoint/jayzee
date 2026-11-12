@@ -331,22 +331,6 @@ gate('a view that drifts ' + DRIFT_METRES_A_TICK + ' m a tick reorders the relea
   assert.equal(bySlot.refills, 1, 'slot order refilled ' + bySlot.refills + ' times')
 })
 
-const PREPARED_IN_DRIFT = 3
-
-gate('a host that prepares the release queue after each tick takes every drift reorder outside the tick: ' + PREPARED_IN_DRIFT + ' prepared in ' + DRIFT_TICKS + ' ticks and only the first fill inside one', async () => {
-  const module = await boot({ budget: BUDGET })
-  const eye = eyeAt(module, BODIES - 1, 3)
-  let prepared = 0
-  for (let tick = 0; tick < DRIFT_TICKS; tick++) {
-    assert.equal(module._engine_world_set_release_view(eye[0] + tick * DRIFT_METRES_A_TICK, eye[1], eye[2], 0, 0, 0, 1, 1000), 0)
-    tickWithRoomForOne(module)
-    prepared += module._engine_world_prepare_release()
-  }
-  assert.ok(module._engine_world_held_bodies() > 0, 'no body is still held')
-  assert.equal(prepared, PREPARED_IN_DRIFT)
-  assert.equal(module._engine_world_release_refills(), PREPARED_IN_DRIFT + 1)
-})
-
 gate('the release view refuses a value that is not finite, a cone outside -1 to 1 and a range that is not above zero', async () => {
   const module = await boot({ budget: BUDGET })
   for (const bad of [[NaN, 0, 0, 1, 0, 0, 0.5, 10], [0, 0, 0, Infinity, 0, 0, 0.5, 10], [0, 0, 0, 1, 0, 0, 1.5, 10], [0, 0, 0, 1, 0, 0, 0.5, 0], [0, 0, 0, 1, 0, 0, 0.5, NaN]]) {

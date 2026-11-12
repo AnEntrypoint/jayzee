@@ -6,7 +6,7 @@ import { BODY_SPACING_M, GROUND, PLANET_RADIUS_M, TIER_1024 } from '../../src/en
 import { solverIterationsFor } from '../../src/engine/solverIterations.js'
 import { createPlanetStreamer } from '../../src/engine/planetStream.js'
 import { attachPoseRegion, poseRegionBuffers } from '../../src/engine/poseRegion.js'
-import { createPoseStepper, createReleasePrepare } from '../../src/engine/poseHandoffCore.js'
+import { createPoseStepper } from '../../src/engine/poseHandoffCore.js'
 import { warmEngine } from '../../src/engine/warmEngine.js'
 import { createTickProbe } from './tickProbe.mjs'
 import { canProfile, createTickProfile } from './tickProfile.mjs'
@@ -101,9 +101,6 @@ const loopStartedEpochMs = Date.now()
 const times = new Float64Array(ticks)
 const tickAt = new Float64Array(ticks)
 held[0] = heldOf ? heldOf() : 0
-const prepareRelease = createReleasePrepare(module)
-const prepareMs = knobs.prepare === 'off' ? null : new Float64Array(ticks)
-let preparedRefills = 0
 if (profile) profile.start()
 probe.start()
 for (let f = 0; f < ticks; f++) {
@@ -111,10 +108,6 @@ for (let f = 0; f < ticks; f++) {
   const at = performance.now()
   stepper(0)
   times[f] = performance.now() - at
-  if (prepareMs) {
-    preparedRefills += prepareRelease()
-    prepareMs[f] = performance.now() - at - times[f]
-  }
   tickAt[f] = at
   if (profile) profile.record(f, times[f])
   if (activeOf) active[f] = activeOf()
@@ -194,9 +187,6 @@ emit({
   unsettledViewBodyTicks: unsettledOf ? unsettled.reduce((sum, count) => sum + count, 0) : null,
   viewer: knobs.still !== undefined ? 'still' : 'path',
   releaseRefills: refillsOf ? refillsOf() : null,
-  preparedRefills,
-  prepareMeanMs: prepareMs ? round(prepareMs.reduce((sum, ms) => sum + ms, 0) / ticks, 3) : null,
-  prepareMaxMs: prepareMs ? round(Math.max(...prepareMs), 2) : null,
   heldAtEnd: heldOf ? held[ticks] : null,
   peakAirborne: airborneOf ? Math.max(...airborne) : null,
   profile: profile ? profile.summarise() : null,
