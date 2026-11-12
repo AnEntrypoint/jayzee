@@ -214,7 +214,8 @@ EMSCRIPTEN_KEEPALIVE int engine_render_frame() {
   rnd::counters().vegetationInstances = 0;
   rnd::SceneView scene = rnd::sceneOf(state);
   const bool drawsEveryBody = rnd::counters().backend == static_cast<std::uint32_t>(rnd::BackendKind::kWebGpu);
-  scene.skipProps = drawsEveryBody && state.planPropsAlways == 0 && state.propsPlanned != 0 && state.plannedStamp == scene.bodyStamp && rnd::propBudget().limit == rnd::kNoPropBudget;
+  scene.skipProps = drawsEveryBody && state.planPropsAlways == 0 && state.propsPlanned != 0 && state.plannedStamp == scene.bodyStamp;
+  if (rnd::propBudget().limit != rnd::kNoPropBudget) scene.skipProps = false;
   {
     engine::phase::Scope scope(engine::phase::kPlan);
     rnd::planFrame(scene, state.camera, state.plan);

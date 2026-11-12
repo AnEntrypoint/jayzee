@@ -43,12 +43,12 @@ gate('the camera keeps its 240 bytes: the cutoff rides in the spare eye word and
 gate('with no budget the flag and the cutoff word are zero, so the uniform and the shader result are what they were', () => {
   assert.ok(frame.includes('const bool cut = budget.limit != kNoPropBudget && budget.bins < kPropBudgetBins;'))
   assert.ok(webgpu.includes('let inside = cam.counts.z == 0u || dot(away, away) < cam.eye.w;'))
-  assert.ok(webgpu.includes('let shown = dot(q, q) > 0.0 && cls < 4u && inside;'))
+  assert.ok(webgpu.includes('clipOf(cam.viewProj * vec4f(world, 1.0)), shown && inside);'))
   assert.ok(witness.includes('camera.counts[rnd::kCameraCutoffFlagWord] == 0 && camera.eye[rnd::kCameraCutoffWord] == 0.0f'))
 })
 
 gate('under a budget the WebGPU frame plans the props every frame, so the cutoff follows the camera', () => {
-  assert.ok(exportsSource.includes('state.plannedStamp == scene.bodyStamp && rnd::propBudget().limit == rnd::kNoPropBudget;'))
+  assert.ok(exportsSource.includes('if (rnd::propBudget().limit != rnd::kNoPropBudget) scene.skipProps = false;'))
 })
 
 gate('a squared distance below the carried cutoff is exactly a distance band below the cutoff band, over a million distances', () => {

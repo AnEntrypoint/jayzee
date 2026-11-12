@@ -85,11 +85,11 @@ fn vsProps(@builtin(vertex_index) vid: u32, @builtin(instance_index) iid: u32) -
   let q = vec4f(instF(base + 3u), instF(base + 4u), instF(base + 5u), instF(base + 6u));
   let world = centre + rotate(q, cubeCorner(vid));
   let cls = inst[base + 7u];
+  let shown = dot(q, q) > 0.0 && cls < 4u;
   let away = centre - cam.eye.xyz;
   let inside = cam.counts.z == 0u || dot(away, away) < cam.eye.w;
-  let shown = dot(q, q) > 0.0 && cls < 4u && inside;
   var out: PropOut;
-  out.clip = select(vec4f(0.0, 0.0, 2.0, 1.0), clipOf(cam.viewProj * vec4f(world, 1.0)), shown);
+  out.clip = select(vec4f(0.0, 0.0, 2.0, 1.0), clipOf(cam.viewProj * vec4f(world, 1.0)), shown && inside);
   out.world = world;
   out.normal = rotate(q, cubeNormal(vid));
   out.cls = cls;
