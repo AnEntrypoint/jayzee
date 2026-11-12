@@ -36,6 +36,10 @@ jobs:
         run: ENGINE_TIER_MIB=128 bash engine/build.sh
       - name: Build the leak variant, 64 MiB tier
         run: ENGINE_VARIANT=leak bash engine/build.sh
+      - name: Build the fixed-memory module, 512 MiB tier
+        run: ENGINE_TIER_MIB=512 bash engine/build.sh
+      - name: Build the threaded module the tier gate plans on, 1024 MiB tier
+        run: ENGINE_VARIANT=threads ENGINE_TIER_MIB=1024 bash engine/build.sh
       - name: Check the artifact hashes and the memory witness of both fixed tiers
         run: |
           set -euo pipefail

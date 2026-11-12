@@ -24,6 +24,14 @@ gate('every action in the engine workflow is pinned to a full commit SHA, never 
   for (const ref of uses) assert.match(ref, /^[\w.-]+\/[\w.-]+@[0-9a-f]{40}$/, ref)
 })
 
+gate('the engine workflow builds every pinned artifact before its gates run, so the artifact gate finds each file', () => {
+  for (const name of Object.keys(manifest.artifacts)) {
+    const [, tier, variant] = /^engine-core-(\d+)mib(?:-(\w+))?$/.exec(name)
+    const command = (variant ? 'ENGINE_VARIANT=' + variant + ' ' : '') + (tier === '64' ? '' : 'ENGINE_TIER_MIB=' + tier + ' ') + 'bash engine/build.sh'
+    assert.ok(workflow.split('\n').some((line) => line.trim() === 'run: ' + command), name + ' is pinned and the workflow has no step that runs ' + command)
+  }
+})
+
 gate('the workflow checks out emsdk at the commit in engine/artifacts.json and activates the same version', () => {
   assert.ok(workflow.includes(manifest.emsdkCommit), 'workflow does not pin ' + manifest.emsdkCommit)
   assert.ok(workflow.includes('install ' + manifest.emsdk), 'workflow does not install ' + manifest.emsdk)

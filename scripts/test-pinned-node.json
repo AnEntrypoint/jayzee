@@ -1,0 +1,5 @@
+[
+  "check:alloc-audit",
+  "check:pose-allocations",
+  "check:scenario-allocations"
+]

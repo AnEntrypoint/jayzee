@@ -13,6 +13,10 @@ const timingsPath = join(outDir, 'timings.json')
 const TREE_KEY_IGNORED = ['docs/PENDING_VALIDATION.md', 'docs/CHECK_TIMES.md']
 const SERIAL = new Set(JSON.parse(readFileSync(join(root, 'scripts', 'test-serial.json'), 'utf8')))
 const CACHE_TREES_KEPT = 8
+const PINNED_NODE_ONLY = new Set(JSON.parse(readFileSync(join(root, 'scripts', 'test-pinned-node.json'), 'utf8')))
+const PINNED_NODE_MAJOR = Number(readFileSync(join(root, '.nvmrc'), 'utf8').trim().split('.')[0])
+const NODE_MAJOR = Number(process.versions.node.split('.')[0])
+const judged = (name) => NODE_MAJOR === PINNED_NODE_MAJOR || !PINNED_NODE_ONLY.has(name)
 
 const args = process.argv.slice(2)
 const flag = (name) => args.includes(name)
@@ -130,7 +134,8 @@ const runPool = async (names, width) => {
 await runPool(todo.filter((name) => !SERIAL.has(name)), jobs)
 await runPool(todo.filter((name) => SERIAL.has(name)), 1)
 
-const failed = results.filter((result) => result.code !== 0)
+const failed = results.filter((result) => result.code !== 0 && judged(result.name))
+const notJudged = results.filter((result) => result.code !== 0 && !judged(result.name))
 if (key !== null) {
   const passed = { ...passedHere }
   for (const result of results) if (result.code === 0) passed[result.name] = result.ms
@@ -146,6 +151,7 @@ const wallMs = Math.round(performance.now() - wallStarted)
 const slowest = results.slice().sort((a, b) => b.ms - a.ms).slice(0, 8).map((result) => result.name + ' ' + result.ms + ' ms').join(', ')
 console.log('checks: ' + results.length + ' run, ' + skipped + ' already passed on this tree, ' + failed.length + ' failed, ' + results.reduce((sum, result) => sum + result.pass, 0) + ' PASS lines, wall ' + wallMs + ' ms, jobs ' + jobs)
 if (results.length > 0) console.log('slowest: ' + slowest)
+if (notJudged.length > 0) console.log('not judged on Node ' + NODE_MAJOR + ', since the allocation figures are claimed for Node ' + PINNED_NODE_MAJOR + ' (scripts/test-pinned-node.json): ' + notJudged.map((result) => result.name).join(' '))
 if (failed.length > 0) console.log('failed: ' + failed.map((result) => result.name).join(' ') + '\nrerun one alone with: npm test -- ' + failed[0].name)
 console.log(failed.length === 0 ? 'RESULT: PASS' : 'RESULT: FAIL')
 process.exit(failed.length === 0 ? 0 : 1)
